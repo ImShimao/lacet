@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+# Tous les .env, pas seulement celui du backend : celui du front peut
+# contenir un jeton Mapbox, et un dépôt public ne pardonne pas.
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+.vite/
+
+.DS_Store
+Thumbs.db

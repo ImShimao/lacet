@@ -1,0 +1,38 @@
+import { Component } from 'react'
+
+/**
+ * Filet de sécurité : une exception dans un composant vide l'arbre React et
+ * laisse un écran noir, sans rien dire. Mieux vaut afficher ce qui s'est passé
+ * et offrir un moyen de repartir.
+ */
+export default class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Lacet — erreur non rattrapée', error, info)
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <div className="crash">
+        <h1>Quelque chose a cassé</h1>
+        <p>
+          L'application s'est arrêtée sur une erreur. Le détail est dans la console du
+          navigateur.
+        </p>
+        <pre>{String(this.state.error?.message || this.state.error)}</pre>
+        <button className="btn btn--primary" onClick={() => window.location.reload()}>
+          Recharger
+        </button>
+      </div>
+    )
+  }
+}

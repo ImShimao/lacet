@@ -1,0 +1,554 @@
+<title>Lacet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --paper:#F3F5F1; --surface:#FBFCFA; --surface-2:#EDF1EA;
+  --ink:#16201C; --ink-2:#58655E; --ink-3:#8A968F;
+  --rule:#DBE2D8; --rule-strong:#C3CDBF;
+  --pine:#0F5347; --pine-soft:#E2ECE7; --pine-on:#FBFCFA;
+  --safe:#2E7D5B; --safe-soft:#DFEEE6;
+  --caution:#A87814; --caution-soft:#F4EBD3;
+  --risk:#AC4126; --risk-soft:#F5E3DD;
+  --shadow:0 1px 2px rgba(22,32,28,.05), 0 8px 24px -12px rgba(22,32,28,.14);
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --body:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101512; --surface:#171E1A; --surface-2:#1D2621;
+    --ink:#E7EDE8; --ink-2:#98A79F; --ink-3:#6E7C74;
+    --rule:#2A342E; --rule-strong:#3A463F;
+    --pine:#5CC6AA; --pine-soft:#16302A; --pine-on:#0C1512;
+    --safe:#54B786; --safe-soft:#14301F;
+    --caution:#D9A83F; --caution-soft:#302711;
+    --risk:#E0765A; --risk-soft:#331A13;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101512; --surface:#171E1A; --surface-2:#1D2621;
+  --ink:#E7EDE8; --ink-2:#98A79F; --ink-3:#6E7C74;
+  --rule:#2A342E; --rule-strong:#3A463F;
+  --pine:#5CC6AA; --pine-soft:#16302A; --pine-on:#0C1512;
+  --safe:#54B786; --safe-soft:#14301F;
+  --caution:#D9A83F; --caution-soft:#302711;
+  --risk:#E0765A; --risk-soft:#331A13;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px 96px}
+.col{max-width:66ch}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.14;letter-spacing:-.02em}
+p{margin:0}
+a{color:var(--pine);text-underline-offset:3px}
+a:focus-visible{outline:2px solid var(--pine);outline-offset:3px;border-radius:3px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+
+/* hero */
+header.hero{padding:64px 0 8px}
+.brandline{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.wordmark{font-family:var(--display);font-weight:800;font-size:clamp(46px,7vw,78px);letter-spacing:-.045em;line-height:.92}
+.wordmark .dot{color:var(--pine)}
+.tagline{font-family:var(--mono);font-size:13px;letter-spacing:.04em;color:var(--ink-2);padding-bottom:6px}
+.lede{margin-top:22px;font-size:21px;line-height:1.55;color:var(--ink-2);max-width:60ch}
+.lede strong{color:var(--ink);font-weight:600}
+.status{
+  display:inline-flex;align-items:center;gap:9px;margin-top:20px;
+  font-family:var(--mono);font-size:12px;color:var(--safe);
+  background:var(--safe-soft);border-radius:999px;padding:6px 14px;
+}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--safe);display:block}
+
+.map{margin-top:36px;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:8px 8px 0;box-shadow:var(--shadow);overflow:hidden}
+.map svg{display:block;width:100%;height:auto}
+.maplegend{display:flex;flex-wrap:wrap;gap:6px 22px;padding:14px;border-top:1px solid var(--rule);margin-top:4px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.key{display:flex;align-items:center;gap:7px}
+.key i{width:16px;height:3px;border-radius:2px;display:block;flex:none}
+
+.stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-top:none;background:var(--surface-2)}
+.stat{flex:1 1 150px;padding:13px 16px;border-right:1px solid var(--rule)}
+.stat:last-child{border-right:none}
+.stat b{display:block;font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.stat span{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+
+section{padding-top:76px}
+.shead{display:flex;flex-direction:column;gap:10px;margin-bottom:26px}
+.shead h2{font-size:clamp(28px,3.6vw,38px);font-weight:700}
+.shead p{color:var(--ink-2);max-width:62ch}
+.rule{height:1px;background:var(--rule);margin-top:76px}
+.body-col > * + *{margin-top:20px}
+.body-col strong{color:var(--ink)}
+
+/* nom */
+.namepick{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start;margin-top:8px}
+@media (max-width:760px){.namepick{grid-template-columns:1fr}}
+.pick{background:var(--surface);border:1px solid var(--rule-strong);border-radius:4px;padding:26px;box-shadow:var(--shadow)}
+.pick h3{font-size:34px;font-weight:800;letter-spacing:-.035em}
+.pick .ipa{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-top:4px}
+.pick .why{margin-top:16px;color:var(--ink-2);font-size:16px}
+.pick .why strong{color:var(--ink)}
+.alts{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+.alt{padding:15px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;align-items:baseline}
+@media (max-width:520px){.alt{grid-template-columns:1fr;gap:4px}}
+.alt b{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.alt span{color:var(--ink-2);font-size:15.5px}
+.alt em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--risk)}
+
+/* couches */
+.layers{display:flex;flex-direction:column;margin-top:8px;border-top:1px solid var(--rule-strong)}
+.layer{display:grid;grid-template-columns:56px minmax(0,1fr);border-bottom:1px solid var(--rule)}
+.layer .lnum{font-family:var(--mono);font-size:12px;color:var(--ink-3);padding:22px 0 0;border-right:1px solid var(--rule)}
+.layer .lbody{padding:20px 0 26px 22px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.layer h3{font-size:20px;font-weight:700}
+.layer p{color:var(--ink-2);max-width:62ch}
+.layer p strong{color:var(--ink)}
+.layer .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--pine)}
+
+pre{margin:0;background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--pine);border-radius:3px;padding:15px 17px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:var(--ink)}
+code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);padding:1.5px 5px;border-radius:3px;color:var(--ink)}
+pre code{background:none;padding:0;font-size:inherit}
+.cmt{color:var(--ink-3)}
+.tag{color:var(--pine)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:500;background:var(--surface-2);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.osm{font-family:var(--mono);font-size:12px;color:var(--pine)}
+
+.gate{display:flex;flex-direction:column;border:1px solid var(--rule-strong);border-radius:4px;background:var(--surface);overflow:hidden}
+.gate .gh{padding:14px 18px;background:var(--surface-2);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.gate .gi{padding:13px 18px;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:baseline}
+.gate .gi:last-child{border-bottom:none}
+.gate .gi span{color:var(--ink-2);font-size:15.5px}
+.gate .gi b{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--risk);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.callout{border-left:3px solid var(--caution);background:var(--caution-soft);padding:16px 20px;border-radius:0 3px 3px 0;color:var(--ink)}
+.callout .ct{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--caution);display:block;margin-bottom:6px}
+
+/* fonctionnalités */
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));border:1px solid var(--rule-strong);border-radius:4px;overflow:hidden;background:var(--surface)}
+.half{padding:24px 26px 28px;border-right:1px solid var(--rule)}
+.half:last-child{border-right:none;background:var(--surface-2)}
+.half h3{font-size:19px;font-weight:700;margin-bottom:4px}
+.half .sub{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:16px}
+.flist{display:flex;flex-direction:column;gap:11px}
+.f{display:grid;grid-template-columns:16px minmax(0,1fr);gap:11px;align-items:start;font-size:15.5px;line-height:1.5}
+.f .m{font-family:var(--mono);font-size:11px;color:var(--pine);padding-top:4px}
+.f .done{color:var(--safe) !important}
+.f em{font-style:normal;color:var(--ink-2)}
+
+/* palette de l'app */
+.swatches{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.sw{display:flex;align-items:center;gap:9px;border:1px solid var(--rule);border-radius:3px;padding:8px 12px;background:var(--surface);font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.sw i{width:18px;height:18px;border-radius:4px;display:block;border:1px solid var(--rule-strong)}
+
+/* phases */
+.phases{display:flex;flex-direction:column}
+.phase{display:grid;grid-template-columns:92px minmax(0,1fr);border-bottom:1px solid var(--rule)}
+.phase:first-child{border-top:1px solid var(--rule-strong)}
+.phase .pn{padding:22px 18px 26px 0;border-right:1px solid var(--rule)}
+.phase .pn b{display:block;font-family:var(--display);font-size:30px;font-weight:800;color:var(--pine);letter-spacing:-.04em;line-height:1}
+.phase .pn span{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em}
+.phase .pc{padding:22px 0 26px 22px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.phase h3{font-size:19px;font-weight:700}
+.phase p{color:var(--ink-2);max-width:60ch}
+.phase .out{font-family:var(--mono);font-size:12px;color:var(--pine);border-left:2px solid var(--pine);padding-left:11px;margin-top:3px;line-height:1.6}
+.phase.done .pn b{color:var(--safe)}
+.phase.done .out{color:var(--safe);border-color:var(--safe)}
+@media (max-width:560px){
+  .phase,.layer{grid-template-columns:1fr}
+  .phase .pn,.layer .lnum{border-right:none;padding:20px 0 0}
+  .phase .pc,.layer .lbody{padding:10px 0 26px}
+}
+footer{padding-top:56px;color:var(--ink-3);font-family:var(--mono);font-size:12px;line-height:1.8}
+@media (prefers-reduced-motion:no-preference){
+  .trace{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw 1.4s cubic-bezier(.22,.61,.36,1) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="brandline">
+    <div class="wordmark">Lacet<span class="dot">.</span></div>
+    <div class="tagline">tu laces, on trace</div>
+  </div>
+  <p class="lede">Génère des boucles de <strong>course à pied et de vélo</strong> depuis ta porte, et <strong>refuse celles qui longent une route rapide sans trottoir</strong>. Ce document décrit le logiciel tel qu'il tourne — pas une intention.</p>
+  <div class="status"><i></i> logiciel fonctionnel · 133 tests · essayé sur Paris, Lyon, Toulouse, Annecy</div>
+
+  <div class="map">
+    <svg viewBox="0 0 800 330" role="img" aria-label="Boucle colorée par niveau de sécurité : voies protégées, une portion sous vigilance, une traversée signalée.">
+      <g stroke="var(--rule)" stroke-width="1" fill="none" opacity=".9">
+        <path d="M -20 92 C 120 62, 250 118, 390 96 S 660 44, 820 76"/>
+        <path d="M -20 146 C 130 116, 262 172, 402 150 S 668 100, 820 132"/>
+        <path d="M -20 212 C 140 184, 274 238, 414 216 S 676 168, 820 198"/>
+        <path d="M -20 282 C 150 254, 286 306, 426 284 S 684 238, 820 268"/>
+      </g>
+      <g fill="none" stroke-width="5.5" stroke-linecap="round">
+        <path class="trace" style="--len:920" stroke="var(--safe)" d="M 120 250 C 150 190, 200 160, 265 158 C 330 156, 380 185, 430 172"/>
+        <path class="trace" style="--len:400" stroke="var(--caution)" d="M 430 172 C 470 161, 500 130, 545 128"/>
+        <path class="trace" style="--len:920" stroke="var(--safe)" d="M 545 128 C 610 125, 665 165, 660 210 C 655 258, 590 285, 520 278"/>
+        <path class="trace" style="--len:920" stroke="var(--safe)" d="M 520 278 C 440 270, 380 240, 300 252 C 240 261, 175 275, 120 250"/>
+      </g>
+      <g>
+        <circle cx="430" cy="172" r="8" fill="var(--paper)" stroke="var(--risk)" stroke-width="3.5"/>
+        <text x="430" y="148" text-anchor="middle" fill="var(--risk)" font-family="IBM Plex Mono, monospace" font-size="12">traversée D14</text>
+        <circle cx="120" cy="250" r="9.5" fill="var(--pine)"/>
+        <circle cx="120" cy="250" r="3.5" fill="var(--paper)"/>
+        <text x="120" y="280" text-anchor="middle" fill="var(--ink-2)" font-family="IBM Plex Mono, monospace" font-size="12">départ</text>
+      </g>
+    </svg>
+    <div class="maplegend">
+      <span class="key"><i style="background:var(--safe)"></i> voie protégée</span>
+      <span class="key"><i style="background:var(--caution)"></i> vigilance : 60 à 80 km/h</span>
+      <span class="key"><i style="background:var(--risk)"></i> traversée non protégée</span>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>10,2 km</b><span>distance</span></div>
+    <div class="stat"><b>D+ 84 m</b><span>dénivelé</span></div>
+    <div class="stat"><b>98 %</b><span>voies protégées</span></div>
+    <div class="stat"><b>0 m</b><span>exposé</span></div>
+    <div class="stat"><b>A</b><span>note sécurité</span></div>
+  </div>
+</header>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Le nom</span>
+    <h2>Lacet</h2>
+    <p>Court, français, prononçable — et il porte deux sens qui parlent tous les deux du produit.</p>
+  </div>
+
+  <div class="namepick">
+    <div class="pick">
+      <h3>Lacet</h3>
+      <div class="ipa">/la.sɛ/ · lacet.app · lacet.run</div>
+      <p class="why"><strong>Le geste.</strong> Lacer ses chaussures, c'est le rituel qui précède chaque sortie. Le nom se pose exactement là où l'app intervient : avant de partir, quand on ne sait pas encore où aller.</p>
+      <p class="why"><strong>La route.</strong> Un lacet, c'est aussi un virage en épingle, une route qui serpente. Le mot contient déjà l'idée du tracé sinueux — et un lacet noué, c'est littéralement une boucle.</p>
+      <p class="why"><strong>Signature :</strong> <em>Tu laces, on trace.</em></p>
+    </div>
+    <div>
+      <span class="eyebrow" style="display:block;margin-bottom:14px">Les autres finalistes, honnêtement</span>
+      <div class="alts">
+        <div class="alt"><b>Volte</b><span>Le cercle en équitation. Élégant, international, disponible. <em>Se confond avec « volt » à l'oral.</em></span></div>
+        <div class="alt"><b>Halo</b><span>La boucle autour de soi, plus l'idée de protection. Le meilleur sens du lot. <em>Référencement impossible : le jeu Microsoft écrase tout.</em></span></div>
+        <div class="alt"><b>Foulée</b><span>Chaleureux, très identitaire. <em>L'accent casse les URLs et bloque hors francophonie.</em></span></div>
+        <div class="alt"><b>Boucle</b><span>Le plus clair de tous. <em>Trop générique : impossible à défendre en marque.</em></span></div>
+      </div>
+      <p style="margin-top:20px;color:var(--ink-2);font-size:15.5px">Avant tout dépôt : vérifier les classes 9 et 42 à l'INPI. Le mot étant courant, c'est le sous-titre qui devra porter le sens — <em>Lacet · Itinéraires running et vélo</em>.</p>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Ce qui a été construit</span>
+    <h2>Un site web installable, pas une app native</h2>
+  </div>
+  <div class="col body-col">
+    <p>C'est le choix le plus compatible : iPhone, Android, PC, une seule base de code, pas d'App Store, et pas besoin d'un Mac pour compiler. Sur téléphone, « Ajouter à l'écran d'accueil » donne l'icône et le plein écran d'une vraie app.</p>
+    <p><strong>Le moteur</strong> est en Python (FastAPI). Il télécharge les données OpenStreetMap à la volée via Overpass, construit un graphe routable, évalue chaque tronçon, génère des boucles et les valide. <strong>L'interface</strong> est en React avec MapLibre.</p>
+    <p><strong>Aucune clé d'API n'est nécessaire.</strong> Les données viennent d'OpenStreetMap, l'altitude de l'IGN, les fonds de carte de CARTO, Esri et OpenTopoMap. Mapbox se branche par jeton si on le souhaite.</p>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">L'interface</span>
+    <h2>La carte prend la place, le panneau porte la lecture</h2>
+    <p>Interface sombre, accent rouge. Sur téléphone, le panneau devient une feuille en bas.</p>
+  </div>
+
+  <div class="col body-col">
+    <p><strong>La bande de parcours</strong> est l'élément central, et ce qu'on ne trouve nulle part ailleurs : elle superpose le profil altimétrique et le niveau de sécurité <em>sur le même axe</em>, celui de la distance. Les deux ne se lisent pas séparément — savoir qu'il y a 200 m d'exposition ne sert à rien tant qu'on ignore <em>où</em>. En la parcourant à la souris, le point correspondant s'allume sur la carte.</p>
+    <p><strong>Cinq fonds de carte</strong> : Sombre, Clair, Plan, Relief, Satellite. Les couleurs du tracé s'adaptent au fond — un vert pâle disparaîtrait sur de l'imagerie satellite.</p>
+    <p><strong>Le point de départ</strong> se pose de trois façons : le bouton de position, la recherche d'adresse mondiale, ou directement sur la carte. Le repère se fait glisser ; un mode dédié permet de le poser d'un clic sans risquer de le déplacer par accident en explorant.</p>
+    <p><strong>Les trois propositions</strong> s'affichent ensemble : la retenue en couleur, les autres en pointillés et cliquables sur la carte.</p>
+
+    <div class="swatches">
+      <span class="sw"><i style="background:#0C0E11"></i> fond #0C0E11</span>
+      <span class="sw"><i style="background:#14171B"></i> surface #14171B</span>
+      <span class="sw"><i style="background:#FF4133"></i> accent #FF4133</span>
+      <span class="sw"><i style="background:#32D74B"></i> sûr #32D74B</span>
+      <span class="sw"><i style="background:#FFD426"></i> vigilance #FFD426</span>
+      <span class="sw"><i style="background:#FF6A45"></i> exposé #FF6A45</span>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Le moteur de sécurité</span>
+    <h2>Comment on évite d'envoyer quelqu'un sur une départementale</h2>
+    <p>Un routeur configuré en mode piéton évite déjà les autoroutes. Il n'évitera pas une départementale à 80 km/h sans trottoir : pour lui, c'est une voie parfaitement légale. C'est là que la plupart des générateurs d'itinéraires échouent.</p>
+  </div>
+
+  <div class="layers">
+
+    <div class="layer">
+      <div class="lnum">L0</div>
+      <div class="lbody">
+        <span class="kicker">Exclusion dure</span>
+        <h3>Ce qui n'entre jamais dans le graphe</h3>
+        <p>Avant tout calcul, ces arêtes sont retirées du réseau. Pas de pénalité : elles n'existent pas. Aucune pondération ne peut les faire revenir.</p>
+        <pre><code><span class="tag">highway</span>   = motorway | motorway_link | trunk | trunk_link
+<span class="tag">highway</span>   = construction | proposed | raceway
+<span class="tag">foot</span>      = no | private
+<span class="tag">access</span>    = no | private   <span class="cmt">(sauf foot=yes|permissive|designated)</span>
+<span class="tag">route</span>     = ferry
+<span class="tag">tunnel</span>    = yes        <span class="cmt">et aucun aménagement piéton</span>
+<span class="tag">sac_scale</span> &gt;= demanding_mountain_hiking  <span class="cmt">(hors mode sentier)</span>
+<span class="cmt">// à vélo, en plus :</span>
+<span class="tag">highway</span>   = steps      <span class="cmt">· un vélo ne descend pas un escalier</span>
+<span class="tag">bicycle</span>   = no | private</code></pre>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="lnum">L1</div>
+      <div class="lbody">
+        <span class="kicker">Le calcul du risque</span>
+        <h3>Le danger commence à 40 km/h, pas à zéro</h3>
+        <p>C'est le calibrage central, et celui qui a été le plus retravaillé. En dessous de 40 km/h, courir sur la chaussée est simplement normal : personne ne fait un détour pour éviter une rue à 30, et une app qui l'imposerait serait inutilisable. Le risque ne commence à compter qu'au-delà — mais il grimpe alors au carré.</p>
+        <pre><code>risque = ((v − 40) / 30)² × (1 − sep / 2)
+
+<span class="cmt">// sep : 0 = chaussée nue · 1 = accotement · 2 = voie séparée</span>
+<span class="cmt">// borné à [0, 8]</span></code></pre>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Type de voie</th><th>v</th><th>sep</th><th>Risque</th><th>Verdict</th></tr></thead>
+            <tbody>
+              <tr><td>Rue à 30, ou trottoir présent</td><td class="num">≤ 40</td><td class="num">—</td><td class="num" style="color:var(--safe)">0</td><td>—</td></tr>
+              <tr><td>Rue à 50 sans trottoir</td><td class="num">50</td><td class="num">0</td><td class="num" style="color:var(--safe)">0,11</td><td>normal</td></tr>
+              <tr><td>Route à 70 sans trottoir</td><td class="num">70</td><td class="num">0</td><td class="num" style="color:var(--caution)">1,00</td><td>acceptable</td></tr>
+              <tr><td>Route à 80 avec accotement</td><td class="num">80</td><td class="num">1</td><td class="num" style="color:var(--caution)">0,89</td><td>acceptable</td></tr>
+              <tr><td>Route à 80 sans rien</td><td class="num">80</td><td class="num">0</td><td class="num" style="color:var(--risk)">1,78</td><td><strong>exposé</strong></td></tr>
+              <tr><td>Route à 90 sans rien</td><td class="num">90</td><td class="num">0</td><td class="num" style="color:var(--risk)">2,78</td><td><strong>exposé</strong></td></tr>
+              <tr><td>Voie rapide, autoroute</td><td class="num">110+</td><td class="num">0</td><td class="num" style="color:var(--risk)">—</td><td>exclue en L0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Le sport change la définition de « protégé ».</strong> Un trottoir protège un coureur, pas un cycliste — lui roule sur la chaussée et a besoin d'une bande ou d'une piste cyclable. Deux modèles de séparation distincts, pas un réglage.</p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="lnum">L2</div>
+      <div class="lbody">
+        <span class="kicker">Données manquantes</span>
+        <h3>La règle du doute, et la limite en agglomération</h3>
+        <p>Le tag <code>sidewalk</code> est absent sur la majorité des rues françaises dans OpenStreetMap. Absence de tag ≠ absence de trottoir. L'inférence est donc <strong>asymétrique</strong> : trottoir probable en zone bâtie à 50 km/h ou moins, aucun trottoir supposé ailleurs. Un faux positif en ville est gênant ; en rase campagne il est dangereux.</p>
+        <p>Deuxième règle, découverte en testant sur une petite ville : <strong>en agglomération, la limite par défaut est 50 km/h quelle que soit la classe de voie</strong> (article R413-3). Une départementale qui traverse un bourg n'y roule pas à 80. Sans cette correction, chaque boulevard de petite ville ressortait au niveau de risque d'une deux-voies de rase campagne, et le portail rejetait <em>tous</em> les itinéraires possibles.</p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="lnum">L3</div>
+      <div class="lbody">
+        <span class="kicker">Le contrôle final</span>
+        <h3>Le portail : un candidat qui échoue est jeté, pas déclassé</h3>
+        <p>Une bonne pondération ne suffit pas : le routeur empruntera quand même 800 m de départementale s'il n'a pas mieux — pour lui, un poids élevé reste un chemin valide. D'où un contrôle <em>après</em> génération, avec des règles binaires.</p>
+        <div class="gate">
+          <div class="gh">Mode Sûr — seuils de rejet</div>
+          <div class="gi"><span>Part du parcours exposée (risque ≥ 1,5)</span><b>&gt; 3 % → rejet</b></div>
+          <div class="gi"><span>Portion exposée continue</span><b>&gt; 150 m → rejet</b></div>
+          <div class="gi"><span>Traversées non protégées de voies ≥ 70 km/h</span><b>&gt; 2 → rejet</b></div>
+          <div class="gi"><span>Tunnel sans aménagement piéton</span><b>&gt; 0 m → rejet</b></div>
+          <div class="gi"><span>Écart de bouclage</span><b>&gt; 50 m → rejet</b></div>
+          <div class="gi"><span>Tracé parcouru deux fois</span><b>&gt; 25 % → rejet</b></div>
+        </div>
+        <p>Le seuil des 150 m est le plus important du lot : traverser une départementale sur 20 m est acceptable, la longer sur 900 m ne l'est pas. Un critère purement exprimé en pourcentage laisse passer le second.</p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="lnum">L4</div>
+      <div class="lbody">
+        <span class="kicker">Nuit</span>
+        <h3>Un modèle distinct, qui inverse le premier</h3>
+        <p>De jour, on privilégie les parcs, les chemins, l'écart au trafic. De nuit, un sentier isolé dans un bois devient le pire choix possible : le risque n'est plus routier, il est humain. Priorité à l'éclairage et aux rues bordées de bâti, pénalité forte sur les chemins hors zone habitée. Bascule automatique au coucher du soleil, calculé pour la position.</p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="lnum">L5</div>
+      <div class="lbody">
+        <span class="kicker">Forme</span>
+        <h3>Une boucle, pas un aller-retour déguisé</h3>
+        <p>Le quotient isopérimétrique <code>4πA/P²</code> mesure la « rondeur » du tracé : 1 pour un cercle, 0,61 pour un triangle équilatéral, presque 0 pour un aller-retour dont l'aire est nulle.</p>
+        <p>C'est ce qui rattrape le cas que le critère de recouvrement laisse passer : partir par une rue et revenir par la rue parallèle. Le tracé ne se recoupe jamais, donc le recouvrement vaut zéro — mais géométriquement, ce n'est pas une boucle.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="callout col" style="margin-top:36px">
+    <span class="ct">Écrit noir sur blanc dans l'app</span>
+    L'app ne promet jamais qu'un itinéraire <em>est</em> sûr. Les données OpenStreetMap sont incomplètes, un chantier peut apparaître, un trottoir peut être supprimé. La formulation retenue est « itinéraires privilégiant les voies protégées », affichée sous chaque parcours. C'est une protection juridique autant qu'une honnêteté produit — et ça ne coûte rien à la promesse.
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">L'algorithme</span>
+    <h2>Générer, mesurer, ajuster</h2>
+    <p>Deux problèmes ont été découverts en testant sur de vraies villes. Aucun n'était visible sur le papier.</p>
+  </div>
+
+  <div class="col body-col">
+    <p><strong>Le principe.</strong> Un seul Dijkstra depuis le départ, borné à environ un tiers de la distance visée. Les nœuds atteints sont répartis en secteurs angulaires ; on garde par direction le moins cher au mètre, donc le plus sûr. On assemble ensuite des <strong>triangles</strong> départ → W1 → W2 → départ, avec W2 à environ 120° de W1.</p>
+
+    <p><strong>Problème 1 — la sucette.</strong> La première version visait un seul point de demi-tour. Le retour empruntait alors presque toujours la rue parallèle à l'aller : un long couloir, une petite boucle au bout. Personne n'appelle ça une boucle. Trois sommets forcent une géométrie fermée — et un détail compte autant que le principe : <em>le tronçon entre les deux sommets doit contourner le départ</em>. Sans cette contrainte, faute de liaison directe, le routeur repasse par le centre et le tracé devient un huit d'aire nulle. Sur Annecy, la rondeur moyenne est passée de 0,01–0,10 à 0,15–0,37.</p>
+
+    <p><strong>Problème 2 — le maillage local.</strong> La longueur obtenue pour une position de sommet donnée dépend entièrement de la densité du réseau : un centre-ville impose des détours constants et allonge le périmètre, une petite ville aux rues droites le raccourcit. Une fenêtre fixe calée sur Paris sortait des boucles de 6 km quand on en demandait 8 à Annecy. L'algorithme <strong>mesure l'écart et corrige sa fenêtre</strong>, jusqu'à quatre passes. Le critère d'arrêt porte sur le nombre de candidats réellement utilisables, pas sur la médiane — une médiane dans la cible avec des candidats étalés de 5 à 7 km ne donne rien à proposer.</p>
+
+    <p>Les retours utilisent A* avec une heuristique légèrement gonflée : les tronçons sont marginalement moins directs, la recherche est deux à trois fois plus rapide, et la sécurité reste garantie par le portail.</p>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Fonctionnalités</span>
+    <h2>Ce qui tourne, ce qui reste</h2>
+  </div>
+
+  <div class="split">
+    <div class="half">
+      <h3>Fonctionnel</h3>
+      <div class="sub">testé de bout en bout</div>
+      <div class="flist">
+        <div class="f"><span class="m done">✓</span><span>Course et vélo · jusqu'à 60 km à pied, 250 km à vélo</span></div>
+        <div class="f"><span class="m done">✓</span><span>Cible par distance <em>ou</em> par durée</span></div>
+        <div class="f"><span class="m done">✓</span><span>Terrain, dénivelé, mode sécurité, jour/nuit</span></div>
+        <div class="f"><span class="m done">✓</span><span>3 propositions notées A/B/C, <em>plus le détail de ce qui a été écarté</em></span></div>
+        <div class="f"><span class="m done">✓</span><span>Bande de parcours : altitude et sécurité liées à la carte</span></div>
+        <div class="f"><span class="m done">✓</span><span>Cinq fonds de carte, couverture mondiale</span></div>
+        <div class="f"><span class="m done">✓</span><span>Recherche d'adresse, repère déplaçable, géolocalisation avec précision</span></div>
+        <div class="f"><span class="m done">✓</span><span>Favoris, historique, export GPX</span></div>
+        <div class="f"><span class="m done">✓</span><span>Suivi GPS live, alerte de traversée, écran maintenu allumé</span></div>
+      </div>
+    </div>
+    <div class="half">
+      <h3>Ensuite</h3>
+      <div class="sub">par ordre de valeur</div>
+      <div class="flist">
+        <div class="f"><span class="m">1</span><span><strong>Séance du jour</strong> — « 6 × 400 m » génère une boucle qui <em>contient</em> une ligne droite plate de 400 m près de chez soi. Personne ne le fait correctement aujourd'hui.</span></div>
+        <div class="f"><span class="m">2</span><span><strong>Vent arrière au retour</strong> — orienter la boucle pour finir vent dans le dos. Coût quasi nul, effet immédiat.</span></div>
+        <div class="f"><span class="m">3</span><span>Guidage vocal turn-by-turn</span></div>
+        <div class="f"><span class="m">4</span><span>Partage live et contact d'urgence</span></div>
+        <div class="f"><span class="m">5</span><span>Couche communautaire de signalements, avec seuil anti-abus : trois signalements indépendants avant qu'un tronçon pèse sur le routage, sinon un seul utilisateur empoisonne le graphe d'une ville</span></div>
+        <div class="f"><span class="m">6</span><span>Apprentissage des préférences, via l'écart entre tracé généré et tracé réel</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Performances</span>
+    <h2>Mesuré, pas estimé</h2>
+    <p>Paris intra-muros, boucle de 10 km, 226 000 nœuds après contraction du graphe. C'est le pire cas de France ; une ville moyenne tourne autour de 2 s à froid.</p>
+  </div>
+
+  <div class="tablewrap col">
+    <table>
+      <thead><tr><th>Étape</th><th>Première recherche</th><th>Suivante, même zone</th></tr></thead>
+      <tbody>
+        <tr><td>Téléchargement OpenStreetMap</td><td class="num">1–12 s</td><td class="num" style="color:var(--safe)">0 s</td></tr>
+        <tr><td>Construction du graphe</td><td class="num">~5 s</td><td class="num" style="color:var(--safe)">0 s</td></tr>
+        <tr><td>Génération et notation</td><td class="num">~1 s</td><td class="num">~1 s</td></tr>
+        <tr><td>Altitude</td><td class="num">~3 s</td><td class="num">~2 s</td></tr>
+        <tr><td><strong>Total</strong></td><td class="num"><strong>~11 s</strong></td><td class="num" style="color:var(--safe)"><strong>~3,5 s</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col body-col" style="margin-top:24px">
+    <p>Le gain vient d'une observation simple : <strong>le graphe ne dépend que de l'extrait et du sport</strong> — ni de la distance visée, ni du profil de sécurité, ni de l'heure. Enchaîner plusieurs recherches au même endroit, ce que tout le monde fait, ne doit le construire qu'une fois. Le rayon téléchargé est arrondi au kilomètre pour que 10 et 10,5 km partagent le même extrait.</p>
+    <p>Trois autres corrections ont divisé le temps de construction par deux : indexer les polygones de zone bâtie dans une grille au lieu de les parcourir linéairement, mesurer chaque segment une seule fois, et figer les facteurs de projection au lieu de refaire de la trigonométrie à chaque appel.</p>
+    <p>Pour descendre plus bas il faudrait un moteur compilé — GraphHopper plutôt qu'un Dijkstra en Python. Mais ce prototype existe pour valider le <strong>modèle de sécurité</strong>, et sur ce point il est déjà juste.</p>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<section>
+  <div class="shead col">
+    <span class="eyebrow">Où on en est</span>
+    <h2>Les phases</h2>
+  </div>
+
+  <div class="phases">
+    <div class="phase done">
+      <div class="pn"><b>0</b><span>FAIT</span></div>
+      <div class="pc">
+        <h3>Le moteur</h3>
+        <p>Graphe OpenStreetMap, modèle de risque, portail de validation, générateur de boucles. 133 tests, dont le tableau de risque de référence et les seuils du portail.</p>
+        <p class="out">Vérifié sur Paris, Lyon, Toulouse et Annecy. Les itinéraires retenus respectent les seuils du mode Sûr, et les motifs de rejet sont affichés.</p>
+      </div>
+    </div>
+    <div class="phase done">
+      <div class="pn"><b>1</b><span>FAIT</span></div>
+      <div class="pc">
+        <h3>API</h3>
+        <p>FastAPI. Un endpoint qui rend 3 candidats notés plus la liste des rejetés avec leur motif, plus la recherche de lieu, l'export GPX et un endpoint qui expose le modèle de sécurité appliqué à des cas types.</p>
+        <p class="out">Réponse en ~3,5 s sur une zone déjà consultée, ~11 s à froid sur Paris.</p>
+      </div>
+    </div>
+    <div class="phase done">
+      <div class="pn"><b>2</b><span>FAIT</span></div>
+      <div class="pc">
+        <h3>Interface</h3>
+        <p>React et MapLibre. Carte, panneau de lecture, bande de parcours, cinq fonds, filtres, favoris, historique, export.</p>
+        <p class="out">Fonctionne sur PC. Installable sur téléphone, à éprouver sur le terrain.</p>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="pn"><b>3</b><span>À FAIRE</span></div>
+      <div class="pc">
+        <h3>L'épreuve du terrain</h3>
+        <p>Le seul test qui compte encore : générer vingt boucles autour de chez soi et aller les vérifier, à pied ou sur Street View. Si trois d'entre elles envoient sur une départementale, le modèle n'est pas prêt — et ça s'apprend pour 0 €.</p>
+        <p class="out">C'est la prochaine étape, et rien ne la remplace.</p>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="pn"><b>4</b><span>ENSUITE</span></div>
+      <div class="pc">
+        <h3>Différenciation</h3>
+        <p>Séance du jour, vent arrière au retour, guidage vocal, partage live. Dans cet ordre : la séance du jour est ce qui rendrait l'app irremplaçable.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Lacet — état du logiciel · septembre 2026<br>
+  Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI et OpenTopoData
+</footer>
+
+</div>
