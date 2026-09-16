@@ -83,9 +83,18 @@ def roundness(coords: list[Coord]) -> float:
         return 0.0
 
     lat0 = sum(c[1] for c in coords) / len(coords)
+    lon0 = sum(c[0] for c in coords) / len(coords)
     kx = EARTH_RADIUS_M * math.cos(math.radians(lat0)) * math.pi / 180.0
     ky = EARTH_RADIUS_M * math.pi / 180.0
-    pts = [((c[0] * kx), (c[1] * ky)) for c in coords]
+    # Coordonnées **centrées** sur le tracé. Projetées telles quelles, elles
+    # valent quelques milliers de kilomètres : la formule du lacet soustrait
+    # alors des produits de l'ordre de 10¹² pour obtenir une aire de 10⁷, et perd
+    # huit chiffres significatifs en route. C'est le test de parité avec le
+    # moteur JavaScript qui l'a révélé — un écart d'une unité de précision sur un
+    # cosinus ressortait amplifié au neuvième chiffre de la rondeur. L'aire ne
+    # dépend pas de l'origine : centrer ne change rien au résultat exact, et
+    # rend le calcul stable.
+    pts = [((c[0] - lon0) * kx, (c[1] - lat0) * ky) for c in coords]
 
     # Formule du lacet (shoelace) — l'aire orientée du polygone.
     area2 = 0.0
