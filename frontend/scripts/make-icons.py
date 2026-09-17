@@ -19,6 +19,9 @@ VIOLET = (0x8B, 0x5C, 0xF6)
 WHITE = (0xFF, 0xFF, 0xFF)
 
 OUT = Path(__file__).resolve().parent.parent / "public"
+# Sources de l'app iPhone : `@capacitor/assets` en tire toutes les tailles
+# d'icône et d'écran de lancement que Xcode réclame.
+RESOURCES = Path(__file__).resolve().parent.parent / "resources"
 SIZES = {
     "icon-180.png": 180,  # apple-touch-icon
     "icon-192.png": 192,
@@ -46,12 +49,12 @@ def write_png(path: Path, width: int, height: int, rows: list[list[tuple[int, in
     path.write_bytes(png)
 
 
-def render(size: int) -> list[list[tuple[int, int, int]]]:
+def render(size: int, supersample: int = SUPERSAMPLE) -> list[list[tuple[int, int, int]]]:
     """La marque : un anneau (la boucle) et un point plein (le départ).
 
     Le point passe devant l'anneau : c'est le départ qu'on pose sur la boucle.
     """
-    big = size * SUPERSAMPLE
+    big = size * supersample
     centre = big / 2
     ring_radius = big * 0.30
     ring_half_width = big * 0.038
@@ -75,20 +78,73 @@ def render(size: int) -> list[list[tuple[int, int, int]]]:
 
     # Réduction : moyenne de chaque bloc SUPERSAMPLE × SUPERSAMPLE.
     out: list[list[tuple[int, int, int]]] = []
-    block = SUPERSAMPLE * SUPERSAMPLE
+    block = supersample * supersample
     for y in range(size):
         row = []
         for x in range(size):
             r = g = b = 0
-            for sy in range(SUPERSAMPLE):
-                for sx in range(SUPERSAMPLE):
-                    pr, pg, pb = hi[y * SUPERSAMPLE + sy][x * SUPERSAMPLE + sx]
+            for sy in range(supersample):
+                for sx in range(supersample):
+                    pr, pg, pb = hi[y * supersample + sy][x * supersample + sx]
                     r += pr
                     g += pg
                     b += pb
             row.append((r // block, g // block, b // block))
         out.append(row)
     return out
+
+
+def write_png_rows(path: Path, width: int, height: int, rows) -> None:
+    """Comme `write_png`, mais les lignes arrivent déjà en octets.
+
+    L'écran de lancement fait 2 732 pixels de côté : 7,5 millions de pixels
+    gardés un par un en tuples occuperaient plusieurs centaines de mégaoctets.
+    Ligne par ligne en octets, il tient sans peine.
+    """
+    compressor = zlib.compressobj(9)
+    data = b"".join(compressor.compress(b"\x00" + row) for row in rows) + compressor.flush()
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        body = kind + payload
+        return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", data) + chunk(b"IEND", b""))
+
+
+def ios_resources() -> None:
+    """L'icône de l'app iPhone et son écran de lancement.
+
+    L'icône est opaque, sans transparence : iOS arrondit lui-même les coins et
+    remplirait de noir une zone transparente. L'écran de lancement reprend la
+    marque au centre, sur le fond de l'app — pas de flash blanc au démarrage.
+    Suréchantillonnage réduit à 2 : à ces tailles l'anticrénelage reste propre, et
+    le rendu en Python pur passe de plusieurs minutes à quelques secondes.
+    """
+    RESOURCES.mkdir(parents=True, exist_ok=True)
+
+    icon = render(1024, supersample=2)
+    write_png(RESOURCES / "icon.png", 1024, 1024, icon)
+    print("  resources/icon.png  (1024×1024)")
+
+    side = 2732
+    logo_size = 760
+    logo = render(logo_size, supersample=2)
+    logo_rows = [bytes(c for pixel in row for c in pixel) for row in logo]
+    background = bytes(INK) * side
+    left = (side - logo_size) // 2
+    top = (side - logo_size) // 2
+
+    def rows():
+        for y in range(side):
+            if top <= y < top + logo_size:
+                yield background[: left * 3] + logo_rows[y - top] + background[(left + logo_size) * 3 :]
+            else:
+                yield background
+
+    for name in ("splash.png", "splash-dark.png"):
+        write_png_rows(RESOURCES / name, side, side, rows())
+        print(f"  resources/{name}  ({side}×{side})")
 
 
 def main() -> None:
@@ -107,6 +163,8 @@ def main() -> None:
         encoding="utf-8",
     )
     print("  icon.svg")
+
+    ios_resources()
 
 
 if __name__ == "__main__":

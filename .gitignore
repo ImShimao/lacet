@@ -15,3 +15,8 @@ dist/
 
 .DS_Store
 Thumbs.db
+
+# Projet iOS : régénéré à chaque compilation (voir .github/workflows/ios.yml)
+frontend/ios/
+frontend/android/
+*.ipa

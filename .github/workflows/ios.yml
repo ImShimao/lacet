@@ -1,0 +1,101 @@
+# L'app iPhone, compilée sur un Mac de GitHub.
+#
+# Une IPA ne se compile qu'avec Xcode, donc sur macOS. Ce workflow le fait à
+# chaque changement du front, et à la demande (onglet Actions → « Run workflow »).
+# L'IPA produite n'est pas signée : c'est Sideloadly qui la signe, avec le compte
+# Apple de la personne, au moment de l'installer sur son téléphone.
+#
+# Le dossier `ios/` n'est pas versionné : il est régénéré ici à chaque fois, puis
+# réglé par `frontend/ios-overlay/customize.py` (autorisations de position, GPS
+# et voix en arrière-plan, session audio). Voir ce fichier pour le pourquoi.
+
+name: App iPhone (IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ios.yml'
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8 exige Node 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Dépendances
+        run: npm ci
+
+      # Les tests d'abord : une IPA construite sur un moteur qui ne calcule plus
+      # comme la référence serait pire qu'aucune IPA.
+      - name: Tests
+        run: npm test
+
+      - name: App web
+        run: npm run build
+
+      - name: Projet iOS
+        run: npx cap add ios --packagemanager SPM
+
+      - name: Icône et écran de lancement
+        run: >
+          npx --yes @capacitor/assets@3.0.5 generate --ios
+          --assetPath resources
+          --iconBackgroundColor '#0A0910' --iconBackgroundColorDark '#0A0910'
+          --splashBackgroundColor '#0A0910' --splashBackgroundColorDark '#0A0910'
+
+      - name: Synchronisation
+        run: npx cap sync ios
+
+      - name: Réglages de Lacet
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: python3 ios-overlay/customize.py ios/App
+
+      - name: Compilation (sans signature)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Lacet.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*deprecated|ARCHIVE (SUCCEEDED|FAILED)" || true
+          test -d "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app"
+
+      - name: Journal de compilation (en cas d'échec)
+        if: failure()
+        run: tail -n 200 "$RUNNER_TEMP/xcodebuild.log" || true
+
+      - name: IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ipa/Payload/Lacet.app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Lacet.ipa" Payload)
+          ls -lh "$GITHUB_WORKSPACE/Lacet.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lacet-ipa
+          path: Lacet.ipa
+          retention-days: 30

@@ -1,0 +1,23 @@
+{
+  "appId": "fr.lacet.app",
+  "appName": "Lacet",
+  "webDir": "dist",
+  "backgroundColor": "#0A0910",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0A0910",
+    "appendUserAgent": "Lacet/1.0",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#0A0910",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "DARK"
+    }
+  }
+}
