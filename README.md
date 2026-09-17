@@ -25,19 +25,45 @@ des sorties.
 
 ## Ce que c'est, techniquement
 
-Un **site web installable** (PWA), pas une app native. C'est le choix le plus
-compatible : iPhone, Android, PC, une seule base de code, pas d'App Store, et pas
-besoin d'un Mac. Sur iPhone, « Ajouter à l'écran d'accueil » lui donne son icône
-et le plein écran d'une vraie app.
+**Une app iPhone et un site web, sur la même base de code.** Le site s'ouvre
+dans n'importe quel navigateur et s'installe comme une app (PWA) ; l'app iPhone
+est ce même site, emballé par Capacitor, avec ce qu'une page web ne peut pas
+faire : GPS et guidage vocal écran verrouillé.
+
+**Les itinéraires se calculent sur l'appareil.** Le moteur — données
+OpenStreetMap, graphe, sécurité, génération, notation — tourne en JavaScript
+dans un *worker*, sur le téléphone ou le PC qui affiche l'app. Aucun serveur à
+lancer, à héberger ni à payer : l'app va chercher elle-même les rues sur
+Overpass, l'altitude à l'IGN, le vent chez Open-Meteo, et garde ce qu'elle a
+téléchargé pour les recherches suivantes.
+
+**Deux versions, selon l'appareil.** Sur un ordinateur on prépare : chercher,
+comparer, lire la sécurité, garder ses favoris, exporter un GPX. Lancer une
+sortie, le suivi GPS, le SOS et l'historique n'y ont aucun sens et n'y
+apparaissent pas. Sur un téléphone, tout. La détection se force dans « Mon
+compte » si elle se trompe (tablette, PC tactile).
 
 ```
-backend/    Python + FastAPI — le moteur : données OSM, graphe, sécurité, génération
-frontend/   React + MapLibre — l'interface
-.vscode/    lancement, tâches et débogage prêts à l'emploi
+frontend/             React + MapLibre — l'app, et le moteur (src/engine/)
+frontend/ios-overlay/ réglages iOS appliqués au projet Xcode généré
+backend/              Python + FastAPI — le moteur de référence
+.github/workflows/    compilation de l'IPA sur un Mac de GitHub
 ```
 
-Aucun service externe à configurer, aucune clé d'API. Les données viennent
-d'OpenStreetMap (via Overpass), l'altitude de l'IGN, le fond de carte de CARTO.
+**Pourquoi garder le moteur Python ?** C'est la référence. Le portage
+JavaScript note la *sécurité* des parcours : subtilement faux, il proposerait un
+« A » là où il faudrait un « C », et rien à l'écran ne le montrerait. Le script
+`backend/scripts/parity_dump.py` fait tourner Python sur dix cas réels (Beaune,
+Lyon, damiers artificiels ; jour, nuit, vent, vélo, tours) et
+`frontend/src/engine/parity.test.js` exige du JavaScript le même graphe, les
+mêmes candidats arête par arête et la même réponse. Les nombres sont comparés à
+1e-9 près : sinus et arc-tangente diffèrent d'une unité de précision entre les
+bibliothèques mathématiques des deux plateformes. Tout le reste doit être
+identique — ce qui a demandé de reproduire l'arithmétique de CPython (modulo
+flottant, arrondi au pair, `sum` compensée, `math.hypot`).
+
+Aucune clé d'API. Données © OpenStreetMap (Overpass), altitude IGN et
+OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche d'adresse Nominatim.
 
 ---
 
@@ -63,6 +89,16 @@ npm install
 ---
 
 ## Lancer
+
+**L'app n'a besoin que du front** : le moteur tourne dans la page.
+
+```powershell
+cd frontend; npm run dev
+```
+
+Puis **http://127.0.0.1:5173**. Le backend ne sert plus qu'au moteur de
+référence — ses tests, le script de parité, et l'ancienne API pour qui voudrait
+l'héberger.
 
 Dans VS Code : `Ctrl+Shift+B`, ou `Terminal → Exécuter la tâche → Lacet — tout lancer`.
 Ça démarre les deux serveurs dans deux panneaux séparés.
@@ -163,10 +199,65 @@ cas types : pratique pour vérifier d'un coup d'œil qu'il n'a pas dérivé.
 
 ---
 
-## Tester sur ton iPhone
+## L'app iPhone
 
-Le brancher en USB ne sert à rien ici : c'est une app web, elle passe par le
-Wi-Fi. Le PC et le téléphone doivent être sur **le même réseau**.
+### Récupérer l'IPA
+
+Une IPA ne se compile qu'avec Xcode, donc sur un Mac. Le dépôt en emprunte un à
+GitHub : à chaque modification du front poussée sur `main`, le workflow
+**App iPhone (IPA)** lance les tests, construit l'app, génère le projet Xcode,
+y applique `frontend/ios-overlay/customize.py` et compile. Compter deux minutes.
+
+L'IPA se télécharge depuis l'onglet **Actions** du dépôt → dernière exécution
+réussie → **Artifacts** → `Lacet-ipa`, ou en ligne de commande :
+
+```bash
+gh run download --name Lacet-ipa
+```
+
+Elle n'est **pas signée** : c'est Sideloadly qui la signe, avec ton identifiant
+Apple, au moment de l'installer. Le dossier `ios/` n'est pas versionné — il est
+régénéré à chaque compilation, et tout ce qui distingue Lacet d'un projet
+Capacitor vierge tient dans `customize.py`, où chaque réglage dit pourquoi.
+
+### L'installer avec Sideloadly
+
+1. Branche l'iPhone en USB, ouvre Sideloadly, glisse `Lacet.ipa` dedans.
+2. Entre ton identifiant Apple et lance **Start**.
+3. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
+   identifiant → **Faire confiance**.
+4. Depuis iOS 16 : **Réglages → Confidentialité et sécurité → Mode
+   développeur** → activer, puis redémarrer.
+
+Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours** : il faut
+la réinstaller (Sideloadly sait le faire automatiquement tant que le PC est
+allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
+
+### Ce que l'app native ajoute
+
+- **Le GPS continue écran verrouillé.** À la première sortie, iOS demande
+  l'accès à la position : choisir **Toujours** (ou « Lors de l'utilisation »
+  puis « Toujours » quand iOS le repropose). Sans cela, la distance se fige dès
+  que le téléphone part dans la poche.
+- **Le guidage vocal aussi**, et il passe par-dessus la musique, même en mode
+  silencieux. La session audio est réglée dans `AppDelegate` : le module de
+  synthèse vocale ne le fait pas, et sans elle iOS coupe la voix au verrouillage.
+- **L'écran reste allumé** pendant la sortie si on le demande, et une vibration
+  prévient avant chaque traversée.
+- **Le GPX s'exporte par la feuille de partage** d'iOS (Fichiers, Strava, AirDrop…).
+- **Elle s'ouvre sans réseau** : ses fichiers sont sur le téléphone. Les zones
+  déjà explorées se recalculent sans réseau aussi — les rues téléchargées sont
+  gardées quatorze jours.
+- **Les cartes hors ligne** sont rangées dans IndexedDB et lues directement par
+  la carte : il n'y a pas de service worker dans une app native, et sans ce
+  chemin une carte « gardée » restait noire une fois dehors.
+
+---
+
+## Tester sur un téléphone, par le navigateur
+
+Pour Android, ou un iPhone sans Sideloadly. Le PC et le téléphone doivent être
+sur **le même réseau** — ou passer par le tunnel plus bas.
 
 ### Le piège à connaître
 
@@ -210,10 +301,9 @@ menu ⋮ → « Ajouter à l'écran d'accueil »). Elle s'ouvre alors en plein
 
 ### Ce qu'il faut savoir
 
-**Le PC reste le serveur.** Calculer un itinéraire demande que le PC soit
-allumé, les deux serveurs lancés, et le téléphone sur le même Wi-Fi. Ce qui est
-déjà sur le téléphone — favoris, historique, cartes mises de côté, suivi d'une
-sortie — n'en a pas besoin. Pour une app indépendante du PC, voir
+**Le PC ne fait que servir les fichiers.** Le calcul se fait sur le
+téléphone ; le PC doit seulement rester allumé pour que la page s'ouvre la
+première fois. Pour s'en passer tout à fait, voir
 [Héberger en ligne](#héberger-en-ligne).
 
 **Tout est rangé par adresse.** Favoris et cartes hors ligne appartiennent à
@@ -266,68 +356,26 @@ depuis « Mes parcours ».
 
 ## Héberger en ligne
 
-Une fois hébergée, Lacet n'a plus besoin du PC : une adresse HTTPS fixe, qu'on
-ouvre sur le téléphone et qu'on installe sur l'écran d'accueil.
+**Le front suffit, et c'est un site statique.** Le moteur tourne dans la page :
+il n'y a plus d'API à faire tourner. `npm run build` produit `frontend/dist/`,
+à déposer tel quel sur n'importe quel hébergeur statique gratuit — Cloudflare
+Pages, Netlify, Vercel (tous acceptent un dépôt privé). Répertoire de
+publication : `frontend/dist`, commande : `npm ci && npm run build`, dossier
+racine : `frontend`.
 
-### Un seul service
+Deux conditions : **HTTPS** (géolocalisation et service worker l'exigent, et les
+hébergeurs ci-dessus le fournissent) et **la racine du domaine** — le service
+worker et le manifeste sont servis depuis `/`.
 
-`backend/app/server.py` sert **l'API sous `/api` et l'app web à la racine**.
-La page et ses appels partagent la même adresse : un seul certificat, ni proxy
-ni CORS, et c'est exactement le chemin (`/api`) qu'emprunte déjà le front en
-développement. Les fichiers de `assets/`, qui portent leur empreinte dans leur
-nom, sont gardés un an par le navigateur ; la page, le service worker et le
-manifeste sont revalidés à chaque visite, pour qu'une mise à jour arrive tout
-de suite.
+### L'ancienne voie : l'API Python
 
-En local, pour l'essayer :
-
-```powershell
-cd frontend; npm run build; cd ..\backend
-.venv\Scripts\python -m uvicorn app.server:app --port 8000
-```
-
-→ http://localhost:8000. Et pour l'ouvrir sur le téléphone sans rien héberger,
-le tunnel pointe sur ce seul port : `cloudflared tunnel --url http://localhost:8000`.
-
-### L'image Docker
-
-Le `Dockerfile` à la racine construit le front puis le sert avec l'API :
-
-```powershell
-docker build -t lacet .
-docker run -p 7860:7860 lacet
-```
-
-Elle écoute sur `$PORT` (7860 par défaut), écrit son cache OSM dans
-`/tmp/lacet-cache` et tourne sous un utilisateur non administrateur. Pour les
-fonds Mapbox : `docker build --build-arg VITE_MAPBOX_TOKEN=pk.… -t lacet .`
-
-### Où l'héberger
-
-| | Mémoire | Veille | Remarque |
-|---|---|---|---|
-| **Hugging Face Spaces** (Docker) | 16 Go | après 48 h sans visite | gratuit ; le plus confortable pour les graphes des grandes villes |
-| **Render** (Web Service, Docker) | 512 Mo | après 15 min, ~1 min de réveil | gratuit ; trop juste pour une grande ville — voir ci-dessous |
-| **Railway / Fly.io** | au choix | aucune | payant, quelques euros par mois |
-
-Sur chacun : créer le service à partir du dépôt Git, type Docker, sans autre
-réglage — le port est lu dans `$PORT`.
-
-**La mémoire décide.** Mesuré : **568 Mo** occupés après une recherche sur Paris,
-dont l'essentiel est le graphe en cache. Les 512 Mo d'une offre gratuite sont
-donc dépassés, et le service tué sans explication. Deux issues : prendre un
-hébergeur plus large, ou baisser le plafond avec
-`LACET_GRAPH_CACHE_NODES=120000` — l'app reste vivante, au prix d'une
-reconstruction du graphe plus fréquente.
-
-**Avant de mettre en ligne**, renseigne `LACET_USER_AGENT` (variable
-d'environnement du service) avec une adresse de contact réelle, par exemple
-`Lacet/0.1 (ton-adresse@exemple.fr)`. Overpass, Nominatim et l'IGN l'exigent de
-toute application publique, et bloquent celles qui ne s'identifient pas.
-
-Le cache disque des hébergeurs gratuits est éphémère : il se vide à chaque
-redémarrage. La première boucle autour d'une nouvelle ville reprend alors ses
-quelques secondes de téléchargement OSM, rien de plus.
+`backend/app/server.py` sert encore l'API sous `/api` et l'app à la racine, et
+le `Dockerfile` construit l'ensemble (`docker build -t lacet .`, port `$PORT`,
+7860 par défaut). Le front ne l'appelle plus : c'est utile pour exposer le
+moteur de référence, pas pour faire fonctionner l'app. Si tu l'héberges,
+renseigne `LACET_USER_AGENT` avec une adresse de contact réelle — Overpass,
+Nominatim et l'IGN bloquent les applications publiques qui ne s'identifient pas —
+et prévois de la mémoire : 568 Mo mesurés après une recherche sur Paris.
 
 ---
 
@@ -521,6 +569,16 @@ village, littoral) × trois distances (5, 10, 21,1 km) :
 | Échecs Overpass | 6/24 | **0/24** |
 
 ## Le choix des propositions
+
+**« Regénérer d'autres boucles » en propose vraiment d'autres.** Le moteur est
+déterministe : relancer la même recherche redonnait exactement les mêmes
+parcours. Une régénération tourne donc les polygones de départ d'une fraction du
+nombre d'or — jamais deux fois le même angle, quel que soit le nombre de
+relances — et pénalise les directions déjà montrées. La note de sécurité garde
+la main : un cran de note retire 0,9 au classement, la ressemblance au plus
+0,75, si bien qu'à qualité égale une boucle moins sûre ne passe pas devant pour
+faire du neuf. Sans régénération, la réponse reste identique à celle du moteur
+Python.
 
 Trier sur la seule note ne marche pas : les meilleurs candidats se ressemblent,
 parce que ce qui fait une bonne note — les rues calmes, les parcs, les berges —
@@ -889,6 +947,24 @@ utilise.
 
 ## Performances
 
+### Sur l'appareil
+
+Le moteur JavaScript est **plus rapide que le Python** qu'il reproduit : les
+graphes y vivent dans des tableaux typés (voisins en CSR, coordonnées dans un
+seul tampon), et la boucle de Dijkstra n'alloue rien.
+
+| Paris intra-muros, 21 km | Python | JavaScript |
+|---|---|---|
+| Construction du graphe | 10,9 s | 4,7 s |
+| Génération et notation | 4,3 s | 0,5 à 0,8 s |
+
+Mesuré dans le navigateur, à Paris : **21 s** pour une première recherche, dont
+l'essentiel est le téléchargement des rues ; **0,12 s** pour la suivante au même
+endroit. Les rues sont gardées par carreaux de 0,05° dans IndexedDB, quatorze
+jours ; une zone voisine ne retélécharge que les carreaux qui lui manquent.
+
+### Le moteur de référence (Python)
+
 Mesuré sur un panel de huit départs et trois distances, après les optimisations :
 
 | | Médiane | Maximum |
@@ -949,28 +1025,28 @@ plutôt qu'un Dijkstra en Python — mais ce prototype existe pour valider le
 ### Robustesse des données
 
 Overpass est une ressource publique gratuite, régulièrement saturée aux heures
-ouvrées européennes. Cinq mesures, toutes tirées d'échecs constatés :
+ouvrées européennes. Ce que fait le moteur de l'app, et l'échec constaté qui a
+motivé chaque mesure :
 
-- **Quatre miroirs**, interrogés dans un ordre **tiré au sort** à chaque requête.
-  Attaquer toujours le même en premier concentre la charge et le fait saturer :
-  c'est ce qui produisait des « 429 Too Many Requests » en rafale.
-- **On n'attend pas un miroir jusqu'au bout avant d'essayer le suivant.** Ils
-  étaient interrogés en file, avec quatre-vingt-dix secondes d'attente chacun.
-  Mesuré en conditions réelles : **87 secondes** perdues à attendre qu'un miroir
-  en panne finisse par répondre « 504 », quand le suivant répondait en sept.
-  Passé quinze secondes, on en lance donc un second **sans abandonner le
-  premier**, et on garde la première réponse qui arrive. Un miroir qui répond
-  normalement reste seul sollicité : quadrupler la charge de chaque recherche
-  sur des serveurs publics serait un abus.
-- **Deux tours**, séparés par une attente qui double et comporte une part
-  aléatoire.
-- **Une réponse vide est un échec, pas un résultat.** Un miroir qui abandonne en
-  cours de route rend un JSON valide contenant zéro élément. Mis en cache, il
-  empoisonnait la zone pendant deux semaines et la recherche répondait « aucune
-  voie praticable » en plein centre-ville.
-- **Un extrait périmé vaut mieux qu'une erreur.** Si tous les miroirs sont muets
-  et qu'un extrait existe en cache, on s'en sert : le réseau de rues n'a pas
-  changé, et la personne voulait juste courir.
+- **Une requête par zone, pas par carreau.** Les carreaux manquants partent
+  regroupés dans le rectangle qui les englobe, jusqu'à 40 Mo par requête. Un
+  carreau par requête en envoyait vingt pour une recherche en ville, et chacune
+  pouvait tomber sur un miroir saturé : **127 s** mesurées, contre 21 s groupées.
+- **Quatre miroirs, dans un ordre fixe, et une santé retenue.** Un miroir qui
+  échoue passe en fin de file pour les requêtes suivantes, et reprend sa place
+  dès qu'il répond. Le tirage au sort répétait les mêmes erreurs une requête sur
+  deux.
+- **On n'attend pas un miroir muet.** Passé huit secondes sans réponse, un
+  second part **sans abandonner le premier** ; la première réponse gagne. Un
+  miroir qui répond normalement reste seul sollicité.
+- **Une erreur passagère se réessaie sur place** (504, coupure) ; une limite de
+  débit (429) attend le temps que le miroir annonce lui-même sur `/api/status`,
+  au lieu de repartir à l'aveugle.
+- **Une réponse vide est un échec, pas un résultat** : mise en cache, elle
+  empoisonnait la zone deux semaines.
+- **Un extrait périmé vaut mieux qu'une erreur.** Si tout est muet et qu'une
+  copie existe, on s'en sert : le réseau de rues n'a pas changé, et la personne
+  voulait juste courir.
 
 ## Limites, dites franchement
 

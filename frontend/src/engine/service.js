@@ -419,9 +419,9 @@ export function selectVaried(scored, limit, avoidBearings = []) {
  *
  * `avoidBearings` : les directions des boucles montrées juste avant, quand on
  * demande d'autres boucles. Elles comptent comme déjà prises pour la
- * direction — pas pour le tracé, qu'on n'a plus. Le retrait de note reste plus
- * fort que ce que la nouveauté peut rapporter : une boucle moins sûre ne passe
- * jamais devant parce qu'elle part ailleurs.
+ * direction — pas pour le tracé, qu'on n'a plus. Un cran de note retire 0,9,
+ * la ressemblance au plus 0,75 : à qualité égale, une boucle moins sûre ne
+ * passe pas devant parce qu'elle part ailleurs.
  */
 function varietyPenalty(cand, chosen, avoidBearings = []) {
   if (!chosen.length && !avoidBearings.length) return 0
