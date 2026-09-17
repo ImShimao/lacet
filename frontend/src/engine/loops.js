@@ -158,8 +158,20 @@ class VertexIndex {
   }
 }
 
-/** Boucles brutes, non filtrées. */
-export function generateLoops(graph, start, targetM, profile, { sectors = 12, maxCandidates = 24, tolerance = 0.1 } = {}) {
+// Rotation des polygones d'un essai à l'autre, en fraction du pas entre deux
+// orientations. Le nombre d'or étale les rotations successives sans jamais
+// retomber sur un angle déjà essayé — un pas fixe reviendrait au départ.
+const GOLDEN = 0.6180339887498949
+
+/**
+ * `variation` : 0 pour la recherche ordinaire — identique au moteur Python. Au-delà,
+ * les polygones tournent d'un cran fractionnaire : les sommets visés changent,
+ * donc les boucles aussi. C'est ce que demande « Régénérer d'autres boucles »,
+ * qui relançait jusque-là exactement le même calcul.
+ */
+// Boucles brutes, non filtrées : le tri se fait ailleurs.
+export function generateLoops(graph, start, targetM, profile, { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0 } = {}) {
+  const phase = variation ? (variation * GOLDEN) % 1 : 0
   const collected = []
   let scale = 1
   const lo = targetM * (1 - tolerance)
@@ -170,7 +182,7 @@ export function generateLoops(graph, start, targetM, profile, { sectors = 12, ma
   const tree = new OutboundTree(graph, start, weights)
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-    const batch = generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates)
+    const batch = generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase)
     collected.push(...batch)
 
     let usable = 0
@@ -216,7 +228,7 @@ class OutboundTree {
   }
 }
 
-function generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates) {
+function generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0) {
   const plans = new Map(SHAPES.map((m) => [m, waypointPlan(m, targetM * scale)]))
   const allDistances = []
   for (const plan of plans.values()) for (const [, d] of plan) allDistances.push(d)
@@ -246,7 +258,7 @@ function generateOnce(graph, start, targetM, profile, weights, tree, scale, orie
 
     for (let k = 0; k < orientations; k += 1) {
       if (candidates.length >= maxCandidates) break
-      const theta = (k * 360) / orientations
+      const theta = ((k + phase) * 360) / orientations
 
       const vertices = pickVertices(index, plan, theta, maxDev)
       if (vertices === null) continue

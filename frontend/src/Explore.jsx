@@ -35,6 +35,7 @@ export default function Explore({
   onSelect,
   onToggleDetail,
   onSearch,
+  onRegenerate,
   onOpenFilters,
   onFavorite,
   onStart,
@@ -246,7 +247,7 @@ export default function Explore({
         )}
         <button
           className="btn btn--icon"
-          onClick={onSearch}
+          onClick={onRegenerate ?? onSearch}
           title="Regénérer d'autres boucles"
           aria-label="Regénérer d'autres boucles"
         >

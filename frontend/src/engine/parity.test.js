@@ -139,3 +139,49 @@ describe('le calcul jour / nuit', () => {
     expect(faux.slice(0, 5)).toEqual([])
   })
 })
+
+describe('« Régénérer d’autres boucles »', () => {
+  /**
+   * Le bouton relançait exactement le même calcul : le moteur est déterministe,
+   * et l'écran reproposait les mêmes boucles. Une régénération tourne désormais
+   * les polygones et s'écarte des directions déjà montrées — sans rien céder sur
+   * la sécurité.
+   */
+  const beaune = expected.cases.find((c) => c.case.name === 'beaune-course')
+  const extract = fromCompact(readGz('extract-beaune.json.gz'))
+  const graph = buildGraph(extract, {})
+  const plan = (extra) =>
+    planLoops(
+      { ...beaune.case.req, with_elevation: false, time_of_day: 'day', ...extra },
+      { loadGraph: async () => graph, wind: async () => null },
+    )
+
+  it('propose d’autres boucles que la recherche d’origine', async () => {
+    const first = await plan({})
+    const again = await plan({ variation: 1, avoid_bearings: first.routes.map((r) => r.bearing) })
+    const shapes = (res) => new Set(res.routes.map((r) => r.geometry.length + ':' + r.distance_m))
+    const before = shapes(first)
+    const nouvelles = [...shapes(again)].filter((k) => !before.has(k))
+    expect(nouvelles.length).toBeGreaterThanOrEqual(Math.ceil(again.routes.length / 2))
+  })
+
+  it('ne recule jamais sur la note pour faire du neuf', async () => {
+    const first = await plan({})
+    const again = await plan({ variation: 1, avoid_bearings: first.routes.map((r) => r.bearing) })
+    const rank = { A: 0, B: 1, C: 2 }
+    const worst = (res) => Math.max(...res.routes.map((r) => rank[r.safety.grade]))
+    const best = (res) => Math.min(...res.routes.map((r) => rank[r.safety.grade]))
+    // La meilleure note proposée reste au moins aussi bonne, et les notes
+    // restent triées : une boucle moins sûre ne passe pas devant.
+    expect(best(again)).toBeLessThanOrEqual(best(first))
+    const grades = again.routes.map((r) => rank[r.safety.grade])
+    expect([...grades].sort((a, b) => a - b)).toEqual(grades)
+    expect(worst(again)).toBeLessThanOrEqual(2)
+  })
+
+  it('sans demande de variation, rien ne change', async () => {
+    const a = await plan({})
+    const b = await plan({ variation: 0, avoid_bearings: [] })
+    expect(firstDifference(a.routes, b.routes, 'routes')).toBe(null)
+  })
+})

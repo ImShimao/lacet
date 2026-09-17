@@ -101,6 +101,8 @@ export default function App() {
   // dans une grande ville ressemblerait à une app bloquée.
   const [progress, setProgress] = useState(null)
   const searchToken = useRef(0)
+  // Numéro de « Régénérer » depuis la dernière recherche ordinaire.
+  const variation = useRef(0)
   const [error, setError] = useState(null)
   const [scrub, setScrub] = useState(null)
   const [focus, setFocus] = useState(null)
@@ -171,8 +173,12 @@ export default function App() {
 
   // --- génération -----------------------------------------------------------
   const search = useCallback(
-    async (next) => {
+    async (next, { regenerate = false } = {}) => {
       const active = next || params
+      // Une recherche ordinaire repart de zéro ; « Régénérer » tourne les polygones
+      // d'un cran de plus et s'écarte des directions qu'on vient de montrer.
+      variation.current = regenerate ? variation.current + 1 : 0
+      const avoid = regenerate ? (result?.routes ?? []).map((r) => r.bearing) : []
       if (next) {
         setParams(next)
         save({ params: next })
@@ -195,7 +201,8 @@ export default function App() {
       // réglage qu'on venait de changer.
       const token = ++searchToken.current
       try {
-        const payload = await generateLoops(toRequest(active, start), (stage, fraction) => {
+        const request = { ...toRequest(active, start), variation: variation.current, avoid_bearings: avoid }
+        const payload = await generateLoops(request, (stage, fraction) => {
           if (token === searchToken.current) setProgress({ stage, fraction })
         })
         if (token !== searchToken.current) return
@@ -213,7 +220,7 @@ export default function App() {
         }
       }
     },
-    [params, start],
+    [params, start, result],
   )
 
   // --- raccourcis clavier ----------------------------------------------------
@@ -510,6 +517,7 @@ export default function App() {
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
+              onRegenerate={() => search(undefined, { regenerate: true })}
               onOpenFilters={() => setFiltersOpen(true)}
               onFavorite={toggleFavorite}
               onStart={() => setRunning(true)}

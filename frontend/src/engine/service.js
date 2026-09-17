@@ -84,6 +84,10 @@ export function normalizeRequest(input) {
     speed_kmh: input.speed_kmh ?? 20,
     limit: input.limit ?? 5,
     with_elevation: input.with_elevation ?? true,
+    // Propres à l'app : « Régénérer d'autres boucles ». Sans eux, la recherche est
+    // celle du moteur Python, à l'identique.
+    variation: input.variation ?? 0,
+    avoid_bearings: input.avoid_bearings ?? [],
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -96,6 +100,11 @@ export function normalizeRequest(input) {
   req.pace_sec_per_km = bounded(req.pace_sec_per_km, 'pace_sec_per_km', { min: 150, max: 1200, integer: true })
   req.speed_kmh = bounded(req.speed_kmh, 'speed_kmh', { min: 5, max: 60 })
   req.limit = bounded(req.limit, 'limit', { min: 1, max: 12, integer: true })
+  req.variation = bounded(req.variation, 'variation', { min: 0, max: 1000, integer: true })
+  if (!Array.isArray(req.avoid_bearings) || req.avoid_bearings.length > 24) {
+    throw new PlanningError('Paramètre avoid_bearings invalide.')
+  }
+  req.avoid_bearings = req.avoid_bearings.map((b) => bounded(b, 'avoid_bearings', { min: 0, max: 360 }))
 
   req.seconds_per_km = req.sport === 'bike' ? 3600 / req.speed_kmh : req.pace_sec_per_km
 
@@ -198,6 +207,7 @@ export async function planLoops(input, deps) {
     sectors: settings.sectors,
     maxCandidates: settings.maxCandidates,
     tolerance: req.tolerance,
+    variation: req.variation,
   })
   trace.raw?.(start, targetM, raw)
   lap('routing')
@@ -237,7 +247,7 @@ export async function planLoops(input, deps) {
     return [finalScore(cand, targetM, req, gain, wind), cand, i]
   })
   sortByKey(scored, (t) => -t[0])
-  const chosen = selectVaried(scored, req.limit)
+  const chosen = selectVaried(scored, req.limit, req.avoid_bearings)
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
@@ -301,6 +311,7 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace) {
       sectors: SETTINGS.sectors,
       maxCandidates: SETTINGS.maxCandidates,
       tolerance: req.tolerance,
+      variation: req.variation,
     })
     trace.raw?.(start, lapTarget, raw)
     const lo = lapTarget * (1 - req.tolerance)
@@ -385,14 +396,14 @@ export function finalScore(cand, targetM, req, ascentM, wind = null) {
   return quality - gradePenalty(cand) - offBand - LAP_PENALTY * (cand.laps - 1)
 }
 
-export function selectVaried(scored, limit) {
+export function selectVaried(scored, limit, avoidBearings = []) {
   const remaining = [...scored]
   const chosen = []
   while (remaining.length && chosen.length < limit) {
     let bestIndex = 0
     let bestValue = -Infinity
     remaining.forEach(([score, cand], i) => {
-      const value = score - varietyPenalty(cand, chosen)
+      const value = score - varietyPenalty(cand, chosen, avoidBearings)
       if (value > bestValue) {
         bestValue = value
         bestIndex = i
@@ -403,13 +414,25 @@ export function selectVaried(scored, limit) {
   return chosen
 }
 
-function varietyPenalty(cand, chosen) {
-  if (!chosen.length) return 0
-  let overlap = -Infinity
+/**
+ * Ce qu'un candidat partage avec les boucles déjà retenues.
+ *
+ * `avoidBearings` : les directions des boucles montrées juste avant, quand on
+ * demande d'autres boucles. Elles comptent comme déjà prises pour la
+ * direction — pas pour le tracé, qu'on n'a plus. Le retrait de note reste plus
+ * fort que ce que la nouveauté peut rapporter : une boucle moins sûre ne passe
+ * jamais devant parce qu'elle part ailleurs.
+ */
+function varietyPenalty(cand, chosen, avoidBearings = []) {
+  if (!chosen.length && !avoidBearings.length) return 0
+  let overlap = chosen.length ? -Infinity : 0
   let closest = Infinity
   for (const [, kept] of chosen) {
     overlap = Math.max(overlap, similarity(cand, kept))
     closest = Math.min(closest, Math.abs(pymod(cand.bearing - kept.bearing + 180, 360) - 180))
+  }
+  for (const bearing of avoidBearings) {
+    closest = Math.min(closest, Math.abs(pymod(cand.bearing - bearing + 180, 360) - 180))
   }
   const crowding = Math.max(0, 1 - closest / BEARING_SPREAD_DEG)
   return VARIETY_OVERLAP_WEIGHT * overlap + VARIETY_BEARING_WEIGHT * crowding
