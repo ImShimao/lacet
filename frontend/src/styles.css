@@ -956,6 +956,59 @@ input:focus-visible {
 .skeleton--block {
   height: 76px;
 }
+
+/* L'avancement d'une recherche calculée sur l'appareil. La barre suit les
+   tuiles téléchargées ; pour les étapes dont on ne connaît pas la durée, un
+   reflet qui passe dit que ça avance sans promettre un pourcentage faux. */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.progress__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.progress__label b {
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.progress__bar {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.progress__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent-grad);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.progress__bar--busy i {
+  width: 35%;
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress__bar--busy i {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}
 @keyframes shimmer {
   to {
     background-position: -200% 0;

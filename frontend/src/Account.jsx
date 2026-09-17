@@ -10,9 +10,11 @@ import Icon from './Icon.jsx'
 import { SPORTS } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { load, save } from './storage'
+import { readModeSetting, setModeSetting } from './platform'
 import * as offline from './offlineMaps'
 
-export default function Account({ params, geo, onClearData, onProfile }) {
+export default function Account({ mode = 'full', params, geo, onClearData, onProfile }) {
+  const canRun = mode === 'full'
   const [confirm, setConfirm] = useState(false)
   const [contact, setContact] = useState(() => load().emergencyContact || '')
   // L'effacement vide aussi les cartes ; le compteur, lui, a lu le journal en
@@ -47,6 +49,8 @@ export default function Account({ params, geo, onClearData, onProfile }) {
         />
       </div>
 
+      {canRun && (
+        <>
       <h4 className="section">Gabarit</h4>
       <p className="muted small">
         Sert uniquement à estimer les calories et le nombre de pas. Rien n'est envoyé.
@@ -91,6 +95,11 @@ export default function Account({ params, geo, onClearData, onProfile }) {
 
       <h4 className="section">Cartes hors ligne</h4>
       <OfflineStorage key={version} />
+        </>
+      )}
+
+      <h4 className="section">Version de l'app</h4>
+      <ModePicker mode={mode} />
 
       <p className="muted">
         Aucun compte, aucune donnée envoyée ailleurs que pour calculer les itinéraires.
@@ -188,6 +197,49 @@ function OfflineStorage() {
             Vider les cartes hors ligne
           </button>
         ))}
+    </>
+  )
+}
+
+const MODES = [
+  ['auto', 'Automatique'],
+  ['full', 'Complète'],
+  ['planner', 'Préparation'],
+]
+
+/**
+ * Forcer la version complète ou la version de préparation.
+ *
+ * La détection suffit presque toujours — un téléphone a la version complète,
+ * un ordinateur celle qui sert à préparer. Mais elle peut se tromper : une
+ * tablette qu'on emporte, un PC à écran tactile. Le réglage reste sur
+ * l'appareil, comme tout le reste.
+ */
+function ModePicker({ mode }) {
+  const [setting, setSetting] = useState(readModeSetting)
+  return (
+    <>
+      <div className="seg" role="radiogroup" aria-label="Version de l'app">
+        {MODES.map(([key, label]) => (
+          <button
+            key={key}
+            role="radio"
+            aria-checked={setting === key}
+            aria-pressed={setting === key}
+            onClick={() => {
+              setSetting(key)
+              setModeSetting(key)
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {mode === 'full'
+          ? 'Version complète : préparer, lancer un parcours, suivi GPS, guidage vocal, SOS et historique.'
+          : 'Version de préparation : chercher, comparer et exporter des boucles. Les fonctions de course sont réservées au téléphone.'}
+      </p>
     </>
   )
 }

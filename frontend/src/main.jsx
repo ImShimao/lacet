@@ -5,6 +5,7 @@ import './styles.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { startOrientationLock } from './orientation'
+import { isNative } from './platform'
 
 // Avant le rendu : téléphone couché, l'app doit s'ouvrir déjà dans le bon sens
 // plutôt que de pivoter sous les yeux après coup.
@@ -21,7 +22,12 @@ createRoot(document.getElementById('root')).render(
 // Le service worker n'est enregistré qu'en production. En développement, il
 // mettrait en cache des modules que Vite recompile à chaque frappe, et on
 // passerait la journée à se demander pourquoi une modification ne s'affiche pas.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// Dans l'app native, les fichiers de l'app sont déjà sur le téléphone : elle
+// s'ouvre sans réseau par construction, et WebKit n'accepte de toute façon pas
+// de service worker hors des adresses http(s).
+if (isNative()) {
+  import('./native').then((native) => native.bootNative())
+} else if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   // Après `load` : l'enregistrement lance des téléchargements, et les faire
   // concurrencer ceux de la page retarde le premier affichage.
   window.addEventListener('load', () => {

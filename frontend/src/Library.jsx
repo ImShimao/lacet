@@ -13,12 +13,16 @@ import { duration, km, pace } from './format'
 import { styleByKey } from './mapStyles'
 import * as offline from './offlineMaps'
 
-export default function Library({ saved, history, onOpen, profile, mapStyle }) {
+export default function Library({ mode = 'full', saved, history, onOpen, profile, mapStyle }) {
+  // Sur ordinateur, pas de sorties : on n'y court pas, l'historique y serait
+  // toujours vide. Seuls les favoris, qui sont ce qu'on y prépare.
+  const canRun = mode === 'full'
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
-  const [view, setView] = useState(() =>
+  const [chosen, setView] = useState(() =>
     history.length === 0 && saved.length > 0 ? 'saved' : 'history',
   )
+  const view = canRun ? chosen : 'saved'
   const rows = view === 'history' ? history : saved
 
   return (
@@ -26,14 +30,16 @@ export default function Library({ saved, history, onOpen, profile, mapStyle }) {
       {view === 'history' && history.length > 0 && (
         <Totals history={history} profile={profile} />
       )}
-      <div className="seg">
-        <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
-          Sorties ({history.length})
-        </button>
-        <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
-          Favoris ({saved.length})
-        </button>
-      </div>
+      {canRun && (
+        <div className="seg">
+          <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
+            Sorties ({history.length})
+          </button>
+          <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
+            Favoris ({saved.length})
+          </button>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="empty">
@@ -48,13 +54,19 @@ export default function Library({ saved, history, onOpen, profile, mapStyle }) {
         </div>
       ) : (
         <>
-          <p className="muted small">
+          {canRun && <p className="muted small">
             Le tracé, les consignes et le profil sont déjà sur l'appareil : ces
             parcours s'ouvrent sans réseau. L'icône à droite ajoute <b>le fond de
             carte</b>, la seule pièce qui manque pour se repérer hors couverture —
             compter un à deux mégaoctets à la campagne, une quinzaine en plein
             centre-ville, où chaque tuile porte les bâtiments et les commerces.
-          </p>
+          </p>}
+          {!canRun && (
+            <p className="muted small">
+              Ouvre un favori pour revoir son détail ou l'exporter en GPX — vers une
+              montre, Strava, ou le téléphone avec lequel tu courras.
+            </p>
+          )}
           <div className="list">
             {rows.map((r, i) => (
               <div key={i} className="list__item">
@@ -73,7 +85,7 @@ export default function Library({ saved, history, onOpen, profile, mapStyle }) {
                     <span className="grade grade--free">libre</span>
                   )}
                 </button>
-                <OfflineControl route={r} mapStyle={mapStyle} />
+                {canRun && <OfflineControl route={r} mapStyle={mapStyle} />}
               </div>
             ))}
           </div>

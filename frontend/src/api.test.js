@@ -1,45 +1,30 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { generateLoops } from './api'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Ce que l'app dit quand la requête échoue.
+ * Ce que l'app dit quand la recherche échoue.
  *
- * C'est le seul texte que verra quelqu'un dont la sortie ne se passe pas comme
- * prévu, et il était écrit pour un développeur : « lance-le depuis le dossier
- * backend : python -m uvicorn… ». Sur un téléphone au milieu d'un chemin, la
- * personne n'a pas de serveur à lancer — elle a perdu le réseau, et ce qu'elle
- * veut savoir, c'est ce qui lui reste d'accessible.
+ * Il n'y a plus de serveur : le calcul se fait sur l'appareil. Mais c'est
+ * toujours le seul texte que verra quelqu'un dont la sortie ne se passe pas
+ * comme prévu, et les exigences n'ont pas changé. Un refus du moteur dit déjà
+ * quoi faire : il doit passer tel quel. Une perte de réseau ne doit pas se
+ * présenter comme une panne de serveurs — la personne veut savoir ce qui lui
+ * reste d'accessible.
  */
 
-/** `navigator` n'existe pas hors navigateur : on ne stube que ce qu'on lit. */
+vi.mock('./engine/client', () => ({ planOnDevice: vi.fn() }))
+
+const { planOnDevice } = await import('./engine/client')
+const { generateLoops } = await import('./api')
+
+const erreur = (name, message) => Object.assign(new Error(message), { name })
+
 function enLigne(valeur) {
   vi.stubGlobal('navigator', { onLine: valeur })
 }
 
-function reseauCoupe() {
-  enLigne(false)
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-}
-
-function serveurInjoignable() {
-  enLigne(true)
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-}
-
-function repond(status, body = null) {
-  enLigne(true)
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: status >= 200 && status < 300,
-      status,
-      json: async () => {
-        if (body === null) throw new SyntaxError('pas du JSON')
-        return body
-      },
-    }),
-  )
-}
+beforeEach(() => {
+  planOnDevice.mockReset()
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -47,81 +32,90 @@ afterEach(() => {
 
 const requete = { lat: 48.85, lon: 2.35, distance_km: 10 }
 
+describe('quand le moteur refuse', () => {
+  it('c’est son message qui parle', async () => {
+    enLigne(true)
+    const detail = 'Ce point de départ est sur une portion de réseau isolée.'
+    planOnDevice.mockRejectedValue(erreur('PlanningError', detail))
+    await expect(generateLoops(requete)).rejects.toThrow(detail)
+  })
+
+  it('même hors ligne : un refus métier n’a rien à voir avec le réseau', async () => {
+    enLigne(false)
+    planOnDevice.mockRejectedValue(erreur('PlanningError', 'Vise au moins 500 m.'))
+    await expect(generateLoops(requete)).rejects.toMatchObject({ message: 'Vise au moins 500 m.', offline: false })
+  })
+})
+
 describe('quand le réseau est coupé', () => {
-  it('le dit, et ne parle pas de serveur', async () => {
-    reseauCoupe()
-    await expect(generateLoops(requete)).rejects.toThrow(/Pas de connexion/)
+  beforeEach(() => {
+    enLigne(false)
+    planOnDevice.mockRejectedValue(erreur('OverpassError', "Aucun miroir OpenStreetMap n'a répondu."))
+  })
+
+  it('le dit, et ne parle pas de serveurs saturés', async () => {
+    const e = await generateLoops(requete).catch((x) => x)
+    expect(e.message).toMatch(/Pas de connexion/)
+    expect(e.message).not.toMatch(/miroir|saturent/)
+  })
+
+  it('dit que les zones déjà explorées restent calculables', async () => {
+    // C'est vrai depuis que le moteur tourne sur l'appareil : les rues d'une
+    // zone déjà visitée sont gardées, et le calcul n'a plus besoin du réseau.
+    await expect(generateLoops(requete)).rejects.toThrow(/hors ligne/)
   })
 
   it('renvoie vers ce qui reste accessible', async () => {
-    reseauCoupe()
     await expect(generateLoops(requete)).rejects.toThrow(/Mes parcours/)
   })
 
   it('se signale comme hors ligne, pour que l’interface s’adapte', async () => {
-    // Hors ligne, « réessayer » ne sert à rien : l'interface doit proposer
-    // autre chose, et elle a besoin de le savoir.
-    reseauCoupe()
     await expect(generateLoops(requete)).rejects.toMatchObject({ offline: true })
   })
 
   it('ne donne aucune commande à taper', async () => {
-    reseauCoupe()
-    await expect(generateLoops(requete)).rejects.not.toThrow(/uvicorn/)
+    await expect(generateLoops(requete)).rejects.not.toThrow(/uvicorn|python/)
   })
 })
 
-describe('quand le serveur ne répond pas', () => {
-  it('parle du serveur, pas du réseau', async () => {
-    serveurInjoignable()
-    await expect(generateLoops(requete)).rejects.toThrow(/serveur ne répond pas/)
-  })
-
-  it('ne se signale pas comme hors ligne', async () => {
-    serveurInjoignable()
-    await expect(generateLoops(requete)).rejects.toMatchObject({ offline: false })
-  })
-
-  it('traite un 5xx comme une panne de serveur', async () => {
-    // En développement, le relais de Vite renvoie une erreur de passerelle au
-    // lieu de laisser `fetch` échouer : sans ce cas, on affichait « Erreur 500 ».
-    repond(502)
-    await expect(generateLoops(requete)).rejects.toThrow(/serveur ne répond pas/)
+describe('quand OpenStreetMap ne répond pas', () => {
+  it('explique que les serveurs sont publics et saturent', async () => {
+    enLigne(true)
+    const detail = "Aucun miroir OpenStreetMap n'a répondu. Vérifie ta connexion, ou réessaie dans une minute."
+    planOnDevice.mockRejectedValue(erreur('OverpassError', detail))
+    await expect(generateLoops(requete)).rejects.toMatchObject({ message: detail, offline: false })
   })
 })
 
-describe('quand le backend explique son refus', () => {
-  it('c’est son message qui parle', async () => {
-    const detail = "Ce point de départ est sur une portion de réseau isolée."
-    repond(422, { detail })
-    await expect(generateLoops(requete)).rejects.toThrow(detail)
+describe('quand le calcul plante', () => {
+  it('propose une sortie de secours plutôt qu’un message technique', async () => {
+    enLigne(true)
+    planOnDevice.mockRejectedValue(erreur('EngineCrash', "Le calcul s'est interrompu. Essaie une distance plus courte."))
+    await expect(generateLoops(requete)).rejects.toThrow(/distance plus courte/)
   })
 
-  it('même sur une erreur de service', async () => {
-    const detail = "Aucun miroir OpenStreetMap n'a répondu."
-    repond(503, { detail })
-    await expect(generateLoops(requete)).rejects.toThrow(detail)
-  })
-})
-
-describe('les autres codes', () => {
-  it('un 429 invite à patienter', async () => {
-    repond(429)
-    await expect(generateLoops(requete)).rejects.toThrow(/Attends quelques secondes/)
-  })
-
-  it('un code inattendu reste lisible', async () => {
-    repond(418)
-    const erreur = await generateLoops(requete).catch((e) => e)
-    expect(erreur.message).toContain('418')
-    expect(erreur.message).not.toMatch(/^Erreur \d+$/)
+  it('une erreur inattendue reste lisible', async () => {
+    enLigne(true)
+    planOnDevice.mockRejectedValue(new TypeError('x is undefined'))
+    const e = await generateLoops(requete).catch((x) => x)
+    expect(e.message).toMatch(/^La recherche a échoué/)
   })
 })
 
 describe('quand tout va bien', () => {
-  it('rend la réponse telle quelle', async () => {
+  it('rend la réponse du moteur telle quelle', async () => {
     const payload = { routes: [{ id: 'r0' }], rejected: [], meta: {} }
-    repond(200, payload)
+    planOnDevice.mockResolvedValue(payload)
     await expect(generateLoops(requete)).resolves.toEqual(payload)
+  })
+
+  it('transmet la progression à l’interface', async () => {
+    planOnDevice.mockImplementation(async (_params, onProgress) => {
+      onProgress('data', 0.5)
+      return { routes: [], rejected: [], meta: {} }
+    })
+    const vus = []
+    await generateLoops(requete, (etape, fraction) => vus.push([etape, fraction]))
+    expect(vus).toEqual([['data', 0.5]])
   })
 })

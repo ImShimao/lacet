@@ -75,6 +75,11 @@ export function slim(route) {
     bearing: route.bearing,
     shape: route.shape,
     roundness: route.roundness,
+    // Un parcours à tours oublié en favori devenait une boucle simple : plus de
+    // compteur de tours pendant la sortie, et une longueur de tour absente de
+    // la carte. Deux nombres suffisent à le restituer.
+    laps: route.laps ?? 1,
+    lap_distance_m: route.lap_distance_m ?? route.distance_m,
     segments: (route.segments || []).map((s) => ({
       length_m: s.length_m,
       level: s.level,

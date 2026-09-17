@@ -4,6 +4,8 @@ import { duration, haversine, km, pace } from './format'
 import { buildTrack, locate, nextInstruction } from './routeTracker'
 import * as voice from './voice'
 import SosButton from './SosButton.jsx'
+import { isNative } from './platform'
+import { watchPosition } from './position'
 
 // Distance à laquelle on prévient d'une traversée à venir.
 const CROSSING_ALERT_M = 120
@@ -64,6 +66,15 @@ export default function LiveRun({ route, onPosition, onStop }) {
   // passe en arrière-plan : il faut le reprendre au retour, sinon l'écran
   // s'éteint dès le premier coup d'œil au téléphone.
   useEffect(() => {
+    // Dans l'app native, le verrou tient pour de bon, onglet ou pas.
+    if (isNative()) {
+      const native = import('./native')
+      native.then((n) => n.keepScreenOn())
+      return () => {
+        native.then((n) => n.allowScreenOff())
+      }
+    }
+
     let lock = null
     let cancelled = false
 
@@ -90,16 +101,13 @@ export default function LiveRun({ route, onPosition, onStop }) {
   }, [])
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setError('Ce navigateur ne donne pas accès à la position.')
-      return undefined
-    }
-
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: (Date.now() - startedAt.current) / 1000 }))
     }, 1000)
 
-    const watch = navigator.geolocation.watchPosition(
+    // `background` : dans l'app native, le suivi continue écran verrouillé,
+    // téléphone dans la poche — c'est toute la différence avec Safari.
+    const stopWatching = watchPosition(
       (position) => {
         setError(null)
         const { longitude, latitude, accuracy } = position.coords
@@ -125,19 +133,13 @@ export default function LiveRun({ route, onPosition, onStop }) {
           warnCrossing(point)
         }
       },
-      (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Accès à la position refusé. Autorise-le dans les réglages du site pour suivre la sortie."
-            : `Position indisponible (${err.message}).`,
-        )
-      },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 },
+      (err) => setError(err.message),
+      { background: true },
     )
 
     return () => {
       clearInterval(tick)
-      navigator.geolocation.clearWatch(watch)
+      stopWatching()
       voice.stop()
       onPosition(null)
     }
@@ -201,7 +203,8 @@ export default function LiveRun({ route, onPosition, onStop }) {
     if (!upcoming) return
     warned.current.add(upcoming.i)
     setAlert(upcoming)
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+    if (isNative()) import('./native').then((n) => n.warnHaptic())
+    else if (navigator.vibrate) navigator.vibrate([200, 100, 200])
     setTimeout(() => setAlert(null), 8000)
   }
 

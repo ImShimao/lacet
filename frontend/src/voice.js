@@ -19,13 +19,22 @@
 // bien après avoir passé le carrefour. Une consigne de navigation périmée est
 // pire que pas de consigne : on annule donc systématiquement ce qui reste.
 
-const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+import { isNative } from './platform'
+
+// Dans l'app native, la voix est celle d'iOS : elle continue écran verrouillé et
+// passe par-dessus la musique, là où celle du navigateur se tait dès que le
+// téléphone part dans la poche. Aucune des trois précautions ci-dessus ne la
+// concerne : pas de liste de voix tardive, pas de geste à attendre.
+const native = isNative()
+const nativeModule = native ? import('./native') : null
+
+const synth = !native && typeof window !== 'undefined' ? window.speechSynthesis : null
 
 let voice = null
 let enabled = false
 let unlocked = false
 
-export const available = Boolean(synth)
+export const available = native || Boolean(synth)
 
 function pickVoice() {
   if (!synth) return null
@@ -76,6 +85,10 @@ export function setEnabled(value) {
  * navigation.
  */
 export function speak(text, { priority = true } = {}) {
+  if (native) {
+    if (enabled && text) nativeModule.then((n) => n.speakNative(text, { priority }))
+    return
+  }
   if (!synth || !enabled || !text) return
   if (!voice) voice = pickVoice()
 
@@ -97,6 +110,10 @@ export function speak(text, { priority = true } = {}) {
 }
 
 export function stop() {
+  if (native) {
+    nativeModule.then((n) => n.stopSpeechNative())
+    return
+  }
   try {
     synth?.cancel()
   } catch {

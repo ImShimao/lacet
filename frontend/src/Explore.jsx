@@ -20,6 +20,8 @@ import { km } from './format'
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
 
 export default function Explore({
+  mode = 'full',
+  progress = null,
   start,
   startLabel,
   geo,
@@ -42,14 +44,15 @@ export default function Explore({
   onOpenDetail,
 }) {
   const [exporting, setExporting] = useState(false)
+  // Sur ordinateur, on prépare : rien de ce qui sert pendant la course.
+  const canRun = mode === 'full'
 
   if (busy) {
     return (
       <div className="panel">
         <div className="skeleton skeleton--card" />
         <div className="skeleton skeleton--line" />
-        <div className="skeleton skeleton--block" />
-        <p className="muted center">Analyse du réseau de voies autour du départ…</p>
+        <SearchProgress progress={progress} />
       </div>
     )
   }
@@ -99,10 +102,12 @@ export default function Explore({
             <Icon name="sliders" size={17} />
             Filtres
           </button>
-          <button className="btn btn--ghost" onClick={onFreeRun}>
-            <Icon name="play" size={17} />
-            Courir libre
-          </button>
+          {canRun && (
+            <button className="btn btn--ghost" onClick={onFreeRun}>
+              <Icon name="play" size={17} />
+              Courir libre
+            </button>
+          )}
         </div>
         <p className="muted small">
           Fais glisser le repère, touche la carte en mode placement, ou cherche une
@@ -125,10 +130,12 @@ export default function Explore({
         <button className="btn btn--primary" onClick={onOpenFilters}>
           Modifier les filtres
         </button>
-        <button className="btn btn--ghost" onClick={onFreeRun}>
-          <Icon name="play" size={17} />
-          Courir sans itinéraire
-        </button>
+        {canRun && (
+          <button className="btn btn--ghost" onClick={onFreeRun}>
+            <Icon name="play" size={17} />
+            Courir sans itinéraire
+          </button>
+        )}
       </div>
     )
   }
@@ -207,9 +214,11 @@ export default function Explore({
         </>
       )}
 
-      <button className="linkish" onClick={onFreeRun}>
-        ou courir librement, sans suivre de tracé
-      </button>
+      {canRun && (
+        <button className="linkish" onClick={onFreeRun}>
+          ou courir librement, sans suivre de tracé
+        </button>
+      )}
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
           que soit l'endroit où l'on a fait défiler le détail. Elle était tout en
@@ -224,15 +233,17 @@ export default function Explore({
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
         </button>
-        <button
-          className="btn btn--icon"
-          onClick={exportGpx}
-          disabled={exporting}
-          title="Exporter en GPX"
-          aria-label="Exporter en GPX"
-        >
-          <Icon name="download" size={19} />
-        </button>
+        {canRun && (
+          <button
+            className="btn btn--icon"
+            onClick={exportGpx}
+            disabled={exporting}
+            title="Exporter en GPX"
+            aria-label="Exporter en GPX"
+          >
+            <Icon name="download" size={19} />
+          </button>
+        )}
         <button
           className="btn btn--icon"
           onClick={onSearch}
@@ -241,11 +252,56 @@ export default function Explore({
         >
           <Icon name="refresh" size={19} />
         </button>
-        <button className="btn btn--primary" onClick={onStart}>
-          <Icon name="play" size={17} />
-          Démarrer
-        </button>
+        {canRun ? (
+          <button className="btn btn--primary" onClick={onStart}>
+            <Icon name="play" size={17} />
+            Démarrer
+          </button>
+        ) : (
+          // Sur ordinateur, le geste qui compte est d'emporter le parcours : vers
+          // une montre, Strava, ou le téléphone avec lequel on courra.
+          <button className="btn btn--primary" onClick={exportGpx} disabled={exporting}>
+            <Icon name="download" size={17} />
+            {exporting ? 'Export…' : 'Exporter en GPX'}
+          </button>
+        )}
       </div>
+    </div>
+  )
+}
+
+const STAGES = {
+  data: 'Téléchargement des rues',
+  graph: 'Construction du réseau de voies',
+  routing: 'Recherche des boucles',
+  elevation: 'Calcul du relief',
+}
+
+/**
+ * Où en est le calcul.
+ *
+ * Tout se passe sur l'appareil, et la première recherche dans une zone commence
+ * par télécharger ses rues — quelques secondes dans une petite ville, bien
+ * plus en plein Paris. Une animation muette laissait croire à une app figée ;
+ * nommer l'étape dit ce qui prend du temps, et pourquoi la suivante sera rapide.
+ */
+function SearchProgress({ progress }) {
+  const stage = progress?.stage ?? 'data'
+  const fraction = stage === 'data' ? (progress?.fraction ?? 0) : null
+  return (
+    <div className="progress" role="status">
+      <div className="progress__label">
+        <span>{STAGES[stage] ?? 'Calcul en cours'}…</span>
+        {fraction !== null && fraction > 0 && <b>{Math.round(fraction * 100)} %</b>}
+      </div>
+      <div className={`progress__bar ${fraction === null ? 'progress__bar--busy' : ''}`}>
+        <i style={fraction === null ? undefined : { transform: `scaleX(${Math.max(0.04, fraction)})` }} />
+      </div>
+      <p className="muted small">
+        {stage === 'data'
+          ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
+          : 'Le calcul se fait sur ton appareil, sans serveur.'}
+      </p>
     </div>
   )
 }

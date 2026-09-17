@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { duration, km } from './format'
 import { load, save } from './storage'
 import useModal from './useModal'
+import { isNative } from './platform'
 
 // Appui long, en millisecondes, avant que le SOS ne s'arme. Un bouton d'alerte
 // posé à côté de « Terminer », sur un écran qu'on touche en courant, part tout
@@ -77,12 +78,21 @@ export default function SosButton({ position, distance, elapsed }) {
     // séparateur diffère : « ?body= » sur Android, « &body= » sur iOS. Mettre
     // les deux marche partout — l'un est ignoré comme paramètre inconnu.
     const href = `sms:${contact.replace(/\s/g, '')}?&body=${encodeURIComponent(text)}`
-    window.location.href = href
+    // Dans l'app native, le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre
+    // de la façon dont WebKit traite un lien d'un autre schéma.
+    if (isNative()) import('./native').then((n) => n.openExternal(href))
+    else window.location.href = href
   }
 
   async function shareInstead() {
     const text = message()
     try {
+      if (isNative()) {
+        const native = await import('./native')
+        await native.shareText('Lacet — besoin d’aide', text)
+        setAsking(false)
+        return
+      }
       if (navigator.share) {
         await navigator.share({ title: 'Lacet — besoin d’aide', text })
         setAsking(false)

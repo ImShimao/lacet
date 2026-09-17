@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { isNative } from './platform'
+import { locateOnce, watchPosition } from './position'
 
 /**
  * Géolocalisation du navigateur, avec ses états réels.
@@ -18,12 +20,12 @@ export default function useGeolocation() {
     at: null,
   })
   const [following, setFollowing] = useState(false)
-  const watchId = useRef(null)
 
   // L'API Permissions dit si c'est refusé *avant* de déclencher une demande —
   // ça évite de proposer un bouton qui ne peut pas fonctionner.
   useEffect(() => {
-    if (!navigator.permissions?.query) return
+    // Dans l'app native, l'autorisation se demande au premier suivi, par iOS.
+    if (isNative() || !navigator.permissions?.query) return
     let cancelled = false
     navigator.permissions
       .query({ name: 'geolocation' })
@@ -54,49 +56,26 @@ export default function useGeolocation() {
     })
   }, [])
 
+  // Les erreurs arrivent déjà ramenées à une forme commune par `position.js`,
+  // qu'elles viennent du navigateur ou de l'iPhone.
   const fail = useCallback((error) => {
-    const denied = error.code === error.PERMISSION_DENIED
     setState((s) => ({
       ...s,
-      status: denied ? 'denied' : 'error',
-      message: denied
-        ? DENIED
-        : error.code === error.TIMEOUT
-          ? "Le signal GPS n'arrive pas. À l'intérieur, ça peut prendre un moment."
-          : 'Position indisponible pour le moment.',
+      status: error.denied ? 'denied' : 'error',
+      message: error.message,
     }))
   }, [])
 
   const locate = useCallback(() => {
-    if (!navigator.geolocation) {
-      setState((s) => ({
-        ...s,
-        status: 'unavailable',
-        message: 'Ce navigateur ne donne pas accès à la position.',
-      }))
-      return
-    }
     setState((s) => ({ ...s, status: 'locating', message: null }))
-    navigator.geolocation.getCurrentPosition(apply, fail, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 30000,
-    })
+    locateOnce(apply, fail)
   }, [apply, fail])
 
-  // Le suivi continu ne tourne que quand on le demande : `watchPosition` garde
-  // la puce GPS active, ce qui se paie en batterie.
+  // Le suivi continu ne tourne que quand on le demande : il garde la puce GPS
+  // active, ce qui se paie en batterie.
   useEffect(() => {
-    if (!following || !navigator.geolocation) return undefined
-    watchId.current = navigator.geolocation.watchPosition(apply, fail, {
-      enableHighAccuracy: true,
-      maximumAge: 2000,
-      timeout: 15000,
-    })
-    return () => {
-      if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current)
-      watchId.current = null
-    }
+    if (!following) return undefined
+    return watchPosition(apply, fail)
   }, [following, apply, fail])
 
   return { ...state, locate, following, setFollowing }

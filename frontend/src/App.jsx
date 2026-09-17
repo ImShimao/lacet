@@ -13,6 +13,8 @@ import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
 import { load, save, slim } from './storage'
 import * as offline from './offlineMaps'
+import { clearEngineData } from './engine/client'
+import { useAppMode } from './platform'
 import { appDeltaY, currentTurn } from './orientation'
 
 const PARIS = { lat: 48.8566, lon: 2.3522 }
@@ -94,6 +96,11 @@ export default function App() {
   const [result, setResult] = useState(null)
   const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(false)
+  // L'étape en cours et son avancement. Le calcul se fait sur l'appareil et
+  // commence par télécharger les rues : sans indication, une première recherche
+  // dans une grande ville ressemblerait à une app bloquée.
+  const [progress, setProgress] = useState(null)
+  const searchToken = useRef(0)
   const [error, setError] = useState(null)
   const [scrub, setScrub] = useState(null)
   const [focus, setFocus] = useState(null)
@@ -110,6 +117,8 @@ export default function App() {
   const [history, setHistory] = useState(stored.history)
 
   const geo = useGeolocation()
+  // 'full' sur téléphone, 'planner' sur ordinateur — voir `platform.js`.
+  const mode = useAppMode()
 
   // --- point de départ ------------------------------------------------------
   // `recenter` distingue les deux gestes : choisir un lieu amène la carte
@@ -172,6 +181,7 @@ export default function App() {
       if (!start) return
 
       setBusy(true)
+      setProgress(null)
       setError(null)
       setResult(null)
       setSelected(null)
@@ -179,16 +189,28 @@ export default function App() {
       setTab('explore')
       setSheet('peek')
 
+      // Une recherche lancée pendant qu'une autre calcule la remplace : seule la
+      // dernière a le droit d'afficher son résultat. Sans ce jeton, la plus
+      // lente des deux gagnait, et l'écran montrait des boucles pour un
+      // réglage qu'on venait de changer.
+      const token = ++searchToken.current
       try {
-        const payload = await generateLoops(toRequest(active, start))
+        const payload = await generateLoops(toRequest(active, start), (stage, fraction) => {
+          if (token === searchToken.current) setProgress({ stage, fraction })
+        })
+        if (token !== searchToken.current) return
         setResult(payload)
         setSelected(payload.routes[0] || null)
       } catch (err) {
+        if (token !== searchToken.current) return
         // On garde l'erreur entière : hors ligne, « réessayer » ne sert à rien
         // et il vaut mieux renvoyer vers les parcours déjà enregistrés.
         setError({ message: err.message, offline: Boolean(err.offline) })
       } finally {
-        setBusy(false)
+        if (token === searchToken.current) {
+          setBusy(false)
+          setProgress(null)
+        }
       }
     },
     [params, start],
@@ -433,6 +455,7 @@ export default function App() {
             />
           ) : tab === 'routes' ? (
             <Library
+              mode={mode}
               saved={saved}
               history={history}
               profile={params}
@@ -447,6 +470,7 @@ export default function App() {
             />
           ) : tab === 'account' ? (
             <Account
+              mode={mode}
               params={params}
               geo={geo}
               onProfile={(patch) => {
@@ -462,6 +486,8 @@ export default function App() {
                 // On l'attend : effacer un cache prend un instant, et l'écran qui
                 // annonce le résultat lit le journal juste après.
                 await offline.clear()
+                // Les rues et altitudes gardées pour calculer hors ligne aussi.
+                await clearEngineData()
                 save({ favorites: [], history: [] })
                 setSaved([])
                 setHistory([])
@@ -469,6 +495,8 @@ export default function App() {
             />
           ) : (
             <Explore
+              mode={mode}
+              progress={progress}
               start={start}
               startLabel={startLabel}
               geo={geo}
