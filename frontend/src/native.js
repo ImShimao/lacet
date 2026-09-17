@@ -37,8 +37,10 @@ export async function bootNative() {
   } catch {
     /* barre d'état : purement cosmétique */
   }
-  // L'écran de lancement reste jusqu'au premier rendu : le retirer plus tôt
-  // laisserait voir une page blanche le temps que React monte.
+  // L'écran de lancement s'efface dès le premier rendu. Il s'effacerait de
+  // lui-même au bout de trois secondes (`capacitor.config.json`) : c'est le
+  // filet, pour qu'une erreur au démarrage laisse voir l'écran d'erreur de
+  // l'app plutôt qu'un logo figé qui a l'air d'un téléphone planté.
   requestAnimationFrame(() => SplashScreen.hide({ fadeOutDuration: 250 }).catch(() => {}))
 }
 
