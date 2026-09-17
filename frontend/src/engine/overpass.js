@@ -30,21 +30,42 @@ export const TILE_DEG = 0.05
 const TTL_MS = 14 * 86_400_000
 const CHUNK_BYTES = 40_000_000
 const MAX_CHUNK_TILES = 64
+// Délai avant de lancer un miroir de secours sur la même requête. Il grandit
+// avec la taille du lot, et c'est la mesure qui l'impose : une tuile de Paris
+// met une bonne minute à arriver, et doubler la requête au bout de huit
+// secondes téléchargeait deux fois quinze mégaoctets — sur des serveurs publics,
+// et sur le forfait de quelqu'un. Une petite zone, elle, doit basculer vite.
 const HEDGE_DELAY_MS = 8_000
+const HEDGE_PER_TILE_MS = 4_000
+const MAX_HEDGE_DELAY_MS = 30_000
+
+const hedgeDelayFor = (tiles) =>
+  Math.min(MAX_HEDGE_DELAY_MS, HEDGE_DELAY_MS + HEDGE_PER_TILE_MS * Math.max(0, tiles - 1))
 const RETRY_DELAY_MS = 1_500
 const MAX_RETRIES = 2
 const MAX_SLOT_WAIT_S = 60
-const QUERY_TIMEOUT_S = 90
+// Quarante-cinq secondes, et non quatre-vingt-dix : passé ce délai, la requête
+// ne va pas aboutir, et sur un téléphone c'est une barre de progression figée
+// avec quelqu'un qui attend en bas de chez lui, chaussures aux pieds. Les
+// miroirs de secours partent bien avant, au bout de huit secondes.
+const QUERY_TIMEOUT_S = 45
 const ROUNDS = 2
 
-// Ordre de préférence. L'instance principale d'abord : c'est la plus fiable, et
-// mesuré en septembre 2026, la seule des quatre qui répondait pour la France
-// (kumi et private.coffee restaient muets, osm.ch ne couvre que la Suisse).
+// Au moins deux miroirs doivent décrire la même zone comme vide avant qu'on le
+// croie. Un seul ne suffit pas, et ce n'est pas de la prudence de principe :
+// `overpass.osm.ch` ne contient que la Suisse et répondait « HTTP 200, aucune
+// rue » en deux dixièmes de seconde pour l'Alsace. L'app le prenait pour une
+// réponse valable et affichait « aucune voie praticable » en plein village.
+const EMPTY_CONFIRMATIONS = 2
+
+// Ordre de préférence, l'instance principale d'abord. **Que des instances
+// mondiales** : un extrait régional répond vite et faux hors de sa région, ce
+// qui est pire qu'une panne — mesuré le 17 septembre 2026 avec osm.ch, retiré
+// depuis.
 export const MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
 ]
 
 const EXCLUDED_HIGHWAYS = 'motorway|motorway_link|trunk|trunk_link|construction|proposed|raceway|bus_guideway|escape'
@@ -204,16 +225,29 @@ export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () =>
   if (homeIndex > 0) missing.unshift(...missing.splice(homeIndex, 1))
 
   let bytesPerTile = null
+  let cap = Infinity
   let silent = false
   while (missing.length) {
-    const budget =
-      bytesPerTile === null ? 1 : Math.max(1, Math.min(MAX_CHUNK_TILES, Math.floor(CHUNK_BYTES / Math.max(bytesPerTile, 1))))
+    const budget = Math.min(cap, firstBudget(bytesPerTile, missing.length, level))
     const { chunk, rect } = takeChunk(missing, budget)
 
     // Quand un lot entier est resté sans réponse, les suivants le resteraient :
     // réseau coupé, ou tous les miroirs tombés. Relancer deux tours de tentatives
     // pour chaque tuile faisait attendre des dizaines de secondes pour rien.
-    const answer = silent ? null : await queryMirrors(query(level, rectBbox(rect)), fetchImpl)
+    const answer = silent
+      ? null
+      : await queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect)))
+
+    // Mais un lot refusé n'est pas forcément un réseau coupé : une requête large
+    // est aussi ce qu'un miroir déjà chargé abandonne en premier, et la même zone
+    // passe en deux morceaux. On repose donc les tuiles et on réduit de moitié
+    // avant de conclure. Une tuile seule qui échoue, elle, est un vrai échec.
+    if (answer === null && chunk.length > 1) {
+      missing.unshift(...chunk)
+      cap = Math.max(1, Math.floor(chunk.length / 2))
+      continue
+    }
+
     if (answer === null) {
       silent = true
       // Tous les miroirs sont muets : une copie périmée vaut mieux qu'un échec.
@@ -226,6 +260,7 @@ export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () =>
       continue
     }
 
+    cap = Infinity
     bytesPerTile = answer.bytes / rectSize(rect)
     const extract = fromOverpass(answer.payload)
     const parts = splitIntoTiles(extract, rect)
@@ -241,6 +276,21 @@ export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () =>
   }
 
   return mergeExtracts(wanted.map((tile) => obtained.get(tileKey(level, tile)) ?? emptyExtract()))
+}
+
+// Combien de tuiles demander tant qu'on n'a pas mesuré la densité de la zone.
+//
+// La tuile du départ part seule pour servir d'étalon — indispensable avant de
+// demander seize tuiles de Paris. Mais une petite zone tient largement dans une
+// requête, et la découper en deux payait deux fois le coût fixe d'Overpass,
+// mesuré entre 2 et 13 secondes : pour une sortie de 6 km, c'est la moitié de
+// l'attente. Le plafond reste bas et ne vaut que pour les niveaux de détail des
+// courtes distances, les seuls où six tuiles pèsent à coup sûr peu.
+const ONE_SHOT_TILES = 6
+
+function firstBudget(bytesPerTile, remaining, level) {
+  if (bytesPerTile === null) return remaining <= ONE_SHOT_TILES && level <= 1 ? remaining : 1
+  return Math.max(1, Math.min(MAX_CHUNK_TILES, Math.floor(CHUNK_BYTES / Math.max(bytesPerTile, 1))))
 }
 
 /**
@@ -295,11 +345,11 @@ const demote = (url) => demotedUntil.set(url, Date.now() + DEMOTE_MS)
 const restore = (url) => demotedUntil.delete(url)
 export const resetMirrorHealth = () => demotedUntil.clear()
 
-async function queryMirrors(body, fetchImpl) {
+async function queryMirrors(body, fetchImpl, hedgeDelayMs = HEDGE_DELAY_MS) {
   let empty = null
   for (let attempt = 0; attempt < ROUNDS; attempt += 1) {
     if (attempt) await sleep(2000 * 2 ** (attempt - 1) + Math.random() * 1000)
-    const answer = await hedgedRound(mirrorOrder(), body, fetchImpl)
+    const answer = await hedgedRound(mirrorOrder(), body, fetchImpl, hedgeDelayMs)
     if (answer !== null) {
       if (answer.payload.elements.length) return answer
       empty = answer
@@ -369,7 +419,7 @@ export async function hedgedRound(mirrors, body, fetchImpl, hedgeDelayMs = HEDGE
       if (outcome.answer.payload.elements.length) {
         restore(outcome.url)
         // Un miroir qui a rendu du vide là où un autre a trouvé des rues ne
-        // couvre pas la zone (osm.ch hors de Suisse) ou a abandonné en route.
+        // couvre pas la zone, ou a abandonné en route.
         for (const url of emptyFrom) demote(url)
         return outcome.answer
       }
@@ -384,7 +434,11 @@ export async function hedgedRound(mirrors, body, fetchImpl, hedgeDelayMs = HEDGE
       task.controller.abort()
     }
   }
-  return empty
+  // Un seul « la zone est vide » ne fait pas une zone vide : sans confirmation,
+  // on rend un échec, que l'appelant traduira par une copie gardée ou par un
+  // message honnête — plutôt que par « aucune voie praticable », qui accuse
+  // l'endroit alors que ce sont les serveurs qui ont failli.
+  return emptyFrom.length >= EMPTY_CONFIRMATIONS ? empty : null
 }
 
 /** Les réponses d'un serveur surchargé, qui passent souvent au second essai. */
@@ -413,7 +467,7 @@ export async function slotDelayMs(url, fetchImpl, fallbackMs = RETRY_DELAY_MS) {
 }
 
 async function ask(url, body, controller, fetchImpl) {
-  const timeout = setTimeout(() => controller.abort(), (QUERY_TIMEOUT_S + 15) * 1000)
+  const timeout = setTimeout(() => controller.abort(), (QUERY_TIMEOUT_S + 10) * 1000)
   try {
     const response = await fetchImpl(url, {
       method: 'POST',

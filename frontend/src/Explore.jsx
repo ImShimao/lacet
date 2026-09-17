@@ -286,22 +286,44 @@ const STAGES = {
  * plus en plein Paris. Une animation muette laissait croire à une app figée ;
  * nommer l'étape dit ce qui prend du temps, et pourquoi la suivante sera rapide.
  */
+// Au-delà de ce délai sans que la barre bouge, on le dit. Les serveurs
+// d'OpenStreetMap sont publics et gratuits, et une requête y prend parfois vingt
+// secondes : une barre figée à 17 % pendant ce temps donne une app plantée, et
+// on la ferme juste avant qu'elle aboutisse.
+const PATIENCE_MS = 12_000
+
 function SearchProgress({ progress }) {
   const stage = progress?.stage ?? 'data'
   const fraction = stage === 'data' ? (progress?.fraction ?? 0) : null
+  const [long, setLong] = useState(false)
+
+  // Le compteur repart à chaque avancée réelle : c'est l'absence de mouvement
+  // qui inquiète, pas la durée totale.
+  useEffect(() => {
+    setLong(false)
+    const timer = setTimeout(() => setLong(true), PATIENCE_MS)
+    return () => clearTimeout(timer)
+  }, [stage, fraction])
+
   return (
     <div className="progress" role="status">
       <div className="progress__label">
         <span>{STAGES[stage] ?? 'Calcul en cours'}…</span>
         {fraction !== null && fraction > 0 && <b>{Math.round(fraction * 100)} %</b>}
       </div>
-      <div className={`progress__bar ${fraction === null ? 'progress__bar--busy' : ''}`}>
-        <i style={fraction === null ? undefined : { transform: `scaleX(${Math.max(0.04, fraction)})` }} />
+      {/* Tant qu'aucune tuile n'est arrivée, la barre défile au lieu de rester à
+          zéro : une petite zone part en une seule requête, et vingt secondes de
+          barre immobile se lisent comme une app figée — on la ferme juste avant
+          qu'elle aboutisse. */}
+      <div className={`progress__bar ${fraction ? '' : 'progress__bar--busy'}`}>
+        <i style={fraction ? { transform: `scaleX(${Math.max(0.04, fraction)})` } : undefined} />
       </div>
       <p className="muted small">
-        {stage === 'data'
-          ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
-          : 'Le calcul se fait sur ton appareil, sans serveur.'}
+        {long && stage === 'data'
+          ? "Les serveurs OpenStreetMap sont lents en ce moment — Lacet interroge leurs miroirs. Ça aboutit en général en moins d'une minute."
+          : stage === 'data'
+            ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
+            : 'Le calcul se fait sur ton appareil, sans serveur.'}
       </p>
     </div>
   )

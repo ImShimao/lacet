@@ -238,6 +238,15 @@ describe('les miroirs', () => {
     expect(answer.payload.elements).toEqual([])
   })
 
+  it('ne croit pas un seul miroir qui décrit le vide', async () => {
+    // Mesuré le 17 septembre 2026 : osm.ch, qui ne contient que la Suisse,
+    // répondait « HTTP 200, aucune rue » en deux dixièmes de seconde pour
+    // l'Alsace. Pris pour une réponse valable, ce vide affichait « aucune voie
+    // praticable » en plein village — l'app accusait l'endroit, pas les serveurs.
+    const { fetchImpl } = fakeNetwork((url) => (url === MIRRORS[0] ? 'empty' : 'error'))
+    expect(await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 50)).toBe(null)
+  })
+
   it('tous en panne ne rend rien', async () => {
     const { fetchImpl } = fakeNetwork(() => 'error')
     expect(await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 50)).toBe(null)
@@ -281,6 +290,36 @@ describe('le téléchargement d’une zone', () => {
     const ids = extract.ways.map((w) => w.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
+
+  it('demande une petite zone d’un seul coup', async () => {
+    // La tuile du départ part seule pour mesurer la densité — indispensable avant
+    // de demander seize tuiles de Paris. Mais une sortie de 6 km tient dans une
+    // requête, et la couper en deux payait deux fois le coût fixe d'Overpass,
+    // mesuré entre 2 et 13 secondes.
+    const { fetchImpl, calls } = fakeNetwork()
+    const extract = await fetchArea({ ...BEAUNE, radiusM: 2000, targetM: 6000, fetchImpl })
+    expect(calls).toHaveLength(1)
+    expect(extract.ways.length).toBeGreaterThan(0)
+  })
+
+  it('repart en deux morceaux quand un lot trop large est refusé', async () => {
+    // Une requête large est ce qu'un miroir déjà chargé abandonne en premier.
+    // Conclure « plus de réseau » sur ce seul refus condamnait la recherche alors
+    // que la même zone passe en deux morceaux.
+    const base = fakeNetwork()
+    const tailles = []
+    const fetchImpl = async (url, options) => {
+      if (url.endsWith('/status')) return base.fetchImpl(url, options)
+      const [s, w, n, e] = bboxOf(options.body)
+      const tuiles = Math.round(((n - s) / TILE_DEG) * ((e - w) / TILE_DEG))
+      tailles.push(tuiles)
+      if (tuiles > 12) throw new TypeError('Failed to fetch')
+      return base.fetchImpl(url, options)
+    }
+    const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
+    expect(extract.ways.length).toBe(15)
+    expect(Math.max(...tailles.filter((t) => t <= 12))).toBeGreaterThan(1)
+  }, 20_000)
 
   it('préfère une copie périmée à un échec quand tout est muet', async () => {
     const debut = Date.now()

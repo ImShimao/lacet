@@ -22,13 +22,15 @@ class Settings(BaseSettings):
     # des ressources publiques et gratuites, régulièrement saturées aux heures
     # ouvrées européennes — en avoir plusieurs n'est pas du luxe, c'est la
     # différence entre « l'app marche » et « l'app marche parfois ».
-    # (overpass.osm.jp a été retiré : son certificat ne correspond plus à son
-    # nom de domaine, chaque appel échouait sur une erreur TLS.)
+    # Que des instances mondiales. (overpass.osm.jp a été retiré : son certificat
+    # ne correspond plus à son nom de domaine, chaque appel échouait sur une
+    # erreur TLS. overpass.osm.ch aussi : il ne contient que la Suisse et
+    # répondait « HTTP 200, aucune rue » en deux dixièmes de seconde pour
+    # l'Alsace — une réponse vite crue, et fausse, ce qui est pire qu'une panne.)
     overpass_urls: list[str] = [
         "https://overpass-api.de/api/interpreter",
         "https://overpass.kumi.systems/api/interpreter",
         "https://overpass.private.coffee/api/interpreter",
-        "https://overpass.osm.ch/api/interpreter",
     ]
     overpass_timeout_s: int = 90
 
