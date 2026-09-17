@@ -38,6 +38,11 @@ createRoot(document.getElementById('root')).render(
 // s'ouvre sans réseau par construction, et WebKit n'accepte de toute façon pas
 // de service worker hors des adresses http(s).
 if (isNative()) {
+  // Dans l'app, rien ne se sélectionne : un appui long faisait surgir le menu
+  // « Copier / Rechercher / Traduire » d'iOS par-dessus la carte, au moment
+  // précis où l'on garde le doigt sur l'écran pour lire. C'est le réflexe d'une
+  // page web, pas d'une app. Le style s'accroche à cette classe (`styles.css`).
+  document.documentElement.classList.add('native')
   import('./native').then((native) => native.bootNative())
 } else if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   // Après `load` : l'enregistrement lance des téléchargements, et les faire

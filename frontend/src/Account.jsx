@@ -5,7 +5,7 @@
  * pour laquelle il ne dépend de rien d'autre que du stockage du navigateur.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { SPORTS } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
@@ -244,24 +244,92 @@ function ModePicker({ mode }) {
   )
 }
 
+/**
+ * Un appui maintenu répète le pas, de plus en plus vite.
+ *
+ * Passer de 70 à 82 kg demandait douze appuis, et de 175 à 194 cm dix-neuf.
+ * La valeur est lue dans une référence à chaque répétition : la lire dans la
+ * fermeture figerait le premier chiffre, et tous les pas suivants
+ * réécriraient la même valeur.
+ */
+function useHold(step, delays = { first: 420, min: 55 }) {
+  const timer = useRef(null)
+  const action = useRef(step)
+  action.current = step
+
+  const stop = () => {
+    clearTimeout(timer.current)
+    timer.current = null
+  }
+  useEffect(() => stop, [])
+
+  const start = (event) => {
+    // Un seul doigt, et pas de sélection ni de zoom déclenchés par l'appui long.
+    event.preventDefault()
+    action.current()
+    let delay = delays.first
+    const tick = () => {
+      action.current()
+      delay = Math.max(delays.min, delay * 0.72)
+      timer.current = setTimeout(tick, delay)
+    }
+    timer.current = setTimeout(tick, delay)
+  }
+
+  // `detail` vaut zéro quand le clic vient du clavier (Entrée ou Espace sur le
+  // bouton) : là, aucun événement de pointeur n'est émis, et le pas ne se ferait
+  // jamais. À la souris ou au doigt, l'appui l'a déjà fait.
+  const onClick = (event) => {
+    if (event.detail === 0) action.current()
+  }
+
+  return { onClick, onPointerDown: start, onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop }
+}
+
+/**
+ * Une valeur chiffrée : au doigt par les deux boutons, au clavier en touchant
+ * le nombre.
+ *
+ * Le nombre est un champ, et pas seulement un affichage : douze appuis pour
+ * corriger un poids est le genre de détail qui fait renoncer à régler quoi que
+ * ce soit. Ce qui est saisi n'est pris qu'à la validation, et ramené dans les
+ * bornes — un champ vidé le temps de retaper ne doit pas valoir « 0 kg ».
+ */
 function NumberRow({ label, unit, value, min, max, onChange }) {
+  const [draft, setDraft] = useState(null)
+  const moins = useHold(() => onChange(Math.max(min, value - 1)))
+  const plus = useHold(() => onChange(Math.min(max, value + 1)))
+
+  const commit = () => {
+    const saisi = Number(draft)
+    setDraft(null)
+    if (draft !== null && draft !== '' && Number.isFinite(saisi)) {
+      onChange(Math.min(max, Math.max(min, Math.round(saisi))))
+    }
+  }
+
   return (
     <div className="rows__row">
       <span>{label}</span>
       <span className="rows__num">
-        <button
-          onClick={() => onChange(Math.max(min, value - 1))}
-          aria-label={`Diminuer ${label.toLowerCase()}`}
-        >
+        <button {...moins} aria-label={`Diminuer ${label.toLowerCase()}`}>
           <Icon name="minus" size={15} />
         </button>
-        <b>
-          {value} {unit}
-        </b>
-        <button
-          onClick={() => onChange(Math.min(max, value + 1))}
-          aria-label={`Augmenter ${label.toLowerCase()}`}
-        >
+        <label className="rows__field">
+          <input
+            type="text"
+            inputMode="numeric"
+            enterKeyHint="done"
+            aria-label={`${label} en ${unit === 'kg' ? 'kilogrammes' : 'centimètres'}`}
+            value={draft ?? value}
+            onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
+            onFocus={(e) => e.target.select()}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+          />
+          <b>{unit}</b>
+        </label>
+        <button {...plus} aria-label={`Augmenter ${label.toLowerCase()}`}>
           <Icon name="plus" size={15} />
         </button>
       </span>

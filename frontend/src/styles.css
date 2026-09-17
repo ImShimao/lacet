@@ -646,6 +646,38 @@ input:focus-visible {
 .rows__row:has(.rows__num) {
   align-items: center;
 }
+/* Le nombre se touche pour le taper : il en a l'air, sans devenir un formulaire. */
+.rows__field {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: var(--surface-3);
+  cursor: text;
+}
+.rows__field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.rows__field input {
+  width: 2.4em;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rows__field input:focus {
+  outline: none;
+}
+.rows__field b {
+  color: var(--text-3);
+  font-weight: 600;
+}
 .safety__value {
   font-family: var(--mono);
   font-size: 12.5px;
@@ -960,6 +992,20 @@ input:focus-visible {
 /* L'avancement d'une recherche calculée sur l'appareil. La barre suit les
    tuiles téléchargées ; pour les étapes dont on ne connaît pas la durée, un
    reflet qui passe dit que ça avance sans promettre un pourcentage faux. */
+/* Dans l'app iPhone, seuls les champs de saisie se sélectionnent : voir
+   `main.jsx` pour la raison. Sur le web, la sélection reste normale — on y
+   copie une adresse ou un nom de rue, et rien ne vient la contrarier. */
+html.native {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.native input,
+html.native textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .progress {
   display: flex;
   flex-direction: column;
