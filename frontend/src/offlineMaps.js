@@ -23,7 +23,17 @@
 // **Le style, les pictogrammes et les polices ne dépendent pas du parcours.**
 // Ils sont téléchargés une fois et servent à tous les suivants ; seul le lot de
 // tuiles est propre à chaque boucle.
+//
+// **Deux endroits où ranger, selon où tourne l'app.** Dans le navigateur, les
+// fichiers vont dans l'API de cache, où le service worker les reprend quand le
+// réseau manque. L'app iPhone, elle, n'a pas de service worker — WebKit n'en
+// fait pas tourner sous son adresse `capacitor://` — et le même rangement y
+// donnait une carte téléchargée, annoncée « hors ligne ✓ », et noire une fois
+// dehors. Les fichiers y vont donc dans IndexedDB, et c'est la carte elle-même
+// qui vient les y lire (`offlineRequest`, `loadOffline`).
 
+import { store } from './engine/store'
+import { isNative } from './platform'
 import { load, save } from './storage'
 
 const CACHE = 'lacet-maps-v1'
@@ -68,15 +78,60 @@ const MARGIN = 1
 const GLYPH_RANGES = ['0-255', '256-511']
 
 /** Même normalisation que le service worker : les quatre sous-domaines de
- *  tuiles sont équivalents, on range tout sous un seul nom. */
-const mapKey = (url) => url.replace(/\/\/tiles-[a-d]\./, '//tiles.')
+ *  tuiles sont équivalents, on range tout sous un seul nom.
+ *
+ *  L'adresse est aussi mise sous sa forme canonique — espaces encodés, virgules
+ *  laissées telles quelles — qui est celle que le réseau reçoit. MapLibre
+ *  demande les polices sous un nom brut (`Montserrat Medium,Open Sans Bold`) ;
+ *  rangées sous une autre écriture, elles n'étaient jamais retrouvées, et la
+ *  carte hors ligne s'affichait sans un seul nom de rue. */
+export function mapKey(url) {
+  const shared = url.replace(/\/\/tiles-[a-d]\./, '//tiles.')
+  try {
+    return new URL(shared).href
+  } catch {
+    return shared
+  }
+}
 
 /** L'API de cache est-elle là ? Elle manque en contexte non sécurisé — une
  *  adresse http://192.168.x.x sur le réseau local, par exemple. On le demande à
  *  chaque appel plutôt qu'une fois au chargement : figé dans une constante, ce
  *  test devenait impossible à éprouver, et c'est justement le genre de détail
  *  qui casse en silence chez quelqu'un d'autre. */
-export const isAvailable = () => typeof caches !== 'undefined'
+export const isAvailable = () =>
+  isNative() ? typeof indexedDB !== 'undefined' : typeof caches !== 'undefined'
+
+/** Les fichiers de carte de l'app iPhone, dans IndexedDB. */
+const deviceFiles = store('maps')
+
+/**
+ * L'endroit où ranger, avec la même façade des deux côtés.
+ *
+ * `put` rend la taille enregistrée : c'est elle qui fait avancer le plafond en
+ * octets, et elle doit être la vraie, pas celle qu'annonce un en-tête.
+ */
+async function openFiles() {
+  if (isNative()) {
+    return {
+      async put(url, response) {
+        const bytes = await response.arrayBuffer()
+        await deviceFiles.set(url, { type: response.headers.get('content-type') || '', bytes })
+        return bytes.byteLength
+      },
+      delete: (url) => deviceFiles.delete(url),
+    }
+  }
+  const cache = await caches.open(CACHE)
+  return {
+    async put(url, response) {
+      const copy = response.clone()
+      await cache.put(url, response)
+      return (await copy.blob()).size
+    },
+    delete: (url) => cache.delete(url),
+  }
+}
 
 /** Clé d'un parcours dans le journal des cartes gardées. */
 export const keyOf = (route) => `${route.name}|${Math.round(route.distance_m)}`
@@ -254,11 +309,9 @@ async function describeStyle(source) {
     }
     for (const stack of stacks) {
       for (const range of GLYPH_RANGES) {
-        shared.push(
-          style.glyphs
-            .replace('{fontstack}', encodeURIComponent(stack))
-            .replace('{range}', range),
-        )
+        // Le nom brut, comme MapLibre le demande : `mapKey` l'encode ensuite
+        // de la seule façon que le réseau et le rendu partagent.
+        shared.push(style.glyphs.replace('{fontstack}', stack).replace('{range}', range))
       }
     }
   }
@@ -297,7 +350,7 @@ export async function download(route, mapStyle, onProgress) {
   if (!templates.length) throw new Error("Ce fond de carte ne peut pas être gardé hors ligne.")
 
   const { levels } = tilePlan(route.geometry, templates.length)
-  const cache = await caches.open(CACHE)
+  const files = await openFiles()
 
   // En série plutôt qu'en rafale : ce sont des serveurs publics et gratuits, et
   // cinquante requêtes simultanées depuis chaque utilisateur seraient un abus.
@@ -312,9 +365,7 @@ export async function download(route, mapStyle, onProgress) {
       try {
         const response = await fetch(url, { mode: 'cors' })
         if (response.ok) {
-          const copy = response.clone()
-          await cache.put(url, response)
-          bytes += (await copy.blob()).size
+          bytes += await files.put(url, response)
           count += 1
         }
       } catch {
@@ -362,6 +413,7 @@ export async function download(route, mapStyle, onProgress) {
     styleLabel: mapStyle.label,
   }
   save({ offlineMaps: journal })
+  forgetStored()
 
   return { bytes, maxZoom }
 }
@@ -400,18 +452,107 @@ export async function remove(route) {
   delete journal[keyOf(route)]
   const encoreUtiles = new Set(Object.values(journal).flatMap((e) => e.urls || []))
 
-  const cache = await caches.open(CACHE)
+  const files = await openFiles()
   for (const url of entry.urls || []) {
-    if (!encoreUtiles.has(url)) await cache.delete(url)
+    if (!encoreUtiles.has(url)) await files.delete(url)
   }
 
   save({ offlineMaps: journal })
+  forgetStored()
 }
 
 /** Vide tout — appelé par l'effacement des données. */
 export async function clear() {
-  if (isAvailable()) await caches.delete(CACHE)
+  if (isNative()) await deviceFiles.clear()
+  else if (isAvailable()) await caches.delete(CACHE)
   save({ offlineMaps: {} })
+  forgetStored()
+}
+
+// --- la carte lit ce qui est gardé (app iPhone) ------------------------------
+
+export const OFFLINE_PROTOCOL = 'lacet-carte'
+
+// Le temps laissé au réseau pour une feuille de style, avant de prendre la
+// copie gardée. Sans réseau du tout, la requête échoue sur-le-champ ; c'est la
+// couverture qui faiblit — une barre, un relais saturé — qui laisse une requête
+// pendre, et la carte resterait vide tout ce temps.
+const STYLE_WAIT_MS = 4000
+
+let storedUrls = null
+
+/** Toutes les adresses gardées, pour un parcours ou un autre. Recalculé
+ *  seulement quand le journal change : la carte le consulte à chaque tuile. */
+function storedSet() {
+  if (!storedUrls) {
+    storedUrls = new Set(Object.values(load().offlineMaps || {}).flatMap((e) => e.urls || []))
+  }
+  return storedUrls
+}
+
+function forgetStored() {
+  storedUrls = null
+}
+
+/**
+ * `transformRequest` de la carte : détourne vers le stockage de l'appareil ce
+ * qui y a été gardé, et laisse le reste partir normalement.
+ *
+ * Les tuiles, les pictogrammes et les polices sont lus **sur l'appareil
+ * d'abord** : ils ne changent pas d'une semaine à l'autre, et les lire sur place
+ * rend la carte instantanée sans coûter un octet de forfait. La feuille de style
+ * et la description des tuiles passent **par le réseau d'abord** : ce sont elles
+ * qui désignent les adresses des tuiles, et une copie figée continuerait de
+ * pointer vers d'anciennes adresses partout ailleurs sur la carte, le jour où
+ * le fournisseur en change.
+ */
+export function offlineRequest(url, resourceType) {
+  if (!isNative() || !url.startsWith('http') || !storedSet().has(mapKey(url))) return undefined
+  const first = resourceType === 'Style' || resourceType === 'Source' ? 'reseau' : 'appareil'
+  return { url: `${OFFLINE_PROTOCOL}://${first}/${url}` }
+}
+
+/** Le chargeur de ces adresses détournées, enregistré par `maplibregl.addProtocol`. */
+export async function loadOffline(params, abortController) {
+  const rest = params.url.slice(OFFLINE_PROTOCOL.length + 3)
+  const cut = rest.indexOf('/')
+  const first = rest.slice(0, cut)
+  const url = rest.slice(cut + 1)
+
+  let file
+  if (first === 'appareil') {
+    file = (await deviceFiles.get(mapKey(url))) ?? (await fromNetwork(url, abortController.signal))
+  } else {
+    try {
+      file = await fromNetwork(url, abortController.signal, STYLE_WAIT_MS)
+    } catch (error) {
+      if (abortController.signal.aborted) throw error
+      file = await deviceFiles.get(mapKey(url))
+      if (!file) throw error
+    }
+  }
+  return { data: decode(file.bytes, params.type) }
+}
+
+async function fromNetwork(url, signal, waitMs) {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  signal?.addEventListener('abort', abort)
+  const timer = waitMs ? setTimeout(abort, waitMs) : null
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`${response.status} pour ${url}`)
+    return { type: response.headers.get('content-type') || '', bytes: await response.arrayBuffer() }
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+  }
+}
+
+function decode(bytes, type) {
+  if (type === 'json') return JSON.parse(new TextDecoder().decode(bytes))
+  if (type === 'string') return new TextDecoder().decode(bytes)
+  return bytes
 }
 
 export function formatBytes(bytes) {

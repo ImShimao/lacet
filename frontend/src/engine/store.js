@@ -5,12 +5,15 @@
 // dizaines de mégaoctets et doivent survivre à la fermeture de l'app. En mémoire
 // ailleurs, pour que le moteur tourne tel quel dans les tests.
 //
+// Les cartes gardées hors ligne de l'app iPhone y vivent aussi (`maps`) : voir
+// `offlineMaps.js` pour la raison.
+//
 // Chaque opération est protégée : un stockage refusé (navigation privée,
 // quota plein) doit dégrader le cache, jamais empêcher de calculer un itinéraire.
 
 const DB_NAME = 'lacet-engine'
-const DB_VERSION = 1
-const STORES = ['osm', 'elevation']
+const DB_VERSION = 2
+const STORES = ['osm', 'elevation', 'maps']
 
 let dbPromise = null
 
@@ -25,7 +28,16 @@ function openDb() {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name)
         }
       }
-      request.onsuccess = () => resolve(request.result)
+      request.onsuccess = () => {
+        // Une version plus récente de la base demande la main (une mise à jour
+        // de l'app ouverte à côté) : on la lui rend. Garder la connexion
+        // bloquerait sa mise à niveau, et son cache retomberait en mémoire.
+        request.result.onversionchange = () => {
+          request.result.close()
+          dbPromise = null
+        }
+        resolve(request.result)
+      }
       request.onerror = () => resolve(null)
       request.onblocked = () => resolve(null)
     } catch {

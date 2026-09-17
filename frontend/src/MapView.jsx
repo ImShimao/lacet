@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { TRACE_COLORS, styleByKey } from './mapStyles'
+import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { currentTurn, onTurn } from './orientation'
+
+// Les cartes gardées hors ligne, dans l'app iPhone : `offlineRequest` détourne
+// vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
+maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
 
 export default function MapView({
   styleKey,
@@ -44,6 +49,7 @@ export default function MapView({
       // Les gestes tactiles à deux doigts sont la norme sur une carte plein
       // écran ; sans ça, faire défiler la page devient impossible sur mobile.
       cooperativeGestures: false,
+      transformRequest: offlineRequest,
     })
     map.current = instance
     // Le style est posé après coup plutôt que passé au constructeur : c'est la
