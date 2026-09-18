@@ -10,7 +10,7 @@
 import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { duration, km, pace } from './format'
-import { styleByKey } from './mapStyles'
+import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 
 export default function Library({ mode = 'full', saved, history, onOpen, profile, mapStyle }) {
@@ -110,7 +110,9 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
  * est souvent celui où l'on n'a plus de réseau pour la reconstituer.
  */
 function OfflineControl({ route, mapStyle }) {
-  const style = styleByKey(mapStyle)
+  // Certains fonds ne se gardent pas hors ligne (OpenStreetMap l'interdit) : on
+  // garde alors le fond par défaut, et la pastille le dit.
+  const style = offlineStyleFor(mapStyle)
   const [entry, setEntry] = useState(() => ({
     stored: offline.isStored(route),
     bytes: offline.storedBytes(route),

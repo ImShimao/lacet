@@ -1,13 +1,21 @@
 // Fonds de carte disponibles. Tous fonctionnent sans clé d'API ; ceux de
-// Mapbox s'ajoutent automatiquement si VITE_MAPBOX_TOKEN est présent dans
-// frontend/.env.
+// Mapbox s'ajoutent automatiquement si VITE_MAPBOX_TOKEN est présent — dans
+// frontend/.env pour le site, en secret du dépôt GitHub pour l'app iPhone.
 //
 // `contrast` indique sur quel fond le tracé se détache : les couleurs du
 // parcours et des libellés s'y adaptent, sinon un tracé vert sur imagerie
 // satellite devient illisible.
 //
+// `description` est la phrase que montre le sélecteur : un nom seul (« Plan »,
+// « Clair ») ne dit pas à quoi sert un fond, ni pourquoi en changer.
+//
 // `transform`, facultatif, retouche la feuille de style une fois téléchargée
 // et avant qu'elle ne s'affiche.
+//
+// `offline: false` : ce fond ne se garde pas hors ligne. C'est le cas des
+// tuiles d'OpenStreetMap, dont les conditions d'usage interdisent le
+// téléchargement en masse ; les cartes hors ligne prennent alors le fond par
+// défaut, et le disent.
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -36,6 +44,27 @@ const ESRI_IMAGERY = {
     { id: 'labels', type: 'raster', source: 'labels' },
   ],
 }
+
+// Le rendu de référence d'OpenStreetMap, celui du site openstreetmap.org. Des
+// tuiles image, servies par la fondation : utilisables pour consulter, pas
+// pour aspirer — d'où `offline: false` plus bas.
+const OSM_STANDARD = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© contributeurs OpenStreetMap',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+}
+
+// Les fonds d'OpenFreeMap : des cartes OpenStreetMap vectorielles, gratuites et
+// sans clé, hébergées bénévolement. Même données que Mapbox, rendu comparable.
+const OPENFREEMAP = 'https://tiles.openfreemap.org/styles'
 
 const TOPO = {
   version: 8,
@@ -185,14 +214,32 @@ export const MAP_STYLES = [
     label: 'Nuit',
     swatch: '#15121d',
     contrast: 'dark',
+    description: "Sombre, aux couleurs de l'app : le tracé ressort, et l'écran éblouit moins le soir.",
     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
     transform: (style) => tintNight(frenchLabels(style)),
+  },
+  {
+    key: 'fiord',
+    label: 'Fjord',
+    swatch: '#2b4250',
+    contrast: 'dark',
+    description: 'Sombre et bleuté, parcs et eau bien distincts : lisible de jour comme de nuit.',
+    style: `${OPENFREEMAP}/fiord`,
+  },
+  {
+    key: 'streets',
+    label: 'Rues',
+    swatch: '#f2efe9',
+    contrast: 'light',
+    description: 'Rues détaillées avec leurs noms, commerces, numéros de route : idéal pour se repérer en ville.',
+    style: `${OPENFREEMAP}/liberty`,
   },
   {
     key: 'light',
     label: 'Clair',
     swatch: '#e8eaed',
     contrast: 'light',
+    description: 'Clair et épuré, presque sans couleur : le plus lisible en plein soleil.',
     style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
     transform: frenchLabels,
   },
@@ -201,14 +248,17 @@ export const MAP_STYLES = [
     label: 'Plan',
     swatch: '#cfd8c8',
     contrast: 'light',
+    description: "Plan en couleurs, parcs, eau et bâtiments : le plus proche d'une carte routière.",
     style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
     transform: frenchLabels,
   },
   {
+    // La clé reste `topo` pour la même raison que `dark` ci-dessus.
     key: 'topo',
-    label: 'Relief',
+    label: 'Nature',
     swatch: '#c9b99a',
     contrast: 'light',
+    description: 'Relief, courbes de niveau, sentiers et chemins : pour les terrains mixtes et la montagne.',
     style: TOPO,
   },
   {
@@ -216,32 +266,53 @@ export const MAP_STYLES = [
     label: 'Satellite',
     swatch: '#3d4a35',
     contrast: 'dark',
+    description: "Photo aérienne avec le nom des rues : pour voir l'ombre d'une allée, un parc, un chemin de terre.",
     style: ESRI_IMAGERY,
+  },
+  {
+    key: 'osm',
+    label: 'OpenStreetMap',
+    swatch: '#aad3df',
+    contrast: 'light',
+    description: "Le rendu du site OpenStreetMap, celui des contributeurs. Ne se garde pas hors ligne : OpenStreetMap l'interdit.",
+    style: OSM_STANDARD,
+    offline: false,
   },
   ...(MAPBOX_TOKEN
     ? [
         {
           key: 'mapbox',
-          label: 'Mapbox sombre',
+          label: 'Mapbox nuit',
           swatch: '#1b2431',
           contrast: 'dark',
-          style: mapboxRaster('dark-v11'),
+          description: 'Le fond sombre de navigation de Mapbox, avec ses numéros de route.',
+          style: mapboxRaster('navigation-night-v1'),
         },
         {
           // Sentiers, courbes de niveau, ombrage du relief : le fond le plus
           // utile dès qu'on court hors des villes.
           key: 'mapbox-outdoors',
-          label: 'Mapbox Outdoors',
+          label: 'Mapbox nature',
           swatch: '#d7e2c6',
           contrast: 'light',
+          description: 'Relief ombré, sentiers de randonnée et courbes de niveau, par Mapbox.',
           style: mapboxRaster('outdoors-v12'),
         },
         {
           key: 'mapbox-satellite',
-          label: 'Mapbox Satellite',
+          label: 'Mapbox satellite',
           swatch: '#33402c',
           contrast: 'dark',
+          description: 'Imagerie satellite haute résolution de Mapbox, avec les rues par-dessus.',
           style: mapboxRaster('satellite-streets-v12'),
+        },
+        {
+          key: 'mapbox-streets',
+          label: 'Mapbox standard',
+          swatch: '#eceae4',
+          contrast: 'light',
+          description: 'Le style classique de Mapbox, simple et clair.',
+          style: mapboxRaster('streets-v12'),
         },
       ]
     : []),
@@ -251,6 +322,19 @@ export const DEFAULT_STYLE = 'dark'
 
 export function styleByKey(key) {
   return MAP_STYLES.find((s) => s.key === key) || MAP_STYLES[0]
+}
+
+/** Options de chargement d'un fond : sa retouche éventuelle, faite avant
+ *  affichage. MapLibre n'accepte de retoucher un style que par `setStyle`. */
+export function loadOptions(entry) {
+  return entry.transform ? { transformStyle: (_previous, next) => entry.transform(next) } : {}
+}
+
+/** Le fond à garder hors ligne quand on regarde celui-ci : lui-même s'il le
+ *  permet, le fond par défaut sinon. */
+export function offlineStyleFor(key) {
+  const style = styleByKey(key)
+  return style.offline === false ? styleByKey(DEFAULT_STYLE) : style
 }
 
 // Couleurs du tracé selon le niveau de risque. Le jeu « light » est plus

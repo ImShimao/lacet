@@ -7,8 +7,9 @@ import LiveRun from './LiveRun.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import Account from './Account.jsx'
+import MapStyleSheet from './MapStyleSheet.jsx'
 import useGeolocation from './useGeolocation'
-import { MAP_STYLES, DEFAULT_STYLE, styleByKey } from './mapStyles'
+import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
 import { load, save, slim } from './storage'
@@ -85,6 +86,7 @@ export default function App() {
 
   const [tab, setTab] = useState('explore')
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [stylesOpen, setStylesOpen] = useState(false)
   const [detail, setDetail] = useState(true)
   // Sur téléphone, le panneau des propositions a deux hauteurs. Repliée, la
   // carte occupe l'écran et seules les cartes de parcours flottent dessus ;
@@ -389,7 +391,15 @@ export default function App() {
           >
             <Icon name="pin" />
           </button>
-          <StylePicker value={mapStyle} onChange={(k) => { setMapStyle(k); save({ mapStyle: k }) }} />
+          <button
+            className={`tool ${stylesOpen ? 'tool--on' : ''}`}
+            onClick={() => setStylesOpen(true)}
+            title="Fond de carte"
+            aria-label="Fond de carte"
+            aria-haspopup="dialog"
+          >
+            <Icon name="layers" />
+          </button>
         </div>
 
         {/* Seule une consigne transitoire flotte sur la carte. Un message
@@ -566,59 +576,16 @@ export default function App() {
       {filtersOpen && (
         <FiltersSheet value={params} onApply={search} onClose={() => setFiltersOpen(false)} />
       )}
-    </div>
-  )
-}
-
-// --- sélecteur de fond de carte ---------------------------------------------
-
-function StylePicker({ value, onChange }) {
-  const [open, setOpen] = useState(false)
-  const root = useRef(null)
-
-  // Un menu qui ne se referme qu'en rappuyant sur son bouton finit toujours par
-  // rester ouvert au-dessus de la carte. Clic à l'extérieur et Échap le ferment.
-  useEffect(() => {
-    if (!open) return undefined
-    const onDown = (e) => {
-      if (!root.current?.contains(e.target)) setOpen(false)
-    }
-    const onKey = (e) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('pointerdown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
-  return (
-    <div className="styler" ref={root}>
-      <button
-        className={`tool ${open ? 'tool--on' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-        title="Fond de carte"
-        aria-label="Fond de carte"
-        aria-expanded={open}
-      >
-        <Icon name="layers" />
-      </button>
-      {open && (
-        <div className="styler__menu">
-          {MAP_STYLES.map((s) => (
-            <button
-              key={s.key}
-              className={`styler__row ${s.key === value ? 'styler__row--on' : ''}`}
-              onClick={() => {
-                onChange(s.key)
-                setOpen(false)
-              }}
-            >
-              <i style={{ background: s.swatch }} />
-              {s.label}
-            </button>
-          ))}
-        </div>
+      {stylesOpen && (
+        <MapStyleSheet
+          value={mapStyle}
+          onSave={(key) => {
+            setMapStyle(key)
+            save({ mapStyle: key })
+            setStylesOpen(false)
+          }}
+          onClose={() => setStylesOpen(false)}
+        />
       )}
     </div>
   )

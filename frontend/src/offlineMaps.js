@@ -286,6 +286,11 @@ async function describeStyle(source) {
 
   const templates = []
   for (const src of Object.values(style.sources || {})) {
+    // Une couche qui s'arrête avant le zoom 10 — l'ombrage du globe entier des
+    // fonds OpenFreeMap — n'a rien à montrer à l'échelle d'un parcours. La
+    // compter faisait demander des centaines de tuiles inexistantes, et
+    // divisait par deux le budget des vraies.
+    if (src.maxzoom !== undefined && src.maxzoom < MIN_ZOOM) continue
     if (src.tiles?.length) {
       templates.push(src.tiles[0])
     } else if (src.url) {

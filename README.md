@@ -251,6 +251,32 @@ allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
 - **Les cartes hors ligne** sont rangées dans IndexedDB et lues directement par
   la carte : il n'y a pas de service worker dans une app native, et sans ce
   chemin une carte « gardée » restait noire une fois dehors.
+- **L'écran de verrouillage guide.** Pendant une sortie guidée, une activité en
+  direct affiche la consigne à venir, sa distance, ce qui reste et un compte à
+  rebours jusqu'à l'arrivée — aussi dans la Dynamic Island. C'est une extension
+  iOS à part (`frontend/ios-overlay/live-activity/`), greffée au projet Xcode par
+  `add_live_activity.rb` pendant la compilation. Elle demande iOS 16.2, et les
+  « Activités en direct » autorisées dans Réglages → Lacet.
+
+### En course, la carte suit comme un GPS
+
+Le sens de la course en haut, la carte inclinée, le coureur placé bas pour voir
+ce qui vient. Le cap se lit **sur le tracé**, pas sur la boussole du GPS : à
+pied, celle-ci est du bruit, et la carte tournait de trente degrés à chaque
+seconde. Déplacer ou tourner la carte au doigt la libère ; « Recentrer » la
+reprend. Pincer pour zoomer ne libère rien, et le zoom choisi est gardé.
+
+### Les fonds de carte
+
+Huit fonds gratuits et sans clé : Nuit et Clair et Plan (CARTO), Fjord et Rues
+(OpenFreeMap), Nature (OpenTopoMap), Satellite (Esri) et le rendu
+OpenStreetMap — ce dernier ne se garde pas hors ligne, ses conditions d'usage
+l'interdisent. Chaque fond a son aperçu et une phrase qui dit à quoi il sert.
+
+Les fonds **Mapbox** (nuit, nature, satellite, standard) s'ajoutent avec une clé
+publique Mapbox (`pk.…`, gratuite jusqu'à un large quota) : dans
+`frontend/.env` sous `VITE_MAPBOX_TOKEN=` pour le site, et en secret du dépôt
+GitHub du même nom pour l'app iPhone.
 
 ---
 
