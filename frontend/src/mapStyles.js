@@ -14,8 +14,10 @@
 //
 // `offline: false` : ce fond ne se garde pas hors ligne. C'est le cas des
 // tuiles d'OpenStreetMap, dont les conditions d'usage interdisent le
-// téléchargement en masse ; les cartes hors ligne prennent alors le fond par
-// défaut, et le disent.
+// téléchargement en masse, et de celles de Mapbox, dont les conditions le
+// réservent à leurs propres kits — sans compter qu'une carte gardée
+// consommerait d'un coup des centaines de tuiles du quota gratuit. Les cartes
+// hors ligne prennent alors le fond par défaut, et le disent.
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -287,6 +289,7 @@ export const MAP_STYLES = [
           contrast: 'dark',
           description: 'Le fond sombre de navigation de Mapbox, avec ses numéros de route.',
           style: mapboxRaster('navigation-night-v1'),
+          offline: false,
         },
         {
           // Sentiers, courbes de niveau, ombrage du relief : le fond le plus
@@ -297,6 +300,7 @@ export const MAP_STYLES = [
           contrast: 'light',
           description: 'Relief ombré, sentiers de randonnée et courbes de niveau, par Mapbox.',
           style: mapboxRaster('outdoors-v12'),
+          offline: false,
         },
         {
           key: 'mapbox-satellite',
@@ -305,6 +309,7 @@ export const MAP_STYLES = [
           contrast: 'dark',
           description: 'Imagerie satellite haute résolution de Mapbox, avec les rues par-dessus.',
           style: mapboxRaster('satellite-streets-v12'),
+          offline: false,
         },
         {
           key: 'mapbox-streets',
@@ -313,6 +318,7 @@ export const MAP_STYLES = [
           contrast: 'light',
           description: 'Le style classique de Mapbox, simple et clair.',
           style: mapboxRaster('streets-v12'),
+          offline: false,
         },
       ]
     : []),
