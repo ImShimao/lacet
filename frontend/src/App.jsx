@@ -14,11 +14,15 @@ import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
 import { load, save, slim } from './storage'
 import * as offline from './offlineMaps'
-import { clearEngineData } from './engine/client'
+import { clearEngineData, prefetchOnDevice } from './engine/client'
 import { useAppMode } from './platform'
 import { appDeltaY, currentTurn } from './orientation'
 
 const PARIS = { lat: 48.8566, lon: 2.3522 }
+
+// Le temps de laisser finir un repère qu'on fait glisser, ou une adresse qu'on
+// choisit, avant de préparer les rues : on ne prépare que là où l'on s'arrête.
+const PREFETCH_DELAY_MS = 1200
 
 /**
  * La poignée de la feuille, sur téléphone : elle replie le détail d'un
@@ -226,6 +230,33 @@ export default function App() {
     },
     [params, start, result],
   )
+
+  // --- préparation en fond -----------------------------------------------------
+  // Dès que le départ et les réglages sont connus, les rues de la zone se
+  // téléchargent en fond, et leur graphe se construit : la recherche qui suit
+  // les trouve prêts — voir `engine/worker.js`. Rien pour Paris par défaut,
+  // qui n'est qu'un repli quand la position est refusée ; rien sans réseau, ni
+  // quand le téléphone demande d'économiser les données.
+  const prefetchKey = useMemo(() => {
+    if (!start || start === PARIS) return null
+    return JSON.stringify(toRequest(params, start))
+  }, [start, params])
+  const [prepared, setPrepared] = useState(null)
+
+  useEffect(() => {
+    if (!prefetchKey || running) return undefined
+    const network = typeof navigator !== 'undefined' ? navigator : {}
+    if (network.onLine === false || network.connection?.saveData) return undefined
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const ready = await prefetchOnDevice(JSON.parse(prefetchKey))
+      if (!cancelled && ready) setPrepared(prefetchKey)
+    }, PREFETCH_DELAY_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [prefetchKey, running])
 
   // --- raccourcis clavier ----------------------------------------------------
   useEffect(() => {
@@ -531,6 +562,7 @@ export default function App() {
               selected={selected}
               detail={detail}
               params={params}
+              streetsReady={prefetchKey !== null && prepared === prefetchKey}
               isFavorite={isFavorite}
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}

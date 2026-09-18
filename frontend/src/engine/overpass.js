@@ -28,6 +28,15 @@ import { store } from './store'
 
 export const TILE_DEG = 0.05
 const TTL_MS = 14 * 86_400_000
+
+// Passé quatorze jours, une tuile n'est plus « fraîche » — mais elle reste
+// bonne à servir pendant trois mois. Les rues d'un quartier changent rarement
+// en quelques semaines, et faire attendre vingt secondes de téléchargement
+// pour vérifier qu'elles n'ont pas bougé, c'était le prix de chaque retour
+// dans un coin après deux semaines. On sert donc la copie tout de suite, et on
+// la rafraîchit après coup, en fond, pour la fois suivante.
+const USABLE_MS = 90 * 86_400_000
+const REFRESH_DELAY_MS = 3000
 const CHUNK_BYTES = 40_000_000
 const MAX_CHUNK_TILES = 64
 // Délai avant de lancer un miroir de secours sur la même requête. Il grandit
@@ -199,24 +208,47 @@ const SILENT =
 /**
  * L'extrait couvrant la zone. `onProgress(fraction)` suit les tuiles obtenues.
  */
-export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () => {}, fetchImpl = fetch, now = Date.now }) {
+export async function fetchArea(args) {
+  const {
+    lat,
+    lon,
+    radiusM,
+    targetM,
+    onProgress = () => {},
+    fetchImpl = fetch,
+    now = Date.now,
+    // Pour le rafraîchissement en fond : des tuiles précises, et aucune copie
+    // considérée comme assez récente.
+    tiles: only = null,
+    freshMs = TTL_MS,
+    usableMs = USABLE_MS,
+    schedule = (task) => setTimeout(task, REFRESH_DELAY_MS),
+    chunkBytes = CHUNK_BYTES,
+  } = args
   const level = detailLevel(targetM)
-  const wanted = tilesFor(lat, lon, radiusM)
+  const wanted = only ?? tilesFor(lat, lon, radiusM)
   const obtained = new Map()
   const stale = new Map()
+  const aged = []
   const missing = []
 
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     const cached = await tiles.get(key)
-    if (cached && now() - cached.at < TTL_MS) obtained.set(key, cached.extract)
-    else {
+    const age = cached ? now() - cached.at : Infinity
+    if (age < freshMs) {
+      obtained.set(key, cached.extract)
+    } else if (age < usableMs) {
+      obtained.set(key, cached.extract)
+      aged.push(tile)
+    } else {
       missing.push(tile)
       if (cached) stale.set(key, cached.extract)
     }
   }
   const report = () => onProgress(obtained.size / wanted.length)
   report()
+  refreshLater(args, level, aged, schedule)
 
   // La tuile du départ d'abord : c'est elle qui mesure la densité de la zone.
   const home = [Math.floor(lon / TILE_DEG), Math.floor(lat / TILE_DEG)]
@@ -228,54 +260,92 @@ export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () =>
   let cap = Infinity
   let silent = false
   while (missing.length) {
-    const budget = Math.min(cap, firstBudget(bytesPerTile, missing.length, level))
-    const { chunk, rect } = takeChunk(missing, budget)
+    const budget = Math.min(cap, firstBudget(bytesPerTile, missing.length, level, chunkBytes))
+    const batch = [takeChunk(missing, budget)]
+    // Overpass accorde deux requêtes simultanées par adresse. Une fois la densité
+    // de la zone mesurée, deux lots partent donc ensemble : dans une grande
+    // ville, découpée en plusieurs lots, c'est l'attente divisée par deux. Avant
+    // la mesure, on ne sait pas ce que pèse un lot, et on n'en risque qu'un.
+    if (bytesPerTile !== null && !silent && missing.length) batch.push(takeChunk(missing, budget))
 
     // Quand un lot entier est resté sans réponse, les suivants le resteraient :
     // réseau coupé, ou tous les miroirs tombés. Relancer deux tours de tentatives
     // pour chaque tuile faisait attendre des dizaines de secondes pour rien.
-    const answer = silent
-      ? null
-      : await queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect)))
+    const answers = await Promise.all(
+      batch.map(({ rect }) =>
+        silent ? null : queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect))),
+      ),
+    )
 
-    // Mais un lot refusé n'est pas forcément un réseau coupé : une requête large
-    // est aussi ce qu'un miroir déjà chargé abandonne en premier, et la même zone
-    // passe en deux morceaux. On repose donc les tuiles et on réduit de moitié
-    // avant de conclure. Une tuile seule qui échoue, elle, est un vrai échec.
-    if (answer === null && chunk.length > 1) {
-      missing.unshift(...chunk)
-      cap = Math.max(1, Math.floor(chunk.length / 2))
-      continue
-    }
+    let refused = false
+    for (let b = 0; b < batch.length; b += 1) {
+      const { chunk, rect } = batch[b]
+      const answer = answers[b]
 
-    if (answer === null) {
-      silent = true
-      // Tous les miroirs sont muets : une copie périmée vaut mieux qu'un échec.
-      for (const tile of chunk) {
-        const key = tileKey(level, tile)
-        if (!stale.has(key)) throw new OverpassError(SILENT)
-        obtained.set(key, stale.get(key))
+      // Mais un lot refusé n'est pas forcément un réseau coupé : une requête
+      // large est aussi ce qu'un miroir déjà chargé abandonne en premier, et la
+      // même zone passe en deux morceaux. On repose donc les tuiles et on réduit
+      // de moitié avant de conclure. Une tuile seule qui échoue, elle, est un
+      // vrai échec.
+      if (answer === null && chunk.length > 1) {
+        missing.unshift(...chunk)
+        cap = Math.max(1, Math.floor(chunk.length / 2))
+        refused = true
+        continue
+      }
+
+      if (answer === null) {
+        silent = true
+        // Tous les miroirs sont muets : une copie périmée vaut mieux qu'un échec.
+        for (const tile of chunk) {
+          const key = tileKey(level, tile)
+          if (!stale.has(key)) throw new OverpassError(SILENT)
+          obtained.set(key, stale.get(key))
+        }
+        report()
+        continue
+      }
+
+      bytesPerTile = answer.bytes / rectSize(rect)
+      const extract = fromOverpass(answer.payload)
+      const parts = splitIntoTiles(extract, rect)
+      for (const [cell, part] of parts) {
+        const [ix, iy] = cell.split(':').map(Number)
+        const key = tileKey(level, [ix, iy])
+        // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
+        // veut pas le figer pour deux semaines.
+        if (part.ways.length) await tiles.set(key, { at: now(), extract: part })
+        if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
       }
       report()
-      continue
     }
-
-    cap = Infinity
-    bytesPerTile = answer.bytes / rectSize(rect)
-    const extract = fromOverpass(answer.payload)
-    const parts = splitIntoTiles(extract, rect)
-    for (const [cell, part] of parts) {
-      const [ix, iy] = cell.split(':').map(Number)
-      const key = tileKey(level, [ix, iy])
-      // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
-      // veut pas le figer pour deux semaines.
-      if (part.ways.length) await tiles.set(key, { at: now(), extract: part })
-      if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
-    }
-    report()
+    if (!refused) cap = Infinity
   }
 
   return mergeExtracts(wanted.map((tile) => obtained.get(tileKey(level, tile)) ?? emptyExtract()))
+}
+
+// Les tuiles dont un rafraîchissement est déjà prévu ou en cours : deux
+// recherches coup sur coup au même endroit ne doivent pas les demander deux fois.
+const refreshing = new Set()
+
+/**
+ * Rafraîchit, un peu plus tard et en fond, les tuiles vieillies qu'on vient de
+ * servir. Le délai laisse passer la fin de la recherche en cours — l'altitude,
+ * le vent — avant d'occuper le réseau. Un échec ne dit rien à personne : la
+ * copie gardée reste en place, et on réessaiera à la prochaine recherche.
+ */
+function refreshLater(args, level, aged, schedule) {
+  const todo = aged.filter((tile) => !refreshing.has(tileKey(level, tile)))
+  if (!todo.length) return
+  for (const tile of todo) refreshing.add(tileKey(level, tile))
+  schedule(() => {
+    fetchArea({ ...args, tiles: todo, freshMs: 0, usableMs: 0, onProgress: () => {} })
+      .catch(() => {})
+      .finally(() => {
+        for (const tile of todo) refreshing.delete(tileKey(level, tile))
+      })
+  })
 }
 
 // Combien de tuiles demander tant qu'on n'a pas mesuré la densité de la zone.
@@ -288,9 +358,9 @@ export async function fetchArea({ lat, lon, radiusM, targetM, onProgress = () =>
 // courtes distances, les seuls où six tuiles pèsent à coup sûr peu.
 const ONE_SHOT_TILES = 6
 
-function firstBudget(bytesPerTile, remaining, level) {
+function firstBudget(bytesPerTile, remaining, level, chunkBytes = CHUNK_BYTES) {
   if (bytesPerTile === null) return remaining <= ONE_SHOT_TILES && level <= 1 ? remaining : 1
-  return Math.max(1, Math.min(MAX_CHUNK_TILES, Math.floor(CHUNK_BYTES / Math.max(bytesPerTile, 1))))
+  return Math.max(1, Math.min(MAX_CHUNK_TILES, Math.floor(chunkBytes / Math.max(bytesPerTile, 1))))
 }
 
 /**
@@ -492,4 +562,7 @@ async function ask(url, body, controller, fetchImpl) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** Oublie les tuiles gardées — appelé par l'effacement des données. */
-export const clearTiles = () => tiles.clear()
+export const clearTiles = () => {
+  refreshing.clear()
+  return tiles.clear()
+}

@@ -134,6 +134,11 @@ export function tailwindFinish(geometry, wind) {
 const IGN_URL = 'https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json'
 const OPENTOPO_URL = 'https://api.opentopodata.org/v1/eu_dem25m,srtm30m'
 const BATCH = 100
+// L'IGN, lui, préfère un gros envoi à plusieurs petits. Mesuré sur mille points :
+// un seul POST, moins d'une seconde à deux ; dix GET de cent en parallèle, plus
+// de cinq ; deux POST de cinq cents en parallèle, dix. Le service met les
+// requêtes simultanées en file : on envoie donc de gros lots, l'un après l'autre.
+const IGN_BATCH = 1000
 const ROUND = 5
 const ELEVATION_TILE = 0.05
 const ASCENT_THRESHOLD_M = 2
@@ -197,13 +202,16 @@ async function fetchWithFallback(coords, providers, fetchImpl) {
 }
 
 async function fetchProvider(provider, coords, fetchImpl) {
+  if (provider === 'ign') {
+    const out = []
+    for (let i = 0; i < coords.length; i += IGN_BATCH) {
+      out.push(...(await ignLot(coords.slice(i, i + IGN_BATCH), fetchImpl)))
+    }
+    return out
+  }
+
   const batches = []
   for (let i = 0; i < coords.length; i += BATCH) batches.push(coords.slice(i, i + BATCH))
-
-  if (provider === 'ign') {
-    const results = await Promise.all(batches.map((batch) => ignBatch(batch, fetchImpl)))
-    return results.flat()
-  }
 
   // OpenTopoData : une requête par seconde, tous appels confondus.
   const run = opentopoQueue.then(async () => {
@@ -218,23 +226,54 @@ async function fetchProvider(provider, coords, fetchImpl) {
   return run
 }
 
-async function ignBatch(batch, fetchImpl) {
-  const params = new URLSearchParams({
-    lon: batch.map((c) => pyFixed(c[0], 6)).join('|'),
-    lat: batch.map((c) => pyFixed(c[1], 6)).join('|'),
-    resource: 'ign_rge_alti_wld',
-    delimiter: '|',
-    indent: 'false',
-    measures: 'false',
-    zonly: 'true',
-  })
-  const response = await withTimeout(fetchImpl(`${IGN_URL}?${params}`), 20_000)
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const data = await response.json()
+const ignQuery = (batch) => ({
+  lon: batch.map((c) => pyFixed(c[0], 6)).join('|'),
+  lat: batch.map((c) => pyFixed(c[1], 6)).join('|'),
+  resource: 'ign_rge_alti_wld',
+  delimiter: '|',
+  indent: 'false',
+  measures: 'false',
+  zonly: 'true',
+})
+
+function ignValues(data) {
   return (data.elevations ?? []).map((item) => {
     const z = item !== null && typeof item === 'object' ? item.z : item
     return missing(z) ? 0 : Number(z)
   })
+}
+
+/**
+ * Un gros lot, en une requête POST. Si le POST échoue — un proxy qui le
+ * refuse, une version du service qui ne l'accepte plus —, on retombe sur des GET
+ * de cent points, plus lents mais éprouvés, avant de changer de fournisseur.
+ */
+async function ignLot(batch, fetchImpl) {
+  try {
+    const response = await withTimeout(
+      fetchImpl(IGN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ignQuery(batch)),
+      }),
+      20_000,
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const values = ignValues(await response.json())
+    if (values.length === batch.length) return values
+  } catch {
+    /* repli sur les GET */
+  }
+  const out = []
+  for (let i = 0; i < batch.length; i += BATCH) out.push(...(await ignBatch(batch.slice(i, i + BATCH), fetchImpl)))
+  return out
+}
+
+async function ignBatch(batch, fetchImpl) {
+  const params = new URLSearchParams(ignQuery(batch))
+  const response = await withTimeout(fetchImpl(`${IGN_URL}?${params}`), 20_000)
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return ignValues(await response.json())
 }
 
 async function opentopoBatch(batch, fetchImpl) {

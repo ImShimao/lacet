@@ -9,11 +9,20 @@
 // l'autre : changer la distance ou le terrain ne refait ni le téléchargement ni
 // la construction. Un graphe couvrant **au moins** les tuiles demandées suffit —
 // raccourcir la distance réutilise celui de la recherche précédente.
+//
+// **Et ils se préparent d'avance.** Le téléchargement des rues faisait l'essentiel
+// de l'attente d'une première recherche — vingt secondes, parfois plus, quand
+// les serveurs d'OpenStreetMap sont chargés. Or l'app connaît le point de départ
+// bien avant qu'on appuie sur « Trouver ma boucle » : dès l'ouverture, ou dès
+// qu'on choisit une adresse. Le message `prefetch` lance alors le chargement en
+// fond, pendant qu'on règle ses filtres ; la recherche qui suit le trouve prêt,
+// ou le rejoint en cours de route au lieu de le recommencer.
 
 import { buildGraph } from './graph'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
-import { planLoops } from './service'
+import { currentWind } from './environment'
+import { graphRequest, planLoops } from './service'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
 // extrait parisien compte 352 000 nœuds et occupe 260 Mo. Au-delà d'une grande
@@ -39,21 +48,52 @@ function remember(entry) {
   }
 }
 
+// Les chargements en cours : leur zone, et qui attend de leurs nouvelles.
+const loads = []
+
 async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress) {
   const level = detailLevel(targetM)
   const needed = tilesFor(lat, lon, radiusM).map(([ix, iy]) => `${ix}:${iy}`)
   const cached = findGraph(level, sport, allowTrail, needed)
   if (cached) return cached
 
-  progress('data', 0)
-  const extract = await fetchArea({
-    lat, lon, radiusM, targetM,
-    onProgress: (fraction) => progress('data', fraction),
-  })
-  progress('graph', 0)
-  const graph = buildGraph(extract, { allowTrail, sport })
-  remember({ level, sport, allowTrail, tiles: new Set(needed), graph })
-  return graph
+  // Un chargement déjà en cours sur ces rues — celui lancé d'avance, le plus
+  // souvent : on le rejoint, et sa progression devient la nôtre. Le relancer en
+  // parallèle retéléchargeait les mêmes tuiles, et doublait l'attente sur des
+  // serveurs qui n'accordent que deux requêtes à la fois.
+  const overlapping = loads.filter((l) => l.level === level && needed.some((k) => l.tiles.has(k)))
+  if (overlapping.length) {
+    progress('data', 0)
+    for (const l of overlapping) l.listeners.add(progress)
+    await Promise.allSettled(overlapping.map((l) => l.promise))
+    for (const l of overlapping) l.listeners.delete(progress)
+    const ready = findGraph(level, sport, allowTrail, needed)
+    if (ready) return ready
+    // Pas tout à fait la même zone, ou un autre sport : on construit le nôtre,
+    // mais les tuiles communes sont désormais sur l'appareil.
+  }
+
+  const entry = { level, tiles: new Set(needed), listeners: new Set([progress]), promise: null }
+  const notify = (stage, fraction) => {
+    for (const listener of entry.listeners) listener(stage, fraction)
+  }
+  entry.promise = (async () => {
+    notify('data', 0)
+    const extract = await fetchArea({
+      lat, lon, radiusM, targetM,
+      onProgress: (fraction) => notify('data', fraction),
+    })
+    notify('graph', 0)
+    const graph = buildGraph(extract, { allowTrail, sport })
+    remember({ level, sport, allowTrail, tiles: new Set(needed), graph })
+    return graph
+  })()
+  loads.push(entry)
+  try {
+    return await entry.promise
+  } finally {
+    loads.splice(loads.indexOf(entry), 1)
+  }
 }
 
 self.onmessage = async ({ data }) => {
@@ -69,6 +109,22 @@ self.onmessage = async ({ data }) => {
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
+    }
+    return
+  }
+
+  // La préparation d'avance : silencieuse, et sans conséquence si elle échoue —
+  // la recherche, elle, dira ce qui ne va pas.
+  if (type === 'prefetch') {
+    try {
+      const args = graphRequest(payload)
+      // Le vent aussi : une requête de rien, gardée une heure, qu'on n'aura
+      // plus à attendre.
+      currentWind(args.lat, args.lon).catch(() => {})
+      await loadGraph(args, () => {})
+      self.postMessage({ id, type: 'result', result: { ready: true } })
+    } catch {
+      self.postMessage({ id, type: 'result', result: { ready: false } })
     }
     return
   }

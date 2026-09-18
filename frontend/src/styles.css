@@ -1743,6 +1743,16 @@ input.field:focus {
   filter: drop-shadow(0 -1px 0 #fff) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
 }
 
+/* Les rues de la zone sont déjà sur l'appareil. */
+.ready {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--safe);
+  font-size: 12.5px;
+}
+
 /* En pause, on le voit d'un coup d'œil : un bandeau, et les chiffres éteints. */
 .live__paused {
   display: flex;

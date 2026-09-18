@@ -984,10 +984,23 @@ seul tampon), et la boucle de Dijkstra n'alloue rien.
 | Construction du graphe | 10,9 s | 4,7 s |
 | Génération et notation | 4,3 s | 0,5 à 0,8 s |
 
-Mesuré dans le navigateur, à Paris : **21 s** pour une première recherche, dont
-l'essentiel est le téléchargement des rues ; **0,12 s** pour la suivante au même
-endroit. Les rues sont gardées par carreaux de 0,05° dans IndexedDB, quatorze
-jours ; une zone voisine ne retélécharge que les carreaux qui lui manquent.
+**Les rues se préparent en fond.** Dès que le point de départ est connu — à
+l'ouverture, ou quand on choisit une adresse —, l'app télécharge les rues de la
+zone et construit leur graphe pendant qu'on règle ses filtres. La recherche qui
+suit les trouve prêtes, ou rejoint le chargement en cours au lieu de le
+recommencer. Mesuré à Colmar, ville jamais visitée : préparation en fond en
+26 s, puis **recherche en 2 s**, relief compris — contre une trentaine de
+secondes d'attente auparavant.
+
+**Le relief part en un seul envoi.** L'IGN met en file les requêtes simultanées :
+mille points passent en moins d'une seconde en un POST, en plus de cinq en dix
+petits envois parallèles.
+
+Les rues sont gardées par carreaux de 0,05° dans IndexedDB. Fraîches quatorze
+jours ; ensuite, et jusqu'à trois mois, elles sont servies tout de suite et
+rafraîchies en fond après la recherche. Une zone voisine ne retélécharge que
+les carreaux qui lui manquent, et dans une grande ville deux lots partent en
+parallèle — Overpass en accorde deux par adresse.
 
 ### Le moteur de référence (Python)
 

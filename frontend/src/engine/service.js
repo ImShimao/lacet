@@ -132,6 +132,27 @@ export function extractRadiusM(targetM) {
   return Math.ceil(Math.max(1500, targetM * 0.62) / 1000) * 1000
 }
 
+/** Ce que la recherche demande au chargeur de graphe : la zone, le détail, le sport. */
+function graphArgs(req) {
+  const targetM = req.distance_km * 1000
+  return {
+    lat: req.lat,
+    lon: req.lon,
+    radiusM: extractRadiusM(targetM),
+    targetM,
+    sport: req.sport,
+    allowTrail: req.surface === 'trail',
+  }
+}
+
+/**
+ * La même chose, depuis une demande brute — pour préparer le graphe d'une
+ * recherche avant qu'elle ne soit lancée. Passer par `graphArgs` garantit que
+ * la préparation et la recherche demandent exactement la même zone : décalées
+ * d'un kilomètre de rayon, la recherche retéléchargerait tout.
+ */
+export const graphRequest = (input) => graphArgs(normalizeRequest(input))
+
 // === orchestration ============================================================
 
 /**
@@ -160,12 +181,10 @@ export async function planLoops(input, deps) {
   }
 
   const req = normalizeRequest(input)
-  const targetM = req.distance_km * 1000
-
-  const radiusM = extractRadiusM(targetM)
-  const allowTrail = req.surface === 'trail'
+  const args = graphArgs(req)
+  const { targetM } = args
   onProgress('data', 0)
-  const graph = await loadGraph({ lat: req.lat, lon: req.lon, radiusM, targetM, sport: req.sport, allowTrail })
+  const graph = await loadGraph(args)
   trace.graph?.(graph)
   lap('fetch')
   lap('graph')

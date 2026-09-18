@@ -31,6 +31,7 @@ export default function Explore({
   selected,
   detail,
   params,
+  streetsReady = false,
   isFavorite,
   onSelect,
   onToggleDetail,
@@ -110,6 +111,15 @@ export default function Explore({
             </button>
           )}
         </div>
+        {/* Les rues se préparent en fond dès que le départ est connu : le dire
+            explique pourquoi la recherche est soudain instantanée — et qu'elle
+            le restera, même sans réseau. */}
+        {streetsReady && (
+          <p className="ready small">
+            <Icon name="check" size={14} />
+            Rues du coin prêtes : la recherche sera presque instantanée.
+          </p>
+        )}
         <p className="muted small">
           Fais glisser le repère, touche la carte en mode placement, ou cherche une
           adresse pour changer de départ.

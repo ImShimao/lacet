@@ -321,11 +321,66 @@ describe('le téléchargement d’une zone', () => {
     expect(Math.max(...tailles.filter((t) => t <= 12))).toBeGreaterThan(1)
   }, 20_000)
 
+  it('sert tout de suite des rues un peu anciennes, puis les rafraîchit en fond', async () => {
+    // Revenir dans un coin après deux semaines coûtait vingt secondes de
+    // téléchargement pour vérifier que des rues n'avaient pas bougé.
+    const debut = Date.now()
+    const first = fakeNetwork()
+    await fetchArea({ ...BEAUNE, radiusM: 3000, targetM: 4000, fetchImpl: first.fetchImpl, now: () => debut })
+
+    const later = () => debut + 30 * 86_400_000
+    const second = fakeNetwork()
+    const tasks = []
+    const extract = await fetchArea({
+      ...BEAUNE, radiusM: 3000, targetM: 4000, fetchImpl: second.fetchImpl, now: later,
+      schedule: (task) => tasks.push(task),
+    })
+    expect(extract.ways.length).toBeGreaterThan(0)
+    expect(second.calls).toHaveLength(0)
+    expect(tasks).toHaveLength(1)
+
+    // Une seconde recherche au même endroit ne prévoit pas le même
+    // rafraîchissement une deuxième fois.
+    await fetchArea({
+      ...BEAUNE, radiusM: 3000, targetM: 4000, fetchImpl: second.fetchImpl, now: later,
+      schedule: (task) => tasks.push(task),
+    })
+    expect(tasks).toHaveLength(1)
+
+    // Le rafraîchissement, lui, retélécharge bien.
+    tasks[0]()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(second.calls.length).toBeGreaterThan(0)
+  })
+
+  it('envoie deux lots à la fois dans une grande ville, jamais plus', async () => {
+    // Overpass accorde deux requêtes simultanées par adresse : deux lots en
+    // parallèle divisent l'attente, un troisième serait refusé.
+    const base = fakeNetwork()
+    let inFlight = 0
+    let peak = 0
+    const fetchImpl = async (url, options) => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      try {
+        return await base.fetchImpl(url, options)
+      } finally {
+        inFlight -= 1
+      }
+    }
+    // Des lots d'environ trois tuiles, comme en plein Paris.
+    const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl, chunkBytes: 1200 })
+    expect(extract.ways.length).toBe(15)
+    expect(peak).toBe(2)
+  })
+
   it('préfère une copie périmée à un échec quand tout est muet', async () => {
     const debut = Date.now()
     const fresh = fakeNetwork()
     await fetchArea({ ...BEAUNE, radiusM: 3000, targetM: 4000, fetchImpl: fresh.fetchImpl, now: () => debut })
-    const later = () => debut + 30 * 86_400_000
+    // Au-delà de trois mois, la copie ne se sert plus d'office — sauf faute de mieux.
+    const later = () => debut + 120 * 86_400_000
     const dead = fakeNetwork(() => 'error')
     const extract = await fetchArea({ ...BEAUNE, radiusM: 3000, targetM: 4000, fetchImpl: dead.fetchImpl, now: later })
     expect(extract.ways.length).toBeGreaterThan(0)

@@ -56,5 +56,15 @@ function request(type, payload, onProgress) {
 /** Calcule des boucles sur l'appareil. `onProgress(étape, fraction)`. */
 export const planOnDevice = (params, onProgress) => request('plan', params, onProgress)
 
+/**
+ * Prépare en fond les rues d'une recherche à venir. Ne rejette jamais : un
+ * échec ici n'a rien à dire à l'écran, la recherche elle-même s'en chargera.
+ */
+export const prefetchOnDevice = (params) =>
+  request('prefetch', params).then(
+    (result) => result?.ready === true,
+    () => false,
+  )
+
 /** Oublie les données OpenStreetMap gardées et les graphes en mémoire. */
 export const clearEngineData = () => request('clear', null)
