@@ -56,6 +56,42 @@ const PATHS = {
     </>
   ),
   navigation: <path d="m3.5 11 17.5-8-8 17.5-1.9-7.6z" />,
+
+  // --- explications ------------------------------------------------------
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5" />
+      <circle cx="12" cy="7.8" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Trois profils de relief, lisibles d'un coup d'œil : plat, ondulé, en dents.
+  flat: (
+    <>
+      <path d="M3 14.5h18" />
+      <path d="M3 18.5h18" opacity="0.4" />
+    </>
+  ),
+  rolling: (
+    <>
+      <path d="M3 15c2.5 0 3.5-4 6-4s3.5 4 6 4 3.5-3 6-3" />
+      <path d="M3 18.5h18" opacity="0.4" />
+    </>
+  ),
+  hilly: (
+    <>
+      <path d="m3 16 5-9 3.5 5 3-4 6.5 8" />
+      <path d="M3 18.5h18" opacity="0.4" />
+    </>
+  ),
+  shield: <path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.2 7.5 9.5 4.3-1.3 7.5-5 7.5-9.5V6z" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+    </>
+  ),
+  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />,
   pin: (
     <>
       <path d="M20 10.2c0 5.8-8 11.8-8 11.8s-8-6-8-11.8a8 8 0 0 1 16 0z" />

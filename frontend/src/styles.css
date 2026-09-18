@@ -282,42 +282,6 @@ input:focus-visible {
   color: var(--accent-text);
 }
 
-.styler {
-  position: relative;
-}
-.styler__menu {
-  position: absolute;
-  right: calc(100% + 8px);
-  top: 0;
-  background: rgba(19, 17, 26, 0.97);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  overflow: hidden;
-  min-width: 132px;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.9);
-}
-.styler__row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 9px 13px;
-  font-size: 13px;
-  color: var(--text-2);
-  text-align: left;
-}
-.styler__row--on {
-  color: var(--accent-text);
-}
-.styler__row i {
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  flex: none;
-}
-
 .stage__hint {
   position: absolute;
   bottom: 22px;
@@ -1433,6 +1397,188 @@ input.field:focus {
   line-height: 1.45;
   color: var(--text-3);
 }
+.field__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+/* Le « i » d'un réglage : discret, mais une vraie cible de doigt (32 px). */
+.info-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -4px -6px -4px 0;
+  border-radius: 50%;
+  color: var(--text-3);
+}
+.info-btn:focus-visible,
+.info-btn:active {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+/* Le choix du fond de carte : un aperçu, les fonds, une phrase pour chacun. */
+.mapsheet__close {
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.mapsheet__preview {
+  position: relative;
+  height: 210px;
+  flex: none;
+  border-radius: var(--r);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.mapsheet__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border-radius: calc(var(--r) + 4px);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+}
+.mapsheet__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 4px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+  line-height: 1.15;
+}
+.mapsheet__opt i {
+  width: 26px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.mapsheet__opt[aria-checked='true'] {
+  background: var(--surface-3);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.mapsheet__desc {
+  margin: 0;
+  min-height: 3em;
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+/* La fiche d'explication : monte du bas comme une feuille, au-dessus de tout. */
+.infosheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(5, 4, 9, 0.62);
+  animation: infosheet-fade 0.18s ease-out;
+}
+.infosheet__panel {
+  width: min(520px, 100%);
+  max-height: 86%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  background: var(--surface);
+  box-shadow: 0 -18px 48px -12px rgba(0, 0, 0, 0.8);
+  animation: infosheet-rise 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.infosheet__panel h3 {
+  margin: 0;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+}
+.infosheet__intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.infosheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.infosheet__list li {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.infosheet__key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 6px;
+  border-right: 1px solid var(--line);
+  color: var(--accent-text);
+  text-align: center;
+}
+.infosheet__key b {
+  font-size: 12.5px;
+  color: var(--text);
+}
+.infosheet__list p {
+  margin: 0;
+  padding: 12px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+  align-self: center;
+}
+@keyframes infosheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes infosheet-rise {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .infosheet,
+  .infosheet__panel {
+    animation: none;
+  }
+}
 
 .tiles {
   display: grid;
@@ -1632,9 +1778,12 @@ input.field:focus {
 .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
   margin: 0 12px 10px 0;
 }
+/* Repliée, l'attribution n'est plus qu'un rond autour du « i ». Sa hauteur doit
+   être exactement celle du bouton (20 + 2 × 2 de marge intérieure = 24) : à
+   22, le rond faisait 26 sur 28 et le « i », calé en haut, paraissait décentré. */
 .maplibregl-ctrl-attrib.maplibregl-compact {
-  min-height: 22px;
-  border-radius: 12px;
+  min-height: 20px;
+  border-radius: 13px;
   border: 1px solid var(--line);
   background: rgba(19, 17, 26, 0.9) !important;
   color: var(--text-3);
@@ -2586,10 +2735,6 @@ input.field:focus {
   }
   .tool:hover {
     background: rgba(27, 24, 36, 0.95);
-  }
-  .styler__row:hover {
-    background: var(--surface-2);
-    color: var(--text);
   }
   .search__row:hover {
     background: var(--surface-2);

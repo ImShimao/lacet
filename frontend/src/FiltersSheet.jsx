@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import useModal from './useModal'
 import Icon from './Icon.jsx'
+import { InfoButton } from './Explain.jsx'
 import { pace } from './format'
 
 export const SPORTS = [
@@ -24,9 +25,9 @@ export const TERRAINS = {
 }
 
 const RELIEFS = [
-  { key: 'flat', label: 'Plat' },
-  { key: 'rolling', label: 'Vallonné' },
-  { key: 'hilly', label: 'Côtes' },
+  { key: 'flat', label: 'Plat', icon: 'flat' },
+  { key: 'rolling', label: 'Vallonné', icon: 'rolling' },
+  { key: 'hilly', label: 'Côtes', icon: 'hilly' },
 ]
 const SAFETY = [
   { key: 'safe', label: 'Sûr' },
@@ -122,7 +123,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
         </div>
 
         <div className="modal__body">
-          <Field label="Activité">
+          <Field label="Activité" info="sport" sport={draft.sport}>
             <div className="tiles">
               {SPORTS.map((s) => (
                 <Tile
@@ -145,7 +146,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </div>
           </Field>
 
-          <Field label="Terrain">
+          <Field label="Terrain" info="terrain" sport={draft.sport}>
             <div className="tiles">
               {TERRAINS[draft.sport].map((t) => (
                 <Tile
@@ -267,15 +268,21 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </p>
           </Field>
 
-          <Field label="Dénivelé">
-            <Segmented
-              options={RELIEFS}
-              value={draft.elevation}
-              onChange={(elevation) => set({ elevation })}
-            />
+          <Field label="Dénivelé" info="relief" sport={draft.sport}>
+            <div className="tiles">
+              {RELIEFS.map((r) => (
+                <Tile
+                  key={r.key}
+                  label={r.label}
+                  icon={r.icon}
+                  on={draft.elevation === r.key}
+                  onClick={() => set({ elevation: r.key })}
+                />
+              ))}
+            </div>
           </Field>
 
-          <Field label="Sécurité">
+          <Field label="Sécurité" info="safety" sport={draft.sport}>
             <Segmented
               options={SAFETY}
               value={draft.safety}
@@ -288,7 +295,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </p>
           </Field>
 
-          <Field label="Moment">
+          <Field label="Moment" info="moment" sport={draft.sport}>
             <Segmented
               options={MOMENTS}
               value={draft.time_of_day}
@@ -327,10 +334,13 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, info, sport, children }) {
   return (
     <div className="field">
-      <span className="label">{label}</span>
+      <div className="field__head">
+        <span className="label">{label}</span>
+        {info && <InfoButton topic={info} sport={sport} />}
+      </div>
       {children}
     </div>
   )
