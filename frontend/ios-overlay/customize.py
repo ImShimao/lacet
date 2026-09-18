@@ -18,10 +18,12 @@ from __future__ import annotations
 import os
 import plistlib
 import re
+import shutil
 import sys
 from pathlib import Path
 
 APP = Path(sys.argv[1] if len(sys.argv) > 1 else "ios/App") / "App"
+OVERLAY = Path(__file__).resolve().parent
 
 
 def info_plist() -> None:
@@ -58,6 +60,10 @@ def info_plist() -> None:
 
     plist["UIUserInterfaceStyle"] = "Dark"
     plist["ITSAppUsesNonExemptEncryption"] = False
+
+    # L'écran de verrouillage pendant la sortie : la consigne à venir et le
+    # temps restant, lisibles sans déverrouiller. Voir `live_activity()`.
+    plist["NSSupportsLiveActivities"] = True
 
     with path.open("wb") as fh:
         plistlib.dump(plist, fh)
@@ -100,8 +106,34 @@ def app_delegate() -> None:
     print(f"AppDelegate réglé ({path})")
 
 
+def live_activity() -> None:
+    """Pose les fichiers de l'activité en direct et branche son module.
+
+    Les fichiers vont où `add_live_activity.rb` les attend : ce script-là les
+    inscrit ensuite dans le projet Xcode, qui ne se modifie pas à la main.
+
+    Le module natif est enregistré par un contrôleur à nous
+    (`LacetBridgeViewController`) : le `SceneDelegate` de Capacitor doit donc le
+    créer à la place du sien.
+    """
+    source = OVERLAY / "live-activity"
+    for swift in (source / "App").glob("*.swift"):
+        shutil.copy(swift, APP / swift.name)
+    shutil.copytree(source / "LacetWidgets", APP.parent / "LacetWidgets", dirs_exist_ok=True)
+
+    scene = APP / "SceneDelegate.swift"
+    code = scene.read_text(encoding="utf-8")
+    if "LacetBridgeViewController()" not in code:
+        if "CAPBridgeViewController()" not in code:
+            sys.exit("SceneDelegate.swift : contrôleur introuvable — le modèle de Capacitor a changé.")
+        code = code.replace("CAPBridgeViewController()", "LacetBridgeViewController()", 1)
+        scene.write_text(code, encoding="utf-8")
+    print(f"Activité en direct posée ({APP.parent / 'LacetWidgets'})")
+
+
 if __name__ == "__main__":
     if not (APP / "Info.plist").exists():
         sys.exit(f"Projet iOS introuvable dans {APP} — lance d'abord « npx cap add ios ».")
     info_plist()
     app_delegate()
+    live_activity()

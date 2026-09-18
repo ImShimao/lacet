@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { duration, haversine, km, pace } from './format'
-import { buildTrack, locate, nextInstruction } from './routeTracker'
+import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
+import { lockScreenState, shouldRefresh } from './lockScreen'
 import * as voice from './voice'
 import SosButton from './SosButton.jsx'
 import { isNative } from './platform'
@@ -22,6 +23,10 @@ const ACT_M = 25
 // Nombre de relevés consécutifs hors du tracé avant d'alerter. Un seul point
 // aberrant est banal en ville, entre deux immeubles ; trois de suite, non.
 const OFF_ROUTE_FIXES = 3
+
+// Hors du tracé, le cap se lit sur le déplacement — à condition qu'il soit assez
+// long pour dépasser l'imprécision du GPS, sinon la carte tourne sur du bruit.
+const MOVE_FOR_HEADING_M = 8
 
 /**
  * Suivi de la sortie : distance, allure, guidage, alertes.
@@ -52,6 +57,12 @@ export default function LiveRun({ route, onPosition, onStop }) {
   const fix = useRef(null)
   const strayCount = useRef(0)
   const lastSplit = useRef(0)
+  const heading = useRef(null)
+  const moved = useRef(null)
+  // L'écran de verrouillage : prêt ou non, et ce qu'on lui a envoyé en dernier.
+  const lockReady = useRef(false)
+  const shown = useRef(null)
+  const shownAt = useRef(0)
 
   const track = useMemo(() => buildTrack(route?.geometry), [route])
   const instructions = route?.instructions || []
@@ -113,9 +124,13 @@ export default function LiveRun({ route, onPosition, onStop }) {
         const { longitude, latitude, accuracy } = position.coords
         const point = [longitude, latitude]
         here.current = point
-        onPosition(point)
 
-        if (accuracy > ACCURACY_LIMIT_M) return
+        // Un point trop imprécis déplace le repère, mais ne compte pas et ne
+        // réoriente pas la carte.
+        if (accuracy > ACCURACY_LIMIT_M) {
+          onPosition(point, heading.current)
+          return
+        }
 
         if (last.current) {
           const step = haversine(last.current, point)
@@ -132,6 +147,8 @@ export default function LiveRun({ route, onPosition, onStop }) {
           followRoute(point)
           warnCrossing(point)
         }
+        heading.current = runHeading(point) ?? heading.current
+        onPosition(point, heading.current)
       },
       (err) => setError(err.message),
       { background: true },
@@ -145,6 +162,79 @@ export default function LiveRun({ route, onPosition, onStop }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
+
+  // L'écran de verrouillage, dans l'app iPhone : la consigne à venir et le temps
+  // restant, lisibles en allumant l'écran, sans déverrouiller ni rouvrir l'app.
+  useEffect(() => {
+    if (!isNative() || !route) return undefined
+    let cancelled = false
+    const native = import('./native')
+    native.then(async (n) => {
+      const first = lockScreenState({
+        route,
+        step: nextInstruction(instructions, 0, new Set()),
+        along: 0,
+        offRoute: false,
+        travelled: 0,
+        elapsedS: 0,
+      })
+      const started = await n.startLiveActivity(first)
+      if (cancelled) {
+        if (started) n.endLiveActivity()
+        return
+      }
+      lockReady.current = started
+      shown.current = first
+      shownAt.current = Date.now()
+    })
+    return () => {
+      cancelled = true
+      lockReady.current = false
+      native.then((n) => n.endLiveActivity())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route])
+
+  /** Met l'écran de verrouillage à jour, sans le réveiller pour rien. */
+  function refreshLockScreen(upcoming, along) {
+    if (!lockReady.current) return
+    const next = lockScreenState({
+      route,
+      step: upcoming,
+      along,
+      offRoute: strayCount.current >= OFF_ROUTE_FIXES,
+      travelled: covered.current,
+      elapsedS: (Date.now() - startedAt.current) / 1000,
+    })
+    const now = Date.now()
+    if (!shouldRefresh(shown.current, next, now - shownAt.current)) return
+    shown.current = next
+    shownAt.current = now
+    import('./native').then((n) => n.updateLiveActivity(next))
+  }
+
+  /**
+   * Où l'on court, pour orienter la carte comme un GPS de voiture.
+   *
+   * Sur le tracé, c'est le tracé qui le dit : voir `headingAt`. Hors du tracé —
+   * course libre, ou détour — on le lit sur le déplacement depuis le dernier
+   * point retenu, et on ne répond rien tant qu'on n'a pas assez bougé.
+   */
+  function runHeading(point) {
+    const onTrack = fix.current && strayCount.current < OFF_ROUTE_FIXES
+    if (route && onTrack) {
+      moved.current = point
+      return headingAt(track, fix.current.along)
+    }
+    const from = moved.current
+    if (!from) {
+      moved.current = point
+      return null
+    }
+    if (haversine(from, point) < MOVE_FOR_HEADING_M) return null
+    moved.current = point
+    return bearing(from, point)
+  }
 
   /** Chaque kilomètre franchi, dit à voix haute — sans couper une consigne. */
   function announceSplit(travelled) {
@@ -180,6 +270,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
 
     const upcoming = nextInstruction(instructions, found.along, announced.current)
     setCurrent(upcoming)
+    refreshLockScreen(upcoming, found.along)
     if (!upcoming || found.offRoute) return
 
     const { index, step, remaining } = upcoming

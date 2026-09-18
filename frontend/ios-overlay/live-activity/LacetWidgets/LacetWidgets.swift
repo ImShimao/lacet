@@ -1,0 +1,159 @@
+import ActivityKit
+import SwiftUI
+import WidgetKit
+
+/// L'extension qui dessine l'activité en direct d'une sortie.
+///
+/// Elle ne fait qu'afficher : l'app calcule tout et lui envoie des valeurs déjà
+/// formatées (`LacetRunAttributes`). Seul le compte à rebours vit ici, parce
+/// qu'iOS sait le faire défiler lui-même — l'app n'a pas à se réveiller chaque
+/// seconde pour changer un chiffre.
+@main
+struct LacetWidgets: WidgetBundle {
+    var body: some Widget {
+        LacetRunActivity()
+    }
+}
+
+// Les couleurs de l'app : le violet de l'accent sur le noir du fond.
+private let accent = Color(red: 0.608, green: 0.435, blue: 1.0)
+private let backdrop = Color(red: 0.039, green: 0.035, blue: 0.063)
+private let caution = Color(red: 1.0, green: 0.416, blue: 0.271)
+
+struct LacetRunActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: LacetRunAttributes.self) { context in
+            LockScreenView(state: context.state)
+                .activityBackgroundTint(backdrop)
+                .activitySystemActionForegroundColor(.white)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    TurnIcon(state: context.state)
+                        .font(.system(size: 28, weight: .bold))
+                        .padding(.leading, 4)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Countdown(arrival: context.state.arrival)
+                        .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                        .foregroundColor(.white)
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    Text(context.state.offRoute ? "Hors parcours" : context.state.distance)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(headline(context.state))
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.85))
+                            .lineLimit(2)
+                        ProgressView(value: context.state.progress)
+                            .tint(accent)
+                    }
+                }
+            } compactLeading: {
+                TurnIcon(state: context.state)
+            } compactTrailing: {
+                Text(context.state.offRoute ? "!" : context.state.distance)
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundColor(.white)
+            } minimal: {
+                TurnIcon(state: context.state)
+            }
+            .keylineTint(accent)
+        }
+    }
+}
+
+/// L'écran de verrouillage : ce qu'on lit en allumant l'écran, en courant.
+///
+/// Dans l'ordre où l'œil le cherche : l'icône du virage et sa distance, en
+/// grand ; la consigne en toutes lettres ; puis l'avancée, ce qui reste et
+/// dans combien de temps on arrive.
+struct LockScreenView: View {
+    let state: LacetRunAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                TurnIcon(state: state)
+                    .font(.system(size: 30, weight: .bold))
+                    .frame(width: 42)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(state.offRoute ? "Hors parcours" : state.distance)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    Text(headline(state))
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            ProgressView(value: state.progress)
+                .tint(accent)
+            HStack {
+                Label(state.remaining, systemImage: "flag.checkered")
+                Spacer()
+                Label {
+                    Countdown(arrival: state.arrival)
+                } icon: {
+                    Image(systemName: "timer")
+                }
+            }
+            .font(.footnote.weight(.semibold).monospacedDigit())
+            .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(16)
+    }
+}
+
+/// Le temps restant, qui défile seul jusqu'à l'arrivée estimée.
+///
+/// L'intervalle doit aller du passé vers le futur : une arrivée déjà dépassée
+/// — on a ralenti sur la fin — ferait planter la vue. On affiche alors
+/// « Arrivée » plutôt qu'un compte à rebours négatif.
+struct Countdown: View {
+    let arrival: Date
+
+    var body: some View {
+        if arrival > Date() {
+            Text(timerInterval: Date()...arrival, countsDown: true)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 76, alignment: .trailing)
+        } else {
+            Text("Arrivée")
+        }
+    }
+}
+
+struct TurnIcon: View {
+    let state: LacetRunAttributes.ContentState
+
+    var body: some View {
+        Image(systemName: state.offRoute ? "exclamationmark.triangle.fill" : symbol(for: state.turn))
+            .foregroundColor(state.offRoute ? caution : accent)
+    }
+}
+
+/// La consigne, ou ce qu'il faut faire quand on n'est plus sur le tracé.
+func headline(_ state: LacetRunAttributes.ContentState) -> String {
+    state.offRoute ? "Reviens sur le tracé pour reprendre le guidage." : state.instruction
+}
+
+/// Le pictogramme d'un virage, tel que le nomme le moteur (`navigation.js`).
+func symbol(for turn: String) -> String {
+    switch turn {
+    case "finish": return "flag.checkered"
+    case "start": return "figure.run"
+    case "lap": return "arrow.clockwise"
+    case "uturn": return "arrow.uturn.left"
+    case "slight_left": return "arrow.up.left"
+    case "slight_right": return "arrow.up.right"
+    case "left", "sharp_left": return "arrow.turn.up.left"
+    case "right", "sharp_right": return "arrow.turn.up.right"
+    default: return "arrow.up"
+    }
+}

@@ -113,6 +113,8 @@ export default function App() {
   // choisir une boucle pour pouvoir simplement démarrer le chronomètre.
   const [freeRun, setFreeRun] = useState(false)
   const [livePosition, setLivePosition] = useState(null)
+  // La direction de course, pour la carte orientée comme un GPS de voiture.
+  const [liveHeading, setLiveHeading] = useState(null)
   const [geoNoticeOpen, setGeoNoticeOpen] = useState(true)
 
   const [saved, setSaved] = useState(stored.favorites)
@@ -308,6 +310,7 @@ export default function App() {
     setRunning(false)
     setFreeRun(false)
     setLivePosition(null)
+    setLiveHeading(null)
   }
 
   const sport = SPORTS.find((s) => s.key === params.sport)
@@ -341,6 +344,8 @@ export default function App() {
           cursor={scrub}
           focus={focus}
           follow={running || geo.following}
+          navigate={running}
+          heading={running ? liveHeading : null}
           placing={placing}
           onPlace={(p) => applyStart(p)}
           onPickRoute={(id) => {
@@ -457,7 +462,10 @@ export default function App() {
           {running ? (
             <LiveRun
               route={freeRun ? null : selected}
-              onPosition={setLivePosition}
+              onPosition={(point, heading) => {
+                setLivePosition(point)
+                setLiveHeading(heading ?? null)
+              }}
               onStop={finishRun}
             />
           ) : tab === 'routes' ? (

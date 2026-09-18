@@ -70,6 +70,16 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: python3 ios-overlay/customize.py ios/App
 
+      # L'écran de verrouillage pendant la sortie est une extension iOS à part,
+      # avec sa propre cible Xcode : on la greffe sur le projet généré. Voir
+      # ios-overlay/add_live_activity.rb.
+      - name: Activité en direct (écran verrouillé)
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          ruby -e 'require "xcodeproj"' 2>/dev/null || gem install xcodeproj --no-document
+          ruby ios-overlay/add_live_activity.rb ios/App/App.xcodeproj
+
       - name: Compilation (sans signature)
         run: |
           set -o pipefail
@@ -82,6 +92,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*deprecated|ARCHIVE (SUCCEEDED|FAILED)" || true
           test -d "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app"
+          test -d "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app/PlugIns/LacetWidgets.appex"
 
       - name: Journal de compilation (en cas d'échec)
         if: failure()

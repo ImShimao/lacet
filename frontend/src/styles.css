@@ -665,7 +665,7 @@ input:focus-visible {
   padding: 0;
   border: none;
   background: none;
-  color: var(--text-1);
+  color: var(--text);
   font: inherit;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1578,6 +1578,51 @@ input.field:focus {
   background: var(--info);
   border: 3px solid #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+/* En course, le point porte une pointe dans le sens de la course : c'est elle
+   qu'on cherche du regard pour savoir où tourner, comme la flèche d'un GPS. */
+.dot-live--nav {
+  width: 22px;
+  height: 22px;
+}
+.dot-live--nav::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -15px;
+  transform: translateX(-50%);
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 13px solid var(--info);
+  filter: drop-shadow(0 -1px 0 #fff) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* La carte suivie a été déplacée à la main : ce bouton la reprend. En haut et
+   au centre, là où le pouce le trouve sans chercher, loin du panneau. */
+.recenter {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 50%;
+  /* Déjà dans le sens de l'app : il est dans #root, que le téléphone couché
+     fait pivoter tout entier. Seule la carte est contre-tournée. */
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: rgba(19, 17, 26, 0.94);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.8);
+}
+.recenter .icon {
+  color: var(--accent-text);
 }
 
 .maplibregl-ctrl-attrib {

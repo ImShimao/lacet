@@ -28,6 +28,10 @@ import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech
 // Ce module-là ne s'importe pas : il se déclare, sous le nom qu'il porte côté natif.
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation')
 
+// Celui-ci est écrit pour Lacet, dans l'app elle-même
+// (`ios-overlay/live-activity/App/LiveActivityPlugin.swift`).
+const LiveActivity = registerPlugin('LiveActivity')
+
 // --- démarrage ----------------------------------------------------------------
 
 export async function bootNative() {
@@ -85,6 +89,7 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
           accuracy: location.accuracy,
           altitude: location.altitude,
           speed: location.speed,
+          heading: location.bearing ?? null,
         },
         timestamp: location.time ?? Date.now(),
       })
@@ -132,6 +137,29 @@ export const allowScreenOff = () => KeepAwake.allowSleep().catch(() => {})
 
 /** L'alerte de traversée : une vibration d'avertissement, perceptible en courant. */
 export const warnHaptic = () => Haptics.notification({ type: NotificationType.Warning }).catch(() => {})
+
+// --- écran de verrouillage ------------------------------------------------------
+
+/**
+ * L'activité en direct d'une sortie guidée : la consigne à venir et le temps
+ * restant, sur l'écran de verrouillage et dans la Dynamic Island.
+ *
+ * Tout échec est silencieux et rend `false` : iOS antérieur à 16.2, activités
+ * désactivées dans les réglages, ou app compilée sans l'extension. Le guidage
+ * vocal et l'écran de l'app n'en dépendent pas.
+ */
+export async function startLiveActivity(state) {
+  try {
+    const { available } = await LiveActivity.available()
+    if (!available) return false
+    return (await LiveActivity.start(state)).started === true
+  } catch {
+    return false
+  }
+}
+
+export const updateLiveActivity = (state) => LiveActivity.update(state).catch(() => {})
+export const endLiveActivity = () => LiveActivity.end().catch(() => {})
 
 // --- fichiers, liens ----------------------------------------------------------
 

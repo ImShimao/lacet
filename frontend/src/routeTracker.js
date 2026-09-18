@@ -144,4 +144,47 @@ export function nextInstruction(instructions, along, done) {
   return null
 }
 
+/** Cap de `a` vers `b`, en degrés depuis le nord, dans le sens horaire. */
+export function bearing(a, b) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const lat1 = toRad(a[1])
+  const lat2 = toRad(b[1])
+  const dLon = toRad(b[0] - a[0])
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+}
+
+/** Le point du tracé situé à `distance` mètres du départ. */
+export function pointAt(track, distance) {
+  const { points, cumulative, total } = track
+  if (points.length < 2) return points[0] ?? null
+  const d = Math.max(0, Math.min(total, distance))
+  // `indexAt` rend le premier sommet *au-delà* de la distance : le segment qui
+  // la contient commence un cran avant.
+  let i = indexAt(cumulative, d)
+  if (i > 0 && cumulative[i] > d) i -= 1
+  const span = cumulative[i + 1] - cumulative[i]
+  const t = span > 0 ? (d - cumulative[i]) / span : 0
+  const a = points[i]
+  const b = points[i + 1]
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+}
+
+/**
+ * La direction où l'on court, lue sur le tracé plutôt que sur le GPS.
+ *
+ * À dix kilomètres-heure, le cap que donne un téléphone est du bruit : deux
+ * relevés distants de trois mètres, chacun juste à cinq mètres près. La carte
+ * orientée sur ce cap tournait de trente degrés à chaque seconde. Le tracé, lui,
+ * sait où l'on va : on vise le point situé `ahead` mètres plus loin, ce qui
+ * lisse aussi les petits zigzags d'une rue sans rater les vrais virages.
+ */
+export function headingAt(track, along, ahead = 25) {
+  const from = pointAt(track, along)
+  const to = pointAt(track, along + ahead)
+  if (!from || !to || haversine(from, to) < 1) return null
+  return bearing(from, to)
+}
+
 export { OFF_ROUTE_M }

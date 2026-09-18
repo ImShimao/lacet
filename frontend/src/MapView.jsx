@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
+import Icon from './Icon.jsx'
 import { TRACE_COLORS, styleByKey } from './mapStyles'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { currentTurn, onTurn } from './orientation'
@@ -7,6 +8,13 @@ import { currentTurn, onTurn } from './orientation'
 // Les cartes gardées hors ligne, dans l'app iPhone : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
 maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
+
+// La carte en course, comme un GPS de voiture : inclinée, assez proche pour
+// lire le prochain carrefour, et le coureur placé bas dans la partie visible
+// pour montrer ce qui vient plutôt que ce qu'on vient de passer.
+const NAV_ZOOM = 17
+const NAV_PITCH = 50
+const NAV_LOW = 0.22
 
 export default function MapView({
   styleKey,
@@ -18,6 +26,8 @@ export default function MapView({
   cursor,
   focus,
   follow,
+  navigate,
+  heading,
   placing,
   onPlace,
   onPickRoute,
@@ -33,6 +43,15 @@ export default function MapView({
 
   const handlers = useRef({})
   handlers.current = { onPlace, onPickRoute, placing }
+
+  // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
+  // On la laisse alors où la main l'a mise, et « Recentrer » la reprend. Le
+  // zoom, lui, ne libère rien : pincer pour voir plus loin et continuer d'être
+  // suivi, c'est ce qu'on attend d'un GPS.
+  const [locked, setLocked] = useState(true)
+  const nav = useRef({})
+  nav.current = { navigate, heading, locked }
+  const relocked = useRef(true)
 
   const theme = styleByKey(styleKey).contrast
 
@@ -69,6 +88,14 @@ export default function MapView({
     instance.on('load', setup)
     instance.on('styledata', setup)
     setup()
+
+    // `originalEvent` n'existe que pour un geste : les animations de suivi
+    // déclenchent les mêmes événements, et ne doivent pas se libérer elles-mêmes.
+    const release = (event) => {
+      if (event.originalEvent && nav.current.navigate) setLocked(false)
+    }
+    instance.on('dragstart', release)
+    instance.on('rotatestart', release)
 
     // L'attribution compacte s'ouvre d'office et ne se replie qu'au premier
     // geste : sur téléphone, elle barrait le milieu de la carte d'une bande de
@@ -225,14 +252,44 @@ export default function MapView({
       liveMarker.current.setLngLat(position)
     }
 
+    // En course, le repère devient une flèche couchée sur la carte, pointée
+    // dans le sens de la course ; au repos, un point droit face à l'écran.
+    const pointed = navigate && heading != null
+    liveMarker.current.getElement().classList.toggle('dot-live--nav', pointed)
+    liveMarker.current.setRotationAlignment(pointed ? 'map' : 'viewport')
+    liveMarker.current.setPitchAlignment(pointed ? 'map' : 'viewport')
+    liveMarker.current.setRotation(pointed ? heading : currentTurn())
+
     // Le cercle de précision dit la vérité sur la fiabilité du point : à 300 m
     // près, afficher un point net serait un mensonge.
     m.getSource('accuracy')?.setData(
       accuracy > 12 ? circlePolygon(position, accuracy) : empty(),
     )
 
-    if (follow) m.easeTo({ center: position, offset: visibleCentre(m), duration: 700 })
-  }, [position, accuracy, follow, revision])
+    if (navigate) {
+      if (locked) {
+        m.easeTo(navCamera(m, position, heading, relocked.current))
+        relocked.current = false
+      }
+    } else if (follow) {
+      m.easeTo({ center: position, offset: visibleCentre(m), duration: 700 })
+    }
+  }, [position, accuracy, follow, navigate, heading, locked, revision])
+
+  // Chaque départ reprend une carte suivie ; chaque arrivée la redresse, pour
+  // revoir le parcours à plat, nord en haut, comme avant la sortie.
+  const wasNavigating = useRef(false)
+  useEffect(() => {
+    const m = map.current
+    if (navigate && !wasNavigating.current) {
+      setLocked(true)
+      relocked.current = true
+    }
+    if (!navigate && wasNavigating.current && m) {
+      m.easeTo({ pitch: 0, bearing: -currentTurn(), duration: 600 })
+    }
+    wasNavigating.current = Boolean(navigate)
+  }, [navigate])
 
   // --- téléphone couché -----------------------------------------------------------
   // L'app tourne pour rester dans le sens du téléphone ; la carte, restée droite,
@@ -240,10 +297,12 @@ export default function MapView({
   useEffect(
     () =>
       onTurn((t) => {
-        map.current?.jumpTo({ bearing: -t })
+        const { navigate: navigating, heading: course, locked: following } = nav.current
+        const pointed = navigating && course != null
+        map.current?.jumpTo({ bearing: pointed && following ? course - t : -t })
         if (map.current?.getStyle()) alignLabels(map.current, t)
         startMarker.current?.setRotation(t)
-        liveMarker.current?.setRotation(t)
+        liveMarker.current?.setRotation(pointed ? course : t)
       }),
     [],
   )
@@ -275,7 +334,52 @@ export default function MapView({
     }
   }, [route, ghost, revision])
 
-  return <div ref={container} className="map" />
+  return (
+    <>
+      <div ref={container} className="map" />
+      {navigate && !locked && (
+        <button
+          className="recenter"
+          onClick={() => {
+            relocked.current = true
+            setLocked(true)
+          }}
+        >
+          <Icon name="navigation" size={17} />
+          Recentrer
+        </button>
+      )}
+    </>
+  )
+}
+
+/**
+ * Le cadrage de la carte en course.
+ *
+ * Le cap passe en haut de l'écran — celui de l'app, qui peut avoir pivoté avec
+ * le téléphone couché, d'où la soustraction. Le coureur est décalé vers le bas
+ * de la partie visible, dans le sens de l'app lui aussi. Le zoom n'est imposé
+ * qu'en reprenant le suivi : ensuite, celui qu'on a choisi du bout des doigts
+ * est respecté.
+ */
+function navCamera(m, position, heading, relock) {
+  const turn = currentTurn()
+  const [ox, oy] = visibleCentre(m)
+  const pad = dockPadding(m)
+  const visible = m.getContainer().clientHeight - pad.top - pad.bottom
+  const shift = Math.max(0, visible) * NAV_LOW
+  const rad = (turn * Math.PI) / 180
+  return {
+    center: position,
+    bearing: heading == null ? m.getBearing() : heading - turn,
+    pitch: NAV_PITCH,
+    zoom: relock ? NAV_ZOOM : m.getZoom(),
+    offset: [ox - shift * Math.sin(rad), oy + shift * Math.cos(rad)],
+    duration: relock ? 800 : 950,
+    // Linéaire : les positions arrivent chaque seconde, et une animation qui
+    // ralentit à la fin de chacune fait avancer la carte par à-coups.
+    easing: relock ? undefined : (t) => t,
+  }
 }
 
 /**
