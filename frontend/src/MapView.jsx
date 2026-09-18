@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import Icon from './Icon.jsx'
-import { TRACE_COLORS, styleByKey } from './mapStyles'
+import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
+import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { currentTurn, onTurn } from './orientation'
 
@@ -52,6 +53,10 @@ export default function MapView({
   const nav = useRef({})
   nav.current = { navigate, heading, locked }
   const relocked = useRef(true)
+  // Le zoom voulu en course : celui du départ, puis celui qu'on a pincé. Tenu à
+  // part plutôt que relu sur la carte : lu en pleine animation, il figeait la
+  // carte au zoom intermédiaire dès qu'un relevé GPS interrompait la première.
+  const navZoom = useRef(NAV_ZOOM)
 
   const theme = styleByKey(styleKey).contrast
 
@@ -74,7 +79,10 @@ export default function MapView({
     // Le style est posé après coup plutôt que passé au constructeur : c'est la
     // seule voie par laquelle MapLibre accepte de le retoucher avant de
     // l'afficher (`transformStyle`), ce dont a besoin le fond « Nuit ».
-    instance.setStyle(initial.style, swapOptions(initial))
+    instance.setStyle(initial.style, loadOptions(initial))
+    instance.on('moveend', () => {
+      rememberCamera({ center: instance.getCenter().toArray(), zoom: instance.getZoom() })
+    })
 
     // Idempotent : `load` et `styledata` peuvent se déclencher tous les deux, et
     // le test porte sur `getStyle()` — la feuille est-elle appliquée — surtout
@@ -96,6 +104,9 @@ export default function MapView({
     }
     instance.on('dragstart', release)
     instance.on('rotatestart', release)
+    instance.on('zoomend', (event) => {
+      if (event.originalEvent && nav.current.navigate) navZoom.current = instance.getZoom()
+    })
 
     // L'attribution compacte s'ouvre d'office et ne se replie qu'au premier
     // geste : sur téléphone, elle barrait le milieu de la carte d'une bande de
@@ -162,7 +173,7 @@ export default function MapView({
     // `setStyle` efface sources et couches ; `styledata` rappellera `setup`,
     // qui remettra tout en place et incrémentera la révision.
     const next = styleByKey(styleKey)
-    m.setStyle(next.style, swapOptions(next))
+    m.setStyle(next.style, loadOptions(next))
   }, [styleKey])
 
   // --- couleurs du tracé selon le fond --------------------------------------
@@ -268,7 +279,7 @@ export default function MapView({
 
     if (navigate) {
       if (locked) {
-        m.easeTo(navCamera(m, position, heading, relocked.current))
+        m.easeTo(navCamera(m, position, heading, navZoom.current, relocked.current))
         relocked.current = false
       }
     } else if (follow) {
@@ -284,6 +295,7 @@ export default function MapView({
     if (navigate && !wasNavigating.current) {
       setLocked(true)
       relocked.current = true
+      navZoom.current = NAV_ZOOM
     }
     if (!navigate && wasNavigating.current && m) {
       m.easeTo({ pitch: 0, bearing: -currentTurn(), duration: 600 })
@@ -358,11 +370,10 @@ export default function MapView({
  *
  * Le cap passe en haut de l'écran — celui de l'app, qui peut avoir pivoté avec
  * le téléphone couché, d'où la soustraction. Le coureur est décalé vers le bas
- * de la partie visible, dans le sens de l'app lui aussi. Le zoom n'est imposé
- * qu'en reprenant le suivi : ensuite, celui qu'on a choisi du bout des doigts
- * est respecté.
+ * de la partie visible, dans le sens de l'app lui aussi. Le zoom est celui du
+ * départ, ou celui qu'on a choisi du bout des doigts depuis.
  */
-function navCamera(m, position, heading, relock) {
+function navCamera(m, position, heading, zoom, relock) {
   const turn = currentTurn()
   const [ox, oy] = visibleCentre(m)
   const pad = dockPadding(m)
@@ -373,12 +384,15 @@ function navCamera(m, position, heading, relock) {
     center: position,
     bearing: heading == null ? m.getBearing() : heading - turn,
     pitch: NAV_PITCH,
-    zoom: relock ? NAV_ZOOM : m.getZoom(),
+    zoom,
     offset: [ox - shift * Math.sin(rad), oy + shift * Math.cos(rad)],
     duration: relock ? 800 : 950,
-    // Linéaire : les positions arrivent chaque seconde, et une animation qui
-    // ralentit à la fin de chacune fait avancer la carte par à-coups.
-    easing: relock ? undefined : (t) => t,
+    // Linéaire en suivi : les positions arrivent chaque seconde, et une
+    // animation qui ralentit à la fin de chacune fait avancer la carte par
+    // à-coups. En reprenant le suivi, la courbe par défaut de MapLibre — à
+    // condition de ne pas lui passer `easing: undefined`, qui écrase ce défaut :
+    // la première image plantait, et MapLibre ne dessinait plus rien ensuite.
+    ...(relock ? {} : { easing: (t) => t }),
   }
 }
 
@@ -466,11 +480,6 @@ function alignLabels(m, t) {
     if (layout['text-field'] !== undefined) m.setLayoutProperty(layer.id, 'text-rotate', t)
     if (layout['icon-image'] !== undefined) m.setLayoutProperty(layer.id, 'icon-rotate', t)
   }
-}
-
-/** Options de chargement d'un fond : sa retouche éventuelle, faite avant affichage. */
-function swapOptions(entry) {
-  return entry.transform ? { transformStyle: (_previous, next) => entry.transform(next) } : {}
 }
 
 /**
