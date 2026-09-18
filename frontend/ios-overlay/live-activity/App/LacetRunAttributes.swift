@@ -28,6 +28,9 @@ struct LacetRunAttributes: ActivityAttributes {
         var progress: Double
         /// Hors du tracé : l'écran le dit à la place de la consigne.
         var offRoute: Bool
+        /// Arrêté — à un feu, ou au bouton. Le compte à rebours s'efface : il
+        /// filerait vers une arrivée qu'on n'atteindra pas à l'heure dite.
+        var paused: Bool
     }
 
     /// Le nom du parcours.

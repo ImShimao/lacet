@@ -18,7 +18,7 @@
 import { registerPlugin } from '@capacitor/core'
 import { AppLauncher } from '@capacitor/app-launcher'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
-import { Haptics, NotificationType } from '@capacitor/haptics'
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics'
 import { KeepAwake } from '@capacitor-community/keep-awake'
 import { Share } from '@capacitor/share'
 import { SplashScreen } from '@capacitor/splash-screen'
@@ -137,6 +137,9 @@ export const allowScreenOff = () => KeepAwake.allowSleep().catch(() => {})
 
 /** L'alerte de traversée : une vibration d'avertissement, perceptible en courant. */
 export const warnHaptic = () => Haptics.notification({ type: NotificationType.Warning }).catch(() => {})
+
+/** La pause automatique : un seul coup, franc, distinct de l'alerte de traversée. */
+export const pulseHaptic = () => Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {})
 
 // --- écran de verrouillage ------------------------------------------------------
 

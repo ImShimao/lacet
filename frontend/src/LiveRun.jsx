@@ -3,6 +3,8 @@ import Icon from './Icon.jsx'
 import { duration, haversine, km, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
 import { lockScreenState, shouldRefresh } from './lockScreen'
+import { motionTracker } from './autoPause'
+import { load } from './storage'
 import * as voice from './voice'
 import SosButton from './SosButton.jsx'
 import { isNative } from './platform'
@@ -42,6 +44,8 @@ export default function LiveRun({ route, onPosition, onStop }) {
   const [speaking, setSpeaking] = useState(() => voice.available)
   const [current, setCurrent] = useState(null)
   const [offRoute, setOffRoute] = useState(false)
+  // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
+  const [paused, setPaused] = useState(null)
 
   const last = useRef(null)
   const here = useRef(null)
@@ -63,6 +67,21 @@ export default function LiveRun({ route, onPosition, onStop }) {
   const lockReady = useRef(false)
   const shown = useRef(null)
   const shownAt = useRef(0)
+  const upcomingStep = useRef(null)
+  // Les pauses : leur genre, depuis quand, et le temps déjà passé à l'arrêt.
+  // Tenues en références : le relevé GPS qui les déclenche doit lire la valeur
+  // du moment, pas celle du dernier rendu.
+  const pausedKind = useRef(null)
+  const pausedAt = useRef(null)
+  const pausedMs = useRef(0)
+  const resumedAt = useRef(Date.now())
+  const motion = useRef(null)
+  if (!motion.current) motion.current = motionTracker()
+  // La distance des dernières secondes, relevé par relevé : l'arrêt n'est sûr
+  // qu'au bout de huit secondes, et le tremblement du GPS pendant ce temps —
+  // une dizaine de mètres mesurés — doit être retiré, pas compté.
+  const trail = useRef([])
+  const autoPause = useRef(load().autoPause !== false)
 
   const track = useMemo(() => buildTrack(route?.geometry), [route])
   const instructions = route?.instructions || []
@@ -113,7 +132,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
 
   useEffect(() => {
     const tick = setInterval(() => {
-      setState((s) => ({ ...s, elapsed: (Date.now() - startedAt.current) / 1000 }))
+      setState((s) => ({ ...s, elapsed: movingSeconds() }))
     }, 1000)
 
     // `background` : dans l'app native, le suivi continue écran verrouillé,
@@ -132,6 +151,31 @@ export default function LiveRun({ route, onPosition, onStop }) {
           return
         }
 
+        // La pause automatique. Une pause mise à la main, elle, ne se lève
+        // qu'à la main : on peut marcher jusqu'à la fontaine sans que le chrono
+        // reparte.
+        if (autoPause.current && pausedKind.current !== 'manual') {
+          const anchor = motion.current.anchor
+          const event = motion.current.push({
+            t: position.timestamp ?? Date.now(),
+            point,
+            speed: position.coords.speed,
+          })
+          if (event === 'stop') pause('auto', motion.current.since)
+          if (event === 'resume') {
+            resume()
+            // La distance reprend du point d'arrêt : les mètres faits pour
+            // repartir comptent, le tremblement de l'arrêt non.
+            last.current = anchor
+          }
+        }
+
+        // En pause, le repère suit, mais rien ne compte.
+        if (pausedKind.current) {
+          onPosition(point, heading.current)
+          return
+        }
+
         if (last.current) {
           const step = haversine(last.current, point)
           // Un saut de plus de 100 m entre deux relevés est un artefact GPS,
@@ -141,6 +185,9 @@ export default function LiveRun({ route, onPosition, onStop }) {
             setState((s) => ({ ...s, distance: covered.current, points: s.points + 1 }))
             announceSplit(covered.current)
           }
+          const now = Date.now()
+          trail.current.push({ t: now, covered: covered.current })
+          while (trail.current.length && now - trail.current[0].t > 20_000) trail.current.shift()
         }
         last.current = point
         if (route) {
@@ -195,6 +242,62 @@ export default function LiveRun({ route, onPosition, onStop }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
 
+  /** Le temps en mouvement, pauses déduites — celui qui fait l'allure. */
+  function movingSeconds(now = Date.now()) {
+    const current = pausedAt.current ? now - pausedAt.current : 0
+    return Math.max(0, (now - startedAt.current - pausedMs.current - current) / 1000)
+  }
+
+  /**
+   * Arrête le chrono. `since` : l'arrêt détecté a commencé avant qu'on en soit
+   * sûr — huit secondes plus tôt — et ces secondes-là ne sont pas de la course.
+   */
+  function pause(kind, since = Date.now()) {
+    if (pausedKind.current) {
+      // Déjà en pause : un appui sur le bouton la rend simplement manuelle.
+      if (kind === 'manual') {
+        pausedKind.current = 'manual'
+        setPaused('manual')
+      }
+      return
+    }
+    pausedKind.current = kind
+    pausedAt.current = Math.min(Date.now(), Math.max(since, resumedAt.current))
+    // La distance revient, elle aussi, au moment de l'arrêt.
+    const before = trail.current.filter((p) => p.t <= pausedAt.current).at(-1)
+    if (kind === 'auto' && before && before.covered < covered.current) covered.current = before.covered
+    setPaused(kind)
+    setState((s) => ({ ...s, elapsed: movingSeconds(), distance: covered.current }))
+    if (kind === 'auto') {
+      voice.speak('Pause automatique.', { priority: false })
+      if (isNative()) import('./native').then((n) => n.pulseHaptic())
+    }
+    refreshLockScreen(upcomingStep.current, fix.current?.along ?? covered.current)
+  }
+
+  function resume({ spoken = true } = {}) {
+    if (!pausedKind.current) return
+    pausedMs.current += Date.now() - pausedAt.current
+    pausedAt.current = null
+    pausedKind.current = null
+    resumedAt.current = Date.now()
+    setPaused(null)
+    if (spoken) voice.speak('Reprise.', { priority: false })
+    refreshLockScreen(upcomingStep.current, fix.current?.along ?? covered.current)
+  }
+
+  /** Le bouton : pause à la main, ou reprise de n'importe quelle pause. */
+  function togglePause() {
+    motion.current.reset()
+    if (pausedKind.current) {
+      resume({ spoken: false })
+      // Ce qu'on a parcouru pendant une pause voulue ne compte pas.
+      last.current = null
+    } else {
+      pause('manual')
+    }
+  }
+
   /** Met l'écran de verrouillage à jour, sans le réveiller pour rien. */
   function refreshLockScreen(upcoming, along) {
     if (!lockReady.current) return
@@ -203,8 +306,9 @@ export default function LiveRun({ route, onPosition, onStop }) {
       step: upcoming,
       along,
       offRoute: strayCount.current >= OFF_ROUTE_FIXES,
+      paused: Boolean(pausedKind.current),
       travelled: covered.current,
-      elapsedS: (Date.now() - startedAt.current) / 1000,
+      elapsedS: movingSeconds(),
     })
     const now = Date.now()
     if (!shouldRefresh(shown.current, next, now - shownAt.current)) return
@@ -241,8 +345,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
     const done = Math.floor(travelled / 1000)
     if (done <= lastSplit.current) return
     lastSplit.current = done
-    const elapsed = (Date.now() - startedAt.current) / 1000
-    const perKm = elapsed / (travelled / 1000)
+    const perKm = movingSeconds() / (travelled / 1000)
     voice.speak(
       `${done} kilomètre${done > 1 ? 's' : ''}. Allure ${spoken(perKm)} au kilomètre.`,
       { priority: false },
@@ -270,6 +373,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
 
     const upcoming = nextInstruction(instructions, found.along, announced.current)
     setCurrent(upcoming)
+    upcomingStep.current = upcoming
     refreshLockScreen(upcoming, found.along)
     if (!upcoming || found.offRoute) return
 
@@ -313,7 +417,21 @@ export default function LiveRun({ route, onPosition, onStop }) {
         </div>
       )}
 
-      <div className="live__big">
+      {paused && (
+        <div className="live__paused" role="status">
+          <Icon name="pause" size={17} />
+          <div>
+            <b>{paused === 'auto' ? 'Pause automatique' : 'En pause'}</b>
+            <span>
+              {paused === 'auto'
+                ? 'Le chrono reprend tout seul dès que tu repars.'
+                : 'Touche le bouton lecture pour reprendre.'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className={`live__big ${paused ? 'live__big--paused' : ''}`}>
         <b>{km(state.distance)}</b>
         <span>KILOMÈTRES</span>
       </div>
@@ -387,7 +505,16 @@ export default function LiveRun({ route, onPosition, onStop }) {
           </button>
         )}
         <SosButton position={here} distance={state.distance} elapsed={state.elapsed} />
-        <button className="btn btn--primary" onClick={() => onStop(state)}>
+        <button
+          className={`btn btn--icon ${paused ? 'btn--on' : ''}`}
+          onClick={togglePause}
+          title={paused ? 'Reprendre' : 'Mettre en pause'}
+          aria-label={paused ? 'Reprendre' : 'Mettre en pause'}
+          aria-pressed={Boolean(paused)}
+        >
+          <Icon name={paused ? 'play' : 'pause'} size={18} />
+        </button>
+        <button className="btn btn--primary" onClick={() => onStop({ ...state, elapsed: movingSeconds() })}>
           <Icon name="stop" size={16} />
           Terminer
         </button>

@@ -93,7 +93,8 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             remaining: call.getString("remaining") ?? "",
             arrival: Date(timeIntervalSince1970: arrivalMs / 1000),
             progress: min(1, max(0, call.getDouble("progress") ?? 0)),
-            offRoute: call.getBool("offRoute") ?? false
+            offRoute: call.getBool("offRoute") ?? false,
+            paused: call.getBool("paused") ?? false
         )
     }
 }

@@ -137,6 +137,7 @@ const PATHS = {
     </>
   ),
   play: <path d="M6.5 4.2 19 12 6.5 19.8z" />,
+  pause: <path d="M8.5 5v14M15.5 5v14" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
   close: <path d="m6.5 6.5 11 11M17.5 6.5l-11 11" />,
   check: <path d="m5 12.6 4.7 4.6L19 6.8" />,

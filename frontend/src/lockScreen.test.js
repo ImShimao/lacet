@@ -72,6 +72,11 @@ describe('la fréquence des mises à jour', () => {
     expect(shouldRefresh(base, { ...base, instruction: 'Tourne à droite' }, 200)).toBe(true)
   })
 
+  it('suit tout de suite une pause, et la reprise', () => {
+    expect(shouldRefresh(base, { ...base, paused: true }, 200)).toBe(true)
+    expect(shouldRefresh({ ...base, paused: true }, { ...base, paused: false }, 200)).toBe(true)
+  })
+
   it('suit tout de suite une sortie du tracé', () => {
     expect(shouldRefresh(base, { ...base, offRoute: true }, 200)).toBe(true)
   })

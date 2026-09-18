@@ -34,7 +34,7 @@ struct LacetRunActivity: Widget {
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Countdown(arrival: context.state.arrival)
+                    Countdown(arrival: context.state.arrival, paused: context.state.paused)
                         .font(.system(size: 17, weight: .semibold).monospacedDigit())
                         .foregroundColor(.white)
                 }
@@ -98,9 +98,9 @@ struct LockScreenView: View {
                 Label(state.remaining, systemImage: "flag.checkered")
                 Spacer()
                 Label {
-                    Countdown(arrival: state.arrival)
+                    Countdown(arrival: state.arrival, paused: state.paused)
                 } icon: {
-                    Image(systemName: "timer")
+                    Image(systemName: state.paused ? "pause.circle.fill" : "timer")
                 }
             }
             .font(.footnote.weight(.semibold).monospacedDigit())
@@ -114,12 +114,16 @@ struct LockScreenView: View {
 ///
 /// L'intervalle doit aller du passé vers le futur : une arrivée déjà dépassée
 /// — on a ralenti sur la fin — ferait planter la vue. On affiche alors
-/// « Arrivée » plutôt qu'un compte à rebours négatif.
+/// « Arrivée » plutôt qu'un compte à rebours négatif. En pause, le compte à
+/// rebours s'efface : il continuerait de défiler pendant l'arrêt.
 struct Countdown: View {
     let arrival: Date
+    let paused: Bool
 
     var body: some View {
-        if arrival > Date() {
+        if paused {
+            Text("En pause")
+        } else if arrival > Date() {
             Text(timerInterval: Date()...arrival, countsDown: true)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 76, alignment: .trailing)

@@ -74,6 +74,9 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
         />
       </div>
 
+      <h4 className="section">Pendant la sortie</h4>
+      <AutoPauseSetting />
+
       <h4 className="section">Contact d'urgence</h4>
       <p className="muted small">
         Le bouton SOS, pendant une sortie, prépare un SMS vers ce numéro avec ta
@@ -215,6 +218,43 @@ const MODES = [
  * tablette qu'on emporte, un PC à écran tactile. Le réglage reste sur
  * l'appareil, comme tout le reste.
  */
+/**
+ * La pause automatique : on la laisse active par défaut, parce que c'est ce
+ * que tout le monde attend d'une app de course. On peut la couper — pour une
+ * sortie fractionnée où l'on veut compter aussi les récupérations debout.
+ */
+function AutoPauseSetting() {
+  const [on, setOn] = useState(() => load().autoPause !== false)
+  return (
+    <>
+      <div className="seg" role="radiogroup" aria-label="Pause automatique">
+        {[
+          [true, 'Pause auto activée'],
+          [false, 'Désactivée'],
+        ].map(([value, label]) => (
+          <button
+            key={String(value)}
+            role="radio"
+            aria-checked={on === value}
+            aria-pressed={on === value}
+            onClick={() => {
+              setOn(value)
+              save({ autoPause: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {on
+          ? "Le chrono et la distance s'arrêtent quand tu t'arrêtes — à un feu, pour boire — et repartent dès que tu repars. Marcher, même lentement en côte, ne met pas en pause."
+          : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
+      </p>
+    </>
+  )
+}
+
 function ModePicker({ mode }) {
   const [setting, setSetting] = useState(readModeSetting)
   return (

@@ -51,7 +51,7 @@ export function paceEstimate({ route, travelled, elapsedS }) {
  * `step` est la consigne à venir telle que la rend `nextInstruction` —
  * `{ step, remaining }` — ou `null` quand il n'y en a plus.
  */
-export function lockScreenState({ route, step, along, offRoute, travelled, elapsedS, now = Date.now() }) {
+export function lockScreenState({ route, step, along, offRoute, paused = false, travelled, elapsedS, now = Date.now() }) {
   const total = route?.distance_m || 0
   const left = Math.max(0, total - (along ?? travelled))
   const pace = paceEstimate({ route, travelled, elapsedS })
@@ -66,6 +66,9 @@ export function lockScreenState({ route, step, along, offRoute, travelled, elaps
     arrival: Math.round(now + left * pace * 1000),
     progress: total ? Math.min(1, Math.max(0, (along ?? 0) / total)) : 0,
     offRoute: Boolean(offRoute),
+    // En pause, l'écran le dit au lieu d'un compte à rebours qui filerait vers
+    // une arrivée qu'on n'atteindra pas à l'heure dite.
+    paused: Boolean(paused),
   }
 }
 
@@ -80,7 +83,13 @@ export function lockScreenState({ route, step, along, offRoute, travelled, elaps
  */
 export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
   if (!previous) return true
-  if (previous.instruction !== next.instruction || previous.offRoute !== next.offRoute) return true
+  if (
+    previous.instruction !== next.instruction ||
+    previous.offRoute !== next.offRoute ||
+    previous.paused !== next.paused
+  ) {
+    return true
+  }
   if (previous.distance === next.distance && previous.remaining === next.remaining) return false
   return elapsedMs >= minMs
 }
