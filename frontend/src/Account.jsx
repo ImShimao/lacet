@@ -10,7 +10,7 @@ import Icon from './Icon.jsx'
 import { SPORTS } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { load, save } from './storage'
-import { readModeSetting, setModeSetting } from './platform'
+import { isNative, readModeSetting, setModeSetting } from './platform'
 import * as offline from './offlineMaps'
 
 export default function Account({ mode = 'full', params, geo, onClearData, onProfile }) {
@@ -76,6 +76,7 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
 
       <h4 className="section">Pendant la sortie</h4>
       <AutoPauseSetting />
+      <LockScreenSetting />
 
       <h4 className="section">Contact d'urgence</h4>
       <p className="muted small">
@@ -251,6 +252,83 @@ function AutoPauseSetting() {
           ? "Le chrono et la distance s'arrêtent quand tu t'arrêtes — à un feu, pour boire — et repartent dès que tu repars. Marcher, même lentement en côte, ne met pas en pause."
           : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
       </p>
+    </>
+  )
+}
+
+/**
+ * L'écran de verrouillage pendant une sortie guidée : ce que l'iPhone permet,
+ * et de quoi le vérifier sans partir courir.
+ *
+ * L'activité en direct dépend de trois choses qui ne se voient pas — la
+ * version d'iOS, un réglage, et une extension que certaines installations hors
+ * App Store retirent. Plutôt que de laisser l'écran vide sans explication,
+ * l'app dit laquelle manque, et se rabat sur une notification silencieuse.
+ */
+function LockScreenSetting() {
+  const [status, setStatus] = useState(undefined)
+  const [testing, setTesting] = useState(false)
+
+  useEffect(() => {
+    if (!isNative()) return
+    import('./native').then((n) => n.lockScreenStatus()).then(setStatus)
+  }, [])
+
+  if (!isNative() || status === undefined) return null
+
+  const live = Boolean(status?.supported && status?.enabled && status?.extension)
+  let text
+  if (!status) text = "Cette version de l'app n'a pas le module d'écran verrouillé."
+  else if (live) {
+    text =
+      "Activité en direct prête : pendant une sortie guidée, le prochain virage, sa distance et le temps restant s'affichent écran verrouillé et dans la Dynamic Island."
+  } else if (!status.supported) {
+    text = "L'activité en direct demande iOS 16.2 ou plus récent. À la place, une notification silencieuse tient la consigne à jour."
+  } else if (!status.extension) {
+    text =
+      "L'extension qui dessine l'activité en direct manque à cette installation. À la place, une notification silencieuse tient la consigne à jour."
+  } else {
+    text = 'Activités en direct coupées : Réglages › Lacet › Activités en direct. En attendant, une notification silencieuse tient la consigne à jour.'
+  }
+  const denied = !live && status?.notifications === 'denied'
+
+  const test = async () => {
+    const n = await import('./native')
+    setTesting(true)
+    const demo = {
+      name: 'Essai',
+      instruction: 'Tourne à droite sur Rue de la Gare',
+      distance: '120 m',
+      turn: 'right',
+      remaining: '4,2 km',
+      arrival: Date.now() + 26 * 60_000,
+      progress: 0.4,
+      offRoute: false,
+      paused: false,
+    }
+    let started = live && (await n.startLiveActivity(demo))
+    if (!started && (await n.askNoticePermission())) {
+      await n.postRunNotice('Dans 120 m · Tourne à droite sur Rue de la Gare', 'Reste 4,2 km · essai de Lacet')
+      started = true
+    }
+    setTimeout(() => {
+      n.endLiveActivity()
+      n.clearRunNotice()
+      setTesting(false)
+    }, 20_000)
+    if (!started) setTesting(false)
+  }
+
+  return (
+    <>
+      <p className="muted small">
+        <b>Écran verrouillé.</b> {text}
+        {denied && ' Les notifications de Lacet sont refusées : Réglages › Lacet › Notifications.'}
+      </p>
+      <button className="btn" onClick={test} disabled={testing}>
+        <Icon name="play" size={15} />
+        {testing ? 'Verrouille ton téléphone pour voir l’essai…' : "Tester l'écran verrouillé (20 s)"}
+      </button>
     </>
   )
 }

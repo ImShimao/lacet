@@ -66,5 +66,11 @@ export const prefetchOnDevice = (params) =>
     () => false,
   )
 
+/**
+ * Le chemin qui ramène sur la boucle, depuis là où l'on est — voir
+ * `engine/reroute.js`. Rend `null` s'il n'y en a pas.
+ */
+export const detourOnDevice = (payload) => request('detour', payload)
+
 /** Oublie les données OpenStreetMap gardées et les graphes en mémoire. */
 export const clearEngineData = () => request('clear', null)

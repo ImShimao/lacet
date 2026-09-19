@@ -63,7 +63,8 @@ identique — ce qui a demandé de reproduire l'arithmétique de CPython (modulo
 flottant, arrondi au pair, `sum` compensée, `math.hypot`).
 
 Aucune clé d'API. Données © OpenStreetMap (Overpass), altitude IGN et
-OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche d'adresse Nominatim.
+OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche de lieux Photon
+(Komoot) et Nominatim.
 
 ---
 
@@ -256,7 +257,11 @@ allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
   rebours jusqu'à l'arrivée — aussi dans la Dynamic Island. C'est une extension
   iOS à part (`frontend/ios-overlay/live-activity/`), greffée au projet Xcode par
   `add_live_activity.rb` pendant la compilation. Elle demande iOS 16.2, et les
-  « Activités en direct » autorisées dans Réglages → Lacet.
+  « Activités en direct » autorisées dans Réglages → Lacet. **Sinon, une
+  notification de secours** : passive — ni son, ni écran allumé — et remplacée
+  à chaque consigne, elle dit la même chose. « Mon compte » indique laquelle
+  des deux l'iPhone utilisera (et pourquoi), et un bouton la montre vingt
+  secondes sans partir courir.
 
 ### En course, la carte suit comme un GPS
 
@@ -265,6 +270,31 @@ ce qui vient. Le cap se lit **sur le tracé**, pas sur la boussole du GPS : à
 pied, celle-ci est du bruit, et la carte tournait de trente degrés à chaque
 seconde. Déplacer ou tourner la carte au doigt la libère ; « Recentrer » la
 reprend. Pincer pour zoomer ne libère rien, et le zoom choisi est gardé.
+
+Pendant la sortie, l'écran change de rôle : la consigne à venir en bandeau, en
+haut (le virage, sa distance en très grand, la rue) ; le chrono et les chiffres
+en bas ; et sur la droite, les seules commandes utiles en courant — fond de
+carte, voix, **orientation** (dans le sens de la course, ou nord en haut, à
+plat) et **vue d'ensemble** du parcours. L'activité et les filtres ne se
+touchent plus : rien ne change le parcours en pleine course. « Terminer »
+n'apparaît qu'en pause, pour qu'un doigt qui glisse n'arrête pas la sortie.
+
+### Hors parcours : un nouveau chemin
+
+Trois relevés GPS de suite à plus de 45 m du tracé : l'app le dit. Si l'on ne
+l'a pas retrouvé vingt secondes plus tard — le temps de contourner des travaux
+sans qu'on nous impose un itinéraire — elle en calcule un nouveau, sur
+l'appareil, avec les rues déjà chargées (`frontend/src/engine/reroute.js`).
+
+Il ne ramène pas au point le plus proche, mais à celui qui **tient la distance
+prévue** : chaque point de la fin de boucle est un candidat, un seul Dijkstra
+donne la distance jusqu'à tous, et l'on garde celui où « déjà couru + raccord +
+fin de boucle » tombe le plus près de l'objectif, le raccord comptant un peu en
+plus. Après un simple écart, on rejoint la boucle devant soi ; après un
+raccourci, on va chercher ce qu'on a sauté ; après un grand détour, on rentre
+au plus court. Le raccord suit les mêmes préférences que la boucle, ses
+consignes se disent comme les autres, et le bouton « Recalculer » n'attend pas
+les vingt secondes.
 
 ### Les fonds de carte
 

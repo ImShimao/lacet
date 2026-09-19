@@ -7,7 +7,7 @@
  * classement des itinéraires pour trouver le bouton qui télécharge une carte.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
@@ -23,12 +23,20 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
     history.length === 0 && saved.length > 0 ? 'saved' : 'history',
   )
   const view = canRun ? chosen : 'saved'
-  const rows = view === 'history' ? history : saved
+  // Les filtres de l'historique : quelle activité, quel mois. Les totaux
+  // suivent — « combien ai-je couru en août » est la question qu'on se pose.
+  const [sport, setSport] = useState('all')
+  const [month, setMonth] = useState('all')
+  const months = useMemo(() => [...new Set(history.map((r) => monthKey(r.ranAt)).filter(Boolean))], [history])
+  const shown = history.filter(
+    (r) => (sport === 'all' || (r.sport || 'run') === sport) && (month === 'all' || monthKey(r.ranAt) === month),
+  )
+  const rows = view === 'history' ? shown : saved
 
   return (
     <div className="panel">
-      {view === 'history' && history.length > 0 && (
-        <Totals history={history} profile={profile} />
+      {view === 'history' && shown.length > 0 && (
+        <Totals history={shown} profile={profile} />
       )}
       {canRun && (
         <div className="seg">
@@ -41,6 +49,31 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
         </div>
       )}
 
+      {view === 'history' && history.length > 0 && (
+        <div className="histfilter">
+          <div className="chips" role="radiogroup" aria-label="Activité">
+            {[
+              ['all', null, 'Tout'],
+              ['run', 'run', 'Course'],
+              ['bike', 'bike', 'Vélo'],
+            ].map(([key, icon, label]) => (
+              <button key={key} role="radio" aria-checked={sport === key} className={`chip ${sport === key ? 'chip--on' : ''}`} onClick={() => setSport(key)}>
+                {icon && <Icon name={icon} size={15} />}
+                {label}
+              </button>
+            ))}
+          </div>
+          <select className="histfilter__month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mois">
+            <option value="all">Tous les mois</option>
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthLabel(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="empty">
           <span className="empty__icon">
@@ -48,7 +81,9 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
           </span>
           <p>
             {view === 'history'
-              ? "Aucune sortie enregistrée. Lance-en une depuis l'onglet Explorer."
+              ? history.length
+                ? 'Aucune sortie pour ce filtre.'
+                : "Aucune sortie enregistrée. Lance-en une depuis l'onglet Explorer."
               : 'Aucun parcours en favori. Le cœur, sous une proposition, la garde ici.'}
           </p>
         </div>
@@ -69,13 +104,22 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
           )}
           <div className="list">
             {rows.map((r, i) => (
-              <div key={i} className="list__item">
+              <div key={i} className="list__group">
+              {view === 'history' && monthKey(r.ranAt) !== monthKey(rows[i - 1]?.ranAt) && (
+                <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={rows.filter((x) => monthKey(x.ranAt) === monthKey(r.ranAt))} />
+              )}
+              <div className="list__item">
                 <button className="list__row" onClick={() => onOpen(r)}>
+                  {view === 'history' && (
+                    <span className="list__sport" aria-hidden="true">
+                      <Icon name={r.sport === 'bike' ? 'bike' : 'run'} size={17} />
+                    </span>
+                  )}
                   <span>
                     {r.name}
                     <em>
                       {view === 'history'
-                        ? `${km(r.actual_distance_m)} km · ${duration(r.actual_duration_s)} · ${paceOf(r)}/km`
+                        ? `${dayLabel(r.ranAt)} · ${km(r.actual_distance_m)} km · ${duration(r.actual_duration_s)} · ${paceOf(r)}/km`
                         : `${km(r.distance_m)} km · D+ ${Math.round(r.ascent_m || 0)} m`}
                     </em>
                   </span>
@@ -86,6 +130,7 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
                   )}
                 </button>
                 {canRun && <OfflineControl route={r} mapStyle={mapStyle} />}
+              </div>
               </div>
             ))}
           </div>
@@ -282,6 +327,42 @@ function steps(distanceM, profile) {
   if (profile?.sport === 'bike') return 0
   const stride = ((profile?.height_cm || 175) / 100) * STRIDE_RATIO
   return distanceM / stride
+}
+
+/** Le mois d'une sortie : « 2026-09 ». */
+function monthKey(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** « Septembre 2026 ». */
+function monthLabel(key) {
+  if (!key) return 'Sans date'
+  const [y, m] = key.split('-').map(Number)
+  const text = new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** « mar. 16 sept. » */
+function dayLabel(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** L'en-tête d'un mois : combien de sorties, de kilomètres, d'heures. */
+function MonthHeader({ label, runs }) {
+  const distance = runs.reduce((m, r) => m + (r.actual_distance_m || 0), 0)
+  const time = runs.reduce((m, r) => m + (r.actual_duration_s || 0), 0)
+  return (
+    <div className="monthhead">
+      <b>{label}</b>
+      <span>
+        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1).replace('.', ',')} km · {duration(time)}
+      </span>
+    </div>
+  )
 }
 
 function paceOf(entry) {

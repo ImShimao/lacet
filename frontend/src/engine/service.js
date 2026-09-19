@@ -15,6 +15,7 @@ import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
 import { buildProfile } from './weights'
+import { planRejoin } from './reroute'
 import { ascentDescent, currentWind, fetchMany, isNight, smooth, tailwindFinish } from './environment'
 
 export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: 100 }
@@ -301,6 +302,22 @@ export async function planLoops(input, deps) {
   }
 
   return { routes, rejected: rejected.slice(0, 6), meta }
+}
+
+/**
+ * Le chemin qui ramène sur la boucle, pendant la sortie — voir `reroute.js`.
+ *
+ * `input.request` est la demande qui a produit le parcours : c'est elle qui
+ * désigne le graphe à employer — celui de la recherche, encore en mémoire le
+ * plus souvent — et le profil, pour que le raccord suive les mêmes
+ * préférences que la boucle.
+ */
+export async function planDetour(input, { loadGraph, now = () => new Date() }) {
+  const req = normalizeRequest(input.request)
+  const graph = await loadGraph(graphArgs(req))
+  const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
+  const profile = buildProfile(req.surface, req.safety, night, req.sport)
+  return planRejoin(graph, profile.precompute(graph), input)
 }
 
 function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace) {

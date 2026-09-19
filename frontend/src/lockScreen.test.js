@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lockScreenState, paceEstimate, shortDistance, shouldRefresh } from './lockScreen'
+import { lockScreenState, noticeOf, paceEstimate, shortDistance, shouldRefresh } from './lockScreen'
 import { bearing, buildTrack, headingAt } from './routeTracker'
 
 /**
@@ -113,3 +113,39 @@ describe('le sens de la carte', () => {
     expect(cap).toBeLessThan(80)
   })
 })
+
+describe('la notification de secours', () => {
+  const state = {
+    instruction: 'Tourne à droite sur Rue de la Gare',
+    distance: '120 m',
+    remaining: '4,2 km',
+    arrival: new Date(2026, 8, 19, 18, 5).getTime(),
+    offRoute: false,
+    paused: false,
+  }
+
+  it('dit le virage, sa distance, et l’heure d’arrivée plutôt qu’un compte à rebours', () => {
+    expect(noticeOf(state)).toEqual({
+      title: 'Dans 120 m · Tourne à droite sur Rue de la Gare',
+      body: 'Reste 4,2 km · arrivée vers 18h05',
+    })
+  })
+
+  it('au moment d’agir, la consigne seule', () => {
+    expect(noticeOf({ ...state, distance: 'maintenant' }).title).toBe('Tourne à droite sur Rue de la Gare')
+  })
+
+  it('hors parcours ou en pause, le dit', () => {
+    expect(noticeOf({ ...state, offRoute: true }).title).toBe('Hors parcours')
+    expect(noticeOf({ ...state, paused: true }).title).toBe('Sortie en pause')
+  })
+})
+
+describe('l’avancée après un détour', () => {
+  it('ne repart pas de zéro : elle suit la part de sortie faite', () => {
+    const route = { distance_m: 3000, duration_s: 1200 }
+    const next = lockScreenState({ route, step: null, along: 0, offRoute: false, travelled: 5000, elapsedS: 1800, share: 0.62 })
+    expect(next.progress).toBeCloseTo(0.62)
+  })
+})
+

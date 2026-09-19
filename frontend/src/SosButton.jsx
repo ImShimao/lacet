@@ -22,7 +22,7 @@ const HOLD_MS = 900
  *
  * Le contact est gardé sur l'appareil, jamais transmis.
  */
-export default function SosButton({ position, distance, elapsed }) {
+export default function SosButton({ position, distance, elapsed, className = '' }) {
   const [held, setHeld] = useState(0)
   const [asking, setAsking] = useState(false)
   const timer = useRef(null)
@@ -109,7 +109,7 @@ export default function SosButton({ position, distance, elapsed }) {
   return (
     <>
       <button
-        className="btn btn--icon btn--sos"
+        className={`btn btn--icon btn--sos ${className}`}
         style={{ '--held': held }}
         onPointerDown={begin}
         onPointerUp={cancel}

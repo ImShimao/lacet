@@ -221,6 +221,22 @@ const PATHS = {
       <path d="M7 20v-6M12 20V6M17 20v-9" />
     </>
   ),
+  // Demi-tour : on remonte, on tourne, on redescend de l'autre côté.
+  uturn: (
+    <>
+      <path d="M17 20V10a5 5 0 0 0-10 0v8" />
+      <path d="m4 15 3 3 3-3" />
+    </>
+  ),
+  // Le point de départ : un repère et une croix pour « poser ici ».
+  pinPlus: (
+    <>
+      <path d="M19 10.2c0 5.4-7 11.3-7 11.3s-7-5.9-7-11.3a7 7 0 0 1 14 0z" />
+      <path d="M12 7.2v6M9 10.2h6" />
+    </>
+  ),
+  // Tout le parcours d'un coup d'œil : quatre coins qui s'écartent.
+  expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   compass: (
     <>
       <circle cx="12" cy="12" r="8.5" />

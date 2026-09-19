@@ -22,7 +22,7 @@ import { buildGraph } from './graph'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
 import { currentWind } from './environment'
-import { graphRequest, planLoops } from './service'
+import { graphRequest, planDetour, planLoops } from './service'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
 // extrait parisien compte 352 000 nœuds et occupe 260 Mo. Au-delà d'une grande
@@ -125,6 +125,18 @@ self.onmessage = async ({ data }) => {
       self.postMessage({ id, type: 'result', result: { ready: true } })
     } catch {
       self.postMessage({ id, type: 'result', result: { ready: false } })
+    }
+    return
+  }
+
+  // Le recalcul en course : le graphe de la recherche est presque toujours
+  // encore en mémoire, et sinon ses rues sont sur l'appareil.
+  if (type === 'detour') {
+    try {
+      const result = await planDetour(payload, { loadGraph: (args) => loadGraph(args, () => {}) })
+      self.postMessage({ id, type: 'result', result })
+    } catch (error) {
+      self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
     }
     return
   }

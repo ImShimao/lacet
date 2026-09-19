@@ -1,6 +1,7 @@
 import ActivityKit
 import Capacitor
 import Foundation
+import UserNotifications
 
 /// L'activité en direct d'une sortie : la consigne à venir et le temps restant,
 /// sur l'écran de verrouillage et dans la Dynamic Island.
@@ -8,6 +9,13 @@ import Foundation
 /// Elle est mise à jour par l'app elle-même, qui tourne en arrière-plan pendant
 /// toute la sortie (mode de fond « location ») : pas de notifications push, donc
 /// pas de serveur, et rien qui passe par Apple en dehors du téléphone.
+///
+/// **Et une notification de secours.** L'activité en direct demande une
+/// extension à part, que l'installation hors App Store peut retirer, et que
+/// Réglages permet de couper. Sans elle, l'écran de verrouillage restait vide :
+/// la consigne passe alors dans une notification **passive** — elle ne sonne
+/// pas, n'allume pas l'écran, et se remplace elle-même à chaque consigne : il
+/// n'y en a jamais qu'une, toujours à jour, qu'on lit en allumant l'écran.
 ///
 /// Côté JavaScript : `registerPlugin('LiveActivity')`, dans `src/native.js`.
 @objc(LiveActivityPlugin)
@@ -19,7 +27,21 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "noticePermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "notice", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearNotice", returnType: CAPPluginReturnPromise),
     ]
+
+    private static let noticeId = "lacet-run"
+
+    /// L'extension qui dessine l'activité est-elle dans l'app installée ?
+    /// Certaines installations hors App Store la retirent : l'activité serait
+    /// alors acceptée par iOS… et ne s'afficherait nulle part.
+    private static var hasExtension: Bool {
+        guard let plugIns = Bundle.main.builtInPlugInsURL else { return false }
+        return FileManager.default.fileExists(atPath: plugIns.appendingPathComponent("LacetWidgets.appex").path)
+    }
 
     /// Faux avant iOS 16.2, ou quand les activités sont coupées dans Réglages.
     @objc func available(_ call: CAPPluginCall) {
@@ -32,6 +54,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func start(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else {
+            call.resolve(["started": false])
+            return
+        }
+        guard Self.hasExtension else {
             call.resolve(["started": false])
             return
         }
@@ -81,6 +107,60 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve()
         }
+    }
+
+    /// Ce que l'écran de verrouillage peut afficher, pour « Mon compte ».
+    @objc func status(_ call: CAPPluginCall) {
+        var result: [String: Any] = ["extension": Self.hasExtension]
+        if #available(iOS 16.2, *) {
+            result["supported"] = true
+            result["enabled"] = ActivityAuthorizationInfo().areActivitiesEnabled
+        } else {
+            result["supported"] = false
+            result["enabled"] = false
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                result["notifications"] = "granted"
+            case .denied:
+                result["notifications"] = "denied"
+            default:
+                result["notifications"] = "prompt"
+            }
+            call.resolve(result)
+        }
+    }
+
+    @objc func noticePermission(_ call: CAPPluginCall) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
+            call.resolve(["granted": granted])
+        }
+    }
+
+    /// Pose — ou remplace — la notification de la sortie.
+    @objc func notice(_ call: CAPPluginCall) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = call.getString("title") ?? "Lacet"
+        content.body = call.getString("body") ?? ""
+        content.sound = nil
+        content.threadIdentifier = Self.noticeId
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .passive
+        }
+        // Retirée puis reposée : une seule notification, toujours la dernière
+        // consigne, plutôt qu'une pile à faire défiler.
+        center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
+        let request = UNNotificationRequest(identifier: Self.noticeId, content: content, trigger: nil)
+        center.add(request) { _ in call.resolve() }
+    }
+
+    @objc func clearNotice(_ call: CAPPluginCall) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.noticeId])
+        center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
+        call.resolve()
     }
 
     @available(iOS 16.1, *)

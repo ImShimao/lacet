@@ -51,7 +51,7 @@ export function paceEstimate({ route, travelled, elapsedS }) {
  * `step` est la consigne à venir telle que la rend `nextInstruction` —
  * `{ step, remaining }` — ou `null` quand il n'y en a plus.
  */
-export function lockScreenState({ route, step, along, offRoute, paused = false, travelled, elapsedS, now = Date.now() }) {
+export function lockScreenState({ route, step, along, offRoute, paused = false, travelled, elapsedS, share = null, now = Date.now() }) {
   const total = route?.distance_m || 0
   const left = Math.max(0, total - (along ?? travelled))
   const pace = paceEstimate({ route, travelled, elapsedS })
@@ -64,7 +64,9 @@ export function lockScreenState({ route, step, along, offRoute, paused = false, 
     turn: step?.step?.turn || (left < 30 ? 'finish' : 'straight'),
     remaining: remainingDistance(left),
     arrival: Math.round(now + left * pace * 1000),
-    progress: total ? Math.min(1, Math.max(0, (along ?? 0) / total)) : 0,
+    // `share` : l'avancée sur le parcours prévu, quand un détour a remplacé le
+    // tracé — la barre ne doit pas repartir de zéro à chaque recalcul.
+    progress: Math.min(1, Math.max(0, share ?? (total ? (along ?? 0) / total : 0))),
     offRoute: Boolean(offRoute),
     // En pause, l'écran le dit au lieu d'un compte à rebours qui filerait vers
     // une arrivée qu'on n'atteindra pas à l'heure dite.
@@ -92,4 +94,23 @@ export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
   }
   if (previous.distance === next.distance && previous.remaining === next.remaining) return false
   return elapsedMs >= minMs
+}
+
+/**
+ * La notification de secours, quand l'activité en direct n'est pas disponible.
+ *
+ * Une notification ne sait pas faire défiler un compte à rebours : elle donne
+ * l'heure d'arrivée, qui, elle, ne se périme pas d'une seconde à l'autre.
+ */
+export function noticeOf(state) {
+  if (state.paused) return { title: 'Sortie en pause', body: `Reste ${state.remaining} jusqu'à l'arrivée.` }
+  if (state.offRoute) {
+    return { title: 'Hors parcours', body: 'Lacet te propose un chemin pour revenir sur la boucle.' }
+  }
+  const at = new Date(state.arrival)
+  const clock = `${at.getHours()}h${String(at.getMinutes()).padStart(2, '0')}`
+  return {
+    title: state.distance === 'maintenant' ? state.instruction : `Dans ${state.distance} · ${state.instruction}`,
+    body: `Reste ${state.remaining} · arrivée vers ${clock}`,
+  }
 }

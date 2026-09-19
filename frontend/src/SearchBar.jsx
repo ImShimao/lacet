@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { searchPlaces } from './api'
+import { km } from './format'
 
 /**
- * Recherche d'un point de départ, n'importe où dans le monde.
+ * Recherche d'un point de départ, n'importe où dans le monde : une adresse,
+ * une ville, ou un lieu par son nom — « macdo guebwiller », « one fitness ».
+ * `near` est là où l'on est : les lieux proches passent devant, et chacun dit
+ * à quelle distance il se trouve.
  *
  * Le champ se pilote entièrement au clavier. Ce n'est pas un raffinement : on
  * arrive ici en tapant une adresse, les doigts sur les touches, et il faut
@@ -12,13 +16,16 @@ import { searchPlaces } from './api'
  * résultat le faisait disparaître, puisque quitter le champ fermait la liste
  * avant qu'on ait pu l'atteindre.
  */
-export default function SearchBar({ onPick }) {
+export default function SearchBar({ onPick, near = null }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [searching, setSearching] = useState(false)
   const controller = useRef(null)
+  // Lue au moment de chercher, sans relancer la recherche à chaque relevé GPS.
+  const nearRef = useRef(near)
+  nearRef.current = near
 
   useEffect(() => {
     if (query.trim().length < 3) {
@@ -26,14 +33,14 @@ export default function SearchBar({ onPick }) {
       setSearching(false)
       return undefined
     }
-    // Nominatim n'accepte qu'une requête par seconde : on attend que la frappe
-    // se calme avant d'interroger, et on annule la précédente.
+    // On attend que la frappe se calme avant d'interroger, et on annule la
+    // précédente : chaque lettre n'a pas à partir sur le réseau.
     setSearching(true)
     const timer = setTimeout(async () => {
       controller.current?.abort()
       controller.current = new AbortController()
       try {
-        setResults(await searchPlaces(query, controller.current.signal))
+        setResults(await searchPlaces(query, controller.current.signal, nearRef.current))
         setActive(0)
         setOpen(true)
       } catch {
@@ -41,7 +48,7 @@ export default function SearchBar({ onPick }) {
       } finally {
         setSearching(false)
       }
-    }, 450)
+    }, 350)
     return () => clearTimeout(timer)
   }, [query])
 
@@ -113,12 +120,23 @@ export default function SearchBar({ onPick }) {
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(place)}
             >
-              {place.short}
-              <em>{place.label}</em>
+              <span className="search__name">
+                <span>{place.short}</span>
+                {place.distance_m != null && <small>{distanceText(place.distance_m)}</small>}
+              </span>
+              {(place.kind || place.label) && (
+                <em>{[place.kind, place.label].filter(Boolean).join(' · ')}</em>
+              )}
             </button>
           ))}
         </div>
       )}
     </div>
   )
+}
+
+/** « 350 m », « 2,4 km », « 38 km » : la précision qui sert à choisir. */
+function distanceText(metres) {
+  if (metres < 950) return `${Math.max(50, Math.round(metres / 50) * 50)} m`
+  return `${km(metres, metres < 20_000 ? 1 : 0).replace('.', ',')} km`
 }

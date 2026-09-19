@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
-import { duration, haversine, km, pace } from './format'
+import ElevationSheet from './ElevationSheet.jsx'
+import { haversine, km, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
-import { lockScreenState, shouldRefresh } from './lockScreen'
+import { lockScreenState, noticeOf, shouldRefresh } from './lockScreen'
 import { motionTracker } from './autoPause'
 import { load } from './storage'
 import * as voice from './voice'
 import SosButton from './SosButton.jsx'
 import { isNative } from './platform'
 import { watchPosition } from './position'
+import { detourOnDevice } from './engine/client'
+import { spliceRoute } from './detour'
 
 // Distance à laquelle on prévient d'une traversée à venir.
 const CROSSING_ALERT_M = 120
@@ -26,26 +30,54 @@ const ACT_M = 25
 // aberrant est banal en ville, entre deux immeubles ; trois de suite, non.
 const OFF_ROUTE_FIXES = 3
 
+// Hors du tracé, le temps de le retrouver seul avant qu'un nouveau chemin soit
+// proposé : un détour pour éviter des travaux, une fontaine, un pont qu'on
+// voulait voir ne réclament pas d'itinéraire. Et s'il n'y en a pas, on
+// réessaie un peu plus tard — on aura bougé.
+const REROUTE_AFTER_MS = 20_000
+const REROUTE_RETRY_MS = 30_000
+
 // Hors du tracé, le cap se lit sur le déplacement — à condition qu'il soit assez
 // long pour dépasser l'imprécision du GPS, sinon la carte tourne sur du bruit.
 const MOVE_FOR_HEADING_M = 8
 
+const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
+
 /**
- * Suivi de la sortie : distance, allure, guidage, alertes.
+ * Suivi de la sortie : chrono, distance, allure, guidage, alertes.
  *
  * Fonctionne avec ou sans itinéraire. Sans (`route` à null), c'est une course
  * libre : on enregistre, on ne guide pas.
+ *
+ * La consigne à venir se lit **en haut de l'écran**, sur la carte, en grand —
+ * c'est elle qu'on cherche des yeux en courant. Le panneau du bas garde les
+ * chiffres et les commandes. `stage` est la zone de la carte, où ce bandeau
+ * est rendu.
+ *
+ * `request` est la demande qui a produit le parcours : c'est avec elle qu'un
+ * chemin de retour se calcule quand on s'est écarté.
  */
-export default function LiveRun({ route, onPosition, onStop }) {
+export default function LiveRun({ route, request, sport, stage, speaking, onPosition, onReroute, onStop }) {
   const [state, setState] = useState({ distance: 0, elapsed: 0, points: 0 })
   const [error, setError] = useState(null)
   const [alert, setAlert] = useState(null)
   const [progress, setProgress] = useState(null)
-  const [speaking, setSpeaking] = useState(() => voice.available)
   const [current, setCurrent] = useState(null)
   const [offRoute, setOffRoute] = useState(false)
   // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
   const [paused, setPaused] = useState(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+
+  // Le tracé suivi : le parcours choisi, puis, après un recalcul, le raccord et
+  // la fin de la boucle. Tenu aussi en référence : les relevés GPS arrivent
+  // dans un rappel créé une fois pour toutes, qui doit lire le tracé du moment.
+  const [guide, setGuide] = useState(() => guideOf(route))
+  const guideRef = useRef(guide)
+  const [rerouting, setRerouting] = useState(false)
+  const [rerouteDue, setRerouteDue] = useState(null)
+  const detouring = useRef(false)
+  const dueAt = useRef(null)
+  const lastOnAlong = useRef(0)
 
   const last = useRef(null)
   const here = useRef(null)
@@ -63,8 +95,9 @@ export default function LiveRun({ route, onPosition, onStop }) {
   const lastSplit = useRef(0)
   const heading = useRef(null)
   const moved = useRef(null)
-  // L'écran de verrouillage : prêt ou non, et ce qu'on lui a envoyé en dernier.
-  const lockReady = useRef(false)
+  // L'écran de verrouillage : l'activité en direct, ou à défaut une
+  // notification ; et ce qu'on lui a envoyé en dernier.
+  const lockMode = useRef(null)
   const shown = useRef(null)
   const shownAt = useRef(0)
   const upcomingStep = useRef(null)
@@ -83,14 +116,21 @@ export default function LiveRun({ route, onPosition, onStop }) {
   const trail = useRef([])
   const autoPause = useRef(load().autoPause !== false)
 
-  const track = useMemo(() => buildTrack(route?.geometry), [route])
-  const instructions = route?.instructions || []
+  const plannedM = route?.distance_m || 0
+  const canDetour = Boolean(route && request && route.geometry?.length > 1)
   const laps = route?.laps || 1
-  const lapLength = (route?.lap_distance_m || route?.distance_m || 1)
+  const lapLength = route?.lap_distance_m || route?.distance_m || 1
 
   useEffect(() => {
     voice.setEnabled(speaking)
   }, [speaking])
+
+  // Un autre parcours — ce qui n'arrive qu'au démarrage : on repart de lui.
+  useEffect(() => {
+    const g = guideOf(route)
+    guideRef.current = g
+    setGuide(g)
+  }, [route])
 
   // Garder l'écran allumé pendant la sortie. Le verrou saute dès que l'onglet
   // passe en arrière-plan : il faut le reprendre au retour, sinon l'écran
@@ -212,6 +252,10 @@ export default function LiveRun({ route, onPosition, onStop }) {
 
   // L'écran de verrouillage, dans l'app iPhone : la consigne à venir et le temps
   // restant, lisibles en allumant l'écran, sans déverrouiller ni rouvrir l'app.
+  //
+  // L'activité en direct d'abord ; si l'iPhone ne peut pas l'afficher — iOS
+  // trop ancien, activités coupées dans Réglages, extension absente — une
+  // notification silencieuse, tenue à jour, dit la même chose.
   useEffect(() => {
     if (!isNative() || !route) return undefined
     let cancelled = false
@@ -219,7 +263,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
     native.then(async (n) => {
       const first = lockScreenState({
         route,
-        step: nextInstruction(instructions, 0, new Set()),
+        step: nextInstruction(route.instructions || [], 0, new Set()),
         along: 0,
         offRoute: false,
         travelled: 0,
@@ -230,14 +274,24 @@ export default function LiveRun({ route, onPosition, onStop }) {
         if (started) n.endLiveActivity()
         return
       }
-      lockReady.current = started
+      if (started) {
+        lockMode.current = 'activity'
+      } else if (await n.askNoticePermission()) {
+        if (cancelled) return
+        lockMode.current = 'notice'
+        const { title, body } = noticeOf(first)
+        n.postRunNotice(title, body)
+      }
       shown.current = first
       shownAt.current = Date.now()
     })
     return () => {
       cancelled = true
-      lockReady.current = false
-      native.then((n) => n.endLiveActivity())
+      lockMode.current = null
+      native.then((n) => {
+        n.endLiveActivity()
+        n.clearRunNotice()
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
@@ -272,7 +326,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
       voice.speak('Pause automatique.', { priority: false })
       if (isNative()) import('./native').then((n) => n.pulseHaptic())
     }
-    refreshLockScreen(upcomingStep.current, fix.current?.along ?? covered.current)
+    refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
 
   function resume({ spoken = true } = {}) {
@@ -283,7 +337,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
     resumedAt.current = Date.now()
     setPaused(null)
     if (spoken) voice.speak('Reprise.', { priority: false })
-    refreshLockScreen(upcomingStep.current, fix.current?.along ?? covered.current)
+    refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
 
   /** Le bouton : pause à la main, ou reprise de n'importe quelle pause. */
@@ -298,23 +352,36 @@ export default function LiveRun({ route, onPosition, onStop }) {
     }
   }
 
+  /** L'avancée de toute la sortie, de 0 à 1 — détours compris. */
+  function outingShare(along) {
+    const left = Math.max(0, (guideRef.current.route?.distance_m || 0) - along)
+    const done = covered.current
+    return done + left > 0 ? done / (done + left) : 0
+  }
+
   /** Met l'écran de verrouillage à jour, sans le réveiller pour rien. */
   function refreshLockScreen(upcoming, along) {
-    if (!lockReady.current) return
+    if (!lockMode.current) return
     const next = lockScreenState({
-      route,
+      route: guideRef.current.route,
       step: upcoming,
       along,
       offRoute: strayCount.current >= OFF_ROUTE_FIXES,
       paused: Boolean(pausedKind.current),
       travelled: covered.current,
       elapsedS: movingSeconds(),
+      share: outingShare(along),
     })
     const now = Date.now()
     if (!shouldRefresh(shown.current, next, now - shownAt.current)) return
     shown.current = next
     shownAt.current = now
-    import('./native').then((n) => n.updateLiveActivity(next))
+    if (lockMode.current === 'activity') {
+      import('./native').then((n) => n.updateLiveActivity(next))
+    } else {
+      const { title, body } = noticeOf(next)
+      import('./native').then((n) => n.postRunNotice(title, body))
+    }
   }
 
   /**
@@ -328,7 +395,7 @@ export default function LiveRun({ route, onPosition, onStop }) {
     const onTrack = fix.current && strayCount.current < OFF_ROUTE_FIXES
     if (route && onTrack) {
       moved.current = point
-      return headingAt(track, fix.current.along)
+      return headingAt(guideRef.current.track, fix.current.along)
     }
     const from = moved.current
     if (!from) {
@@ -354,6 +421,8 @@ export default function LiveRun({ route, onPosition, onStop }) {
 
   /** Position sur le tracé, consigne à venir, et détection du hors-parcours. */
   function followRoute(point) {
+    const { track, route: guided } = guideRef.current
+    const instructions = guided?.instructions || []
     const found = locate(track, point, fix.current)
     if (!found) return
     fix.current = found
@@ -363,12 +432,24 @@ export default function LiveRun({ route, onPosition, onStop }) {
       strayCount.current += 1
       if (strayCount.current === OFF_ROUTE_FIXES) {
         setOffRoute(true)
-        voice.speak("Tu t'es écarté du parcours. Reviens sur le tracé.")
+        if (canDetour) {
+          dueAt.current = Date.now() + REROUTE_AFTER_MS
+          setRerouteDue(dueAt.current)
+          voice.speak("Tu t'es écarté du parcours. Si tu ne le retrouves pas, je t'en propose un nouveau.")
+        } else {
+          voice.speak("Tu t'es écarté du parcours. Reviens sur le tracé.")
+        }
+      }
+      if (strayCount.current >= OFF_ROUTE_FIXES && canDetour && dueAt.current && Date.now() >= dueAt.current) {
+        detour(point)
       }
     } else {
+      lastOnAlong.current = found.along
       if (strayCount.current >= OFF_ROUTE_FIXES) voice.speak('Te revoilà sur le parcours.')
       strayCount.current = 0
+      dueAt.current = null
       setOffRoute(false)
+      setRerouteDue(null)
     }
 
     const upcoming = nextInstruction(instructions, found.along, announced.current)
@@ -388,29 +469,119 @@ export default function LiveRun({ route, onPosition, onStop }) {
     }
   }
 
+  /**
+   * Un nouveau chemin, depuis là où l'on est, pour finir la boucle — voir
+   * `engine/reroute.js`. Calculé sur l'appareil, avec les rues de la
+   * recherche : hors réseau aussi.
+   */
+  async function detour(point = here.current) {
+    if (!canDetour || detouring.current || !point) return
+    detouring.current = true
+    dueAt.current = null
+    setRerouting(true)
+    const { route: guided, track } = guideRef.current
+    try {
+      const found = await detourOnDevice({
+        request,
+        position: point,
+        heading: heading.current,
+        geometry: guided.geometry,
+        fromAlong: lastOnAlong.current,
+        travelledM: covered.current,
+        plannedM,
+      })
+      if (!found) throw new Error('Aucun chemin')
+      // Revenu sur le tracé pendant le calcul : rien à changer.
+      if (strayCount.current < OFF_ROUTE_FIXES) return
+      const next = spliceRoute(guided, found, track.cumulative[found.joinIndex] ?? 0)
+      adopt(next)
+      // La consigne s'affiche tout de suite, sans attendre le relevé suivant.
+      const first = nextInstruction(next.instructions, 0, announced.current)
+      setCurrent(first)
+      upcomingStep.current = first
+      refreshLockScreen(first, 0)
+      // La première consigne est dite tout de suite, avec l'annonce : on ne la
+      // répète pas au relevé suivant.
+      acted.current.add(0)
+      previewed.current.add(0)
+      voice.speak(`Nouvel itinéraire. ${next.instructions[0]?.text ?? ''}`)
+      if (isNative()) import('./native').then((n) => n.pulseHaptic())
+      onReroute?.(next)
+    } catch {
+      if (strayCount.current >= OFF_ROUTE_FIXES) {
+        dueAt.current = Date.now() + REROUTE_RETRY_MS
+        setRerouteDue(dueAt.current)
+        voice.speak("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
+      }
+    } finally {
+      detouring.current = false
+      setRerouting(false)
+    }
+  }
+
+  /** Suit désormais `next` : le guidage repart de son début. */
+  function adopt(next) {
+    const g = guideOf(next)
+    guideRef.current = g
+    setGuide(g)
+    fix.current = null
+    strayCount.current = 0
+    lastOnAlong.current = 0
+    announced.current = new Set()
+    previewed.current = new Set()
+    acted.current = new Set()
+    setOffRoute(false)
+    setRerouteDue(null)
+    setCurrent(null)
+    setProgress(null)
+  }
+
   /** L'alerte de traversée — la seule fois où l'app parle d'elle-même. */
   function warnCrossing(point) {
-    const upcoming = (route?.crossings || [])
-      .map((c, i) => ({ ...c, i, d: haversine(point, [c.lon, c.lat]) }))
-      .filter((c) => c.d < CROSSING_ALERT_M && !warned.current.has(c.i))
+    // Repérées par leur position, pas par leur rang : un recalcul renumérote la
+    // liste, et une traversée déjà signalée le serait deux fois.
+    const upcoming = (guideRef.current.route?.crossings || [])
+      .map((c) => ({ ...c, key: `${c.lon},${c.lat}`, d: haversine(point, [c.lon, c.lat]) }))
+      .filter((c) => c.d < CROSSING_ALERT_M && !warned.current.has(c.key))
       .sort((a, b) => a.d - b.d)[0]
 
     if (!upcoming) return
-    warned.current.add(upcoming.i)
+    warned.current.add(upcoming.key)
     setAlert(upcoming)
     if (isNative()) import('./native').then((n) => n.warnHaptic())
     else if (navigator.vibrate) navigator.vibrate([200, 100, 200])
     setTimeout(() => setAlert(null), 8000)
   }
 
-  const currentPace = state.distance > 50 ? state.elapsed / (state.distance / 1000) : 0
-  const remaining = route
-    ? Math.max(0, (route.distance_m || 0) - (progress?.along ?? state.distance))
-    : null
-  const share = route && track.total ? Math.min(1, (progress?.along ?? 0) / track.total) : 0
+  const finish = () => onStop({ ...state, elapsed: movingSeconds() })
+
+  const bike = sport === 'bike'
+  const moving = state.distance > 50 ? state.elapsed / (state.distance / 1000) : 0
+  const along = progress?.along ?? 0
+  const remaining = route ? Math.max(0, (guide.route?.distance_m || 0) - along) : null
+  const share = route ? (state.distance + remaining > 0 ? state.distance / (state.distance + remaining) : 0) : 0
+  // Sur le parcours prévu : un détour décale les distances du tracé suivi.
+  const planAlong = along + (guide.route?.plan_offset_m ?? 0)
+  const hasProfile = Boolean(route?.elevation_profile?.length > 1)
+  const hasGuidance = Boolean(guide.route?.instructions?.length)
+  const rerouteIn = rerouteDue ? Math.max(0, Math.ceil((rerouteDue - Date.now()) / 1000)) : null
 
   return (
     <div className="live">
+      {stage && route &&
+        createPortal(
+          <RunBanner
+            step={current}
+            offRoute={offRoute}
+            rerouting={rerouting}
+            rerouteIn={canDetour ? rerouteIn : null}
+            onReroute={canDetour ? () => detour() : null}
+            hasGuidance={hasGuidance}
+            waiting={state.points === 0}
+          />,
+          stage,
+        )}
+
       {route && (
         <div className="live__bar" aria-hidden="true">
           <i style={{ width: `${share * 100}%` }} />
@@ -425,15 +596,29 @@ export default function LiveRun({ route, onPosition, onStop }) {
             <span>
               {paused === 'auto'
                 ? 'Le chrono reprend tout seul dès que tu repars.'
-                : 'Touche le bouton lecture pour reprendre.'}
+                : 'Reprends quand tu veux, ou termine la sortie.'}
             </span>
           </div>
         </div>
       )}
 
-      <div className={`live__big ${paused ? 'live__big--paused' : ''}`}>
-        <b>{km(state.distance)}</b>
-        <span>KILOMÈTRES</span>
+      <div className={`live__clock ${paused ? 'live__clock--paused' : ''}`} role="timer" aria-label="Temps de course">
+        {clock(state.elapsed)}
+      </div>
+
+      <div className="stats stats--live">
+        <div>
+          <b>{km(state.distance)}</b>
+          <span>Distance (km)</span>
+        </div>
+        <div>
+          <b>{bike ? speed(state.distance, state.elapsed) : pace(moving)}</b>
+          <span>{bike ? 'Vitesse (km/h)' : 'Allure (/km)'}</span>
+        </div>
+        <div>
+          <b>{remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}</b>
+          <span>{remaining === null ? (bike ? 'Allure (/km)' : 'Vitesse (km/h)') : 'Restant (km)'}</span>
+        </div>
       </div>
 
       {/* Sur un parcours à tours, la question qu'on se pose en courant n'est pas
@@ -441,35 +626,8 @@ export default function LiveRun({ route, onPosition, onStop }) {
           identiques : sans compteur, rien ne les distingue. */}
       {laps > 1 && (
         <div className="lapcount" role="status">
-          Tour <b>{Math.min(laps, Math.floor((progress?.along ?? 0) / lapLength) + 1)}</b>
+          Tour <b>{Math.min(laps, Math.floor(Math.max(0, planAlong) / lapLength) + 1)}</b>
           {' '}sur <b>{laps}</b>
-        </div>
-      )}
-
-      <div className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div>
-          <b>{pace(currentPace)}</b>
-          <span>Allure /km</span>
-        </div>
-        <div>
-          <b>{duration(state.elapsed)}</b>
-          <span>Temps</span>
-        </div>
-        <div>
-          <b>{remaining === null ? '—' : km(remaining, 1)}</b>
-          <span>Restants (km)</span>
-        </div>
-      </div>
-
-      {route && instructions.length > 0 && (
-        <NextStep step={current} offRoute={offRoute} />
-      )}
-      {route && instructions.length === 0 && (
-        <div className="step step--idle">
-          <em>
-            Parcours enregistré avant l'ajout du guidage : la carte et les alertes de
-            traversée fonctionnent, mais il n'y a pas de consignes à annoncer.
-          </em>
         </div>
       )}
 
@@ -488,82 +646,146 @@ export default function LiveRun({ route, onPosition, onStop }) {
         <div className="live__wait">Acquisition du signal GPS…</div>
       )}
 
-      {/* Collés au bas du panneau : « Terminer » et le SOS doivent rester à
-          portée de pouce en courant, pas sous le pli à aller chercher. */}
-      <div className="row live__controls">
-        {voice.available && (
+      {/* Collés au bas du panneau, à portée de pouce. En course : le profil, la
+          pause, le SOS. « Terminer » n'apparaît qu'en pause : un bouton d'arrêt
+          touché par erreur en courant effaçait la fin de la sortie. */}
+      <div className="live__controls runctl">
+        {paused ? (
+          <button className="runctl__side runctl__stop" onClick={finish}>
+            <Icon name="stop" size={18} />
+            <span>Terminer</span>
+          </button>
+        ) : (
           <button
-            className={`btn btn--icon ${speaking ? 'btn--on' : ''}`}
-            onClick={() => {
-              voice.unlock()
-              setSpeaking((v) => !v)
-            }}
-            title={speaking ? 'Couper le guidage vocal' : 'Activer le guidage vocal'}
-            aria-pressed={speaking}
+            className="runctl__side"
+            onClick={() => setProfileOpen(true)}
+            disabled={!hasProfile}
+            aria-label="Voir le dénivelé prévu"
           >
-            <Icon name={speaking ? 'volume' : 'volumeOff'} size={19} />
+            <Icon name="mountain" size={19} />
+            <span>Dénivelé</span>
           </button>
         )}
-        <SosButton position={here} distance={state.distance} elapsed={state.elapsed} />
         <button
-          className={`btn btn--icon ${paused ? 'btn--on' : ''}`}
+          className={`runctl__main ${paused ? 'runctl__main--paused' : ''}`}
           onClick={togglePause}
-          title={paused ? 'Reprendre' : 'Mettre en pause'}
           aria-label={paused ? 'Reprendre' : 'Mettre en pause'}
           aria-pressed={Boolean(paused)}
         >
-          <Icon name={paused ? 'play' : 'pause'} size={18} />
+          <Icon name={paused ? 'play' : 'pause'} size={30} strokeWidth={2.4} />
         </button>
-        <button className="btn btn--primary" onClick={() => onStop({ ...state, elapsed: movingSeconds() })}>
-          <Icon name="stop" size={16} />
-          Terminer
-        </button>
+        <SosButton position={here} distance={state.distance} elapsed={state.elapsed} className="runctl__sos" />
       </div>
+
+      {profileOpen && hasProfile && (
+        <ElevationSheet route={route} along={planAlong} onClose={() => setProfileOpen(false)} />
+      )}
     </div>
   )
 }
 
-/** La consigne du moment, en grand — c'est ce qu'on regarde en courant. */
-function NextStep({ step, offRoute }) {
+/**
+ * La consigne du moment, en bandeau sur la carte — c'est ce qu'on regarde en
+ * courant. Le virage en pictogramme, sa distance en très grand, la rue en
+ * toutes lettres.
+ */
+function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidance, waiting }) {
+  if (rerouting) {
+    return (
+      <div className="runbar runbar--stray" role="status">
+        <span className="runbar__spin" aria-hidden="true" />
+        <div className="runbar__text">
+          <b>Nouvel itinéraire…</b>
+          <em>Recherche d'un chemin pour finir la boucle</em>
+        </div>
+      </div>
+    )
+  }
   if (offRoute) {
     return (
-      <div className="step step--stray" role="status">
-        <Icon name="warning" size={20} />
-        <div>
+      <div className="runbar runbar--stray" role="status">
+        <span className="runbar__turn">
+          <Icon name="warning" size={30} strokeWidth={2.2} />
+        </span>
+        <div className="runbar__text">
           <b>Hors parcours</b>
-          <em>Reviens sur le tracé pour reprendre le guidage.</em>
+          <em>
+            {rerouteIn != null
+              ? rerouteIn > 0
+                ? `Nouvel itinéraire dans ${rerouteIn} s`
+                : 'Nouvel itinéraire au prochain relevé'
+              : 'Reviens sur le tracé pour reprendre le guidage'}
+          </em>
+        </div>
+        {onReroute && (
+          <button className="runbar__act" onClick={onReroute}>
+            Recalculer
+          </button>
+        )}
+      </div>
+    )
+  }
+  if (!hasGuidance) {
+    return (
+      <div className="runbar runbar--idle" role="status">
+        <div className="runbar__text">
+          <em>Parcours enregistré sans consignes : suis le tracé sur la carte.</em>
         </div>
       </div>
     )
   }
   if (!step) {
     return (
-      <div className="step step--idle">
-        <em>Guidage en attente du signal GPS…</em>
+      <div className="runbar runbar--idle" role="status">
+        <div className="runbar__text">
+          <em>{waiting ? 'Guidage en attente du signal GPS…' : 'Suis le tracé.'}</em>
+        </div>
       </div>
     )
   }
+  const distance = step.remaining > 20 ? roundedDistance(step.remaining) : 'Maintenant'
   return (
-    <div className="step" role="status">
-      <Icon name={turnIcon(step.step.turn)} size={22} />
-      <div>
-        <b>{step.step.text}</b>
-        <em>
-          {step.remaining > 20 ? `dans ${Math.round(step.remaining / 10) * 10} m` : 'maintenant'}
-          {step.step.caution ? ' · traversée non protégée' : ''}
-        </em>
+    <div className="runbar" role="status">
+      <span className="runbar__turn">
+        <Icon name={turnIcon(step.step.turn)} size={34} strokeWidth={2.4} />
+      </span>
+      <div className="runbar__text">
+        <b>{distance}</b>
+        <em>{step.step.text}</em>
+        {step.step.caution && <small>Traversée non protégée</small>}
       </div>
     </div>
   )
 }
 
+function roundedDistance(metres) {
+  if (metres >= 1000) return `${(metres / 1000).toFixed(1).replace('.', ',')} km`
+  return `${Math.round(metres / 10) * 10} m`
+}
+
 function turnIcon(turn) {
   if (turn === 'finish') return 'flag'
   if (turn === 'lap') return 'refresh'
-  if (turn === 'start') return 'play'
+  if (turn === 'start') return 'navigation'
+  if (turn === 'uturn') return 'uturn'
   if (turn.includes('left')) return 'turnLeft'
   if (turn.includes('right')) return 'turnRight'
   return 'straight'
+}
+
+/** « 00:12:07 » : le chrono de course, comme sur une montre. */
+function clock(seconds) {
+  const total = Math.floor(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':')
+}
+
+/** « 11,4 » km/h. */
+function speed(metres, seconds) {
+  if (metres < 50 || seconds <= 0) return '—'
+  return ((metres / seconds) * 3.6).toFixed(1).replace('.', ',')
 }
 
 /** « 5 minutes 30 » — la synthèse vocale lit « 5:30 » comme une heure. */

@@ -60,8 +60,8 @@ export async function downloadGpx(name, geometry, elevation, sport = 'run') {
   await saveTextFile(gpxFilename(name), buildGpx(name, geometry, elevation, sport), 'application/gpx+xml')
 }
 
-export async function searchPlaces(query, signal) {
-  return search(query, { signal })
+export async function searchPlaces(query, signal, near = null) {
+  return search(query, { signal, near })
 }
 
 export async function describePlace(lat, lon) {

@@ -17,6 +17,7 @@ import * as offline from './offlineMaps'
 import { clearEngineData, prefetchOnDevice } from './engine/client'
 import { useAppMode } from './platform'
 import { appDeltaY, currentTurn } from './orientation'
+import * as voice from './voice'
 
 const PARIS = { lat: 48.8566, lon: 2.3522 }
 
@@ -121,7 +122,19 @@ export default function App() {
   const [livePosition, setLivePosition] = useState(null)
   // La direction de course, pour la carte orientée comme un GPS de voiture.
   const [liveHeading, setLiveHeading] = useState(null)
+  // Le tracé suivi en course, quand un recalcul a remplacé celui du départ.
+  const [liveRoute, setLiveRoute] = useState(null)
   const [geoNoticeOpen, setGeoNoticeOpen] = useState(true)
+
+  // Les commandes de la carte en course : la voix, l'orientation — dans le sens
+  // de la course, ou nord en haut — et la vue d'ensemble du parcours.
+  const [speaking, setSpeaking] = useState(() => voice.available)
+  const [runView, setRunView] = useState(stored.runView === 'north' ? 'north' : 'heading')
+  const [overviewAt, setOverviewAt] = useState(0)
+  const [northAt, setNorthAt] = useState(0)
+  const [startMenu, setStartMenu] = useState(false)
+  const stageRef = useRef(null)
+  const compassRef = useRef(null)
 
   const [saved, setSaved] = useState(stored.favorites)
   const [history, setHistory] = useState(stored.history)
@@ -158,26 +171,70 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.status, geo.position])
 
-  // Le bouton de position doit *toujours* amener la carte sur place — c'est
-  // toute la raison de le presser. Si la position est déjà connue on y va
-  // immédiatement, et on relance une mesure en parallèle pour l'affiner.
+  // Le bouton de position ne fait qu'une chose : amener la carte sur place.
+  // Il déplaçait aussi le départ, ce qui mêlait deux questions — « où suis-je »
+  // et « d'où je pars » ; le départ a désormais son propre bouton.
+  //
+  // Comme sur les cartes d'un téléphone : une touche recentre, une seconde,
+  // sans avoir bougé la carte entre-temps, la fait suivre nos déplacements ;
+  // une troisième arrête. Si la position est déjà connue on y va tout de suite,
+  // et on relance une mesure en parallèle pour l'affiner.
   const pendingLocate = useRef(false)
-  const goToMyPosition = () => {
+  const pendingStart = useRef(false)
+  const centered = useRef(false)
+  const centerOnMe = () => {
+    if (geo.following) {
+      geo.setFollowing(false)
+      centered.current = false
+      return
+    }
+    if (centered.current && geo.position) {
+      geo.setFollowing(true)
+      return
+    }
     if (geo.position) {
-      applyStart({ lat: geo.position[1], lon: geo.position[0] }, undefined, true)
+      setFocus({ lat: geo.position[1], lon: geo.position[0], at: Date.now() })
+      centered.current = true
     }
     pendingLocate.current = true
     geo.locate()
   }
 
-  // Résultat d'une demande explicite : on recadre, même si la position n'avait
-  // pas changé de valeur.
+  const startFromHere = () => {
+    setStartMenu(false)
+    if (geo.position) {
+      applyStart({ lat: geo.position[1], lon: geo.position[0] }, undefined, true)
+    } else {
+      pendingStart.current = true
+      geo.locate()
+    }
+  }
+
+  // Résultat d'une demande explicite : on recadre — ou on pose le départ —
+  // même si la position n'avait pas changé de valeur.
   useEffect(() => {
-    if (!pendingLocate.current || geo.status !== 'ready' || !geo.position) return
-    pendingLocate.current = false
-    applyStart({ lat: geo.position[1], lon: geo.position[0] }, undefined, true)
+    if (geo.status !== 'ready' || !geo.position) return
+    const point = { lat: geo.position[1], lon: geo.position[0] }
+    if (pendingStart.current) {
+      pendingStart.current = false
+      applyStart(point, undefined, true)
+    } else if (pendingLocate.current) {
+      pendingLocate.current = false
+      setFocus({ ...point, at: Date.now() })
+      centered.current = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.status, geo.at])
+
+  // Le menu du départ se ferme au premier geste ailleurs.
+  useEffect(() => {
+    if (!startMenu) return undefined
+    const close = (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.startmenu, .tool--start')) setStartMenu(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [startMenu])
 
   // --- génération -----------------------------------------------------------
   const search = useCallback(
@@ -214,7 +271,9 @@ export default function App() {
           if (token === searchToken.current) setProgress({ stage, fraction })
         })
         if (token !== searchToken.current) return
-        setResult(payload)
+        // La demande reste attachée au résultat : c'est avec elle qu'un chemin
+        // de retour se calcule, en course, si l'on s'écarte du parcours.
+        setResult({ ...payload, request })
         setSelected(payload.routes[0] || null)
       } catch (err) {
         if (token !== searchToken.current) return
@@ -270,11 +329,14 @@ export default function App() {
       if (e.key === 'Escape') {
         setFiltersOpen(false)
         setPlacing(false)
+        setStartMenu(false)
         setSheet('peek')
       }
-      if (e.key === 'Enter' && !filtersOpen && !running) search()
+      // En course, plus rien ne change le parcours ni les réglages.
+      if (running) return
+      if (e.key === 'Enter' && !filtersOpen) search()
       if (e.key === 'f') setFiltersOpen((v) => !v)
-      if (e.key === 'l') goToMyPosition()
+      if (e.key === 'l') centerOnMe()
       if (e.key === 'p') setPlacing((v) => !v)
       const n = Number(e.key)
       if (n >= 1 && n <= 9 && result?.routes[n - 1]) setSelected(result.routes[n - 1])
@@ -344,6 +406,28 @@ export default function App() {
     setFreeRun(false)
     setLivePosition(null)
     setLiveHeading(null)
+    setLiveRoute(null)
+  }
+
+  // La demande d'où vient le parcours suivi. Celle de la recherche s'il en
+  // sort ; pour un parcours rouvert depuis les favoris, on la reconstitue :
+  // son départ, sa longueur, les réglages du moment.
+  const detourRequest = useMemo(() => {
+    if (!selected?.geometry?.length) return null
+    if (result?.request && result.routes?.some((r) => r.id === selected.id)) return result.request
+    const [lon, lat] = selected.geometry[0]
+    const distanceKm = Math.max(0.5, Math.round((selected.distance_m || 0) / 100) / 10)
+    return toRequest({ ...params, mode: 'distance', distance_km: distanceKm }, { lat, lon })
+  }, [selected, result, params])
+
+  const toggleVoice = () => {
+    voice.unlock()
+    setSpeaking((v) => !v)
+  }
+  const toggleRunView = () => {
+    const next = runView === 'north' ? 'heading' : 'north'
+    setRunView(next)
+    save({ runView: next })
   }
 
   const sport = SPORTS.find((s) => s.key === params.sport)
@@ -366,11 +450,11 @@ export default function App() {
 
   return (
     <div className="shell" data-map={theme} data-sheet={sheetMode} ref={shellRef}>
-      <div className="stage">
+      <div className="stage" ref={stageRef}>
         <MapView
           styleKey={mapStyle}
           start={start}
-          route={running && freeRun ? null : selected}
+          route={running && freeRun ? null : running ? liveRoute ?? selected : selected}
           ghost={!running ? result?.routes : null}
           position={running ? livePosition : geo.position}
           accuracy={geo.accuracy}
@@ -379,8 +463,16 @@ export default function App() {
           follow={running || geo.following}
           navigate={running}
           heading={running ? liveHeading : null}
+          orientation={runView}
+          overview={overviewAt}
+          northAt={northAt}
+          compassRef={compassRef}
           placing={placing}
           onPlace={(p) => applyStart(p)}
+          onUserMove={() => {
+            centered.current = false
+            if (geo.following) geo.setFollowing(false)
+          }}
           onPickRoute={(id) => {
             const match = result?.routes.find((r) => r.id === id)
             if (match) setSelected(match)
@@ -390,48 +482,120 @@ export default function App() {
         {!running && (
           <div className="stage__top">
             <SearchBar
+              near={
+                geo.position
+                  ? { lat: geo.position[1], lon: geo.position[0] }
+                  : start && start !== PARIS
+                    ? start
+                    : null
+              }
               onPick={(p) => applyStart({ lat: p.lat, lon: p.lon }, p.label, true)}
             />
           </div>
         )}
 
-        <div className="stage__tools">
-          <button
-            className={`tool ${geo.status === 'locating' ? 'tool--busy' : ''}`}
-            onClick={goToMyPosition}
-            title="Aller à ma position (L)"
-            aria-label="Aller à ma position"
-          >
-            <Icon name="locate" />
-          </button>
-          <button
-            className={`tool ${geo.following ? 'tool--on' : ''}`}
-            onClick={() => geo.setFollowing(!geo.following)}
-            title="Suivre mes déplacements"
-            aria-label="Suivre mes déplacements"
-            aria-pressed={geo.following}
-          >
-            <Icon name="navigation" />
-          </button>
-          <button
-            className={`tool ${placing ? 'tool--on' : ''}`}
-            onClick={() => setPlacing((v) => !v)}
-            title="Placer le départ sur la carte (P)"
-            aria-label="Placer le départ sur la carte"
-            aria-pressed={placing}
-          >
-            <Icon name="pin" />
-          </button>
-          <button
-            className={`tool ${stylesOpen ? 'tool--on' : ''}`}
-            onClick={() => setStylesOpen(true)}
-            title="Fond de carte"
-            aria-label="Fond de carte"
-            aria-haspopup="dialog"
-          >
-            <Icon name="layers" />
-          </button>
-        </div>
+        {running ? (
+          // En course : ce qui sert en courant, rien qui change le parcours.
+          <div className="stage__tools stage__tools--run">
+            <button className="tool" onClick={() => setStylesOpen(true)} aria-label="Fond de carte" title="Fond de carte">
+              <Icon name="layers" />
+            </button>
+            {voice.available && (
+              <button
+                className={`tool ${speaking ? '' : 'tool--muted'}`}
+                onClick={toggleVoice}
+                aria-pressed={speaking}
+                aria-label={speaking ? 'Couper le guidage vocal' : 'Activer le guidage vocal'}
+                title={speaking ? 'Couper le guidage vocal' : 'Activer le guidage vocal'}
+              >
+                <Icon name={speaking ? 'volume' : 'volumeOff'} />
+              </button>
+            )}
+            <button
+              ref={compassRef}
+              className="tool tool--compass"
+              onClick={toggleRunView}
+              aria-label={runView === 'north' ? 'Orienter la carte dans le sens de la course' : 'Mettre le nord en haut'}
+              title={runView === 'north' ? 'Nord en haut — touche pour suivre ton cap' : 'Dans ton sens — touche pour mettre le nord en haut'}
+            >
+              <span className="needle" aria-hidden="true" />
+              <small>{runView === 'north' ? 'N' : 'CAP'}</small>
+            </button>
+            {!freeRun && (
+              <button className="tool" onClick={() => setOverviewAt(Date.now())} aria-label="Voir tout le parcours" title="Voir tout le parcours">
+                <Icon name="expand" />
+              </button>
+            )}
+          </div>
+        ) : (
+          // Trois questions, un bouton chacune, dans l'ordre où on se les pose :
+          // à quoi ressemble la carte, où suis-je, d'où je pars. La boussole
+          // n'apparaît que carte tournée, pour la remettre nord en haut.
+          <div className="stage__tools">
+            <button
+              className={`tool ${stylesOpen ? 'tool--on' : ''}`}
+              onClick={() => setStylesOpen(true)}
+              title="Fond de carte"
+              aria-label="Fond de carte"
+              aria-haspopup="dialog"
+            >
+              <Icon name="layers" />
+            </button>
+            <span className="tools__gap" aria-hidden="true" />
+            <button
+              className={`tool ${geo.following ? 'tool--on' : ''} ${geo.status === 'locating' ? 'tool--busy' : ''}`}
+              onClick={centerOnMe}
+              title={geo.following ? 'Arrêter de me suivre' : 'Ma position (L) — touche deux fois pour me suivre'}
+              aria-label={geo.following ? 'Arrêter de suivre ma position' : 'Centrer la carte sur ma position'}
+              aria-pressed={geo.following}
+            >
+              <Icon name={geo.following ? 'navigation' : 'locate'} />
+            </button>
+            <div className="toolmenu">
+              <button
+                className={`tool tool--start ${placing || startMenu ? 'tool--on' : ''}`}
+                onClick={() => {
+                  if (placing) setPlacing(false)
+                  else setStartMenu((v) => !v)
+                }}
+                title="Point de départ (P)"
+                aria-label="Choisir le point de départ"
+                aria-haspopup="menu"
+                aria-expanded={startMenu}
+              >
+                <Icon name="pinPlus" />
+              </button>
+              {startMenu && (
+                <div className="startmenu" role="menu">
+                  <b>Point de départ</b>
+                  <button role="menuitem" onClick={startFromHere}>
+                    <Icon name="locate" size={17} />
+                    Partir de ma position
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setStartMenu(false)
+                      setPlacing(true)
+                    }}
+                  >
+                    <Icon name="pin" size={17} />
+                    Choisir sur la carte
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              ref={compassRef}
+              className="tool tool--compass"
+              onClick={() => setNorthAt(Date.now())}
+              title="Remettre le nord en haut"
+              aria-label="Remettre le nord en haut"
+            >
+              <span className="needle" aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
         {/* Seule une consigne transitoire flotte sur la carte. Un message
             permanent y masquerait le tracé — il appartient au panneau. */}
@@ -443,6 +607,9 @@ export default function App() {
       </div>
 
       <aside className="side">
+        {/* En course, pas d'en-tête : l'activité et ses réglages ne se changent
+            plus, et chaque ligne rendue à la carte compte. */}
+        {!running && (
         <header className="side__head">
           <SheetGrabber open={sheetMode === 'full'} onSet={setSheet} />
           <div className="brand">
@@ -458,6 +625,7 @@ export default function App() {
             <Icon name="sliders" size={17} className="sportpill__gear" />
           </button>
         </header>
+        )}
 
         {/* Ce qui vient de se passer, dit à voix haute par un lecteur d'écran.
             Le reste de l'interface change en silence : la carte se redessine et
@@ -503,10 +671,15 @@ export default function App() {
           {running ? (
             <LiveRun
               route={freeRun ? null : selected}
+              request={freeRun ? null : detourRequest}
+              sport={params.sport}
+              stage={stageRef.current}
+              speaking={speaking}
               onPosition={(point, heading) => {
                 setLivePosition(point)
                 setLiveHeading(heading ?? null)
               }}
+              onReroute={setLiveRoute}
               onStop={finishRun}
             />
           ) : tab === 'routes' ? (

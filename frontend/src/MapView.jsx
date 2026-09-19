@@ -29,9 +29,14 @@ export default function MapView({
   follow,
   navigate,
   heading,
+  orientation = 'heading',
+  overview,
+  northAt,
+  compassRef,
   placing,
   onPlace,
   onPickRoute,
+  onUserMove,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -43,7 +48,7 @@ export default function MapView({
   const [revision, setRevision] = useState(0)
 
   const handlers = useRef({})
-  handlers.current = { onPlace, onPickRoute, placing }
+  handlers.current = { onPlace, onPickRoute, onUserMove, placing, compassRef }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
   // On la laisse alors où la main l'a mise, et « Recentrer » la reprend. Le
@@ -51,7 +56,7 @@ export default function MapView({
   // suivi, c'est ce qu'on attend d'un GPS.
   const [locked, setLocked] = useState(true)
   const nav = useRef({})
-  nav.current = { navigate, heading, locked }
+  nav.current = { navigate, heading, locked, orientation, route }
   const relocked = useRef(true)
   // Le zoom voulu en course : celui du départ, puis celui qu'on a pincé. Tenu à
   // part plutôt que relu sur la carte : lu en pleine animation, il figeait la
@@ -99,14 +104,32 @@ export default function MapView({
 
     // `originalEvent` n'existe que pour un geste : les animations de suivi
     // déclenchent les mêmes événements, et ne doivent pas se libérer elles-mêmes.
+    // Hors course, le même geste arrête le suivi de position.
     const release = (event) => {
-      if (event.originalEvent && nav.current.navigate) setLocked(false)
+      if (!event.originalEvent) return
+      if (nav.current.navigate) setLocked(false)
+      else handlers.current.onUserMove?.()
     }
     instance.on('dragstart', release)
     instance.on('rotatestart', release)
     instance.on('zoomend', (event) => {
       if (event.originalEvent && nav.current.navigate) navZoom.current = instance.getZoom()
     })
+
+    // La boussole : son aiguille montre le nord de l'écran — celui de l'app,
+    // qui peut avoir pivoté avec le téléphone couché. Mise à jour à même le
+    // bouton, sans passer par React : la carte tourne à chaque image.
+    const needle = () => {
+      const button = handlers.current.compassRef?.current
+      if (!button) return
+      const north = -(instance.getBearing() + currentTurn())
+      const angle = ((north % 360) + 360) % 360
+      button.style.setProperty('--north', `${north}deg`)
+      button.dataset.rotated = String(Math.min(angle, 360 - angle) > 1 || instance.getPitch() > 1)
+    }
+    instance.on('rotate', needle)
+    instance.on('pitch', needle)
+    instance.on('load', needle)
 
     // L'attribution compacte s'ouvre d'office et ne se replie qu'au premier
     // geste : sur téléphone, elle barrait le milieu de la carte d'une bande de
@@ -279,13 +302,44 @@ export default function MapView({
 
     if (navigate) {
       if (locked) {
-        m.easeTo(navCamera(m, position, heading, navZoom.current, relocked.current))
+        m.easeTo(navCamera(m, position, heading, navZoom.current, relocked.current, orientation === 'north'))
         relocked.current = false
       }
     } else if (follow) {
       m.easeTo({ center: position, offset: visibleCentre(m), duration: 700 })
     }
-  }, [position, accuracy, follow, navigate, heading, locked, revision])
+  }, [position, accuracy, follow, navigate, heading, orientation, locked, revision])
+
+  // Changer d'orientation en course se voit tout de suite, avec une vraie
+  // animation plutôt que le glissé linéaire du suivi.
+  const lastOrientation = useRef(orientation)
+  if (lastOrientation.current !== orientation) {
+    lastOrientation.current = orientation
+    relocked.current = true
+  }
+
+  // --- vue d'ensemble, nord en haut ---------------------------------------------
+  // Tout le parcours d'un coup d'œil, en pleine course : la carte cesse de
+  // suivre, et « Recentrer » la reprend.
+  const lastOverview = useRef(overview)
+  useEffect(() => {
+    const m = map.current
+    if (!m || overview === lastOverview.current) return
+    lastOverview.current = overview
+    const line = nav.current.route?.geometry
+    if (!line?.length) return
+    setLocked(false)
+    const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
+    m.fitBounds(bounds, { padding: dockPadding(m), bearing: -currentTurn(), pitch: 0, duration: 800 })
+  }, [overview])
+
+  const lastNorth = useRef(northAt)
+  useEffect(() => {
+    const m = map.current
+    if (!m || northAt === lastNorth.current) return
+    lastNorth.current = northAt
+    m.easeTo({ bearing: -currentTurn(), pitch: 0, duration: 500 })
+  }, [northAt])
 
   // Chaque départ reprend une carte suivie ; chaque arrivée la redresse, pour
   // revoir le parcours à plat, nord en haut, comme avant la sortie.
@@ -309,9 +363,9 @@ export default function MapView({
   useEffect(
     () =>
       onTurn((t) => {
-        const { navigate: navigating, heading: course, locked: following } = nav.current
+        const { navigate: navigating, heading: course, locked: following, orientation: facing } = nav.current
         const pointed = navigating && course != null
-        map.current?.jumpTo({ bearing: pointed && following ? course - t : -t })
+        map.current?.jumpTo({ bearing: pointed && following && facing !== 'north' ? course - t : -t })
         if (map.current?.getStyle()) alignLabels(map.current, t)
         startMarker.current?.setRotation(t)
         liveMarker.current?.setRotation(pointed ? course : t)
@@ -337,7 +391,9 @@ export default function MapView({
     m.getSource('crossings')?.setData(crossingsToGeoJson(route))
     m.getSource('ghost')?.setData(ghostToGeoJson(ghost, route))
 
-    if (route?.geometry?.length) {
+    // En course, la carte suit le coureur : un nouveau tracé — un détour — ne
+    // doit pas la faire sauter sur une vue d'ensemble.
+    if (route?.geometry?.length && !nav.current.navigate) {
       const bounds = route.geometry.reduce(
         (acc, c) => acc.extend(c),
         new maplibregl.LngLatBounds(route.geometry[0], route.geometry[0]),
@@ -372,18 +428,21 @@ export default function MapView({
  * le téléphone couché, d'où la soustraction. Le coureur est décalé vers le bas
  * de la partie visible, dans le sens de l'app lui aussi. Le zoom est celui du
  * départ, ou celui qu'on a choisi du bout des doigts depuis.
+ *
+ * `north` : la carte reste nord en haut, à plat, comme une carte papier — le
+ * coureur au centre, puisqu'il peut aller dans n'importe quel sens.
  */
-function navCamera(m, position, heading, zoom, relock) {
+function navCamera(m, position, heading, zoom, relock, north = false) {
   const turn = currentTurn()
   const [ox, oy] = visibleCentre(m)
   const pad = dockPadding(m)
   const visible = m.getContainer().clientHeight - pad.top - pad.bottom
-  const shift = Math.max(0, visible) * NAV_LOW
+  const shift = north ? 0 : Math.max(0, visible) * NAV_LOW
   const rad = (turn * Math.PI) / 180
   return {
     center: position,
-    bearing: heading == null ? m.getBearing() : heading - turn,
-    pitch: NAV_PITCH,
+    bearing: north ? -turn : heading == null ? m.getBearing() : heading - turn,
+    pitch: north ? 0 : NAV_PITCH,
     zoom,
     offset: [ox - shift * Math.sin(rad), oy + shift * Math.cos(rad)],
     duration: relock ? 800 : 950,
@@ -413,7 +472,7 @@ function dockPadding(m) {
   const map = m.getContainer().getBoundingClientRect()
   const pad = { top: 32, bottom: 32, left: 32, right: 32 }
 
-  for (const selector of ['.side', '.stage__top', '.stage__tools']) {
+  for (const selector of ['.side', '.stage__top', '.stage__tools', '.runbar']) {
     const el = document.querySelector(selector)
     if (!el) continue
     const r = el.getBoundingClientRect()

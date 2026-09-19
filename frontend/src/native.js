@@ -164,6 +164,26 @@ export async function startLiveActivity(state) {
 export const updateLiveActivity = (state) => LiveActivity.update(state).catch(() => {})
 export const endLiveActivity = () => LiveActivity.end().catch(() => {})
 
+/**
+ * Ce que l'écran de verrouillage peut afficher : `{ supported, enabled,
+ * extension, notifications }` — ou `null` si l'app a été compilée sans le module.
+ */
+export const lockScreenStatus = () => LiveActivity.status().catch(() => null)
+
+/**
+ * La notification de secours, quand l'activité en direct n'est pas là :
+ * passive — ni son, ni écran allumé — et remplacée à chaque consigne.
+ */
+export async function askNoticePermission() {
+  try {
+    return (await LiveActivity.noticePermission()).granted === true
+  } catch {
+    return false
+  }
+}
+export const postRunNotice = (title, body) => LiveActivity.notice({ title, body }).catch(() => {})
+export const clearRunNotice = () => LiveActivity.clearNotice().catch(() => {})
+
 // --- fichiers, liens ----------------------------------------------------------
 
 /** Ouvre un lien d'une autre app — la messagerie pour le SOS. */

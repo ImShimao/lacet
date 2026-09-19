@@ -202,3 +202,23 @@ function advance(coords, distanceM) {
   }
   return coords[coords.length - 1]
 }
+
+// === détours ==================================================================
+//
+// Hors du portage Python : le recalcul en course (`reroute.js`) n'existe que
+// dans l'app. Il réemploie les mêmes règles — mêmes angles, mêmes phrases — pour
+// que les consignes d'un détour sonnent comme celles du parcours.
+
+/** Les consignes le long d'une suite d'arêtes, distances comptées depuis `source`. */
+export function pathSteps(graph, source, edges) {
+  return mergeClose(rawSteps(graph, source, { edges, crossings: [] }))
+}
+
+/** Le virage que fait un angle (degrés, positif à droite), et sa phrase. */
+export function turnOf(angle, road = null) {
+  const turn = classify(angle)
+  return { turn, text: phrase(turn, road) }
+}
+
+/** Cap de départ et cap d'arrivée d'une géométrie, lissés sur vingt mètres. */
+export const headings = (coords) => [bearingFromStart(coords), bearingToEnd(coords)]
