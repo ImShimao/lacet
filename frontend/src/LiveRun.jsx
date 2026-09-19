@@ -269,7 +269,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
         travelled: 0,
         elapsedS: 0,
       })
-      const started = await n.startLiveActivity(first)
+      const { started } = await n.startLiveActivity(first)
       if (cancelled) {
         if (started) n.endLiveActivity()
         return

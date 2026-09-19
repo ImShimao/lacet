@@ -148,17 +148,21 @@ export const pulseHaptic = () => Haptics.impact({ style: ImpactStyle.Heavy }).ca
  * L'activité en direct d'une sortie guidée : la consigne à venir et le temps
  * restant, sur l'écran de verrouillage et dans la Dynamic Island.
  *
- * Tout échec est silencieux et rend `false` : iOS antérieur à 16.2, activités
- * désactivées dans les réglages, ou app compilée sans l'extension. Le guidage
- * vocal et l'écran de l'app n'en dépendent pas.
+ * Rend `{ started, reason }`. L'échec n'arrête rien — le guidage vocal et
+ * l'écran de l'app n'en dépendent pas — mais il se raconte : sans la raison,
+ * un écran de verrouillage vide n'a aucune explication, et on ne sait pas s'il
+ * faut changer un réglage, mettre iOS à jour, ou réinstaller l'app.
  */
 export async function startLiveActivity(state) {
   try {
     const { available } = await LiveActivity.available()
-    if (!available) return false
-    return (await LiveActivity.start(state)).started === true
-  } catch {
-    return false
+    if (!available) return { started: false, reason: 'coupées dans Réglages, ou iOS trop ancien' }
+    const { started } = await LiveActivity.start(state)
+    return started === true
+      ? { started: true, reason: null }
+      : { started: false, reason: "extension d'écran verrouillé absente de l'app installée" }
+  } catch (error) {
+    return { started: false, reason: error?.message || 'module natif injoignable' }
   }
 }
 
@@ -182,7 +186,8 @@ export async function askNoticePermission() {
     return false
   }
 }
-export const postRunNotice = (title, body) => LiveActivity.notice({ title, body }).catch(() => {})
+export const postRunNotice = (title, body, delay = 0) =>
+  LiveActivity.notice({ title, body, delay }).catch(() => {})
 export const clearRunNotice = () => LiveActivity.clearNotice().catch(() => {})
 
 /**

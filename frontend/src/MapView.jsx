@@ -74,12 +74,16 @@ export default function MapView({
       zoom: 12,
       // Téléphone couché : la carte reste droite et fait pivoter son contenu.
       bearing: -currentTurn(),
-      attributionControl: { compact: true },
+      // Posée nous-mêmes, en bas à gauche : à droite, elle tombait au-dessus
+      // des cartes de parcours, entre deux boutons, et donnait l'impression
+      // d'un élément oublié là. À gauche, le coin est libre.
+      attributionControl: false,
       // Les gestes tactiles à deux doigts sont la norme sur une carte plein
       // écran ; sans ça, faire défiler la page devient impossible sur mobile.
       cooperativeGestures: false,
       transformRequest: offlineRequest,
     })
+    instance.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
     map.current = instance
     // Le style est posé après coup plutôt que passé au constructeur : c'est la
     // seule voie par laquelle MapLibre accepte de le retoucher avant de
@@ -131,15 +135,30 @@ export default function MapView({
     instance.on('pitch', needle)
     instance.on('load', needle)
 
-    // L'attribution compacte s'ouvre d'office et ne se replie qu'au premier
-    // geste : sur téléphone, elle barrait le milieu de la carte d'une bande de
-    // texte, par-dessus les noms de quartier. Repliée, il en reste le « i » qui
-    // la rouvre — et les sources sont citées en toutes lettres dans « Mon compte ».
-    instance.once('load', () => {
+    // L'attribution compacte s'ouvre d'office : sur téléphone, elle barrait le
+    // bas de la carte d'une bande de texte. Repliée, il en reste le « i » qui la
+    // rouvre — et les sources sont citées en toutes lettres dans « Mon compte ».
+    //
+    // Elle se rouvre à chaque fois que MapLibre récrit son contenu — changement
+    // de fond, chargement d'une source — d'où le repli à chaque `styledata`,
+    // jusqu'à ce qu'on l'ouvre soi-même.
+    let attributionAsked = false
+    const collapseAttribution = () => {
       const attribution = instance.getContainer().querySelector('.maplibregl-ctrl-attrib')
-      attribution?.classList.remove('maplibregl-compact-show')
-      attribution?.removeAttribute('open')
-    })
+      if (!attribution || attributionAsked) return
+      attribution.classList.remove('maplibregl-compact-show')
+      attribution.removeAttribute('open')
+      attribution.querySelector('.maplibregl-ctrl-attrib-button')?.addEventListener(
+        'click',
+        () => {
+          attributionAsked = true
+        },
+        { once: true },
+      )
+    }
+    instance.on('load', collapseAttribution)
+    instance.on('styledata', collapseAttribution)
+    instance.on('idle', collapseAttribution)
 
     instance.on('click', (event) => {
       if (handlers.current.placing) {

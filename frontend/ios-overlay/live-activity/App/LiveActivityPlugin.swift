@@ -152,7 +152,12 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         // Retirée puis reposée : une seule notification, toujours la dernière
         // consigne, plutôt qu'une pile à faire défiler.
         center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
-        let request = UNNotificationRequest(identifier: Self.noticeId, content: content, trigger: nil)
+        // `delay` sert à l'essai depuis « Mon compte » : posée pendant qu'on
+        // regarde l'app, iOS ne la montre pas — elle doit arriver une fois
+        // l'écran verrouillé.
+        let delay = call.getDouble("delay") ?? 0
+        let trigger = delay > 0 ? UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false) : nil
+        let request = UNNotificationRequest(identifier: Self.noticeId, content: content, trigger: trigger)
         center.add(request) { _ in call.resolve() }
     }
 

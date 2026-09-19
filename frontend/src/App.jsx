@@ -26,48 +26,23 @@ const PARIS = { lat: 48.8566, lon: 2.3522 }
 const PREFETCH_DELAY_MS = 1200
 
 /**
- * La poignée de la feuille, sur téléphone : elle replie le détail d'un
- * parcours pour rendre la carte, ou le déplie.
+ * La poignée de la feuille, sur téléphone.
  *
- * Deux positions plutôt qu'un réglage continu. Glisser au pixel près
- * demandait de viser, et aucune hauteur intermédiaire n'était la bonne : on
- * veut soit la carte, soit le détail. Un geste vers le haut ou vers le bas
- * choisit, une simple touche bascule.
- *
- * La CSS ne la montre que feuille dépliée : repliée, c'est la carte de
- * parcours elle-même qui ouvre le détail.
+ * Elle ne porte que le repère visuel et le clavier : le geste, lui, est écouté
+ * par **tout l'en-tête** de la feuille (voir `useSheetDrag`). Viser une barre
+ * de quarante pixels en courant, ou d'une main dans le métro, ne marchait pas ;
+ * on tire maintenant n'importe où dans le bandeau du haut, et la feuille suit
+ * le doigt avant de se refermer.
  */
 function SheetGrabber({ open, onSet }) {
-  const drag = useRef(null)
-
-  const begin = (e) => {
-    drag.current = { x: e.clientX, y: e.clientY }
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
-
-  const end = (e) => {
-    if (drag.current === null) return
-    // Mesuré dans le sens de l'app : téléphone couché, son « vers le haut »
-    // court le long de l'écran.
-    const dy = appDeltaY(currentTurn(), e.clientX - drag.current.x, e.clientY - drag.current.y)
-    drag.current = null
-    if (dy < -30) onSet('full')
-    else if (dy > 30) onSet('peek')
-    else onSet(open ? 'peek' : 'full')
-  }
-
   return (
     <button
       type="button"
       className="grabber"
       aria-label={open ? 'Replier le détail' : 'Déplier le détail'}
       aria-expanded={open}
-      onPointerDown={begin}
-      onPointerUp={end}
-      onPointerCancel={() => (drag.current = null)}
-      // Le clavier passe par `click` (`detail` vaut 0) ; au doigt et à la
-      // souris, `pointerup` a déjà tranché — le compter deux fois annulerait
-      // le geste.
+      // Le doigt et la souris passent par l'en-tête ; ici, seul le clavier
+      // (`detail` vaut 0) — sinon le geste serait compté deux fois.
       onClick={(e) => e.detail === 0 && onSet(open ? 'peek' : 'full')}
       onKeyDown={(e) => {
         if (e.key === 'ArrowUp') onSet('full')
@@ -79,6 +54,62 @@ function SheetGrabber({ open, onSet }) {
   )
 }
 
+/**
+ * Tirer la feuille de détail vers le bas pour la refermer.
+ *
+ * Trois choses en font un vrai geste plutôt qu'un raccourci : la feuille suit
+ * le doigt pendant qu'on tire, elle ne se referme qu'au-delà d'un seuil — sinon
+ * elle revient en place — et un simple appui sur la poignée suffit aussi.
+ *
+ * Les distances sont mesurées **dans le sens de l'app** : téléphone couché,
+ * elle a pivoté d'un quart de tour, et « vers le bas » n'est plus le bas de
+ * l'écran (voir `orientation.js`).
+ */
+function useSheetDrag(mode, setSheet, shellRef) {
+  const drag = useRef(null)
+  const CLOSE_M = 60
+
+  const shift = (px) => {
+    const shell = shellRef.current
+    if (!shell) return
+    if (px === null) {
+      shell.style.removeProperty('--sheet-drag')
+      delete shell.dataset.dragging
+    } else {
+      shell.style.setProperty('--sheet-drag', `${px}px`)
+      shell.dataset.dragging = 'yes'
+    }
+  }
+
+  const travel = (e) =>
+    appDeltaY(currentTurn(), e.clientX - drag.current.x, e.clientY - drag.current.y)
+
+  return {
+    onPointerDown: (e) => {
+      if (mode !== 'full') return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select')) return
+      drag.current = { x: e.clientX, y: e.clientY, grip: e.target instanceof Element && Boolean(e.target.closest('.grabber')) }
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    },
+    onPointerMove: (e) => {
+      if (!drag.current) return
+      // Vers le haut, rien ne bouge : la feuille est déjà en butée.
+      shift(Math.max(0, travel(e)))
+    },
+    onPointerUp: (e) => {
+      if (!drag.current) return
+      const dy = travel(e)
+      const { grip } = drag.current
+      drag.current = null
+      shift(null)
+      if (dy > CLOSE_M || (grip && Math.abs(dy) < 8)) setSheet('peek')
+    },
+    onPointerCancel: () => {
+      drag.current = null
+      shift(null)
+    },
+  }
+}
 
 export default function App() {
   const stored = useMemo(() => load(), [])
@@ -434,6 +465,7 @@ export default function App() {
   const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
   const sheetMode = running ? 'live' : tab !== 'explore' ? 'page' : sheet
+  const sheetDrag = useSheetDrag(sheetMode, setSheet, shellRef)
 
   const announcement = busy
     ? 'Recherche des itinéraires en cours.'
@@ -610,7 +642,7 @@ export default function App() {
         {/* En course, pas d'en-tête : l'activité et ses réglages ne se changent
             plus, et chaque ligne rendue à la carte compte. */}
         {!running && (
-        <header className="side__head">
+        <header className="side__head" {...sheetDrag}>
           <SheetGrabber open={sheetMode === 'full'} onSet={setSheet} />
           <div className="brand">
             Lacet<span>.</span>

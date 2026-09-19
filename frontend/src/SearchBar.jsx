@@ -23,6 +23,7 @@ export default function SearchBar({ onPick, near = null }) {
   const [active, setActive] = useState(0)
   const [searching, setSearching] = useState(false)
   const controller = useRef(null)
+  const field = useRef(null)
   // Lue au moment de chercher, sans relancer la recherche à chaque relevé GPS.
   const nearRef = useRef(near)
   nearRef.current = near
@@ -51,6 +52,15 @@ export default function SearchBar({ onPick, near = null }) {
     }, 350)
     return () => clearTimeout(timer)
   }, [query])
+
+  const clear = () => {
+    setQuery('')
+    setResults([])
+    setOpen(false)
+    controller.current?.abort()
+    // Le champ garde le curseur : on efface pour retaper, pas pour partir.
+    field.current?.focus()
+  }
 
   const choose = (place) => {
     onPick({ lat: place.lat, lon: place.lon, label: place.short })
@@ -87,7 +97,15 @@ export default function SearchBar({ onPick, near = null }) {
     <div className="search">
       <Icon name="search" size={16} className="search__icon" />
       <input
+        ref={field}
         type="search"
+        // iOS met une majuscule au premier mot et corrige « macdo » en
+        // « mac do » : sur un nom de lieu, les deux gênent.
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        autoComplete="off"
+        enterKeyHint="search"
         value={query}
         placeholder="Chercher un lieu de départ…"
         onChange={(e) => setQuery(e.target.value)}
@@ -101,8 +119,23 @@ export default function SearchBar({ onPick, near = null }) {
         aria-autocomplete="list"
         aria-activedescendant={visible ? `search-result-${active}` : undefined}
       />
-      {searching && query.trim().length >= 3 && (
+      {searching && query.trim().length >= 3 ? (
         <span className="search__spinner" aria-hidden="true" />
+      ) : (
+        query.length > 0 && (
+          <button
+            type="button"
+            className="search__clear"
+            // Sans ça, le champ perd le focus avant que le clic n'arrive, et la
+            // liste se referme sous le doigt.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={clear}
+            aria-label="Effacer la recherche"
+            title="Effacer"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        )
       )}
       {visible && (
         <div className="search__results" id="search-results" role="listbox">

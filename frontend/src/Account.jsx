@@ -269,6 +269,7 @@ function AutoPauseSetting() {
 function LockScreenSetting() {
   const [status, setStatus] = useState(undefined)
   const [testing, setTesting] = useState(false)
+  const [result, setResult] = useState(null)
 
   useEffect(() => {
     if (!isNative()) return
@@ -287,14 +288,25 @@ function LockScreenSetting() {
     text = "L'activité en direct demande iOS 16.2 ou plus récent. À la place, une notification silencieuse tient la consigne à jour."
   } else if (!status.extension) {
     text =
-      "L'extension qui dessine l'activité en direct manque à cette installation. À la place, une notification silencieuse tient la consigne à jour."
+      "L'extension qui dessine l'activité en direct manque à cette installation — l'outil d'installation l'a retirée. À la place, une notification silencieuse tient la consigne à jour."
   } else {
     text = 'Activités en direct coupées : Réglages › Lacet › Activités en direct. En attendant, une notification silencieuse tient la consigne à jour.'
   }
-  const denied = !live && status?.notifications === 'denied'
+
+  // Le détail, en clair : c'est ce qu'on demande de lire quand l'écran de
+  // verrouillage reste vide. Quatre conditions, et il suffit qu'une manque.
+  const detail = status
+    ? [
+        `iOS ${status.supported ? '16.2 ou plus' : 'trop ancien'}`,
+        `activités ${status.enabled ? 'autorisées' : 'coupées'}`,
+        `extension ${status.extension ? 'présente' : 'absente'}`,
+        `notifications ${{ granted: 'autorisées', denied: 'refusées' }[status.notifications] ?? 'jamais demandées'}`,
+      ].join(' · ')
+    : 'module natif injoignable'
 
   const test = async () => {
     const n = await import('./native')
+    setResult(null)
     setTesting(true)
     const demo = {
       name: 'Essai',
@@ -307,29 +319,45 @@ function LockScreenSetting() {
       offRoute: false,
       paused: false,
     }
-    let started = live && (await n.startLiveActivity(demo))
-    if (!started && (await n.askNoticePermission())) {
-      await n.postRunNotice('Dans 120 m · Tourne à droite sur Rue de la Gare', 'Reste 4,2 km · essai de Lacet')
-      started = true
+    const { started, reason } = await n.startLiveActivity(demo)
+    if (started) {
+      setResult('Activité en direct lancée. Verrouille l’écran tout de suite : elle doit s’afficher dessus. Elle s’efface dans 20 secondes.')
+      setTimeout(() => {
+        n.endLiveActivity()
+        setTesting(false)
+      }, 20_000)
+      return
     }
-    setTimeout(() => {
-      n.endLiveActivity()
-      n.clearRunNotice()
-      setTesting(false)
-    }, 20_000)
-    if (!started) setTesting(false)
+    if (await n.askNoticePermission()) {
+      // Cinq secondes de délai : posée pendant qu'on regarde l'app, iOS ne
+      // l'affiche pas. Le temps de verrouiller l'écran, elle arrive.
+      await n.postRunNotice('Dans 120 m · Tourne à droite sur Rue de la Gare', 'Reste 4,2 km · essai de Lacet', 5)
+      setResult(
+        `Activité en direct impossible ici (${reason}). Une notification silencieuse arrive dans 5 secondes : verrouille ton écran maintenant pour la voir. Elle s’efface au bout de 20 secondes.`,
+      )
+      setTimeout(() => {
+        n.clearRunNotice()
+        setTesting(false)
+      }, 20_000)
+      return
+    }
+    setResult(
+      `Rien n’a pu s’afficher : activité en direct impossible (${reason}), et les notifications de Lacet sont refusées — Réglages › Lacet › Notifications.`,
+    )
+    setTesting(false)
   }
 
   return (
     <>
       <p className="muted small">
         <b>Écran verrouillé.</b> {text}
-        {denied && ' Les notifications de Lacet sont refusées : Réglages › Lacet › Notifications.'}
       </p>
       <button className="btn" onClick={test} disabled={testing}>
         <Icon name="play" size={15} />
-        {testing ? 'Verrouille ton téléphone pour voir l’essai…' : "Tester l'écran verrouillé (20 s)"}
+        {testing ? 'Essai en cours — verrouille ton téléphone…' : "Tester l'écran verrouillé (20 s)"}
       </button>
+      {result && <p className="muted small">{result}</p>}
+      <p className="muted small">Détail : {detail}.</p>
     </>
   )
 }

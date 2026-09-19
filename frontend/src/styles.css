@@ -327,6 +327,36 @@ input:focus-visible {
 .search input::placeholder {
   color: var(--text-3);
 }
+/* Un champ `type="search"` porte déjà une croix, dessinée par le navigateur et
+   différente d'un navigateur à l'autre — grise, minuscule, collée au bord.
+   L'app pose la sienne : celle d'origine ferait double emploi. */
+.search input::-webkit-search-cancel-button,
+.search input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+/* De quoi effacer ce qu'on a tapé sans viser la touche retour arrière vingt
+   fois : sur téléphone, le champ occupe toute la largeur et la correction d'une
+   adresse commençait par un long grattage de clavier. */
+.search__clear {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.search input {
+  padding-right: 40px;
+}
+
 /* Un point qui pulse pendant l'appel : sans lui, une recherche lente passe pour
    une absence de résultat, et on retape l'adresse. */
 .search__spinner {
@@ -1833,8 +1863,8 @@ input.field:focus {
   font-size: 9px;
   background: rgba(10, 9, 16, 0.72) !important;
 }
-.maplibregl-ctrl-bottom-right .maplibregl-ctrl {
-  margin: 0 12px 10px 0;
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+  margin: 0 0 10px 12px;
 }
 /* Repliée, l'attribution n'est plus qu'un rond autour du « i ». Sa hauteur doit
    être exactement celle du bouton (20 + 2 × 2 de marge intérieure = 24) : à
@@ -2616,15 +2646,29 @@ input.field:focus {
     padding: 0 12px 8px;
     border-bottom: none;
   }
-  /* L'activité et ses réglages, en pastille : un résumé qu'on touche pour
-     changer les filtres, pas une barre qui prend toute la largeur. */
+  /* L'activité et ses réglages : une pastille posée **sous la recherche**,
+     avec elle. Les deux disent la même chose — ce qu'on cherche, et pour quel
+     sport — et les séparer, l'une en haut, l'autre flottant au milieu de la
+     carte au-dessus des propositions, donnait un écran encombré sans qu'on
+     sache où regarder. En haut, la carte reste dégagée.
+
+     Posée en `fixed` : elle appartient à l'en-tête du panneau, qui vit en bas
+     de l'écran, et seule cette place la sort de là. `#root` porte la
+     rotation de l'app, donc téléphone couché elle suit. */
   .shell[data-sheet='peek'] .sportpill {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 63px);
+    left: 12px;
+    z-index: 6;
     width: auto;
     align-self: flex-start;
     padding: 8px 13px;
     background: rgba(27, 24, 36, 0.94);
     backdrop-filter: blur(12px);
     box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  }
+  .shell[data-sheet='peek'] .side__head {
+    padding-bottom: 0;
   }
   .shell[data-sheet='peek'] .sportpill__spec {
     margin-left: 6px;
@@ -2718,6 +2762,24 @@ input.field:focus {
   }
   .shell[data-sheet='full'] .side {
     height: 88cqh;
+    /* Le geste de fermeture : la feuille descend avec le doigt, puis revient
+       ou s'efface. Sans transformation au repos (`0px` compte comme une
+       transformation), les éléments en position fixe se caleraient sur elle. */
+    transition: transform 0.18s ease-out;
+  }
+  .shell[data-sheet='full'][data-dragging] .side {
+    transform: translateY(var(--sheet-drag, 0px));
+    transition: none;
+  }
+  /* L'en-tête est la zone de préhension : le doigt doit y glisser sans que la
+     page tente de défiler. */
+  .shell[data-sheet='full'] .side__head {
+    touch-action: none;
+  }
+  /* Détail ouvert, l'activité s'efface : c'est le parcours qu'on regarde, et
+     la pastille se retrouverait posée sur la bande de carte qui reste. */
+  .shell[data-sheet='full'] .sportpill {
+    display: none;
   }
   .shell[data-sheet='page'] .side {
     max-height: 88cqh;

@@ -71,6 +71,11 @@ def info_plist() -> None:
 
 
 AUDIO_SETUP = """
+        // « Annuler la saisie ? » — iOS ouvre cette alerte quand on secoue le
+        // téléphone. En courant, le téléphone est secoué en permanence, et la
+        // question tombait au milieu d'une sortie, sur une saisie qui n'existe
+        // pas : l'app n'a aucun champ de texte à annuler.
+        application.applicationSupportsShakeToEdit = false
         // Une version installée par-dessus une autre doit montrer *sa* version.
         // WKWebView garde en cache les fichiers de l'app — page et scripts — et
         // une réinstallation pouvait continuer d'afficher l'interface
