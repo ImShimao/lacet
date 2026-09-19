@@ -995,6 +995,21 @@ géométries au bit près. Seules les tuiles entièrement dans la région sont
 livrées : une tuile à cheval sur la limite n'aurait que la moitié de ses rues.
 Hors de la région, rien ne change.
 
+**Ailleurs, des pays entiers préparés en ligne.** Le 1er de chaque mois, le
+workflow `cartes.yml` prépare de la même façon la France, la Suisse, la
+Belgique, le Luxembourg, l'Allemagne, l'Italie, l'Espagne, l'Autriche et
+Andorre, et les dépose sur Hugging Face : un fichier par pays, fait de tuiles
+compressées une à une (`region_tiles.py --pack`), et l'index de leurs
+positions. L'app n'en lit que les octets des tuiles dont elle a besoin
+(`src/engine/remote.js`, requêtes HTTP « Range », les tuiles voisines d'un seul
+tenant) : quelques mégaoctets servis en une fraction de seconde, au lieu d'un
+calcul d'Overpass. Hugging Face plutôt que GitHub : l'app lit ces fichiers
+depuis son navigateur intégré, et GitHub refuse les requêtes d'une autre
+origine sur ses fichiers de version. À régler une fois dans le dépôt : le
+secret `HF_TOKEN` (jeton Hugging Face en écriture) et la variable
+`HF_DATASET` (`utilisateur/lacet-cartes`). Sans eux, Overpass reste la source
+hors de la région livrée.
+
 **Changer de distance ne retélécharge plus rien.** Au-delà de 25 km, le moteur
 demande moins de détail (plus de voies de service) : c'était un autre
 téléchargement, alors que les rues déjà gardées contenaient tout. Elles sont

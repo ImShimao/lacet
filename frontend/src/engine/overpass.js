@@ -25,6 +25,7 @@ import { emptyExtract, fromOverpass, mergeExtracts } from './extract'
 import { bboxAround } from './geo'
 import { pyFixed } from './py'
 import { regionTile } from './region'
+import { remoteTiles } from './remote'
 import { store } from './store'
 
 export const TILE_DEG = 0.05
@@ -38,6 +39,10 @@ const TTL_MS = 14 * 86_400_000
 // la rafraîchit après coup, en fond, pour la fois suivante.
 const USABLE_MS = 90 * 86_400_000
 const REFRESH_DELAY_MS = 3000
+// Les pays préparés en ligne le sont chaque mois : leurs tuiles restent
+// fraîches jusqu'à la préparation suivante, plutôt que d'être redemandées à
+// Overpass au bout de deux semaines.
+const PACK_TTL_MS = 40 * 86_400_000
 
 // La progression d'une requête, en deux temps. D'abord le serveur prépare les
 // rues : rien n'arrive, parfois vingt secondes. Cette attente avance à l'œil,
@@ -264,6 +269,8 @@ export async function fetchArea(args) {
     // rafraîchissement : on veut alors les données du jour, pas celles livrées.
     useRegion = true,
     regionFetch = fetch,
+    remoteFetch = fetch,
+    tilesUrl = undefined,
     tileBytesGuess = null,
   } = args
   const level = detailLevel(targetM)
@@ -278,8 +285,13 @@ export async function fetchArea(args) {
   // deux copies l'emporte.
   const found = new Map()
   for (const tile of wanted) found.set(tile, await cachedTile(level, tile))
+  // Une copie préparée d'un pays reste fraîche jusqu'à la préparation suivante ;
+  // un rafraîchissement, lui, veut toujours les données du jour.
+  const freshFor = (copy) => (only ? freshMs : Math.max(freshMs, copy?.ttl ?? 0))
+  const isFresh = (copy) => Boolean(copy) && now() - copy.at < freshFor(copy)
+
   if (useRegion) {
-    const unfresh = wanted.filter((tile) => !(now() - (found.get(tile)?.at ?? -Infinity) < freshMs))
+    const unfresh = wanted.filter((tile) => !isFresh(found.get(tile)))
     const shipped = await Promise.all(unfresh.map(([ix, iy]) => regionTile(ix, iy, regionFetch)))
     unfresh.forEach((tile, k) => {
       const copy = shipped[k]
@@ -287,13 +299,36 @@ export async function fetchArea(args) {
         found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level) })
       }
     })
+
+    // Puis les pays préparés en ligne, pour ce qui n'est toujours pas frais :
+    // quelques requêtes à un hébergement de fichiers, au lieu d'Overpass.
+    const still = wanted.filter((tile) => !isFresh(found.get(tile)))
+    if (still.length) {
+      let ready = wanted.length - still.length
+      const online = await remoteTiles(still, {
+        fetchImpl: remoteFetch,
+        ...(tilesUrl !== undefined ? { base: tilesUrl } : {}),
+        onTile: () => {
+          ready += 1
+          onProgress(Math.min(0.99, ready / wanted.length))
+        },
+      })
+      for (const tile of still) {
+        const copy = online.get(`${tile[0]}_${tile[1]}`)
+        if (!copy || found.get(tile)?.at >= copy.at) continue
+        // Gardée sur l'appareil, au niveau le plus fin : les recherches suivantes
+        // — une autre distance, un autre jour — la trouvent sans réseau.
+        await tiles.set(tileKey(0, tile), { at: copy.at, extract: copy.extract, ttl: PACK_TTL_MS })
+        found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), ttl: PACK_TTL_MS })
+      }
+    }
   }
 
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     const cached = found.get(tile)
     const age = cached ? now() - cached.at : Infinity
-    if (age < freshMs) {
+    if (age < freshFor(cached)) {
       obtained.set(key, cached.extract)
     } else if (age < usableMs) {
       obtained.set(key, cached.extract)
@@ -465,7 +500,9 @@ async function cachedTile(level, tile) {
   let best = null
   for (let l = level; l >= 0; l -= 1) {
     const copy = await tiles.get(tileKey(l, tile))
-    if (copy && !(best?.at >= copy.at)) best = { at: copy.at, extract: l === level ? copy.extract : deriveLevel(copy.extract, level) }
+    if (copy && !(best?.at >= copy.at)) {
+      best = { at: copy.at, ttl: copy.ttl, extract: l === level ? copy.extract : deriveLevel(copy.extract, level) }
+    }
   }
   return best
 }

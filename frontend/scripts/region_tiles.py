@@ -1,36 +1,51 @@
-"""Découpe un extrait OpenStreetMap régional en tuiles embarquées dans l'app.
+"""Découpe un extrait OpenStreetMap en tuiles de rues, prêtes pour l'app.
 
+    # Une région livrée dans l'app : un fichier par tuile.
     python scripts/region_tiles.py alsace-latest.osm.pbf alsace.poly public/region --name Alsace
+
+    # Un pays hébergé en ligne : un seul fichier, lu morceau par morceau.
+    python scripts/region_tiles.py france-latest.osm.pbf france.poly out/france --name France --pack
 
 La première recherche dans une zone commençait par télécharger ses rues sur
 Overpass : un serveur public, gratuit et souvent saturé, qui mettait de vingt
-secondes à plusieurs minutes à répondre. Augmenter la distance au-delà de 25 km
-recommençait l'attente. Pour la région où l'on court, ce téléchargement n'a
-pas lieu d'être : les rues y sont préparées ici, une fois par semaine, sur un
-serveur de GitHub, et livrées **dans l'app**. Une recherche y part tout de
-suite, et même sans réseau.
+secondes à plusieurs minutes à répondre. Ce script prépare ces rues à l'avance,
+sur un serveur de GitHub, sous deux formes :
 
-**Mêmes voies qu'Overpass, à la tuile près.** Le moteur de l'app doit recevoir
-exactement ce que lui aurait rendu sa requête (`src/engine/overpass.js`,
-niveau de détail 0) : mêmes filtres, mêmes étiquettes, mêmes géométries. Les
-filtres sont recopiés ici, et un test (`region.test.js`) vérifie qu'ils n'ont
-pas divergé.
+- **la région où l'on court, dans l'app** (un fichier JSON par tuile) : une
+  recherche y part tout de suite, même sans réseau ;
+- **des pays entiers, en ligne** (`--pack`) : toutes les tuiles compressées une
+  à une et mises bout à bout dans un seul fichier, avec l'index de leurs
+  positions. L'app n'en lit que les morceaux dont elle a besoin (requêtes HTTP
+  « Range »), depuis un hébergement de fichiers rapide plutôt qu'un serveur qui
+  calcule chaque requête.
 
-**Seules les tuiles entièrement dans la région sont livrées.** Une tuile à
-cheval sur la limite n'aurait que la moitié de ses rues — l'autre moitié est
-dans l'extrait voisin. Livrée, elle ferait proposer des boucles qui s'arrêtent
-net à la frontière du département. Ces tuiles-là restent donc à Overpass.
+**Mêmes voies qu'Overpass, à la tuile près.** Le moteur doit recevoir
+exactement ce que lui aurait rendu sa requête (`src/engine/overpass.js`, niveau
+de détail 0) : mêmes filtres, mêmes étiquettes, mêmes géométries. Les filtres
+sont recopiés ici, et un test (`region.test.js`) vérifie qu'ils n'ont pas
+divergé. Comparé sur Andorre : 596 voies sur 596 identiques, au bit près.
 
-**Un format serré.** Coordonnées en entiers de 1e-7 degré, et chaque point
-écrit comme l'écart au précédent ; même chose pour les numéros de nœuds. Un
-point de rue passe ainsi d'une vingtaine de caractères à cinq ou six.
+**Seules les tuiles entièrement dans le territoire sont gardées.** Une tuile à
+cheval sur une frontière n'aurait que la moitié de ses rues — l'autre moitié
+est dans l'extrait du voisin. Ces tuiles-là restent à Overpass.
+
+**Un format serré.** Coordonnées en entiers de 1e-7 degré, chaque point écrit
+comme l'écart au précédent ; même chose pour les numéros de nœuds.
+
+**Un pays ne tient pas en mémoire.** La France compte des millions de voies :
+les garder toutes en attendant de les ranger demandait plus que la mémoire
+d'une machine de compilation. Elles sont donc triées sur disque, par carré
+d'un degré, puis rangées carré par carré.
 """
 
 from __future__ import annotations
 
 import argparse
+import bisect
+import gzip
 import json
 import math
+import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -39,6 +54,8 @@ import osmium
 
 TILE_DEG = 0.05
 EDGE = 1e-9
+# Un carré de tri : 20 × 20 tuiles, un degré de côté.
+BUCKET = 20
 
 # Recopiés de `src/engine/overpass.js` — voir la docstring.
 EXCLUDED_HIGHWAYS = "motorway|motorway_link|trunk|trunk_link|construction|proposed|raceway|bus_guideway|escape"
@@ -50,7 +67,7 @@ BUILTUP = set(BUILTUP_LANDUSE.split("|"))
 SERVICE = set(EXCLUDED_SERVICE.split("|"))
 
 
-# --- la limite de la région ------------------------------------------------------
+# --- la limite du territoire -------------------------------------------------------
 
 
 def read_poly(path: Path) -> tuple[list[list[tuple[float, float]]], list[list[tuple[float, float]]]]:
@@ -73,20 +90,18 @@ def read_poly(path: Path) -> tuple[list[list[tuple[float, float]]], list[list[tu
     return outer, holes
 
 
-def inside_ring(lon: float, lat: float, ring: list[tuple[float, float]]) -> bool:
-    inside = False
-    j = len(ring) - 1
-    for i in range(len(ring)):
-        xi, yi = ring[i]
-        xj, yj = ring[j]
-        if (yi > lat) != (yj > lat) and lon < (xj - xi) * (lat - yi) / (yj - yi) + xi:
-            inside = not inside
-        j = i
-    return inside
-
-
-def inside(lon: float, lat: float, outer, holes) -> bool:
-    return any(inside_ring(lon, lat, r) for r in outer) and not any(inside_ring(lon, lat, r) for r in holes)
+def crossings_at(lat: float, rings) -> list[float]:
+    """Les longitudes où la ligne de latitude `lat` coupe les anneaux, triées."""
+    xs = []
+    for ring in rings:
+        j = len(ring) - 1
+        for i in range(len(ring)):
+            (xi, yi), (xj, yj) = ring[i], ring[j]
+            if (yi > lat) != (yj > lat):
+                xs.append((xj - xi) * (lat - yi) / (yj - yi) + xi)
+            j = i
+    xs.sort()
+    return xs
 
 
 def complete_tiles(outer, holes) -> set[tuple[int, int]]:
@@ -95,28 +110,39 @@ def complete_tiles(outer, holes) -> set[tuple[int, int]]:
     Quatre coins dedans ne suffisent pas : une limite en dents de scie peut
     entrer dans la tuile entre deux coins. On exige donc aussi qu'aucun sommet
     de la limite ne tombe dans la tuile.
+
+    Les coins sont testés ligne par ligne : on calcule une fois où chaque ligne
+    de latitude coupe la limite, et un coin est dedans si un nombre impair de
+    ces coupures le précède. Tester chaque coin contre chaque sommet prenait des
+    heures sur la limite de la France.
     """
-    vertices = [v for ring in outer + holes for v in ring]
+    rings = outer + holes
+    vertices = [v for ring in rings for v in ring]
     lons = [v[0] for v in vertices]
     lats = [v[1] for v in vertices]
     ix0, ix1 = math.floor(min(lons) / TILE_DEG), math.floor(max(lons) / TILE_DEG)
     iy0, iy1 = math.floor(min(lats) / TILE_DEG), math.floor(max(lats) / TILE_DEG)
 
-    by_tile = defaultdict(int)
-    for lon, lat in vertices:
-        by_tile[(math.floor(lon / TILE_DEG), math.floor(lat / TILE_DEG))] += 1
+    with_vertex = {(math.floor(lon / TILE_DEG), math.floor(lat / TILE_DEG)) for lon, lat in vertices}
+
+    # Les coins intérieurs, par ligne de coins.
+    inside = {}
+    for cy in range(iy0, iy1 + 2):
+        xs = crossings_at(cy * TILE_DEG, rings)
+        for cx in range(ix0, ix1 + 2):
+            inside[(cx, cy)] = bisect.bisect_left(xs, cx * TILE_DEG) % 2 == 1
 
     tiles = set()
     for ix in range(ix0, ix1 + 1):
         for iy in range(iy0, iy1 + 1):
-            w, s = ix * TILE_DEG, iy * TILE_DEG
-            corners = [(w, s), (w + TILE_DEG, s), (w, s + TILE_DEG), (w + TILE_DEG, s + TILE_DEG)]
-            if by_tile[(ix, iy)] == 0 and all(inside(x, y, outer, holes) for x, y in corners):
+            if (ix, iy) in with_vertex:
+                continue
+            if inside[(ix, iy)] and inside[(ix + 1, iy)] and inside[(ix, iy + 1)] and inside[(ix + 1, iy + 1)]:
                 tiles.add((ix, iy))
     return tiles
 
 
-# --- les données -------------------------------------------------------------------
+# --- l'encodage ------------------------------------------------------------------------
 
 
 def delta(values: list[int]) -> list[int]:
@@ -143,7 +169,30 @@ def tiles_of(xs: list[int], ys: list[int], keep: set[tuple[int, int]]):
                 yield ix, iy
 
 
-def build(pbf: Path, keep: set[tuple[int, int]]):
+# --- premier passage : trier sur disque ----------------------------------------------------
+
+
+class Buckets:
+    """Des fichiers de tri, un par carré d'un degré, ouverts à la demande."""
+
+    def __init__(self, folder: Path):
+        self.folder = folder
+        self.files = {}
+
+    def write(self, ix: int, iy: int, kind: str, oid: int, record: str) -> None:
+        key = (ix // BUCKET, iy // BUCKET)
+        handle = self.files.get(key)
+        if handle is None:
+            handle = self.files[key] = (self.folder / f"{key[0]}_{key[1]}.tsv").open("a", encoding="utf-8")
+        handle.write(f"{ix}\t{iy}\t{kind}\t{oid}\t{record}\n")
+
+    def close(self) -> list[Path]:
+        for handle in self.files.values():
+            handle.close()
+        return sorted(self.folder.glob("*.tsv"), key=lambda p: tuple(int(v) for v in p.stem.split("_"))[::-1])
+
+
+def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locations: str = "flex_mem") -> int:
     """Parcourt l'extrait et range voies, polygones bâtis et traversées par tuile.
 
     Les filtres reproduisent ceux de la requête Overpass : une voie `highway`
@@ -152,16 +201,13 @@ def build(pbf: Path, keep: set[tuple[int, int]]):
     `highway` et un `landuse` bâti est rangée comme voie — c'est ce que fait
     `fromOverpass` de la même voie revenue par la seconde requête.
     """
-    ways = defaultdict(list)
-    landuse = defaultdict(list)
-    crossings = defaultdict(list)
-
+    count = 0
     # Le filtre ne laisse remonter en Python que ce qui porte une de ces clés :
-    # sur l'Alsace, quelques centaines de milliers d'objets au lieu de vingt
-    # millions de nœuds. Les positions, elles, sont retenues avant le filtre.
+    # quelques millions d'objets au lieu de centaines de millions de nœuds. Les
+    # positions, elles, sont retenues avant le filtre.
     processor = (
         osmium.FileProcessor(str(pbf))
-        .with_locations()
+        .with_locations(locations)
         .with_filter(osmium.filter.KeyFilter("highway", "landuse"))
     )
     for obj in processor:
@@ -171,7 +217,8 @@ def build(pbf: Path, keep: set[tuple[int, int]]):
                 x, y = obj.location.x, obj.location.y
                 tile = (math.floor(x / 1e7 / TILE_DEG), math.floor(y / 1e7 / TILE_DEG))
                 if tile in keep:
-                    crossings[tile].append([obj.id, x, y, tags])
+                    record = json.dumps([obj.id, x, y, tags], ensure_ascii=False, separators=(",", ":"))
+                    buckets.write(tile[0], tile[1], "c", obj.id, record)
             continue
         if not obj.is_way():
             continue
@@ -198,58 +245,86 @@ def build(pbf: Path, keep: set[tuple[int, int]]):
             continue
 
         if highway is not None:
-            record = [obj.id, tags, delta(refs), delta_pairs(xs, ys)]
-            for tile in tiles_of(xs, ys, keep):
-                ways[tile].append(record)
+            kind = "w"
+            record = json.dumps([obj.id, tags, delta(refs), delta_pairs(xs, ys)], ensure_ascii=False, separators=(",", ":"))
         else:
-            record = [obj.id, delta_pairs(xs, ys)]
-            for tile in tiles_of(xs, ys, keep):
-                landuse[tile].append(record)
+            kind = "l"
+            record = json.dumps([obj.id, delta_pairs(xs, ys)], separators=(",", ":"))
+        for ix, iy in tiles_of(xs, ys, keep):
+            buckets.write(ix, iy, kind, obj.id, record)
+            if kind == "w":
+                count += 1
+    return count
 
-    return ways, landuse, crossings
+
+# --- second passage : ranger tuile par tuile -------------------------------------------------
+
+
+def tiles_in(bucket_file: Path):
+    """Les tuiles d'un carré, dans l'ordre (ligne, colonne), texte JSON prêt."""
+    grouped = defaultdict(lambda: {"w": [], "l": [], "c": []})
+    with bucket_file.open(encoding="utf-8") as handle:
+        for line in handle:
+            ix, iy, kind, oid, record = line.rstrip("\n").split("\t", 4)
+            grouped[(int(iy), int(ix))][kind].append((int(oid), record))
+    for (iy, ix) in sorted(grouped):
+        parts = grouped[(iy, ix)]
+        if not parts["w"]:
+            continue  # une tuile sans rue — lac, forêt sans chemin : Overpass dira pareil
+        body = {k: ",".join(r for _, r in sorted(v)) for k, v in parts.items()}
+        yield ix, iy, f'{{"w":[{body["w"]}],"l":[{body["l"]}],"c":[{body["c"]}]}}'
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("pbf", type=Path)
     parser.add_argument("poly", type=Path)
-    parser.add_argument("out", type=Path)
+    parser.add_argument("out", type=Path, help="dossier de sortie")
     parser.add_argument("--name", default="Région")
+    parser.add_argument("--pack", action="store_true", help="un seul fichier compressé, pour l'hébergement en ligne")
+    # La position de chaque nœud, le temps de reconstituer les voies. En mémoire
+    # pour une région ; sur disque pour un pays (« sparse_file_array,chemin ») :
+    # l'Allemagne en demanderait une dizaine de gigaoctets.
+    parser.add_argument("--locations", default="flex_mem", help="index des positions de nœuds (pyosmium)")
     args = parser.parse_args()
 
     started = time.time()
     outer, holes = read_poly(args.poly)
     keep = complete_tiles(outer, holes)
-    ways, landuse, crossings = build(args.pbf, keep)
-
     args.out.mkdir(parents=True, exist_ok=True)
-    written = []
-    total = 0
-    for tile in sorted(keep):
-        if not ways[tile]:
-            continue  # une tuile sans rue — lac, forêt sans chemin : Overpass dira pareil
-        data = {
-            "w": sorted(ways[tile], key=lambda r: r[0]),
-            "l": sorted(landuse[tile], key=lambda r: r[0]),
-            "c": sorted(crossings[tile], key=lambda r: r[0]),
-        }
-        text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        (args.out / f"{tile[0]}_{tile[1]}.json").write_text(text, encoding="utf-8")
-        written.append(f"{tile[0]}_{tile[1]}")
-        total += len(text.encode("utf-8"))
 
-    index = {
-        "v": 3,
-        "name": args.name,
-        "builtAt": int(time.time() * 1000),
-        "tileDeg": TILE_DEG,
-        "tiles": written,
-    }
-    (args.out / "index.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
-    print(
-        f"{args.name} : {len(written)} tuiles, {total / 1e6:.1f} Mo, "
-        f"{sum(len(ways[t]) for t in keep)} voies, en {time.time() - started:.0f} s"
-    )
+    with tempfile.TemporaryDirectory() as scratch:
+        buckets = Buckets(Path(scratch))
+        ways = sort_to_disk(args.pbf, keep, buckets, args.locations)
+
+        written = []
+        index = {}
+        total = 0
+        pack = (args.out / "tiles.bin").open("wb") if args.pack else None
+        for bucket_file in buckets.close():
+            for ix, iy, text in tiles_in(bucket_file):
+                key = f"{ix}_{iy}"
+                data = text.encode("utf-8")
+                if pack:
+                    # Chaque tuile compressée seule : n'importe laquelle se lit
+                    # sans les autres, par une requête « Range » sur ses octets.
+                    blob = gzip.compress(data, compresslevel=9, mtime=0)
+                    index[key] = [pack.tell(), len(blob)]
+                    pack.write(blob)
+                    total += len(blob)
+                else:
+                    (args.out / f"{key}.json").write_bytes(data)
+                    total += len(data)
+                written.append(key)
+        if pack:
+            pack.close()
+
+    meta = {"v": 3, "name": args.name, "builtAt": int(time.time() * 1000), "tileDeg": TILE_DEG}
+    if args.pack:
+        (args.out / "index.json").write_text(json.dumps({**meta, "tiles": index}, separators=(",", ":")), encoding="utf-8")
+    else:
+        (args.out / "index.json").write_text(json.dumps({**meta, "tiles": written}, separators=(",", ":")), encoding="utf-8")
+    print(f"{args.name} : {len(written)} tuiles, {total / 1e6:.1f} Mo, {ways} voies, en {time.time() - started:.0f} s")
 
 
 if __name__ == "__main__":

@@ -108,9 +108,12 @@ jobs:
       # Les fonds Mapbox n'apparaissent que si le secret VITE_MAPBOX_TOKEN est
       # défini dans le dépôt (Settings → Secrets and variables → Actions). Sans
       # lui, la variable est vide et l'app propose ses fonds gratuits.
+      # Les pays préparés en ligne (workflow cartes.yml) : l'adresse n'existe que
+      # si la variable HF_DATASET est réglée ; sinon, Overpass hors de la région.
       - name: App web
         env:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_TILES_URL: ${{ vars.HF_DATASET && format('https://huggingface.co/datasets/{0}/resolve/main/', vars.HF_DATASET) || '' }}
         run: npm run build
 
       - name: Projet iOS
