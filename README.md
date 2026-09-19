@@ -984,6 +984,23 @@ seul tampon), et la boucle de Dijkstra n'alloue rien.
 | Construction du graphe | 10,9 s | 4,7 s |
 | Génération et notation | 4,3 s | 0,5 à 0,8 s |
 
+**La région où l'on court est livrée avec l'app.** Chaque lundi, la compilation
+télécharge l'extrait OpenStreetMap de la région chez Geofabrik (l'Alsace, dans
+`.github/workflows/ios.yml`), le découpe en tuiles avec
+`frontend/scripts/region_tiles.py` et les range dans l'app. Une recherche dans
+la région lit ses rues sur place : **0,04 s** au lieu de vingt secondes à
+plusieurs minutes chez Overpass, et même sans réseau. Les tuiles sont identiques
+à ce qu'Overpass aurait rendu — vérifié voie par voie, étiquettes, nœuds et
+géométries au bit près. Seules les tuiles entièrement dans la région sont
+livrées : une tuile à cheval sur la limite n'aurait que la moitié de ses rues.
+Hors de la région, rien ne change.
+
+**Changer de distance ne retélécharge plus rien.** Au-delà de 25 km, le moteur
+demande moins de détail (plus de voies de service) : c'était un autre
+téléchargement, alors que les rues déjà gardées contenaient tout. Elles sont
+maintenant filtrées sur place. Et quand seule la couronne extérieure manque, on
+ne redemande qu'elle, en bandes, sans le centre.
+
 **Les rues se préparent en fond.** Dès que le point de départ est connu — à
 l'ouverture, ou quand on choisit une adresse —, l'app télécharge les rues de la
 zone et construit leur graphe pendant qu'on règle ses filtres. La recherche qui

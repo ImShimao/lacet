@@ -20,3 +20,6 @@ Thumbs.db
 frontend/ios/
 frontend/android/
 *.ipa
+
+# Carte régionale : produite par la compilation (scripts/region_tiles.py), jamais versionnée.
+frontend/public/region/

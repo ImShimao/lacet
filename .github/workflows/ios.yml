@@ -18,13 +18,63 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/ios.yml'
+  # Chaque lundi matin, une IPA neuve avec les rues de la semaine : il suffit de
+  # la télécharger en réinstallant l'app, ce que Sideloadly demande de toute
+  # façon tous les sept jours.
+  schedule:
+    - cron: '0 4 * * 1'
 
 concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # La carte régionale livrée dans l'app : toutes les rues de la région, prêtes,
+  # pour ne plus rien attendre d'Overpass quand on court chez soi. Voir
+  # frontend/scripts/region_tiles.py. Calculée une fois par semaine : les
+  # compilations de la même semaine reprennent le résultat en cache.
+  region:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Le chemin de l'extrait chez Geofabrik (download.geofabrik.de/europe/…).
+      REGION: france/alsace
+      REGION_NAME: Alsace
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semaine
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: region
+          key: region-${{ env.REGION }}-${{ steps.week.outputs.week }}-${{ hashFiles('frontend/scripts/region_tiles.py') }}
+
+      - uses: actions/setup-python@v5
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          python-version: '3.12'
+
+      - name: Rues de la région
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          pip install --quiet osmium
+          curl -sSfL -o region.osm.pbf "https://download.geofabrik.de/europe/${REGION}-latest.osm.pbf"
+          curl -sSfL -o region.poly "https://download.geofabrik.de/europe/${REGION}.poly"
+          python frontend/scripts/region_tiles.py region.osm.pbf region.poly region --name "$REGION_NAME"
+          du -sh region
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: region
+          path: region
+          retention-days: 7
+
   ipa:
+    needs: region
     runs-on: macos-15
     timeout-minutes: 45
     defaults:
@@ -43,6 +93,12 @@ jobs:
 
       - name: Dépendances
         run: npm ci
+
+      # Rangée dans public/ : Vite la copie telle quelle dans l'app.
+      - uses: actions/download-artifact@v4
+        with:
+          name: region
+          path: frontend/public/region
 
       # Les tests d'abord : une IPA construite sur un moteur qui ne calcule plus
       # comme la référence serait pire qu'aucune IPA.

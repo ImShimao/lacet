@@ -29,10 +29,17 @@ export default function SafetyPanel({ safety, surfaces, distance, sport = 'run' 
     {
       label: 'Traversées non protégées',
       value: String(safety.unprotected_crossings),
+      // Les ronds blancs cerclés sur la carte : sans cette phrase, rien ne disait
+      // ce qu'ils étaient, et on les prenait pour des étapes.
       hint:
-        safety.protected_crossings > 0
-          ? `${safety.protected_crossings} protégée(s) par ailleurs`
-          : null,
+        [
+          safety.unprotected_crossings > 0 ? 'ronds cerclés de rouge sur la carte' : null,
+          safety.protected_crossings > 0
+            ? `${safety.protected_crossings} protégée(s), cerclées de jaune`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || null,
       tone: safety.unprotected_crossings === 0 ? 'good' : 'warn',
     },
   ]
