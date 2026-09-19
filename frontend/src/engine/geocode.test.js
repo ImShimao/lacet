@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandNicknames, fromPhoton, rankPlaces, search } from './geocode'
+import { expandNicknames, fromMapbox, fromPhoton, rankPlaces, search } from './geocode'
 
 /**
  * Chercher un lieu comme on le dit : « macdo guebwiller », « one fitness ».
@@ -98,3 +98,62 @@ describe('la recherche', () => {
     expect(results[0].distance_m).toBeLessThan(2000)
   })
 })
+
+/**
+ * Le renfort de Mapbox : ce qu'OpenStreetMap ne connaît pas encore.
+ *
+ * Le One Fitness de Kingersheim a ouvert récemment et n'est pas dans
+ * OpenStreetMap — celui de Colmar, plus loin, y est. Sans deuxième source, la
+ * recherche répondait Colmar et rien d'autre.
+ */
+const mapboxFeature = (name, [lon, lat], props = {}) => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [lon, lat] },
+  properties: {
+    name,
+    feature_type: 'poi',
+    poi_category: ['fitness_center'],
+    place_formatted: '83 Rue de Guebwiller, 68260 Kingersheim, France',
+    ...props,
+  },
+})
+
+describe('les deux sources', () => {
+  const serve = (photonFeatures, mapboxFeatures, { mapboxFails = false } = {}) => async (url) => {
+    if (String(url).includes('photon')) return { ok: true, json: async () => ({ features: photonFeatures }) }
+    if (mapboxFails) return { ok: false, status: 401, json: async () => ({}) }
+    return { ok: true, json: async () => ({ features: mapboxFeatures }) }
+  }
+
+  it('fond les deux listes et met le plus proche devant', async () => {
+    const fetchImpl = serve(
+      [feature('One Fitness Club', [7.3686, 48.1003], { osm_key: 'leisure', osm_value: 'fitness_centre', city: 'Colmar' })],
+      [mapboxFeature('One Fitness Club', [7.315, 47.7888])],
+    )
+    const results = await search('one fitness kingersheim', { near: GUEBWILLER, fetchImpl, token: 'test' })
+    expect(results.map((p) => Math.round(p.distance_m / 1000))).toEqual([16, 24])
+    expect(results[0].label).toBe('83 Rue de Guebwiller, 68260 Kingersheim')
+    expect(results[0].kind).toBe('Salle de sport')
+  })
+
+  it('ne montre pas deux fois le même lieu connu des deux côtés', async () => {
+    const fetchImpl = serve(
+      [feature('One Fitness Club', [7.315, 47.7888], { osm_key: 'leisure', osm_value: 'fitness_centre' })],
+      [mapboxFeature('One Fitness Club', [7.3151, 47.7889])],
+    )
+    expect(await search('one fitness', { near: GUEBWILLER, fetchImpl, token: 'test' })).toHaveLength(1)
+  })
+
+  it('un token refusé ne casse rien : Photon suffit', async () => {
+    const fetchImpl = serve([feature("McDonald's", [7.223, 47.9017])], [], { mapboxFails: true })
+    const results = await search('macdo', { near: GUEBWILLER, fetchImpl, token: 'périmé' })
+    expect(results.map((p) => p.short)).toEqual(["McDonald's"])
+  })
+
+  it('lit la position et le genre d’un résultat Mapbox', () => {
+    const place = fromMapbox(mapboxFeature('One Fitness Club', [7.315, 47.7888]))
+    expect([place.lon, place.lat]).toEqual([7.315, 47.7888])
+    expect(place.kind).toBe('Salle de sport')
+  })
+})
+

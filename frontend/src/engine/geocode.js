@@ -10,6 +10,14 @@
 // Mulhouse. Pas de compte, pas de clé, et pas de limite d'une requête par
 // seconde : la frappe n'attend plus.
 //
+// **Mapbox en renfort**, quand l'app a un token (le même que les fonds de
+// carte). Les deux premiers ne connaissent que ce qu'OpenStreetMap contient ;
+// un commerce ouvert cette année peut n'y être pas encore — le One Fitness de
+// Kingersheim, par exemple, n'y figure pas, alors que son adresse, elle, y est.
+// Mapbox tient sa propre base de commerces, plus fraîche sur ce point. Les deux
+// listes sont fondues : à nom égal, le lieu n'apparaît qu'une fois, et c'est le
+// plus proche qui passe devant. Sans token, rien ne change.
+//
 // **Nominatim en secours**, si Photon ne répond pas — et pour l'inverse (d'un
 // point au nom de sa rue), où il reste le meilleur. Sa charte demande une
 // requête par seconde au plus : la cadence est tenue ici.
@@ -18,6 +26,9 @@
 // géocodeur ne le devine ; une petite table les traduit avant d'interroger.
 
 const PHOTON_URL = 'https://photon.komoot.io/api/'
+const MAPBOX_URL = 'https://api.mapbox.com/search/searchbox/v1/forward'
+// `import.meta.env` n'existe pas partout (tests hors Vite) : on se garde.
+const MAPBOX_TOKEN = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MAPBOX_TOKEN) || ''
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 const REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
 const CACHE_MAX = 500
@@ -81,7 +92,7 @@ function throttled(url, params, signal) {
  * Cherche un lieu. `near` ({lat, lon}) : là où l'on est — les lieux proches
  * passent devant, et chaque résultat porte sa distance.
  */
-export async function search(query, { limit = 7, near = null, signal, fetchImpl = fetch } = {}) {
+export async function search(query, { limit = 7, near = null, signal, fetchImpl = fetch, token = MAPBOX_TOKEN } = {}) {
   const text = query.trim()
   if (text.length < 2) return []
   // La position entre dans la clé, arrondie au kilomètre : la même recherche
@@ -94,25 +105,41 @@ export async function search(query, { limit = 7, near = null, signal, fetchImpl 
     return hit
   }
 
+  const asked = expandNicknames(text)
+  // Les deux sources partent ensemble : l'attente est celle de la plus lente,
+  // pas leur somme. Celle qui échoue ne fait pas échouer la recherche.
+  const [free, extra] = await Promise.all([
+    attempt(() => photon(asked, { limit, near, signal, fetchImpl })),
+    token ? attempt(() => mapbox(asked, { limit, near, signal, fetchImpl, token })) : Promise.resolve(null),
+  ])
+  if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
+
   let results
-  try {
-    results = await photon(expandNicknames(text), { limit, near, signal, fetchImpl })
-  } catch (error) {
-    if (error.name === 'AbortError') throw error
-    results = null
-  }
-  if (results === null) {
+  if (free === null && extra === null) {
+    // Photon muet et pas de renfort : Nominatim, sur les mêmes données.
     try {
-      results = await nominatim(expandNicknames(text), { limit, near, signal })
+      results = await nominatim(asked, { limit, near, signal })
     } catch (error) {
       if (error.name === 'AbortError') throw error
       return []
     }
+  } else {
+    results = rankPlaces([...(free ?? []), ...(extra ?? [])], near).slice(0, limit)
   }
 
   cache.set(key, results)
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value)
   return results
+}
+
+/** Rend `null` plutôt que d'échouer — sauf si la frappe a continué. */
+async function attempt(task) {
+  try {
+    return await task()
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    return null
+  }
 }
 
 async function photon(text, { limit, near, signal, fetchImpl }) {
@@ -126,7 +153,76 @@ async function photon(text, { limit, near, signal, fetchImpl }) {
   const response = await fetchImpl(`${PHOTON_URL}?${params}`, { signal })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const data = await response.json()
-  return rankPlaces((data.features ?? []).map(fromPhoton).filter(Boolean), near).slice(0, limit)
+  return (data.features ?? []).map(fromPhoton).filter(Boolean)
+}
+
+async function mapbox(text, { limit, near, signal, fetchImpl, token }) {
+  const params = new URLSearchParams({
+    q: text.slice(0, 120),
+    access_token: token,
+    language: 'fr',
+    limit: String(Math.min(10, limit)),
+  })
+  if (near) params.set('proximity', `${near.lon.toFixed(5)},${near.lat.toFixed(5)}`)
+  const response = await fetchImpl(`${MAPBOX_URL}?${params}`, { signal })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const data = await response.json()
+  return (data.features ?? []).map(fromMapbox).filter(Boolean)
+}
+
+/** Un résultat de Mapbox, au format de l'app. */
+export function fromMapbox(feature) {
+  const p = feature?.properties ?? {}
+  // La position arrive deux fois, en géométrie GeoJSON et dans les propriétés.
+  const coords = feature?.geometry?.coordinates
+  const lon = Array.isArray(coords) ? coords[0] : p.coordinates?.longitude
+  const lat = Array.isArray(coords) ? coords[1] : p.coordinates?.latitude
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null
+
+  const short = p.name_preferred || p.name
+  if (!short) return null
+  const place = p.feature_type === 'place' || p.feature_type === 'locality' || p.feature_type === 'region' || p.feature_type === 'country'
+  // `place_formatted` est l'adresse sans le nom : « 83 Rue de Guebwiller,
+  // 68260 Kingersheim, France » — exactement ce qu'on veut en dessous.
+  const label = (p.place_formatted || p.full_address || '')
+    .split(', ')
+    .filter((part) => part && part !== short && part !== 'France')
+    .join(', ')
+  return {
+    short,
+    label,
+    kind: MAPBOX_KINDS[p.poi_category?.[0]] ?? (p.feature_type === 'address' ? 'Adresse' : place ? 'Ville' : null),
+    lat,
+    lon,
+    group: `${fold(short)}|${place ? 'lieu' : 'poi'}`,
+  }
+}
+
+// Les catégories Mapbox qui reviennent dans une recherche de point de départ.
+const MAPBOX_KINDS = {
+  fitness_center: 'Salle de sport',
+  gym: 'Salle de sport',
+  sports_club: 'Club de sport',
+  stadium: 'Stade',
+  park: 'Parc',
+  trail: 'Sentier',
+  restaurant: 'Restaurant',
+  fast_food: 'Restauration rapide',
+  cafe: 'Café',
+  bakery: 'Boulangerie',
+  grocery: 'Supermarché',
+  supermarket: 'Supermarché',
+  shopping_mall: 'Centre commercial',
+  train_station: 'Gare',
+  bus_station: 'Gare routière',
+  parking_lot: 'Parking',
+  school: 'École',
+  university: 'Université',
+  hospital: 'Hôpital',
+  pharmacy: 'Pharmacie',
+  swimming_pool: 'Piscine',
+  lake: 'Lac',
+  mountain: 'Sommet',
 }
 
 async function nominatim(text, { limit, near, signal }) {
@@ -190,7 +286,10 @@ export function fromPhoton(feature) {
     kind: kindOf(p),
     lat,
     lon,
-    group: `${fold(short)}|${p.osm_key}:${p.osm_value}`,
+    // Le genre, en deux familles seulement — une ville ou le reste. Plus fin,
+    // le même lieu vu par deux sources ne se reconnaîtrait pas : « salle de
+    // sport » d'un côté, « bâtiment » de l'autre.
+    group: `${fold(short)}|${place ? 'lieu' : 'poi'}`,
   }
 }
 

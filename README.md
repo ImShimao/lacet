@@ -64,7 +64,9 @@ flottant, arrondi au pair, `sum` compensée, `math.hypot`).
 
 Aucune clé d'API. Données © OpenStreetMap (Overpass), altitude IGN et
 OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche de lieux Photon
-(Komoot) et Nominatim.
+(Komoot) et Nominatim — plus Mapbox pour les commerces, si un token est présent :
+OpenStreetMap ignore les enseignes ouvertes trop récemment, et une salle de
+sport de l'année n'y est pas encore.
 
 ---
 
