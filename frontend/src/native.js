@@ -175,6 +175,9 @@ export const endLiveActivity = () => LiveActivity.end().catch(() => {})
  */
 export const lockScreenStatus = () => LiveActivity.status().catch(() => null)
 
+/** Ce qu'iOS dit des activités en cours : `{ count, states }`. */
+export const liveActivities = () => LiveActivity.activities().catch(() => null)
+
 /**
  * La notification de secours, quand l'activité en direct n'est pas là :
  * passive — ni son, ni écran allumé — et remplacée à chaque consigne.
@@ -186,8 +189,8 @@ export async function askNoticePermission() {
     return false
   }
 }
-export const postRunNotice = (title, body, delay = 0) =>
-  LiveActivity.notice({ title, body, delay }).catch(() => {})
+export const postRunNotice = (notice, delay = 0) =>
+  LiveActivity.notice({ ...notice, delay }).catch(() => {})
 export const clearRunNotice = () => LiveActivity.clearNotice().catch(() => {})
 
 /**

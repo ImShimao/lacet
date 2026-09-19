@@ -28,6 +28,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "activities", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "noticePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "notice", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearNotice", returnType: CAPPluginReturnPromise),
@@ -117,6 +118,31 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    /// Ce qu'iOS dit des activités vivantes : combien, et dans quel état.
+    ///
+    /// La question qui tranche : si iOS en compte une « active » et que
+    /// l'écran de verrouillage reste vide, ce n'est pas la demande qui échoue,
+    /// c'est l'extension qui ne la dessine pas.
+    @objc func activities(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.resolve(["count": 0, "states": ""])
+            return
+        }
+        Task { @MainActor in
+            let live = Activity<LacetRunAttributes>.activities
+            let states = live.map { activity -> String in
+                switch activity.activityState {
+                case .active: return "active"
+                case .dismissed: return "écartée"
+                case .ended: return "terminée"
+                case .stale: return "périmée"
+                @unknown default: return "inconnue"
+                }
+            }
+            call.resolve(["count": live.count, "states": states.joined(separator: ", ")])
+        }
+    }
+
     /// Ce que l'écran de verrouillage peut afficher, pour « Mon compte ».
     @objc func status(_ call: CAPPluginCall) {
         var result: [String: Any] = ["extension": Self.hasExtension]
@@ -151,9 +177,16 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.title = call.getString("title") ?? "Lacet"
+        let subtitle = call.getString("subtitle") ?? ""
+        if !subtitle.isEmpty { content.subtitle = subtitle }
         content.body = call.getString("body") ?? ""
         content.sound = nil
         content.threadIdentifier = Self.noticeId
+        // La flèche du virage, en vignette : c'est elle qui distingue une
+        // consigne de navigation d'une ligne de texte de plus.
+        if let icon = call.getString("icon"), let arrow = Self.attachment(named: icon) {
+            content.attachments = [arrow]
+        }
         if #available(iOS 15.0, *) {
             content.interruptionLevel = .passive
         }
@@ -174,6 +207,25 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         center.removePendingNotificationRequests(withIdentifiers: [Self.noticeId])
         center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
         call.resolve()
+    }
+
+    /// La flèche du virage, copiée hors du paquet de l'app.
+    ///
+    /// Le système **déplace** le fichier d'une pièce jointe dans son propre
+    /// stockage : lui donner directement une ressource de l'app la ferait
+    /// disparaître du paquet. On lui donne donc une copie jetable.
+    private static func attachment(named name: String) -> UNNotificationAttachment? {
+        guard let source = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "public/turns") else {
+            return nil
+        }
+        let copy = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("lacet-\(name)-\(UUID().uuidString).png")
+        do {
+            try FileManager.default.copyItem(at: source, to: copy)
+            return try UNNotificationAttachment(identifier: "turn", url: copy, options: nil)
+        } catch {
+            return nil
+        }
     }
 
     @available(iOS 16.1, *)

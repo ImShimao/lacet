@@ -282,8 +282,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
       } else if (await n.askNoticePermission()) {
         if (cancelled) return
         lockMode.current = 'notice'
-        const { title, body } = noticeOf(first)
-        n.postRunNotice(title, body)
+        n.postRunNotice(noticeOf(first))
       }
       shown.current = first
       shownAt.current = Date.now()
@@ -382,8 +381,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
     if (lockMode.current === 'activity') {
       import('./native').then((n) => n.updateLiveActivity(next))
     } else {
-      const { title, body } = noticeOf(next)
-      import('./native').then((n) => n.postRunNotice(title, body))
+      import('./native').then((n) => n.postRunNotice(noticeOf(next)))
     }
   }
 

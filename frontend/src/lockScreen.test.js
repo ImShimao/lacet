@@ -125,14 +125,20 @@ describe('la notification de secours', () => {
   }
 
   it('dit le virage, sa distance, et l’heure d’arrivée plutôt qu’un compte à rebours', () => {
-    expect(noticeOf(state)).toEqual({
-      title: 'Dans 120 m · Tourne à droite sur Rue de la Gare',
+    expect(noticeOf({ ...state, turn: 'right' })).toEqual({
+      title: 'Tourne à droite sur Rue de la Gare',
+      subtitle: 'Dans 120 m',
       body: 'Reste 4,2 km · arrivée vers 18h05',
+      icon: 'right',
     })
   })
 
-  it('au moment d’agir, la consigne seule', () => {
-    expect(noticeOf({ ...state, distance: 'maintenant' }).title).toBe('Tourne à droite sur Rue de la Gare')
+  it('au moment d’agir, le sous-titre le dit', () => {
+    expect(noticeOf({ ...state, distance: 'maintenant' }).subtitle).toBe('Maintenant')
+  })
+
+  it('porte la flèche du virage — celle d’un avertissement hors parcours', () => {
+    expect(noticeOf({ ...state, offRoute: true }).icon).toBe('warning')
   })
 
   it('hors parcours ou en pause, le dit', () => {

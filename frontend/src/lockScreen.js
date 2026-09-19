@@ -103,14 +103,26 @@ export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
  * l'heure d'arrivée, qui, elle, ne se périme pas d'une seconde à l'autre.
  */
 export function noticeOf(state) {
-  if (state.paused) return { title: 'Sortie en pause', body: `Reste ${state.remaining} jusqu'à l'arrivée.` }
+  if (state.paused) {
+    return { title: 'Sortie en pause', subtitle: '', body: `Reste ${state.remaining} jusqu'à l'arrivée.`, icon: 'start' }
+  }
   if (state.offRoute) {
-    return { title: 'Hors parcours', body: 'Lacet te propose un chemin pour revenir sur la boucle.' }
+    return {
+      title: 'Hors parcours',
+      subtitle: '',
+      body: 'Lacet te propose un chemin pour revenir sur la boucle.',
+      icon: 'warning',
+    }
   }
   const at = new Date(state.arrival)
   const clock = `${at.getHours()}h${String(at.getMinutes()).padStart(2, '0')}`
   return {
-    title: state.distance === 'maintenant' ? state.instruction : `Dans ${state.distance} · ${state.instruction}`,
+    // Le virage en titre, sa distance en sous-titre : c'est l'ordre dans lequel
+    // l'œil les prend sur un écran de verrouillage, et la vignette de la flèche
+    // (`icon`) donne la direction avant même la lecture.
+    title: state.instruction,
+    subtitle: state.distance === 'maintenant' ? 'Maintenant' : `Dans ${state.distance}`,
     body: `Reste ${state.remaining} · arrivée vers ${clock}`,
+    icon: state.turn || 'straight',
   }
 }

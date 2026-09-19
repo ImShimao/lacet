@@ -271,6 +271,7 @@ function LockScreenSetting() {
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState(null)
   const [mode, setMode] = useState(() => (load().lockScreen === 'notice' ? 'notice' : 'auto'))
+  const [failure, setFailure] = useState(() => load().lockScreenError || null)
 
   useEffect(() => {
     if (!isNative()) return
@@ -323,10 +324,30 @@ function LockScreenSetting() {
     const { started, count, reason } = mode === 'notice'
       ? { started: false, count: null, reason: 'notification choisie dans ce réglage' }
       : await n.startLiveActivity(demo)
+    // Gardé : la phrase disparaît dès qu'on quitte l'écran, et c'est
+    // justement celle qu'il faut pouvoir relire — ou m'envoyer.
+    if (!started && mode !== 'notice') {
+      save({ lockScreenError: reason })
+      setFailure(reason)
+    }
     if (started) {
+      save({ lockScreenError: null })
+      setFailure(null)
       setResult(
         `Activité en direct lancée (${count ?? '?'} active). Verrouille l’écran tout de suite : elle doit s’afficher dessus. Elle s’efface dans 20 secondes.`,
       )
+      // Trois secondes plus tard, ce qu'iOS en dit vraiment.
+      setTimeout(async () => {
+        const live = await n.liveActivities()
+        if (live) {
+          setResult(
+            `Activité en direct lancée. iOS en compte ${live.count} (${live.states || 'aucun état'}). ` +
+              (live.count > 0
+                ? "Si l'écran de verrouillage reste vide, c'est l'extension qui ne la dessine pas : passe sur « Notification »."
+                : "iOS l'a écartée aussitôt."),
+          )
+        }
+      }, 3000)
       setTimeout(() => {
         n.endLiveActivity()
         setTesting(false)
@@ -336,7 +357,15 @@ function LockScreenSetting() {
     if (await n.askNoticePermission()) {
       // Cinq secondes de délai : posée pendant qu'on regarde l'app, iOS ne
       // l'affiche pas. Le temps de verrouiller l'écran, elle arrive.
-      await n.postRunNotice('Dans 120 m · Tourne à droite sur Rue de la Gare', 'Reste 4,2 km · essai de Lacet', 5)
+      await n.postRunNotice(
+        {
+          title: 'Tourne à droite sur Rue de la Gare',
+          subtitle: 'Dans 120 m',
+          body: 'Reste 4,2 km · essai de Lacet',
+          icon: 'right',
+        },
+        5,
+      )
       setResult(
         `Activité en direct impossible ici (${reason}). Une notification silencieuse arrive dans 5 secondes : verrouille ton écran maintenant pour la voir. Elle s’efface au bout de 20 secondes.`,
       )
@@ -387,6 +416,31 @@ function LockScreenSetting() {
       </button>
       {result && <p className="muted small">{result}</p>}
       <p className="muted small">Détail : {detail}.</p>
+      {failure && (
+        <p className="muted small">
+          Dernier refus d'iOS : <b>{failure}</b>
+        </p>
+      )}
+      {/* Tout le diagnostic en un texte à partager : plus rapide et plus sûr
+          que de recopier trois lignes à la main. */}
+      <button
+        className="btn"
+        onClick={async () => {
+          const n = await import('./native')
+          const app = await n.appVersion()
+          const lines = [
+            `Lacet ${app ? `${app.version} (build ${app.build})` : ''} · interface ${import.meta.env.VITE_BUILD || 'dev'}`,
+            `Écran verrouillé : ${detail}`,
+            `Réglage : ${mode === 'notice' ? 'notification' : 'activité en direct'}`,
+            failure ? `Dernier refus : ${failure}` : 'Aucun refus enregistré',
+            result ? `Dernier essai : ${result}` : null,
+          ].filter(Boolean)
+          n.shareText('Diagnostic Lacet', lines.join('\n'))
+        }}
+      >
+        <Icon name="download" size={15} />
+        Partager le diagnostic
+      </button>
     </>
   )
 }

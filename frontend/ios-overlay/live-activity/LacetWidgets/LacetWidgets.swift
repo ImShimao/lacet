@@ -8,8 +8,11 @@ import WidgetKit
 /// formatées (`LacetRunAttributes`). Seul le compte à rebours vit ici, parce
 /// qu'iOS sait le faire défiler lui-même — l'app n'a pas à se réveiller chaque
 /// seconde pour changer un chiffre.
+/// Le nom diffère volontairement de celui du module (`LacetWidgets`) : une
+/// structure qui porte le nom de son propre module rend ce nom ambigu, et
+/// WidgetKit cherche le point d'entrée par son nom.
 @main
-struct LacetWidgets: WidgetBundle {
+struct LacetWidgetBundle: WidgetBundle {
     var body: some Widget {
         LacetRunActivity()
     }
