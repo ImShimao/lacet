@@ -54,16 +54,21 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func start(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else {
-            call.resolve(["started": false])
+            call.resolve(["started": false, "reason": "iOS 16.2 requis"])
             return
         }
         guard Self.hasExtension else {
-            call.resolve(["started": false])
+            call.resolve(["started": false, "reason": "extension d'écran verrouillé absente de l'app installée"])
             return
         }
         let name = call.getString("name") ?? "Sortie"
         let state = Self.state(from: call)
-        Task {
+        // **Sur le fil principal.** Capacitor exécute les modules natifs sur un
+        // fil de fond ; ActivityKit, lui, veut le fil principal et l'app au
+        // premier plan. Appelée d'ailleurs, `request` échoue selon les versions
+        // d'iOS — parfois sans rien dire, ce qui laisse un écran de
+        // verrouillage vide et aucune explication.
+        Task { @MainActor in
             // Une sortie à la fois. Une activité laissée par un arrêt brutal de
             // l'app resterait sinon affichée à côté de la nouvelle.
             for activity in Activity<LacetRunAttributes>.activities {
@@ -75,9 +80,12 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     content: ActivityContent(state: state, staleDate: nil),
                     pushType: nil
                 )
-                call.resolve(["started": true])
+                // Le compte d'activités vivantes : iOS a-t-il vraiment accepté ?
+                call.resolve(["started": true, "count": Activity<LacetRunAttributes>.activities.count])
             } catch {
-                call.reject("Activité en direct refusée : \(error.localizedDescription)")
+                // Rendu plutôt que rejeté : c'est une réponse, pas une panne, et
+                // le message d'iOS doit arriver jusqu'à l'écran.
+                call.resolve(["started": false, "reason": "\(error)"])
             }
         }
     }
@@ -88,7 +96,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let state = Self.state(from: call)
-        Task {
+        Task { @MainActor in
             for activity in Activity<LacetRunAttributes>.activities {
                 await activity.update(ActivityContent(state: state, staleDate: nil))
             }
@@ -101,7 +109,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
             return
         }
-        Task {
+        Task { @MainActor in
             for activity in Activity<LacetRunAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }

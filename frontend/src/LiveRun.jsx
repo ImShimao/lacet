@@ -269,7 +269,10 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
         travelled: 0,
         elapsedS: 0,
       })
-      const { started } = await n.startLiveActivity(first)
+      // Le réglage de « Mon compte » : l'activité en direct, ou tout de suite
+      // la notification — utile quand iOS accepte l'activité sans rien afficher.
+      const wanted = load().lockScreen === 'notice' ? 'notice' : 'auto'
+      const { started } = wanted === 'notice' ? { started: false } : await n.startLiveActivity(first)
       if (cancelled) {
         if (started) n.endLiveActivity()
         return

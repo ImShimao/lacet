@@ -270,6 +270,7 @@ function LockScreenSetting() {
   const [status, setStatus] = useState(undefined)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState(null)
+  const [mode, setMode] = useState(() => (load().lockScreen === 'notice' ? 'notice' : 'auto'))
 
   useEffect(() => {
     if (!isNative()) return
@@ -319,9 +320,13 @@ function LockScreenSetting() {
       offRoute: false,
       paused: false,
     }
-    const { started, reason } = await n.startLiveActivity(demo)
+    const { started, count, reason } = mode === 'notice'
+      ? { started: false, count: null, reason: 'notification choisie dans ce réglage' }
+      : await n.startLiveActivity(demo)
     if (started) {
-      setResult('Activité en direct lancée. Verrouille l’écran tout de suite : elle doit s’afficher dessus. Elle s’efface dans 20 secondes.')
+      setResult(
+        `Activité en direct lancée (${count ?? '?'} active). Verrouille l’écran tout de suite : elle doit s’afficher dessus. Elle s’efface dans 20 secondes.`,
+      )
       setTimeout(() => {
         n.endLiveActivity()
         setTesting(false)
@@ -352,6 +357,30 @@ function LockScreenSetting() {
       <p className="muted small">
         <b>Écran verrouillé.</b> {text}
       </p>
+      {/* Le choix, parce que l'activité en direct peut être acceptée par iOS et
+          ne s'afficher nulle part — une app installée hors App Store n'a aucune
+          garantie de ce côté. « Notification » donne alors quelque chose qui
+          marche : une seule notification silencieuse, remplacée à chaque
+          consigne, qu'on lit en allumant l'écran. */}
+      <div className="seg" role="radiogroup" aria-label="Affichage sur l'écran verrouillé">
+        {[
+          ['auto', 'Activité en direct'],
+          ['notice', 'Notification'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            role="radio"
+            aria-checked={mode === value}
+            aria-pressed={mode === value}
+            onClick={() => {
+              setMode(value)
+              save({ lockScreen: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <button className="btn" onClick={test} disabled={testing}>
         <Icon name="play" size={15} />
         {testing ? 'Essai en cours — verrouille ton téléphone…' : "Tester l'écran verrouillé (20 s)"}

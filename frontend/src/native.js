@@ -157,10 +157,10 @@ export async function startLiveActivity(state) {
   try {
     const { available } = await LiveActivity.available()
     if (!available) return { started: false, reason: 'coupées dans Réglages, ou iOS trop ancien' }
-    const { started } = await LiveActivity.start(state)
+    const { started, count, reason } = await LiveActivity.start(state)
     return started === true
-      ? { started: true, reason: null }
-      : { started: false, reason: "extension d'écran verrouillé absente de l'app installée" }
+      ? { started: true, count: count ?? null, reason: null }
+      : { started: false, reason: reason || 'refus sans explication d’iOS' }
   } catch (error) {
     return { started: false, reason: error?.message || 'module natif injoignable' }
   }
