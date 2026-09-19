@@ -103,6 +103,7 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
       )}
 
       <h4 className="section">Version de l'app</h4>
+      <BuildStamp />
       <ModePicker mode={mode} />
 
       <p className="muted">
@@ -330,6 +331,45 @@ function LockScreenSetting() {
         {testing ? 'Verrouille ton téléphone pour voir l’essai…' : "Tester l'écran verrouillé (20 s)"}
       </button>
     </>
+  )
+}
+
+/**
+ * Quelle version tourne, exactement.
+ *
+ * Deux numéros, parce qu'ils peuvent différer : celui du **paquet installé**,
+ * lu par iOS, et celui de l'**interface** compilée dedans. Une réinstallation
+ * ratée laisse le premier en arrière ; un cache tenace, le second. Sans les
+ * afficher, on cherche un bogue dans du code que le téléphone n'exécute même
+ * pas — c'est arrivé.
+ */
+function BuildStamp() {
+  const web = import.meta.env.VITE_BUILD || null
+  const commit = (import.meta.env.VITE_COMMIT || '').slice(0, 7)
+  const [app, setApp] = useState(null)
+
+  useEffect(() => {
+    if (!isNative()) return
+    import('./native').then((n) => n.appVersion()).then(setApp)
+  }, [])
+
+  const parts = [
+    app ? `app ${app.version} (build ${app.build})` : null,
+    web ? `interface build ${web}` : 'interface de développement',
+    commit || null,
+  ].filter(Boolean)
+
+  return (
+    <p className="muted small">
+      {parts.join(' · ')}
+      {app && web && app.build !== String(web) && (
+        <>
+          {' '}— <b>les deux numéros diffèrent</b> : l'app affiche une interface
+          plus ancienne que celle qu'elle contient. Ferme-la complètement et
+          rouvre-la ; si ça persiste, réinstalle-la.
+        </>
+      )}
+    </p>
   )
 }
 

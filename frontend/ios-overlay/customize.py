@@ -71,6 +71,23 @@ def info_plist() -> None:
 
 
 AUDIO_SETUP = """
+        // Une version installée par-dessus une autre doit montrer *sa* version.
+        // WKWebView garde en cache les fichiers de l'app — page et scripts — et
+        // une réinstallation pouvait continuer d'afficher l'interface
+        // précédente, sans que rien ne le signale. Au premier lancement d'un
+        // nouveau build, on vide donc ce cache-là. Les données de l'app
+        // (favoris, historique, cartes gardées) vivent dans le stockage local
+        // et IndexedDB, qui ne sont pas touchés.
+        let lacetBuild = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        if UserDefaults.standard.string(forKey: "lacet.build") != lacetBuild {
+            UserDefaults.standard.set(lacetBuild, forKey: "lacet.build")
+            let caches: Set<String> = [
+                WKWebsiteDataTypeDiskCache,
+                WKWebsiteDataTypeMemoryCache,
+                WKWebsiteDataTypeOfflineWebApplicationCache,
+            ]
+            WKWebsiteDataStore.default().removeData(ofTypes: caches, modifiedSince: .distantPast) {}
+        }
         // Session audio du guidage vocal. Le module de synthèse vocale ne la règle
         // pas lui-même : sans elle, iOS coupe la voix dès que l'écran se verrouille,
         // et la rend muette en mode silencieux.
@@ -95,7 +112,7 @@ def app_delegate() -> None:
         return
 
     if "import AVFoundation" not in source:
-        source = source.replace("import UIKit", "import UIKit\nimport AVFoundation", 1)
+        source = source.replace("import UIKit", "import UIKit\nimport AVFoundation\nimport WebKit", 1)
 
     pattern = re.compile(r"(didFinishLaunchingWithOptions[^{]*\{)")
     match = pattern.search(source)

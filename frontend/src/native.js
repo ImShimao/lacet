@@ -16,6 +16,7 @@
 // tout ça n'existe, et l'importer ferait charger Capacitor pour rien.
 
 import { registerPlugin } from '@capacitor/core'
+import { App } from '@capacitor/app'
 import { AppLauncher } from '@capacitor/app-launcher'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics'
@@ -183,6 +184,15 @@ export async function askNoticePermission() {
 }
 export const postRunNotice = (title, body) => LiveActivity.notice({ title, body }).catch(() => {})
 export const clearRunNotice = () => LiveActivity.clearNotice().catch(() => {})
+
+/**
+ * La version de l'app installée : `{ version, build }`.
+ *
+ * Celle du paquet iOS, pas celle de l'interface web qu'il contient. Comparer
+ * les deux dit tout de suite si un téléphone tourne sur une vieille
+ * installation, ou sur une page gardée en cache.
+ */
+export const appVersion = () => App.getInfo().catch(() => null)
 
 // --- fichiers, liens ----------------------------------------------------------
 

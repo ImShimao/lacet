@@ -108,9 +108,14 @@ jobs:
       # Les fonds Mapbox n'apparaissent que si le secret VITE_MAPBOX_TOKEN est
       # défini dans le dépôt (Settings → Secrets and variables → Actions). Sans
       # lui, la variable est vide et l'app propose ses fonds gratuits.
+      # `VITE_BUILD` : le numéro de compilation et le commit, affichés dans
+      # « Mon compte ». Sans eux, impossible de savoir, téléphone en main, si
+      # l'app installée est bien la dernière — ce qui a déjà coûté une soirée.
       - name: App web
         env:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          VITE_BUILD: ${{ github.run_number }}
+          VITE_COMMIT: ${{ github.sha }}
         run: npm run build
 
       - name: Projet iOS
