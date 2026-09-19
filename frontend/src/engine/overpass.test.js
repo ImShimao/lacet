@@ -98,11 +98,21 @@ const BEAUNE = { lat: 47.0245, lon: 4.8395 }
 // --- les tuiles ---------------------------------------------------------------
 
 describe('le découpage en tuiles', () => {
-  it('couvre tout le disque demandé', () => {
-    const tiles = tilesFor(BEAUNE.lat, BEAUNE.lon, 7000)
-    expect(tiles.length).toBe(15)
+  it('couvre tout le disque demandé, sans les coins hors d’atteinte', () => {
+    const radius = 7000
+    const tiles = tilesFor(BEAUNE.lat, BEAUNE.lon, radius)
     const home = [Math.floor(BEAUNE.lon / TILE_DEG), Math.floor(BEAUNE.lat / TILE_DEG)]
     expect(tiles).toContainEqual(home)
+    // Tout le bord du disque tombe dans une tuile retenue…
+    const kx = Math.cos((BEAUNE.lat * Math.PI) / 180) * 111_320
+    const keys = new Set(tiles.map(([ix, iy]) => `${ix}:${iy}`))
+    for (let a = 0; a < 360; a += 5) {
+      const lon = BEAUNE.lon + (Math.sin((a * Math.PI) / 180) * radius * 0.999) / kx
+      const lat = BEAUNE.lat + (Math.cos((a * Math.PI) / 180) * radius * 0.999) / 110_540
+      expect(keys.has(`${Math.floor(lon / TILE_DEG)}:${Math.floor(lat / TILE_DEG)}`)).toBe(true)
+    }
+    // …et le carré englobant en comptait davantage : ses coins sont hors d'atteinte.
+    expect(tiles.length).toBeLessThan(15)
   })
 
   it('range une voie à cheval dans chacune des tuiles qu’elle traverse', () => {
@@ -166,10 +176,37 @@ describe('les lots de tuiles', () => {
 // --- les miroirs --------------------------------------------------------------
 
 describe('les miroirs', () => {
-  it('un miroir qui répond reste seul sollicité', async () => {
+  it('un miroir qui répond reste seul sollicité quand on ne fait pas la course', async () => {
     const { fetchImpl, calls } = fakeNetwork()
-    await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 50)
+    await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 50, 10, null, 1)
     expect(calls.map((c) => c.url)).toEqual([MIRRORS[0]])
+  })
+
+  it('les deux premiers miroirs font la course, sans attendre le délai de secours', async () => {
+    // Mesuré : l'instance principale rendait « 504 » au bout de 14 s selon la
+    // minute ; celle d'OpenStreetMap France répondait en deux. Attendre huit
+    // secondes avant de la solliciter, c'était huit secondes de trop.
+    const { fetchImpl } = fakeNetwork((url) => (url === MIRRORS[0] ? 'silent' : 'ok'))
+    const started = Date.now()
+    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 60_000)
+    expect(answer.payload.elements.length).toBeGreaterThan(0)
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+
+  it('ne prend pas une réponse tronquée pour la zone entière', async () => {
+    // À court de temps, Overpass répond « 200 » avec ce qu'il a trouvé et une
+    // remarque : un quartier entier pourrait manquer sans que rien ne le dise.
+    const fetchImpl = async (url) => {
+      const payload =
+        url === MIRRORS[0]
+          ? { remark: 'runtime error: Query timed out in "query" at line 3 after 31 seconds.', elements: [{ type: 'way', id: 1 }] }
+          : { elements: [{ type: 'way', id: 1, tags: { highway: 'residential' }, geometry: [] }, { type: 'way', id: 2 }] }
+      const text = JSON.stringify(payload)
+      return { ok: true, status: 200, text: async () => text }
+    }
+    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 50, 10, null, 1)
+    expect(answer.payload.remark).toBeUndefined()
+    expect(answer.payload.elements).toHaveLength(2)
   })
 
   it('un miroir muet ne fait pas attendre les autres', async () => {
@@ -210,7 +247,8 @@ describe('les miroirs', () => {
       }
       return url === MIRRORS[0] ? 'ok' : 'silent'
     })
-    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 500, 10)
+    // Sans course, pour isoler la règle du nouvel essai.
+    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 500, 10, null, 1)
     expect(answer.payload.elements.length).toBeGreaterThan(0)
     expect(calls.map((c) => c.url)).toEqual([MIRRORS[0], MIRRORS[0]])
     expect(mirrorOrder()[0]).toBe(MIRRORS[0])
@@ -225,7 +263,7 @@ describe('les miroirs', () => {
       }
       return url === MIRRORS[0] ? 'ok' : 'silent'
     })
-    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 5000, 10)
+    const answer = await hedgedRound(MIRRORS, 'data=(47,4.8,47.05,4.85);', fetchImpl, 5000, 10, null, 1)
     expect(answer.payload.elements.length).toBeGreaterThan(0)
     // La page d'état a été lue, et le même miroir a répondu au second essai.
     expect(calls.some((c) => c.status)).toBe(true)
@@ -261,8 +299,9 @@ describe('le téléchargement d’une zone', () => {
     // d'un bloc — au lieu de quinze requêtes.
     const { fetchImpl, calls } = fakeNetwork()
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
-    expect(calls.length).toBeLessThanOrEqual(2)
-    expect(extract.ways.length).toBe(15)
+    // Deux lots au plus — chacun demandé à deux miroirs à la fois.
+    expect(new Set(calls.map((c) => c.bbox.join())).size).toBeLessThanOrEqual(2)
+    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
   })
 
   it('commence par la tuile du départ', async () => {
@@ -317,7 +356,7 @@ describe('le téléchargement d’une zone', () => {
       return base.fetchImpl(url, options)
     }
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
-    expect(extract.ways.length).toBe(15)
+    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
     expect(Math.max(...tailles.filter((t) => t <= 12))).toBeGreaterThan(1)
   }, 20_000)
 
@@ -353,26 +392,28 @@ describe('le téléchargement d’une zone', () => {
     expect(second.calls.length).toBeGreaterThan(0)
   })
 
-  it('envoie deux lots à la fois dans une grande ville, jamais plus', async () => {
+  it('envoie deux lots à la fois dans une grande ville, jamais plus de deux par serveur', async () => {
     // Overpass accorde deux requêtes simultanées par adresse : deux lots en
-    // parallèle divisent l'attente, un troisième serait refusé.
+    // parallèle divisent l'attente, un troisième serait refusé. Chaque lot fait
+    // la course sur deux serveurs, chacun reçoit donc au plus deux requêtes.
     const base = fakeNetwork()
-    let inFlight = 0
-    let peak = 0
+    const inFlight = new Map()
+    const peak = new Map()
     const fetchImpl = async (url, options) => {
-      inFlight += 1
-      peak = Math.max(peak, inFlight)
+      inFlight.set(url, (inFlight.get(url) ?? 0) + 1)
+      peak.set(url, Math.max(peak.get(url) ?? 0, inFlight.get(url)))
       await new Promise((resolve) => setTimeout(resolve, 20))
       try {
         return await base.fetchImpl(url, options)
       } finally {
-        inFlight -= 1
+        inFlight.set(url, inFlight.get(url) - 1)
       }
     }
     // Des lots d'environ trois tuiles, comme en plein Paris.
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl, chunkBytes: 1200 })
-    expect(extract.ways.length).toBe(15)
-    expect(peak).toBe(2)
+    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
+    expect(peak.get(MIRRORS[0])).toBe(2)
+    expect(Math.max(...peak.values())).toBe(2)
   })
 
   it('préfère une copie périmée à un échec quand tout est muet', async () => {

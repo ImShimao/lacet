@@ -1,23 +1,12 @@
-"""Découpe un extrait OpenStreetMap en tuiles de rues, prêtes pour l'app.
+"""Découpe un extrait OpenStreetMap en tuiles de rues, livrées dans l'app.
 
-    # Une région livrée dans l'app : un fichier par tuile.
     python scripts/region_tiles.py alsace-latest.osm.pbf alsace.poly public/region --name Alsace
 
-    # Un pays hébergé en ligne : un seul fichier, lu morceau par morceau.
-    python scripts/region_tiles.py france-latest.osm.pbf france.poly out/france --name France --pack
-
 La première recherche dans une zone commençait par télécharger ses rues sur
-Overpass : un serveur public, gratuit et souvent saturé, qui mettait de vingt
-secondes à plusieurs minutes à répondre. Ce script prépare ces rues à l'avance,
-sur un serveur de GitHub, sous deux formes :
-
-- **la région où l'on court, dans l'app** (un fichier JSON par tuile) : une
-  recherche y part tout de suite, même sans réseau ;
-- **des pays entiers, en ligne** (`--pack`) : toutes les tuiles compressées une
-  à une et mises bout à bout dans un seul fichier, avec l'index de leurs
-  positions. L'app n'en lit que les morceaux dont elle a besoin (requêtes HTTP
-  « Range »), depuis un hébergement de fichiers rapide plutôt qu'un serveur qui
-  calcule chaque requête.
+Overpass : un serveur public, gratuit et souvent saturé. Pour la région où l'on
+court, ce script prépare ces rues à l'avance, sur un serveur de GitHub, et les
+range dans l'app — un fichier JSON par tuile : une recherche y part tout de
+suite, même sans réseau.
 
 **Mêmes voies qu'Overpass, à la tuile près.** Le moteur doit recevoir
 exactement ce que lui aurait rendu sa requête (`src/engine/overpass.js`, niveau
@@ -32,17 +21,16 @@ est dans l'extrait du voisin. Ces tuiles-là restent à Overpass.
 **Un format serré.** Coordonnées en entiers de 1e-7 degré, chaque point écrit
 comme l'écart au précédent ; même chose pour les numéros de nœuds.
 
-**Un pays ne tient pas en mémoire.** La France compte des millions de voies :
-les garder toutes en attendant de les ranger demandait plus que la mémoire
-d'une machine de compilation. Elles sont donc triées sur disque, par carré
-d'un degré, puis rangées carré par carré.
+**Trié sur disque.** Une grande région compte des millions de voies : les
+garder toutes en mémoire en attendant de les ranger ne passe pas à l'échelle.
+Elles sont triées sur disque, par carré d'un degré, puis rangées carré par
+carré.
 """
 
 from __future__ import annotations
 
 import argparse
 import bisect
-import gzip
 import json
 import math
 import tempfile
@@ -281,10 +269,8 @@ def main() -> None:
     parser.add_argument("poly", type=Path)
     parser.add_argument("out", type=Path, help="dossier de sortie")
     parser.add_argument("--name", default="Région")
-    parser.add_argument("--pack", action="store_true", help="un seul fichier compressé, pour l'hébergement en ligne")
     # La position de chaque nœud, le temps de reconstituer les voies. En mémoire
-    # pour une région ; sur disque pour un pays (« sparse_file_array,chemin ») :
-    # l'Allemagne en demanderait une dizaine de gigaoctets.
+    # pour une région ; sur disque pour plus grand (« sparse_file_array,chemin »).
     parser.add_argument("--locations", default="flex_mem", help="index des positions de nœuds (pyosmium)")
     args = parser.parse_args()
 
@@ -298,32 +284,17 @@ def main() -> None:
         ways = sort_to_disk(args.pbf, keep, buckets, args.locations)
 
         written = []
-        index = {}
         total = 0
-        pack = (args.out / "tiles.bin").open("wb") if args.pack else None
         for bucket_file in buckets.close():
             for ix, iy, text in tiles_in(bucket_file):
                 key = f"{ix}_{iy}"
                 data = text.encode("utf-8")
-                if pack:
-                    # Chaque tuile compressée seule : n'importe laquelle se lit
-                    # sans les autres, par une requête « Range » sur ses octets.
-                    blob = gzip.compress(data, compresslevel=9, mtime=0)
-                    index[key] = [pack.tell(), len(blob)]
-                    pack.write(blob)
-                    total += len(blob)
-                else:
-                    (args.out / f"{key}.json").write_bytes(data)
-                    total += len(data)
+                (args.out / f"{key}.json").write_bytes(data)
+                total += len(data)
                 written.append(key)
-        if pack:
-            pack.close()
 
-    meta = {"v": 3, "name": args.name, "builtAt": int(time.time() * 1000), "tileDeg": TILE_DEG}
-    if args.pack:
-        (args.out / "index.json").write_text(json.dumps({**meta, "tiles": index}, separators=(",", ":")), encoding="utf-8")
-    else:
-        (args.out / "index.json").write_text(json.dumps({**meta, "tiles": written}, separators=(",", ":")), encoding="utf-8")
+    index = {"v": 3, "name": args.name, "builtAt": int(time.time() * 1000), "tileDeg": TILE_DEG, "tiles": written}
+    (args.out / "index.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
     print(f"{args.name} : {len(written)} tuiles, {total / 1e6:.1f} Mo, {ways} voies, en {time.time() - started:.0f} s")
 
 

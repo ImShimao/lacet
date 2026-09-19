@@ -25,7 +25,6 @@ import { emptyExtract, fromOverpass, mergeExtracts } from './extract'
 import { bboxAround } from './geo'
 import { pyFixed } from './py'
 import { regionTile } from './region'
-import { remoteTiles } from './remote'
 import { store } from './store'
 
 export const TILE_DEG = 0.05
@@ -39,10 +38,6 @@ const TTL_MS = 14 * 86_400_000
 // la rafraîchit après coup, en fond, pour la fois suivante.
 const USABLE_MS = 90 * 86_400_000
 const REFRESH_DELAY_MS = 3000
-// Les pays préparés en ligne le sont chaque mois : leurs tuiles restent
-// fraîches jusqu'à la préparation suivante, plutôt que d'être redemandées à
-// Overpass au bout de deux semaines.
-const PACK_TTL_MS = 40 * 86_400_000
 
 // La progression d'une requête, en deux temps. D'abord le serveur prépare les
 // rues : rien n'arrive, parfois vingt secondes. Cette attente avance à l'œil,
@@ -78,11 +73,12 @@ const hedgeDelayFor = (tiles) =>
 const RETRY_DELAY_MS = 1_500
 const MAX_RETRIES = 2
 const MAX_SLOT_WAIT_S = 60
-// Quarante-cinq secondes, et non quatre-vingt-dix : passé ce délai, la requête
-// ne va pas aboutir, et sur un téléphone c'est une barre de progression figée
-// avec quelqu'un qui attend en bas de chez lui, chaussures aux pieds. Les
-// miroirs de secours partent bien avant, au bout de huit secondes.
-const QUERY_TIMEOUT_S = 45
+// Trente secondes, et non quatre-vingt-dix : passé ce délai, la requête ne va
+// pas aboutir, et sur un téléphone c'est une barre figée avec quelqu'un qui
+// attend en bas de chez lui, chaussures aux pieds. Et un serveur Overpass
+// chargé fait passer d'abord les requêtes qui annoncent peu de temps : un délai
+// court, c'est aussi une place plus tôt dans sa file.
+const QUERY_TIMEOUT_S = 30
 const ROUNDS = 2
 
 // Au moins deux miroirs doivent décrire la même zone comme vide avant qu'on le
@@ -92,15 +88,28 @@ const ROUNDS = 2
 // réponse valable et affichait « aucune voie praticable » en plein village.
 const EMPTY_CONFIRMATIONS = 2
 
-// Ordre de préférence, l'instance principale d'abord. **Que des instances
-// mondiales** : un extrait régional répond vite et faux hors de sa région, ce
-// qui est pire qu'une panne — mesuré le 17 septembre 2026 avec osm.ch, retiré
-// depuis.
+// Ordre de préférence. **Que des instances mondiales** : un extrait régional
+// répond vite et faux hors de sa région, ce qui est pire qu'une panne — mesuré
+// le 17 septembre 2026 avec osm.ch, retiré depuis.
+//
+// Les deux premières font la course dès la première seconde (`RACE_WIDTH`).
+// Mesuré le 19 septembre 2026, sur des tuiles de France, de Suisse, d'Italie,
+// d'Espagne et d'Allemagne : l'instance principale répondait en 1,6 s… ou en
+// « 504 » au bout de 14 s, ou « 429 » faute de créneau, selon la minute ; celle
+// d'OpenStreetMap France, mondiale elle aussi et aux données identiques, en 1,5
+// à 5,4 s à chaque fois. Kumi et private.coffee, les anciens secours, restaient
+// muets quarante secondes : ils passent en dernier recours.
 export const MIRRORS = [
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
 ]
+
+// Combien de miroirs partent ensemble sur chaque lot. Le premier qui répond
+// l'emporte, l'autre est annulé : on paie une requête de plus pour ne plus
+// jamais attendre qu'un serveur surchargé se décide.
+const RACE_WIDTH = 2
 
 const EXCLUDED_HIGHWAYS = 'motorway|motorway_link|trunk|trunk_link|construction|proposed|raceway|bus_guideway|escape'
 const BUILTUP_LANDUSE = 'residential|retail|commercial|industrial|education'
@@ -154,12 +163,25 @@ out body;`
 
 // --- tuiles -------------------------------------------------------------------
 
-/** Tuiles (ix, iy) couvrant le disque de rayon `radiusM`, rangées ligne par ligne. */
+/**
+ * Tuiles (ix, iy) couvrant le disque de rayon `radiusM`, rangées ligne par ligne.
+ *
+ * Seules celles qui touchent le **disque**, pas tout le carré qui l'entoure : les
+ * tuiles des coins, hors d'atteinte, se téléchargeaient pour rien — jusqu'à un
+ * quart du poids en ville, où une seule tuile pèse une dizaine de mégaoctets.
+ */
 export function tilesFor(lat, lon, radiusM) {
   const [s, w, n, e] = bboxAround(lat, lon, radiusM)
+  const kx = Math.cos((lat * Math.PI) / 180) * 111_320
+  const ky = 110_540
   const out = []
   for (let iy = Math.floor(s / TILE_DEG); iy <= Math.floor(n / TILE_DEG); iy += 1) {
-    for (let ix = Math.floor(w / TILE_DEG); ix <= Math.floor(e / TILE_DEG); ix += 1) out.push([ix, iy])
+    for (let ix = Math.floor(w / TILE_DEG); ix <= Math.floor(e / TILE_DEG); ix += 1) {
+      // Le point de la tuile le plus proche du centre, et sa distance.
+      const nearLon = Math.min(Math.max(lon, ix * TILE_DEG), (ix + 1) * TILE_DEG)
+      const nearLat = Math.min(Math.max(lat, iy * TILE_DEG), (iy + 1) * TILE_DEG)
+      if (Math.hypot((nearLon - lon) * kx, (nearLat - lat) * ky) <= radiusM) out.push([ix, iy])
+    }
   }
   return out
 }
@@ -269,8 +291,6 @@ export async function fetchArea(args) {
     // rafraîchissement : on veut alors les données du jour, pas celles livrées.
     useRegion = true,
     regionFetch = fetch,
-    remoteFetch = fetch,
-    tilesUrl = undefined,
     tileBytesGuess = null,
   } = args
   const level = detailLevel(targetM)
@@ -285,10 +305,7 @@ export async function fetchArea(args) {
   // deux copies l'emporte.
   const found = new Map()
   for (const tile of wanted) found.set(tile, await cachedTile(level, tile))
-  // Une copie préparée d'un pays reste fraîche jusqu'à la préparation suivante ;
-  // un rafraîchissement, lui, veut toujours les données du jour.
-  const freshFor = (copy) => (only ? freshMs : Math.max(freshMs, copy?.ttl ?? 0))
-  const isFresh = (copy) => Boolean(copy) && now() - copy.at < freshFor(copy)
+  const isFresh = (copy) => Boolean(copy) && now() - copy.at < freshMs
 
   if (useRegion) {
     const unfresh = wanted.filter((tile) => !isFresh(found.get(tile)))
@@ -299,36 +316,13 @@ export async function fetchArea(args) {
         found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level) })
       }
     })
-
-    // Puis les pays préparés en ligne, pour ce qui n'est toujours pas frais :
-    // quelques requêtes à un hébergement de fichiers, au lieu d'Overpass.
-    const still = wanted.filter((tile) => !isFresh(found.get(tile)))
-    if (still.length) {
-      let ready = wanted.length - still.length
-      const online = await remoteTiles(still, {
-        fetchImpl: remoteFetch,
-        ...(tilesUrl !== undefined ? { base: tilesUrl } : {}),
-        onTile: () => {
-          ready += 1
-          onProgress(Math.min(0.99, ready / wanted.length))
-        },
-      })
-      for (const tile of still) {
-        const copy = online.get(`${tile[0]}_${tile[1]}`)
-        if (!copy || found.get(tile)?.at >= copy.at) continue
-        // Gardée sur l'appareil, au niveau le plus fin : les recherches suivantes
-        // — une autre distance, un autre jour — la trouvent sans réseau.
-        await tiles.set(tileKey(0, tile), { at: copy.at, extract: copy.extract, ttl: PACK_TTL_MS })
-        found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), ttl: PACK_TTL_MS })
-      }
-    }
   }
 
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     const cached = found.get(tile)
     const age = cached ? now() - cached.at : Infinity
-    if (age < freshFor(cached)) {
+    if (age < freshMs) {
       obtained.set(key, cached.extract)
     } else if (age < usableMs) {
       obtained.set(key, cached.extract)
@@ -501,7 +495,7 @@ async function cachedTile(level, tile) {
   for (let l = level; l >= 0; l -= 1) {
     const copy = await tiles.get(tileKey(l, tile))
     if (copy && !(best?.at >= copy.at)) {
-      best = { at: copy.at, ttl: copy.ttl, extract: l === level ? copy.extract : deriveLevel(copy.extract, level) }
+      best = { at: copy.at, extract: l === level ? copy.extract : deriveLevel(copy.extract, level) }
     }
   }
   return best
@@ -641,6 +635,7 @@ export async function hedgedRound(
   hedgeDelayMs = HEDGE_DELAY_MS,
   retryDelayMs = RETRY_DELAY_MS,
   onBytes = null,
+  raceWidth = RACE_WIDTH,
 ) {
   const waiting = [...mirrors]
   const inFlight = new Set()
@@ -651,7 +646,12 @@ export async function hedgedRound(
     const controller = new AbortController()
     const startedAt = Date.now()
     const task = sleep(delayMs)
-      .then(() => ask(url, body, controller, fetchImpl, onBytes))
+      // Un départ différé dont la course est déjà gagnée ne part plus : sans
+      // cette garde, la requête du perdant partait quand même, pour rien.
+      .then(() => {
+        if (controller.signal.aborted) throw Object.assign(new Error('course terminée'), { name: 'AbortError' })
+        return ask(url, body, controller, fetchImpl, onBytes)
+      })
       .then(
         (answer) => ({ task, url, answer }),
         (error) => ({ task, url, error }),
@@ -660,10 +660,18 @@ export async function hedgedRound(
     inFlight.add(task)
   }
 
+  let raced = false
   try {
     while (waiting.length || inFlight.size) {
-      // Rien en cours : le miroir suivant part tout de suite, sans délai.
-      if (!inFlight.size) launch(waiting.shift())
+      // Rien en cours : le miroir suivant part tout de suite, sans délai — et au
+      // tout premier départ, les `RACE_WIDTH` premiers ensemble.
+      if (!inFlight.size) {
+        launch(waiting.shift())
+        if (!raced) {
+          raced = true
+          for (let k = 1; k < raceWidth && waiting.length; k += 1) launch(waiting.shift())
+        }
+      }
 
       const outcome = await Promise.race([
         ...inFlight,
@@ -755,6 +763,13 @@ async function ask(url, body, controller, fetchImpl, onBytes = null) {
     const text = await readText(response, onBytes)
     const payload = JSON.parse(text)
     if (!Array.isArray(payload.elements)) throw new OverpassError(`réponse de ${url} sans champ 'elements'`)
+    // À court de temps ou de mémoire, Overpass répond quand même « 200 », avec
+    // ce qu'il a eu le temps de trouver et une remarque. Prendre ces rues-là pour
+    // la zone entière laisserait des quartiers vides — un échec, donc, qu'on
+    // retente, ailleurs ou en plus petit.
+    if (typeof payload.remark === 'string' && /runtime error|timed out|out of memory/i.test(payload.remark)) {
+      throw Object.assign(new Error(`${url} : ${payload.remark}`), { transient: true })
+    }
     return { payload, bytes: text.length }
   } finally {
     clearTimeout(timeout)
