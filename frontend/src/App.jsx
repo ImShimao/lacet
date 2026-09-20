@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import MapView from './MapView.jsx'
-import FiltersSheet, { DEFAULTS, SPORTS, estimateKm, raceOf } from './FiltersSheet.jsx'
+import FiltersSheet, { DEFAULTS, SPORTS, estimateKm, formatKm, raceOf } from './FiltersSheet.jsx'
 import SearchBar from './SearchBar.jsx'
 import LiveRun from './LiveRun.jsx'
 import Explore from './Explore.jsx'
@@ -317,7 +317,7 @@ export default function App() {
               meta: {
                 ...relaxed.meta,
                 relaxed: true,
-                message: `Aucune boucle à ±2,5 % de ${active.distance_km} km depuis ce départ : voici les plus proches, à ±10 %.`,
+                message: `Aucune boucle à ±2,5 % de ${formatKm(active.distance_km)} km depuis ce départ : voici les plus proches, à ±10 %.`,
               },
             }
           }
@@ -876,7 +876,7 @@ function summarise(p) {
   const dist = race
     ? race.label
     : p.mode === 'distance'
-      ? `${p.distance_km} km`
+      ? `${formatKm(p.distance_km)} km`
       : `≈${Math.round(estimateKm(p))} km`
   const speed =
     p.sport === 'bike' || p.speedUnit === 'speed'

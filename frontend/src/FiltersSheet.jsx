@@ -217,7 +217,9 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                   suffix: 'km',
                   min: MIN_KM,
                   max: maxKm,
-                  onCommit: (v) => set({ distance_km: round(clamp(v, MIN_KM, maxKm), 0.05) }),
+                  // Au mètre près : c'est tout l'intérêt de taper soi-même —
+                  // 21,0975 pour un semi, 8,4 pour une boucle connue.
+                  onCommit: (v) => set({ distance_km: round(clamp(v, MIN_KM, maxKm), 0.001) }),
                 }}
                 onStep={(d) => {
                   const step = distanceStep(draft.distance_km + (d > 0 ? 0 : -0.001))
@@ -482,14 +484,18 @@ function Stepper({ text, onStep, canDown, canUp, editable }) {
 }
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
-const round = (v, step) => Math.round(v / step) * step
+// `Math.round(42.295 / 0.1) * 0.1` rend 42.300000000000004 : la division puis
+// la multiplication en binaire ne retombent pas sur le compte. Trois décimales
+// — le mètre — suffisent à une distance de course, et referment la parenthèse.
+const round = (v, step) => Number((Math.round(v / step) * step).toFixed(3))
 
-/** « 10 » plutôt que « 10.0 », mais « 10,5 » quand la décimale compte. */
-function formatKm(v) {
-  const rounded = Math.round(v * 100) / 100
-  return Number.isInteger(rounded)
-    ? String(rounded)
-    : String(rounded).replace('.', ',')
+/**
+ * « 10 » plutôt que « 10.0 », « 10,5 » quand la décimale compte, et
+ * « 21,098 » quand on a saisi une distance au mètre près.
+ */
+export function formatKm(v) {
+  const rounded = Number(Number(v).toFixed(3))
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',')
 }
 
 function formatMinutes(total) {
