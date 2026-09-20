@@ -5,12 +5,20 @@ import WidgetKit
 /// L'extension qui dessine l'activité en direct d'une sortie.
 ///
 /// Elle ne fait qu'afficher : l'app calcule tout et lui envoie des valeurs déjà
-/// formatées (`LacetRunAttributes`). Seul le compte à rebours vit ici, parce
-/// qu'iOS sait le faire défiler lui-même — l'app n'a pas à se réveiller chaque
-/// seconde pour changer un chiffre.
-/// Le nom diffère volontairement de celui du module (`LacetWidgets`) : une
-/// structure qui porte le nom de son propre module rend ce nom ambigu, et
-/// WidgetKit cherche le point d'entrée par son nom.
+/// formatées (`LacetRunAttributes`).
+///
+/// **Écrite pour ne jamais rendre du vide.** Sur l'iPhone de test, iOS acceptait
+/// l'activité — la Dynamic Island s'ouvrait sur l'app — et n'affichait qu'une
+/// barre noire. Deux causes possibles : une vue qui ne dessine rien, ou un état
+/// arrivé vide. Les deux sont traitées ici :
+///
+/// - chaque zone porte **son propre fond et un repère visible** (« LACET ») :
+///   une vue qui s'affiche se voit, même si toutes les valeurs manquent ;
+/// - chaque valeur a un **repli** (« — ») : plus de texte vide sur fond noir ;
+/// - plus rien qui puisse échouer à l'affichage. Le compte à rebours de
+///   `Text(timerInterval:)` et la `ProgressView` sont remplacés par du texte et
+///   une barre dessinée à la main : l'app sait déjà tout calculer, et une vue
+///   qui plante dans une extension ne laisse aucune trace visible.
 @main
 struct LacetWidgetBundle: WidgetBundle {
     var body: some Widget {
@@ -23,26 +31,37 @@ private let accent = Color(red: 0.608, green: 0.435, blue: 1.0)
 private let backdrop = Color(red: 0.039, green: 0.035, blue: 0.063)
 private let caution = Color(red: 1.0, green: 0.416, blue: 0.271)
 
+/// Ce qu'on affiche quand une valeur manque — plutôt qu'un espace vide.
+private func shown(_ value: String, fallback: String = "—") -> String {
+    value.trimmingCharacters(in: .whitespaces).isEmpty ? fallback : value
+}
+
 struct LacetRunActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LacetRunAttributes.self) { context in
-            LockScreenView(state: context.state)
+            LockScreenView(state: context.state, name: context.attributes.name)
                 .activityBackgroundTint(backdrop)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    TurnIcon(state: context.state)
-                        .font(.system(size: 28, weight: .bold))
-                        .padding(.leading, 4)
+                    HStack(spacing: 6) {
+                        TurnIcon(state: context.state)
+                            .font(.system(size: 24, weight: .bold))
+                        Text("LACET")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(accent)
+                    }
+                    .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Countdown(arrival: context.state.arrival, paused: context.state.paused)
-                        .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                    Text(shown(context.state.remaining))
+                        .font(.system(size: 16, weight: .semibold).monospacedDigit())
                         .foregroundColor(.white)
+                        .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(context.state.offRoute ? "Hors parcours" : context.state.distance)
+                    Text(context.state.offRoute ? "Hors parcours" : shown(context.state.distance))
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -52,14 +71,13 @@ struct LacetRunActivity: Widget {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
                             .lineLimit(2)
-                        ProgressView(value: context.state.progress)
-                            .tint(accent)
+                        Bar(progress: context.state.progress)
                     }
                 }
             } compactLeading: {
                 TurnIcon(state: context.state)
             } compactTrailing: {
-                Text(context.state.offRoute ? "!" : context.state.distance)
+                Text(context.state.offRoute ? "!" : shown(context.state.distance, fallback: "Lacet"))
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundColor(.white)
             } minimal: {
@@ -74,18 +92,29 @@ struct LacetRunActivity: Widget {
 ///
 /// Dans l'ordre où l'œil le cherche : l'icône du virage et sa distance, en
 /// grand ; la consigne en toutes lettres ; puis l'avancée, ce qui reste et
-/// dans combien de temps on arrive.
+/// l'heure d'arrivée.
 struct LockScreenView: View {
     let state: LacetRunAttributes.ContentState
+    let name: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("LACET")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundColor(accent)
+                Text(shown(name, fallback: "Sortie"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.55))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
             HStack(alignment: .center, spacing: 12) {
                 TurnIcon(state: state)
                     .font(.system(size: 30, weight: .bold))
                     .frame(width: 42)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(state.offRoute ? "Hors parcours" : state.distance)
+                    Text(state.offRoute ? "Hors parcours" : shown(state.distance))
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                     Text(headline(state))
@@ -95,45 +124,50 @@ struct LockScreenView: View {
                 }
                 Spacer(minLength: 0)
             }
-            ProgressView(value: state.progress)
-                .tint(accent)
+            Bar(progress: state.progress)
             HStack {
-                Label(state.remaining, systemImage: "flag.checkered")
+                Text("Reste \(shown(state.remaining))")
                 Spacer()
-                Label {
-                    Countdown(arrival: state.arrival, paused: state.paused)
-                } icon: {
-                    Image(systemName: state.paused ? "pause.circle.fill" : "timer")
-                }
+                Text(state.paused ? "En pause" : "Arrivée \(arrivalText(state.arrival))")
             }
             .font(.footnote.weight(.semibold).monospacedDigit())
             .foregroundColor(.white.opacity(0.85))
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Le fond est dessiné ici, en plus de la teinte demandée au système :
+        // une vue qui s'affiche doit se voir, quoi qu'il arrive au tint.
+        .background(backdrop)
     }
 }
 
-/// Le temps restant, qui défile seul jusqu'à l'arrivée estimée.
-///
-/// L'intervalle doit aller du passé vers le futur : une arrivée déjà dépassée
-/// — on a ralenti sur la fin — ferait planter la vue. On affiche alors
-/// « Arrivée » plutôt qu'un compte à rebours négatif. En pause, le compte à
-/// rebours s'efface : il continuerait de défiler pendant l'arrêt.
-struct Countdown: View {
-    let arrival: Date
-    let paused: Bool
+/// L'avancée, dessinée à la main : deux capsules, rien qui puisse échouer.
+struct Bar: View {
+    let progress: Double
 
     var body: some View {
-        if paused {
-            Text("En pause")
-        } else if arrival > Date() {
-            Text(timerInterval: Date()...arrival, countsDown: true)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 76, alignment: .trailing)
-        } else {
-            Text("Arrivée")
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+                Capsule()
+                    .fill(accent)
+                    .frame(width: max(0, min(1, progress)) * geo.size.width)
+            }
         }
+        .frame(height: 5)
     }
+}
+
+/// L'heure d'arrivée, en clair — « 18h42 ».
+///
+/// Un compte à rebours qui défile serait plus vivant, mais `Text(timerInterval:)`
+/// exige un intervalle strictement futur : une arrivée dépassée d'une seconde
+/// fait échouer la vue, et une extension qui échoue n'affiche rien du tout.
+func arrivalText(_ date: Date) -> String {
+    let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+    guard let hour = parts.hour, let minute = parts.minute else { return "—" }
+    return String(format: "%dh%02d", hour, minute)
 }
 
 struct TurnIcon: View {
@@ -147,7 +181,8 @@ struct TurnIcon: View {
 
 /// La consigne, ou ce qu'il faut faire quand on n'est plus sur le tracé.
 func headline(_ state: LacetRunAttributes.ContentState) -> String {
-    state.offRoute ? "Reviens sur le tracé pour reprendre le guidage." : state.instruction
+    if state.offRoute { return "Reviens sur le tracé pour reprendre le guidage." }
+    return shown(state.instruction, fallback: "Sortie en cours")
 }
 
 /// Le pictogramme d'un virage, tel que le nomme le moteur (`navigation.js`).
