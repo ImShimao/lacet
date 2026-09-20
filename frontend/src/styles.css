@@ -3369,3 +3369,18 @@ html[data-turn] .maplibregl-control-container {
   gap: 7px;
 }
 
+/* Les distances de course, en pastilles : quatre chiffres qu'on ne veut pas
+   composer au pas de 0,5 km. */
+.races {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.races .chip {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.races .chip:disabled {
+  opacity: 0.35;
+}
+

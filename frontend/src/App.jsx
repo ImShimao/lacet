@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import MapView from './MapView.jsx'
-import FiltersSheet, { DEFAULTS, SPORTS, estimateKm } from './FiltersSheet.jsx'
+import FiltersSheet, { DEFAULTS, SPORTS, estimateKm, raceOf } from './FiltersSheet.jsx'
 import SearchBar from './SearchBar.jsx'
 import LiveRun from './LiveRun.jsx'
 import Explore from './Explore.jsx'
@@ -20,6 +20,9 @@ import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
 
 const PARIS = { lat: 48.8566, lon: 2.3522 }
+
+// « Distance exacte » : l'écart toléré entre la boucle et la distance visée.
+const PRECISE_TOLERANCE = 0.025
 
 // Le temps de laisser finir un repère qu'on fait glisser, ou une adresse qu'on
 // choisit, avant de préparer les rues : on ne prépare que là où l'on s'arrête.
@@ -298,9 +301,27 @@ export default function App() {
       const token = ++searchToken.current
       try {
         const request = { ...toRequest(active, start), variation: variation.current, avoid_bearings: avoid }
-        const payload = await generateLoops(request, (stage, fraction) => {
+        const onStage = (stage, fraction) => {
           if (token === searchToken.current) setProgress({ stage, fraction })
-        })
+        }
+        let payload = await generateLoops(request, onStage)
+        // Rien à ±2,5 % ? Plutôt qu'un écran vide, on élargit et on le dit : le
+        // réseau de rues ne se plie pas toujours au mètre près, et une boucle
+        // de 20,4 km vaut mieux que pas de sortie.
+        if (!payload.routes.length && request.tolerance) {
+          const { tolerance, ...wider } = request
+          const relaxed = await generateLoops(wider, onStage)
+          if (relaxed.routes.length) {
+            payload = {
+              ...relaxed,
+              meta: {
+                ...relaxed.meta,
+                relaxed: true,
+                message: `Aucune boucle à ±2,5 % de ${active.distance_km} km depuis ce départ : voici les plus proches, à ±10 %.`,
+              },
+            }
+          }
+        }
         if (token !== searchToken.current) return
         // La demande reste attachée au résultat : c'est avec elle qu'un chemin
         // de retour se calcule, en course, si l'on s'écarte du parcours.
@@ -843,14 +864,20 @@ function toRequest(p, start) {
   }
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
+  // Viser un semi à ±10 %, c'est viser à deux kilomètres près.
+  if (p.mode === 'distance' && p.precise) body.tolerance = PRECISE_TOLERANCE
   if (p.sport === 'bike' || p.speedUnit === 'speed') body.speed_kmh = p.speed_kmh
   else body.pace_sec_per_km = p.pace_sec_per_km
   return body
 }
 
 function summarise(p) {
-  const dist =
-    p.mode === 'distance' ? `${p.distance_km} km` : `≈${Math.round(estimateKm(p))} km`
+  const race = p.mode === 'distance' ? raceOf(p.distance_km) : null
+  const dist = race
+    ? race.label
+    : p.mode === 'distance'
+      ? `${p.distance_km} km`
+      : `≈${Math.round(estimateKm(p))} km`
   const speed =
     p.sport === 'bike' || p.speedUnit === 'speed'
       ? `${p.speed_kmh} km/h`

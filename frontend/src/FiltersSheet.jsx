@@ -56,6 +56,24 @@ const MIN_KM = 0.5
 const MAX_MIN = 900
 const MIN_MIN = 10
 
+/**
+ * Les distances de course, au mètre près.
+ *
+ * Un semi ne fait pas « environ 21 km » : il fait 21,0975 km, et préparer
+ * l'épreuve demande de courir cette distance-là, pas une approximation. Les
+ * choisir resserre aussi la tolérance (voir `PRECISE_TOLERANCE`) : une boucle
+ * à ±10 % d'un marathon, c'est quatre kilomètres d'écart.
+ */
+export const RACES = [
+  { key: '5k', km: 5, label: '5 km' },
+  { key: '10k', km: 10, label: '10 km' },
+  { key: 'semi', km: 21.0975, label: 'Semi', detail: '21,097 km' },
+  { key: 'marathon', km: 42.195, label: 'Marathon', detail: '42,195 km' },
+]
+
+/** La distance de course qui correspond, à dix mètres près. */
+export const raceOf = (km) => RACES.find((r) => Math.abs(r.km - km) < 0.01) ?? null
+
 export const DEFAULTS = {
   sport: 'run',
   mode: 'distance',
@@ -70,6 +88,9 @@ export const DEFAULTS = {
   speed_kmh: 20,
   speedUnit: 'pace',
   count: 5,
+  // Distance exacte : ±2,5 % au lieu de ±10 %. Réservé à qui vise une distance
+  // précise — plus c'est serré, moins il y a de boucles qui conviennent.
+  precise: false,
   // Servent seulement aux estimations de calories et de pas (onglet compte).
   weight_kg: 70,
   height_cm: 175,
@@ -169,6 +190,25 @@ export default function FiltersSheet({ value, onApply, onClose }) {
               value={draft.mode}
               onChange={(mode) => set({ mode })}
             />
+            {draft.mode === 'distance' && (
+              <div className="races" role="group" aria-label="Distances de course">
+                {RACES.map((race) => {
+                  const on = Math.abs(draft.distance_km - race.km) < 0.01
+                  return (
+                    <button
+                      key={race.key}
+                      className={`chip ${on ? 'chip--on' : ''}`}
+                      aria-pressed={on}
+                      disabled={race.km > maxKm}
+                      onClick={() => set({ distance_km: race.km, precise: true })}
+                      title={race.detail ? `${race.label} — ${race.detail}` : race.label}
+                    >
+                      {race.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             {draft.mode === 'distance' ? (
               <Stepper
                 text={`${formatKm(draft.distance_km)} km`}
@@ -203,6 +243,27 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 canDown={draft.duration_min > MIN_MIN}
                 canUp={draft.duration_min < MAX_MIN}
               />
+            )}
+            {draft.mode === 'distance' && (
+              <>
+                <Segmented
+                  options={[
+                    { key: 'loose', label: 'Souple · ±10 %' },
+                    { key: 'exact', label: 'Exacte · ±2,5 %' },
+                  ]}
+                  value={draft.precise ? 'exact' : 'loose'}
+                  onChange={(v) => set({ precise: v === 'exact' })}
+                />
+                <p className="field__hint">
+                  {draft.precise
+                    ? `La boucle tombera entre ${formatKm(draft.distance_km * 0.975)} et ${formatKm(
+                        draft.distance_km * 1.025,
+                      )} km. Moins de boucles conviennent : s'il n'y en a aucune, Lacet élargit tout seul et le dit.`
+                    : `La boucle tombera entre ${formatKm(draft.distance_km * 0.9)} et ${formatKm(
+                        draft.distance_km * 1.1,
+                      )} km — de quoi suivre les rues plutôt que le chiffre.`}
+                </p>
+              </>
             )}
             <p className="field__hint">
               {draft.mode === 'duration'
