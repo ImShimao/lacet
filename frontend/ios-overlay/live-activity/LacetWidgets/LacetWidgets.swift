@@ -23,6 +23,59 @@ import WidgetKit
 struct LacetWidgetBundle: WidgetBundle {
     var body: some Widget {
         LacetRunActivity()
+        LacetShortcut()
+    }
+}
+
+/// Une petite vignette pour l'écran d'accueil.
+///
+/// Elle sert d'abord de **preuve** : un widget se pose à la main depuis la
+/// galerie d'iOS. S'il s'affiche, l'extension tourne, et un écran de
+/// verrouillage vide ne peut venir que de l'activité elle-même. S'il n'apparaît
+/// même pas dans la galerie, c'est l'extension qu'iOS refuse de lancer — et
+/// aucune ligne de code ne l'y forcera : c'est la signature de l'installation.
+struct LacetShortcut: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "LacetShortcut", provider: ShortcutProvider()) { _ in
+            ShortcutView()
+        }
+        .configurationDisplayName("Lacet")
+        .description("Ouvrir Lacet pour lancer une sortie.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct ShortcutEntry: TimelineEntry {
+    let date: Date
+}
+
+struct ShortcutProvider: TimelineProvider {
+    func placeholder(in context: Context) -> ShortcutEntry { ShortcutEntry(date: Date()) }
+
+    func getSnapshot(in context: Context, completion: @escaping (ShortcutEntry) -> Void) {
+        completion(ShortcutEntry(date: Date()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ShortcutEntry>) -> Void) {
+        completion(Timeline(entries: [ShortcutEntry(date: Date())], policy: .never))
+    }
+}
+
+struct ShortcutView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("LACET")
+                .font(.system(size: 15, weight: .black))
+                .foregroundColor(accent)
+            Text("Trouver ma boucle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(14)
+        .lacetBackground()
     }
 }
 
@@ -30,6 +83,22 @@ struct LacetWidgetBundle: WidgetBundle {
 private let accent = Color(red: 0.608, green: 0.435, blue: 1.0)
 private let backdrop = Color(red: 0.039, green: 0.035, blue: 0.063)
 private let caution = Color(red: 1.0, green: 0.416, blue: 0.271)
+
+/// Le fond, posé comme iOS 17 et suivants l'exigent.
+///
+/// Depuis iOS 17, une vue de widget — activité en direct comprise — doit
+/// déclarer son fond par `containerBackground`. Un fond posé à l'ancienne, en
+/// `background`, peut se retrouver ignoré, et la vue rendue sur du vide.
+extension View {
+    @ViewBuilder
+    func lacetBackground() -> some View {
+        if #available(iOS 17.0, *) {
+            containerBackground(backdrop, for: .widget)
+        } else {
+            background(backdrop)
+        }
+    }
+}
 
 /// Ce qu'on affiche quand une valeur manque — plutôt qu'un espace vide.
 private func shown(_ value: String, fallback: String = "—") -> String {
@@ -135,9 +204,9 @@ struct LockScreenView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Le fond est dessiné ici, en plus de la teinte demandée au système :
-        // une vue qui s'affiche doit se voir, quoi qu'il arrive au tint.
-        .background(backdrop)
+        // Le fond est posé ici, en plus de la teinte demandée au système : une
+        // vue qui s'affiche doit se voir, quoi qu'il arrive au tint.
+        .lacetBackground()
     }
 }
 
