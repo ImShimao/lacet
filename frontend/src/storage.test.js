@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { load, save, slim } from './storage'
+import { exportAll, importAll, load, save, slim } from './storage'
 
 /**
  * La persistance locale.
@@ -161,3 +161,38 @@ describe('load et save', () => {
     expect(apres).toEqual({ favorites: [], history: [], params: null })
   })
 })
+
+/**
+ * La sauvegarde : ce qui permet de réinstaller l'app sans tout perdre.
+ *
+ * Elle est **fusionnée** à la restauration, jamais substituée : on restaure
+ * souvent après avoir déjà recouru, et effacer ces sorties-là serait le
+ * contraire de ce qu'on attend d'une sauvegarde.
+ */
+describe('la sauvegarde', () => {
+  const sortie = (ranAt, m) => ({ id: `h-${ranAt}`, ranAt, actual_distance_m: m, actual_duration_s: 1800 })
+
+  it('emporte favoris, sorties et réglages', () => {
+    save({ favorites: [slim(routeComplete)], history: [sortie('2026-09-01T10:00:00.000Z', 10_000)], params: { sport: 'bike' } })
+    const copie = JSON.parse(exportAll())
+    expect(copie.app).toBe('lacet')
+    expect(copie.data.favorites).toHaveLength(1)
+    expect(copie.data.params.sport).toBe('bike')
+  })
+
+  it('remet tout en place, sans effacer ce qui a été fait depuis', () => {
+    save({ favorites: [], history: [sortie('2026-09-01T10:00:00.000Z', 10_000)], params: null })
+    const copie = exportAll()
+    save({ history: [sortie('2026-09-20T10:00:00.000Z', 5000)] })
+    const { history } = importAll(copie)
+    expect(history).toBe(2)
+    // La plus récente d'abord, comme dans l'historique.
+    expect(load().history[0].ranAt).toBe('2026-09-20T10:00:00.000Z')
+  })
+
+  it('refuse un fichier qui n’en est pas une', () => {
+    expect(() => importAll('{"app":"autre"}')).toThrow(/sauvegarde Lacet/)
+    expect(() => importAll('pas du json')).toThrow(/sauvegarde Lacet/)
+  })
+})
+

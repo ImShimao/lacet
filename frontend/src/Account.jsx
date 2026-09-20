@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { SPORTS } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
-import { load, save } from './storage'
-import { isNative, readModeSetting, setModeSetting } from './platform'
+import { exportAll, importAll, load, save } from './storage'
+import { isNative, readModeSetting, saveTextFile, setModeSetting } from './platform'
 import * as offline from './offlineMaps'
 
 export default function Account({ mode = 'full', params, geo, onClearData, onProfile }) {
@@ -101,6 +101,9 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
       <OfflineStorage key={version} />
         </>
       )}
+
+      <h4 className="section">Sauvegarde</h4>
+      <BackupRows />
 
       <h4 className="section">Version de l'app</h4>
       <BuildStamp />
@@ -481,6 +484,61 @@ function BuildStamp() {
         </>
       )}
     </p>
+  )
+}
+
+/**
+ * Emporter ses données, et les remettre.
+ *
+ * Favoris, sorties et réglages vivent dans cet appareil, et nulle part
+ * ailleurs : c'est le principe de l'app, mais ça veut dire qu'une
+ * réinstallation les emporte. Un fichier suffit à les retrouver — et il se
+ * range où l'on veut, sans compte.
+ */
+function BackupRows() {
+  const [message, setMessage] = useState(null)
+
+  const backup = async () => {
+    const stamp = new Date().toISOString().slice(0, 10)
+    await saveTextFile(`lacet-sauvegarde-${stamp}.json`, exportAll(), 'application/json')
+    setMessage('Sauvegarde écrite. Garde-la hors du téléphone si tu comptes réinstaller l’app.')
+  }
+
+  const restore = async (file) => {
+    if (!file) return
+    try {
+      const { favorites, history } = importAll(await file.text())
+      setMessage(`Restauré : ${favorites} parcours en favori, ${history} sorties. Rouvre l’app pour les voir.`)
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  return (
+    <>
+      <p className="muted small">
+        Tes favoris, tes sorties et tes réglages ne sont que sur cet appareil. Cette
+        sauvegarde les met dans un fichier — à garder ailleurs avant de réinstaller
+        l'app, qui les effacerait.
+      </p>
+      <div className="row">
+        <button className="btn" onClick={backup}>
+          <Icon name="download" size={15} />
+          Sauvegarder
+        </button>
+        <label className="btn">
+          <Icon name="refresh" size={15} />
+          Restaurer
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="visually-hidden"
+            onChange={(e) => restore(e.target.files?.[0])}
+          />
+        </label>
+      </div>
+      {message && <p className="muted small">{message}</p>}
+    </>
   )
 }
 
