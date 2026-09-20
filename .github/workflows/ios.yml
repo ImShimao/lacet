@@ -75,7 +75,11 @@ jobs:
 
   ipa:
     needs: region
-    runs-on: macos-15
+    # Le SDK le plus récent disponible. Une extension de widget compilée avec un
+    # SDK de deux versions en retard peut n'être jamais enregistrée par un iPhone
+    # récent : l'app s'installe, l'extension est ignorée, et l'activité en direct
+    # reste vide — constaté sur un iPhone sous iOS 27.
+    runs-on: macos-26
     timeout-minutes: 45
     defaults:
       run:
@@ -83,6 +87,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          ls /Applications | grep -i "^Xcode" || true
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
 
       # Capacitor 8 exige Node 22.
       - uses: actions/setup-node@v4
