@@ -170,8 +170,17 @@ export const updateLiveActivity = (state) => LiveActivity.update(state).catch(()
 export const endLiveActivity = () => LiveActivity.end().catch(() => {})
 
 /**
- * Ce que l'écran de verrouillage peut afficher : `{ supported, enabled,
- * extension, notifications }` — ou `null` si l'app a été compilée sans le module.
+ * Ce que l'écran de verrouillage peut afficher — ou `null` si l'app a été
+ * compilée sans le module :
+ *
+ * - `supported` : iOS 16.2 ou plus ;
+ * - `enabled` : les activités en direct autorisées dans Réglages ;
+ * - `extension` : le paquet qui les dessine est bien dans l'app installée ;
+ * - `nested` : et il lui est encore **rattaché**. Un installateur hors App
+ *   Store qui renomme l'app rompt ce lien sans rien retirer : iOS accepte alors
+ *   l'activité et ne dessine rien ;
+ * - `bundle`, `extensionBundle` : les deux identifiants, pour le dire en clair ;
+ * - `notifications` : `'granted' | 'denied' | 'prompt'`.
  */
 export const lockScreenStatus = () => LiveActivity.status().catch(() => null)
 
@@ -191,6 +200,31 @@ export async function askNoticePermission() {
 }
 export const postRunNotice = (notice, delay = 0) =>
   LiveActivity.notice({ ...notice, delay }).catch(() => {})
+
+/**
+ * La carte du lecteur sur l'écran de verrouillage : la consigne en titre, la
+ * distance en sous-titre, la flèche du virage en pochette, et le bouton
+ * lecture/pause branché sur la pause de la sortie.
+ *
+ * Pendant la sortie, Lacet devient le lecteur du téléphone : la musique qui
+ * jouait s'arrête. `interrupted` le dit, pour que l'app puisse le signaler.
+ */
+export async function startRunCard(card) {
+  try {
+    const { started, interrupted } = await LiveActivity.cardStart(card)
+    return { started: started === true, interrupted: interrupted === true }
+  } catch {
+    return { started: false, interrupted: false }
+  }
+}
+export const updateRunCard = (card) => LiveActivity.cardUpdate(card).catch(() => {})
+export const stopRunCard = () => LiveActivity.cardStop().catch(() => {})
+
+/** Les boutons de l'écran de verrouillage. Rend de quoi se désabonner. */
+export function onRunControl(handler) {
+  const pending = LiveActivity.addListener('runControl', handler)
+  return () => pending.then((h) => h.remove()).catch(() => {})
+}
 export const clearRunNotice = () => LiveActivity.clearNotice().catch(() => {})
 
 /**

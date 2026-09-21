@@ -97,6 +97,72 @@ export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
 }
 
 /**
+ * Ce qui doit tenir l'écran de verrouillage pendant la sortie.
+ *
+ * `'activity'`, `'notice'`, `'both'`, ou `null` quand l'iPhone ne peut rien
+ * afficher du tout.
+ *
+ * **Pourquoi « les deux » est le cas ordinaire.** iOS accepte une activité en
+ * direct dès que l'extension qui la dessine est dans le paquet de l'app ; il ne
+ * dit jamais s'il a réussi à la lancer. Une installation hors App Store qui
+ * n'enregistre pas l'extension donne donc une demande acceptée, un écran de
+ * verrouillage noir, et pas un mot d'explication — l'app se croyait tirée
+ * d'affaire et ne posait pas la notification de secours.
+ *
+ * Tant que personne n'a confirmé avoir vu l'activité sur cet iPhone (`seen`),
+ * on tient donc les deux à jour. La notification est passive : ni son, ni écran
+ * allumé, et une seule à la fois, remplacée à chaque consigne. La redondance ne
+ * coûte rien ; le silence coûtait la sortie.
+ *
+ * @param {object} o
+ * @param {string} o.setting      le réglage de « Mon compte » : 'auto' | 'notice'
+ * @param {boolean} o.started     iOS a accepté l'activité en direct
+ * @param {boolean} o.noticeAllowed les notifications sont autorisées
+ * @param {boolean} o.seen        l'activité a déjà été vue sur cet iPhone
+ */
+export function lockScreenMode({ setting, started, noticeAllowed, seen, card = false }) {
+  // La carte du lecteur ne se devine pas : on ne prend le lecteur du téléphone
+  // — et la musique avec — que si on l'a demandé.
+  if (setting === 'card') return card ? 'card' : noticeAllowed ? 'notice' : null
+  if (!started) return noticeAllowed ? 'notice' : null
+  if (seen) return 'activity'
+  return noticeAllowed ? 'both' : 'activity'
+}
+
+/** L'activité en direct doit-elle être tentée, vu le réglage ? */
+export const wantsActivity = (setting) => setting === 'auto'
+
+/**
+ * Faut-il la notification, avant même de savoir si elle est autorisée ?
+ *
+ * Oui dès que l'activité en direct a échoué, et oui tant qu'elle n'a pas fait
+ * ses preuves ici. C'est ce qui décide s'il faut demander l'autorisation.
+ */
+export const wantsNotice = ({ started, seen }) => !started || !seen
+
+/**
+ * Ce que porte la carte du lecteur : la consigne en titre, la distance et ce
+ * qui reste en sous-titre, la flèche du virage en pochette.
+ *
+ * C'est la place d'un titre et d'un artiste : deux lignes, la première en gras.
+ * Elles tombent juste sur ce qu'on lit en courant.
+ */
+export function cardOf(state) {
+  if (state.offRoute) {
+    return { title: 'Hors parcours', subtitle: 'Reviens sur le tracé', icon: 'warning' }
+  }
+  if (state.paused) {
+    return { title: 'Sortie en pause', subtitle: `Reste ${state.remaining}`, icon: 'start' }
+  }
+  const near = state.distance === 'maintenant' ? 'Maintenant' : state.distance
+  return {
+    title: state.instruction,
+    subtitle: `${near} · reste ${state.remaining}`,
+    icon: state.turn || 'straight',
+  }
+}
+
+/**
  * La notification de secours, quand l'activité en direct n'est pas disponible.
  *
  * Une notification ne sait pas faire défiler un compte à rebours : elle donne

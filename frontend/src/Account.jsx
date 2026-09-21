@@ -273,8 +273,16 @@ function LockScreenSetting() {
   const [status, setStatus] = useState(undefined)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState(null)
-  const [mode, setMode] = useState(() => (load().lockScreen === 'notice' ? 'notice' : 'auto'))
+  const [mode, setMode] = useState(() =>
+    ['notice', 'card'].includes(load().lockScreen) ? load().lockScreen : 'auto',
+  )
   const [failure, setFailure] = useState(() => load().lockScreenError || null)
+  // `seen` : quelqu'un a confirmé avoir vu l'activité en direct sur cet
+  // iPhone. Tant que non, une sortie pose **aussi** la notification — iOS
+  // accepte l'activité sans garantir qu'il l'affiche, et le silence coûtait la
+  // sortie entière. `ask` ouvre la question juste après un essai réussi.
+  const [seen, setSeen] = useState(() => load().lockScreenSeen === true)
+  const [ask, setAsk] = useState(false)
 
   useEffect(() => {
     if (!isNative()) return
@@ -283,17 +291,33 @@ function LockScreenSetting() {
 
   if (!isNative() || status === undefined) return null
 
-  const live = Boolean(status?.supported && status?.enabled && status?.extension)
+  const live = Boolean(status?.supported && status?.enabled && status?.extension && status?.nested)
   let text
-  if (!status) text = "Cette version de l'app n'a pas le module d'écran verrouillé."
-  else if (live) {
+  if (mode === 'card') {
+    // Le repli qui ne dépend d'aucune signature : c'est l'app elle-même qui
+    // remplit la carte, comme un lecteur de musique.
+    text =
+      "Carte du lecteur : pendant la sortie, Lacet devient le lecteur du téléphone et affiche la consigne, sa distance et la flèche du virage sur l'écran verrouillé — mise à jour en direct, avec un bouton pause qui met vraiment la sortie en pause. Le prix : la musique qui jouait s'arrête le temps de la sortie."
+  } else if (!status) text = "Cette version de l'app n'a pas le module d'écran verrouillé."
+  else if (live && seen) {
     text =
       "Activité en direct prête : pendant une sortie guidée, le prochain virage, sa distance et le temps restant s'affichent écran verrouillé et dans la Dynamic Island."
+  } else if (live) {
+    // iOS accepte l'activité sans promettre de l'afficher : tant que personne
+    // ne l'a vue sur cet iPhone, une sortie pose les deux. Voir `LiveRun.jsx`.
+    text =
+      "Activité en direct disponible — mais iOS ne dit pas s'il arrive à la dessiner. Tant qu'elle n'a pas été vue ici, une sortie affiche aussi une notification silencieuse, pour ne jamais laisser l'écran vide. Lance l'essai ci-dessous, puis réponds à la question : la redondance s'arrête là."
   } else if (!status.supported) {
     text = "L'activité en direct demande iOS 16.2 ou plus récent. À la place, une notification silencieuse tient la consigne à jour."
   } else if (!status.extension) {
     text =
       "L'extension qui dessine l'activité en direct manque à cette installation — l'outil d'installation l'a retirée. À la place, une notification silencieuse tient la consigne à jour."
+  } else if (status.nested === false) {
+    // Le cas qui ressemblait à une panne sans cause : l'extension est là, iOS
+    // accepte l'activité, et rien ne s'affiche. Voir `LiveActivityPlugin.swift`.
+    text =
+      `L'app a été installée sous un autre nom (${status.bundle}) : l'extension ${status.extensionBundle} ne lui est plus rattachée, et iOS refuse de la lancer. ` +
+      "Réinstalle en laissant l'identifiant d'origine « fr.lacet.app » dans l'outil d'installation. En attendant, une notification silencieuse tient la consigne à jour."
   } else {
     text = 'Activités en direct coupées : Réglages › Lacet › Activités en direct. En attendant, une notification silencieuse tient la consigne à jour.'
   }
@@ -304,7 +328,7 @@ function LockScreenSetting() {
     ? [
         `iOS ${status.supported ? '16.2 ou plus' : 'trop ancien'}`,
         `activités ${status.enabled ? 'autorisées' : 'coupées'}`,
-        `extension ${status.extension ? 'présente' : 'absente'}`,
+        `extension ${status.extension ? (status.nested === false ? 'détachée' : 'présente') : 'absente'}`,
         `notifications ${{ granted: 'autorisées', denied: 'refusées' }[status.notifications] ?? 'jamais demandées'}`,
       ].join(' · ')
     : 'module natif injoignable'
@@ -313,6 +337,29 @@ function LockScreenSetting() {
     const n = await import('./native')
     setResult(null)
     setTesting(true)
+    // La carte du lecteur : Lacet prend la place du lecteur du téléphone, la
+    // consigne s'affiche en grand sur l'écran verrouillé, et le bouton pause y
+    // met la sortie en pause. Rien à voir avec l'activité en direct : aucune
+    // extension, donc aucune signature à réussir.
+    if (mode === 'card') {
+      const { started, interrupted } = await n.startRunCard({
+        title: 'Tourne à droite sur Rue de la Gare',
+        subtitle: '120 m · reste 4,2 km',
+        icon: 'right',
+      })
+      setResult(
+        started
+          ? `Carte du lecteur prise. Verrouille l'écran : la consigne s'y affiche, avec un bouton pause.${
+              interrupted ? ' Ta musique a été mise en pause.' : ''
+            } L'essai s'arrête dans 20 secondes.`
+          : "iOS n'a pas donné la carte du lecteur. Essaie en coupant toute musique en cours, ou choisis « Notification ».",
+      )
+      setTimeout(() => {
+        n.stopRunCard()
+        setTesting(false)
+      }, 20_000)
+      return
+    }
     const demo = {
       name: 'Essai',
       instruction: 'Tourne à droite sur Rue de la Gare',
@@ -336,9 +383,22 @@ function LockScreenSetting() {
     if (started) {
       save({ lockScreenError: null })
       setFailure(null)
+      // Tant que l'activité n'a pas été vue, l'essai pose les deux — comme le
+      // fera une vraie sortie. Un essai qui promet mieux que la réalité ne
+      // servirait à rien.
+      const alsoNotice = !seen && (await n.askNoticePermission())
+      if (alsoNotice) {
+        await n.postRunNotice(
+          { title: 'Tourne à droite sur Rue de la Gare', subtitle: 'Dans 120 m', body: 'Reste 4,2 km · essai de Lacet', icon: 'right' },
+          5,
+        )
+      }
       setResult(
-        `Activité en direct lancée (${count ?? '?'} active). Verrouille l’écran tout de suite : elle doit s’afficher dessus. Elle s’efface dans 20 secondes.`,
+        `Activité en direct lancée (${count ?? '?'} active). Verrouille l’écran tout de suite.` +
+          (alsoNotice ? ' Une notification silencieuse arrive aussi dans 5 secondes.' : '') +
+          ' Tout s’efface dans 20 secondes.',
       )
+      setAsk(true)
       // Trois secondes plus tard, ce qu'iOS en dit vraiment.
       setTimeout(async () => {
         const live = await n.liveActivities()
@@ -353,6 +413,7 @@ function LockScreenSetting() {
       }, 3000)
       setTimeout(() => {
         n.endLiveActivity()
+        n.clearRunNotice()
         setTesting(false)
       }, 20_000)
       return
@@ -397,6 +458,7 @@ function LockScreenSetting() {
       <div className="seg" role="radiogroup" aria-label="Affichage sur l'écran verrouillé">
         {[
           ['auto', 'Activité en direct'],
+          ['card', 'Carte du lecteur'],
           ['notice', 'Notification'],
         ].map(([value, label]) => (
           <button
@@ -418,6 +480,39 @@ function LockScreenSetting() {
         {testing ? 'Essai en cours — verrouille ton téléphone…' : "Tester l'écran verrouillé (20 s)"}
       </button>
       {result && <p className="muted small">{result}</p>}
+      {/* La seule chose que l'app ne peut pas constater elle-même : iOS dit
+          qu'il a accepté l'activité, jamais qu'il l'a dessinée. On le demande
+          donc, une fois, à la seule personne qui peut voir l'écran. */}
+      {ask && (
+        <>
+          <p className="muted small">L’activité en direct s’est-elle vraiment affichée sur ton écran verrouillé ?</p>
+          <div className="seg" role="group" aria-label="L’activité en direct s’est-elle affichée ?">
+            <button
+              onClick={() => {
+                save({ lockScreenSeen: true })
+                setSeen(true)
+                setAsk(false)
+                setResult('Noté : les sorties n’afficheront plus que l’activité en direct.')
+              }}
+            >
+              Oui
+            </button>
+            <button
+              onClick={() => {
+                // Elle ne s'affiche pas ici : on ne réessaiera plus de la
+                // faire passer pour un guidage. La notification, elle, marche.
+                save({ lockScreenSeen: false, lockScreen: 'notice' })
+                setSeen(false)
+                setMode('notice')
+                setAsk(false)
+                setResult('Noté : les sorties passeront par la notification silencieuse, qui, elle, s’affiche.')
+              }}
+            >
+              Non, rien
+            </button>
+          </div>
+        </>
+      )}
       <p className="muted small">Détail : {detail}.</p>
       {failure && (
         <p className="muted small">
@@ -434,6 +529,7 @@ function LockScreenSetting() {
           const lines = [
             `Lacet ${app ? `${app.version} (build ${app.build})` : ''} · interface ${import.meta.env.VITE_BUILD || 'dev'}`,
             `Écran verrouillé : ${detail}`,
+            status ? `Identifiants : app ${status.bundle || '?'} · extension ${status.extensionBundle || '—'}` : null,
             `Réglage : ${mode === 'notice' ? 'notification' : 'activité en direct'}`,
             failure ? `Dernier refus : ${failure}` : 'Aucun refus enregistré',
             result ? `Dernier essai : ${result}` : null,

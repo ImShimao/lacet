@@ -4,7 +4,7 @@ import Icon from './Icon.jsx'
 import ElevationSheet from './ElevationSheet.jsx'
 import { haversine, km, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
-import { lockScreenState, noticeOf, shouldRefresh } from './lockScreen'
+import { cardOf, lockScreenMode, lockScreenState, noticeOf, shouldRefresh, wantsActivity, wantsNotice } from './lockScreen'
 import { motionTracker } from './autoPause'
 import { load } from './storage'
 import * as voice from './voice'
@@ -67,6 +67,9 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
   // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
   const [paused, setPaused] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  // La musique s'est arrêtée parce que Lacet a pris la carte du lecteur : on le
+  // dit, sinon ça passe pour une panne du téléphone.
+  const [cardNote, setCardNote] = useState(false)
 
   // Le tracé suivi : le parcours choisi, puis, après un recalcul, le raccord et
   // la fin de la boucle. Tenu aussi en référence : les relevés GPS arrivent
@@ -95,8 +98,9 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
   const lastSplit = useRef(0)
   const heading = useRef(null)
   const moved = useRef(null)
-  // L'écran de verrouillage : l'activité en direct, ou à défaut une
-  // notification ; et ce qu'on lui a envoyé en dernier.
+  // L'écran de verrouillage : l'activité en direct, la notification, ou les
+  // deux ; et ce qu'on lui a envoyé en dernier. Voir l'effet plus bas pour
+  // pourquoi « les deux » est le cas ordinaire.
   const lockMode = useRef(null)
   const shown = useRef(null)
   const shownAt = useRef(0)
@@ -253,12 +257,14 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
   // L'écran de verrouillage, dans l'app iPhone : la consigne à venir et le temps
   // restant, lisibles en allumant l'écran, sans déverrouiller ni rouvrir l'app.
   //
-  // L'activité en direct d'abord ; si l'iPhone ne peut pas l'afficher — iOS
-  // trop ancien, activités coupées dans Réglages, extension absente — une
-  // notification silencieuse, tenue à jour, dit la même chose.
+  // Trois façons de le tenir, selon « Mon compte » : l'activité en direct (la
+  // bonne, quand l'iPhone veut bien la dessiner), la carte du lecteur audio
+  // (sans extension, mais Lacet devient le lecteur du téléphone), ou la
+  // notification silencieuse, qui marche partout.
   useEffect(() => {
     if (!isNative() || !route) return undefined
     let cancelled = false
+    let stopControl = null
     const native = import('./native')
     native.then(async (n) => {
       const first = lockScreenState({
@@ -269,30 +275,51 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
         travelled: 0,
         elapsedS: 0,
       })
-      // Le réglage de « Mon compte » : l'activité en direct, ou tout de suite
-      // la notification — utile quand iOS accepte l'activité sans rien afficher.
-      const wanted = load().lockScreen === 'notice' ? 'notice' : 'auto'
-      const { started } = wanted === 'notice' ? { started: false } : await n.startLiveActivity(first)
+      // Le réglage de « Mon compte ».
+      const settings = load()
+      const setting = ['notice', 'card'].includes(settings.lockScreen) ? settings.lockScreen : 'auto'
+      const seen = settings.lockScreenSeen === true
+      const { started } = wantsActivity(setting) ? await n.startLiveActivity(first) : { started: false }
       if (cancelled) {
         if (started) n.endLiveActivity()
         return
       }
-      if (started) {
-        lockMode.current = 'activity'
-      } else if (await n.askNoticePermission()) {
-        if (cancelled) return
-        lockMode.current = 'notice'
-        n.postRunNotice(noticeOf(first))
+      // La carte du lecteur, quand c'est elle qu'on a choisie. Le bouton
+      // lecture/pause de l'écran de verrouillage met la sortie en pause : c'est
+      // la seule commande qui ait un sens ici.
+      let card = false
+      if (setting === 'card') {
+        const taken = await n.startRunCard(cardOf(first))
+        card = taken.started
+        if (card) stopControl = n.onRunControl(() => togglePause())
+        if (taken.interrupted) setCardNote(true)
       }
+      if (cancelled) {
+        if (started) n.endLiveActivity()
+        if (card) n.stopRunCard()
+        return
+      }
+      // « Acceptée » ne veut pas dire « affichée » : voir `lockScreenMode`.
+      const needsNotice = setting === 'card' ? !card : wantsNotice({ started, seen })
+      const noticeAllowed = needsNotice && (await n.askNoticePermission())
+      if (cancelled) {
+        if (started) n.endLiveActivity()
+        if (card) n.stopRunCard()
+        return
+      }
+      lockMode.current = lockScreenMode({ setting, started, noticeAllowed, seen, card })
+      if (lockMode.current === 'notice' || lockMode.current === 'both') n.postRunNotice(noticeOf(first))
       shown.current = first
       shownAt.current = Date.now()
     })
     return () => {
       cancelled = true
       lockMode.current = null
+      stopControl?.()
       native.then((n) => {
         n.endLiveActivity()
         n.clearRunNotice()
+        n.stopRunCard()
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,11 +405,15 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
     if (!shouldRefresh(shown.current, next, now - shownAt.current)) return
     shown.current = next
     shownAt.current = now
-    if (lockMode.current === 'activity') {
-      import('./native').then((n) => n.updateLiveActivity(next))
-    } else {
-      import('./native').then((n) => n.postRunNotice(noticeOf(next)))
-    }
+    const mode = lockMode.current
+    import('./native').then((n) => {
+      if (mode === 'card') {
+        n.updateRunCard({ ...cardOf(next), paused: next.paused })
+        return
+      }
+      if (mode !== 'notice') n.updateLiveActivity(next)
+      if (mode !== 'activity') n.postRunNotice(noticeOf(next))
+    })
   }
 
   /**
@@ -639,6 +670,12 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
             Traversée dans {Math.round(alert.d)} m
             {alert.protected ? ' — passage protégé' : ' — pas de passage protégé'}
           </span>
+        </div>
+      )}
+
+      {cardNote && (
+        <div className="live__wait">
+          Lacet tient la carte du lecteur pour l'écran verrouillé : ta musique a été mise en pause.
         </div>
       )}
 

@@ -236,6 +236,36 @@ Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours** : il faut
 la réinstaller (Sideloadly sait le faire automatiquement tant que le PC est
 allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
 
+**Deux réglages de Sideloadly décident de l'écran de verrouillage.** L'activité
+en direct est dessinée par une extension (`LacetWidgets.appex`) rangée dans
+l'app, et iOS ne la lance qu'à deux conditions :
+
+- l'extension doit être **dans le paquet installé**. Certains outils
+  d'installation la retirent d'office — une option « remove app extensions » ou
+  « remove plugins » — parce que chaque extension consomme un identifiant d'app
+  supplémentaire, et qu'un compte gratuit en a dix par semaine. Décoche-la ;
+- l'app doit garder son **identifiant d'origine, `fr.lacet.app`**. iOS n'accepte
+  de lancer une extension que si son identifiant est un *enfant* de celui de
+  l'app : `fr.lacet.app` → `fr.lacet.app.widgets`. Si le champ « Bundle ID » de
+  Sideloadly est modifié — c'est parfois automatique quand l'identifiant est
+  déjà pris par une installation précédente — le lien se rompt **sans rien
+  retirer du paquet** : l'app s'installe, iOS accepte l'activité en direct, et
+  personne ne la dessine. Écran de verrouillage vide, barre noire dans la
+  Dynamic Island, aucun message.
+
+Les deux se lisent depuis le téléphone : **Mon compte → Écran verrouillé** donne
+les quatre conditions en clair (`iOS · activités · extension · notifications`),
+nomme les deux identifiants réellement installés, et dit « extension détachée »
+quand c'est ce lien-là qui manque. La preuve indépendante : poser le widget
+**Lacet** depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension
+tourne ; s'il n'apparaît même pas dans la galerie, iOS refuse de la lancer, et
+c'est l'installation qu'il faut reprendre — aucune ligne de code n'y changera
+rien.
+
+Rien de tout cela n'empêche de courir : sans activité en direct, Lacet bascule
+sur une **notification silencieuse** qui dit la même chose, et qu'on peut
+choisir d'emblée dans le même réglage.
+
 ### Ce que l'app native ajoute
 
 - **Le GPS continue écran verrouillé.** À la première sortie, iOS demande
@@ -259,11 +289,21 @@ allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
   rebours jusqu'à l'arrivée — aussi dans la Dynamic Island. C'est une extension
   iOS à part (`frontend/ios-overlay/live-activity/`), greffée au projet Xcode par
   `add_live_activity.rb` pendant la compilation. Elle demande iOS 16.2, et les
-  « Activités en direct » autorisées dans Réglages → Lacet. **Sinon, une
+  « Activités en direct » autorisées dans Réglages → Lacet. **Et une
   notification de secours** : passive — ni son, ni écran allumé — et remplacée
   à chaque consigne, elle dit la même chose. « Mon compte » indique laquelle
   des deux l'iPhone utilisera (et pourquoi), et un bouton la montre vingt
   secondes sans partir courir.
+
+  **Les deux, jusqu'à preuve du contraire.** iOS accepte une activité en direct
+  dès que l'extension est dans le paquet de l'app ; il ne dit jamais s'il a
+  réussi à la *dessiner*. Une installation hors App Store qui n'enregistre pas
+  l'extension donne donc une demande acceptée, un écran de verrouillage noir, et
+  pas un mot — l'app se croyait tirée d'affaire et ne posait pas la
+  notification. Tant que personne n'a confirmé, dans « Mon compte », avoir vu
+  l'activité sur cet iPhone, une sortie tient donc **les deux** à jour. Une
+  réponse suffit à arrêter la redondance. Voir `lockScreenMode` dans
+  `src/lockScreen.js`.
 
 ### En course, la carte suit comme un GPS
 

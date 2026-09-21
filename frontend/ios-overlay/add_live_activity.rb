@@ -31,7 +31,7 @@ app_group = project.main_group.children.find { |g| g.isa == 'PBXGroup' && g.path
   abort("Groupe « App » introuvable : le modèle de Capacitor a changé.")
 
 # --- côté app : le module natif et la structure partagée ------------------------
-app_sources = %w[LacetRunAttributes.swift LiveActivityPlugin.swift LacetBridgeViewController.swift]
+app_sources = %w[LacetRunAttributes.swift LiveActivityPlugin.swift LacetBridgeViewController.swift NowPlayingCard.swift]
 app_refs = app_sources.map { |name| app_group.new_reference(name) }
 app.add_file_references(app_refs)
 shared = app_refs.first
@@ -47,6 +47,16 @@ app.build_configurations.each do |config|
 end
 
 # --- l'extension -------------------------------------------------------------
+# L'identifiant de l'extension se **déduit** de celui de l'app, jamais écrit en
+# dur : iOS ne lance une extension que si son identifiant est un enfant de celui
+# de l'app (`fr.lacet.app` → `fr.lacet.app.widgets`). Écrits séparément, un
+# changement d'`appId` dans capacitor.config.json romprait ce lien en silence —
+# l'app s'installerait, l'activité en direct serait acceptée, et rien ne
+# s'afficherait.
+host_id = app.build_configurations.map { |c| c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] }.compact.uniq
+abort("Identifiant de l'app introuvable ou incohérent : #{host_id.inspect}") unless host_id.size == 1
+widget_id = "#{host_id.first}.widgets"
+
 ext = project.new_target(:app_extension, 'LacetWidgets', :ios, '16.2', nil, :swift)
 group = project.main_group.new_group('LacetWidgets', 'LacetWidgets')
 widget_ref = group.new_reference('LacetWidgets.swift')
@@ -56,7 +66,7 @@ ext.add_file_references([widget_ref, shared])
 ext.build_configurations.each do |config|
   s = config.build_settings
   s['PRODUCT_NAME'] = '$(TARGET_NAME)'
-  s['PRODUCT_BUNDLE_IDENTIFIER'] = 'fr.lacet.app.widgets'
+  s['PRODUCT_BUNDLE_IDENTIFIER'] = widget_id
   s['INFOPLIST_FILE'] = 'LacetWidgets/Info.plist'
   s['GENERATE_INFOPLIST_FILE'] = 'NO'
   s['SWIFT_VERSION'] = '5.0'
@@ -78,4 +88,4 @@ embedded = embed.add_file_reference(ext.product_reference, true)
 embedded.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
 
 project.save
-puts "Activité en direct greffée (#{project_path})"
+puts "Activité en direct greffée (#{project_path}) — #{host_id.first} → #{widget_id}"

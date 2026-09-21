@@ -170,6 +170,47 @@ jobs:
           test -d "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app"
           test -d "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app/PlugIns/LacetWidgets.appex"
 
+      # Ce qu'une compilation verte ne prouve pas encore : que l'écran de
+      # verrouillage pourra s'afficher. Quatre conditions se vérifient ici, sur
+      # le paquet réellement construit — chacune a déjà coûté une soirée à
+      # chercher, téléphone en main, pourquoi l'écran restait noir.
+      - name: Vérifier l'activité en direct
+        run: |
+          python3 - "$RUNNER_TEMP/Lacet.xcarchive/Products/Applications/App.app" <<'PY'
+          import plistlib, sys
+          from pathlib import Path
+
+          app = Path(sys.argv[1])
+          host = plistlib.loads((app / "Info.plist").read_bytes())
+          widget = plistlib.loads((app / "PlugIns/LacetWidgets.appex/Info.plist").read_bytes())
+          problems = []
+
+          if not host.get("NSSupportsLiveActivities"):
+              problems.append("NSSupportsLiveActivities absent de l'Info.plist de l'app")
+
+          # iOS ne lance une extension que si son identifiant est un enfant de
+          # celui de l'app. Sinon : activité acceptée, écran vide.
+          host_id, widget_id = host.get("CFBundleIdentifier", ""), widget.get("CFBundleIdentifier", "")
+          if not widget_id.startswith(host_id + "."):
+              problems.append(f"extension {widget_id} non rattachée à l'app {host_id}")
+
+          # Une extension qui ne porte pas la version de l'app est rejetée.
+          for key in ("CFBundleVersion", "CFBundleShortVersionString"):
+              if host.get(key) != widget.get(key):
+                  problems.append(f"{key} : app {host.get(key)!r} ≠ extension {widget.get(key)!r}")
+
+          point = widget.get("NSExtension", {}).get("NSExtensionPointIdentifier")
+          if point != "com.apple.widgetkit-extension":
+              problems.append(f"point d'extension inattendu : {point!r}")
+
+          if problems:
+              print("L'activité en direct ne pourra pas s'afficher :")
+              for p in problems:
+                  print(f"  - {p}")
+              sys.exit(1)
+          print(f"Activité en direct vérifiée : {host_id} → {widget_id}, version {host.get('CFBundleVersion')}")
+          PY
+
       - name: Journal de compilation (en cas d'échec)
         if: failure()
         run: tail -n 200 "$RUNNER_TEMP/xcodebuild.log" || true

@@ -32,16 +32,42 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "noticePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "notice", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearNotice", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cardStart", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cardUpdate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cardStop", returnType: CAPPluginReturnPromise),
     ]
 
     private static let noticeId = "lacet-run"
 
-    /// L'extension qui dessine l'activité est-elle dans l'app installée ?
+    /// Le paquet de l'extension qui dessine l'activité, s'il est là.
+    ///
     /// Certaines installations hors App Store la retirent : l'activité serait
     /// alors acceptée par iOS… et ne s'afficherait nulle part.
-    private static var hasExtension: Bool {
-        guard let plugIns = Bundle.main.builtInPlugInsURL else { return false }
-        return FileManager.default.fileExists(atPath: plugIns.appendingPathComponent("LacetWidgets.appex").path)
+    private static var extensionBundle: Bundle? {
+        guard let plugIns = Bundle.main.builtInPlugInsURL else { return nil }
+        let appex = plugIns.appendingPathComponent("LacetWidgets.appex")
+        guard FileManager.default.fileExists(atPath: appex.path) else { return nil }
+        return Bundle(url: appex)
+    }
+
+    private static var hasExtension: Bool { extensionBundle != nil }
+
+    /// L'extension est-elle encore **rattachée** à l'app installée ?
+    ///
+    /// iOS n'accepte de lancer une extension que si son identifiant est un
+    /// enfant de celui de l'app : `fr.lacet.app` → `fr.lacet.app.widgets`. Un
+    /// installateur hors App Store qui renomme l'app — Sideloadly le fait quand
+    /// l'identifiant d'origine est déjà pris, ou sur demande — rompt ce lien
+    /// sans rien retirer du paquet. Le fichier `.appex` est toujours là, iOS
+    /// accepte l'activité en direct… et personne ne la dessine : écran de
+    /// verrouillage vide, barre noire dans la Dynamic Island.
+    ///
+    /// C'est la seule des quatre conditions qu'on ne pouvait pas voir depuis le
+    /// téléphone, et c'est exactement le symptôme qu'on cherchait.
+    private static var extensionNested: Bool {
+        guard let host = Bundle.main.bundleIdentifier,
+              let widget = extensionBundle?.bundleIdentifier else { return false }
+        return widget.hasPrefix(host + ".")
     }
 
     /// Faux avant iOS 16.2, ou quand les activités sont coupées dans Réglages.
@@ -60,6 +86,17 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         guard Self.hasExtension else {
             call.resolve(["started": false, "reason": "extension d'écran verrouillé absente de l'app installée"])
+            return
+        }
+        // Présente mais détachée : iOS accepterait la demande et ne dessinerait
+        // rien. Autant le dire ici, plutôt que de laisser un écran vide.
+        guard Self.extensionNested else {
+            let host = Bundle.main.bundleIdentifier ?? "?"
+            let widget = Self.extensionBundle?.bundleIdentifier ?? "?"
+            call.resolve([
+                "started": false,
+                "reason": "l'app a été renommée à l'installation (\(host)) : l'extension \(widget) ne lui est plus rattachée",
+            ])
             return
         }
         let name = call.getString("name") ?? "Sortie"
@@ -118,6 +155,49 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // === la carte du lecteur ===================================================
+    //
+    // L'autre façon de tenir l'écran de verrouillage, sans extension : Lacet
+    // devient le lecteur du téléphone et y affiche la consigne. Voir
+    // `NowPlayingCard.swift` pour ce que ça implique.
+
+    @objc func cardStart(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let card = NowPlayingCard.shared
+            let music = card.otherAudioPlaying
+            card.onToggle = { [weak self] in
+                self?.notifyListeners("runControl", data: ["action": "toggle"])
+            }
+            let started = card.start(
+                title: call.getString("title") ?? "Sortie",
+                subtitle: call.getString("subtitle") ?? "",
+                icon: call.getString("icon")
+            )
+            // `interrupted` : une musique jouait, et elle vient de s'arrêter —
+            // l'app le dit plutôt que de laisser croire à une panne.
+            call.resolve(["started": started, "interrupted": started && music])
+        }
+    }
+
+    @objc func cardUpdate(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            NowPlayingCard.shared.update(
+                title: call.getString("title") ?? "Sortie",
+                subtitle: call.getString("subtitle") ?? "",
+                icon: call.getString("icon"),
+                paused: call.getBool("paused") ?? false
+            )
+            call.resolve()
+        }
+    }
+
+    @objc func cardStop(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            NowPlayingCard.shared.stop()
+            call.resolve()
+        }
+    }
+
     /// Ce qu'iOS dit des activités vivantes : combien, et dans quel état.
     ///
     /// La question qui tranche : si iOS en compte une « active » et que
@@ -145,7 +225,14 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     /// Ce que l'écran de verrouillage peut afficher, pour « Mon compte ».
     @objc func status(_ call: CAPPluginCall) {
-        var result: [String: Any] = ["extension": Self.hasExtension]
+        var result: [String: Any] = [
+            "extension": Self.hasExtension,
+            "nested": Self.extensionNested,
+            // Les deux identifiants en clair : c'est ce qu'on lit, téléphone en
+            // main, pour savoir si l'installateur a renommé l'app.
+            "bundle": Bundle.main.bundleIdentifier ?? "",
+            "extensionBundle": Self.extensionBundle?.bundleIdentifier ?? "",
+        ]
         if #available(iOS 16.2, *) {
             result["supported"] = true
             result["enabled"] = ActivityAuthorizationInfo().areActivitiesEnabled
