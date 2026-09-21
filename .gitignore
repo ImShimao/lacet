@@ -23,3 +23,7 @@ frontend/android/
 
 # Carte régionale : produite par la compilation (scripts/region_tiles.py), jamais versionnée.
 frontend/public/region/
+
+# La source AltStore porte l’adresse du PC sur le réseau local : elle se
+# régénère (scripts/altstore_source.py) et n’a rien à faire dans le dépôt.
+source.json
