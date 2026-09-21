@@ -52,6 +52,21 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static var hasExtension: Bool { extensionBundle != nil }
 
+    /// L'extension a-t-elle reçu son propre profil de signature ?
+    ///
+    /// iOS ne lance une extension que si elle est provisionnée **pour
+    /// elle-même** : son `embedded.mobileprovision`, à côté de celui de l'app.
+    /// Un installateur qui signe l'app et oublie ses extensions produit
+    /// exactement ce qu'on observe — l'extension est là, rattachée, complète,
+    /// et le système l'ignore : ni widget dans la galerie, ni activité dessinée.
+    ///
+    /// C'est la dernière chose qu'on pouvait encore vérifier depuis l'app, et
+    /// elle dit si un autre compte de signature changerait quelque chose.
+    private static func provisioned(_ bundle: Bundle?) -> Bool {
+        guard let url = bundle?.bundleURL else { return false }
+        return FileManager.default.fileExists(atPath: url.appendingPathComponent("embedded.mobileprovision").path)
+    }
+
     /// L'extension est-elle encore **rattachée** à l'app installée ?
     ///
     /// iOS n'accepte de lancer une extension que si son identifiant est un
@@ -235,6 +250,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             // Une musique joue-t-elle ? La carte du lecteur la couperait : en
             // mode automatique, c'est ce qui décide.
             "otherAudio": NowPlayingCard.shared.otherAudioPlaying,
+            // Les profils de signature, app et extension : voir `provisioned`.
+            "signedApp": Self.provisioned(Bundle.main),
+            "signedExtension": Self.provisioned(Self.extensionBundle),
             // Les deux identifiants en clair : c'est ce qu'on lit, téléphone en
             // main, pour savoir si l'installateur a renommé l'app.
             "bundle": Bundle.main.bundleIdentifier ?? "",

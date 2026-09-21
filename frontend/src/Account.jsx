@@ -291,7 +291,9 @@ function LockScreenSetting() {
 
   if (!isNative() || status === undefined) return null
 
-  const live = Boolean(status?.supported && status?.enabled && status?.extension && status?.nested)
+  const live = Boolean(
+    status?.supported && status?.enabled && status?.extension && status?.nested && status?.signedExtension !== false,
+  )
   let text
   if (mode === 'card') {
     // Le repli qui ne dépend d'aucune signature : c'est l'app elle-même qui
@@ -321,6 +323,12 @@ function LockScreenSetting() {
   } else {
     text = 'Activités en direct coupées : Réglages › Lacet › Activités en direct. En attendant, une notification silencieuse tient la consigne à jour.'
   }
+  // Tout est en place et rien ne s'affiche : reste la signature. L'app peut le
+  // vérifier elle-même — l'extension a-t-elle reçu son propre profil ?
+  if (live && status?.signedApp && !status?.signedExtension) {
+    text =
+      "L'extension est bien là, rattachée à l'app, et elle n'a pas reçu de profil de signature : l'outil d'installation a signé l'app et pas son extension. iOS refuse alors de la lancer — ni vignette dans la galerie, ni activité dessinée. Un compte développeur Apple payant, ou un installateur qui signe les extensions, est la seule issue. En attendant, la carte du lecteur ou la notification tiennent l'écran verrouillé."
+  }
 
   // Le détail, en clair : c'est ce qu'on demande de lire quand l'écran de
   // verrouillage reste vide. Quatre conditions, et il suffit qu'une manque.
@@ -329,6 +337,7 @@ function LockScreenSetting() {
         `iOS ${status.supported ? '16.2 ou plus' : 'trop ancien'}`,
         `activités ${status.enabled ? 'autorisées' : 'coupées'}`,
         `extension ${status.extension ? (status.nested === false ? 'détachée' : 'présente') : 'absente'}`,
+        `signature ${status.signedExtension ? 'de l’extension présente' : status.signedApp ? 'de l’extension absente' : 'inconnue'}`,
         `notifications ${{ granted: 'autorisées', denied: 'refusées' }[status.notifications] ?? 'jamais demandées'}`,
       ].join(' · ')
     : 'module natif injoignable'
@@ -451,7 +460,7 @@ function LockScreenSetting() {
     <>
       {/* En clair et en évidence quand quelque chose bloque : la ligne grise
           se lisait comme un détail, et personne n'y cherchait la cause. */}
-      {live || mode !== 'auto' ? (
+      {live ? (
         <p className="muted small">
           <b>Écran verrouillé.</b> {text}
         </p>
