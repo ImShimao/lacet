@@ -4,7 +4,7 @@ import Icon from './Icon.jsx'
 import ElevationSheet from './ElevationSheet.jsx'
 import { haversine, km, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
-import { cardOf, lockScreenMode, lockScreenState, noticeOf, shouldRefresh, wantsActivity, wantsNotice } from './lockScreen'
+import { cardOf, fallbackCard, lockScreenMode, lockScreenState, noticeOf, shouldRefresh, wantsActivity, wantsNotice } from './lockScreen'
 import { motionTracker } from './autoPause'
 import { load } from './storage'
 import * as voice from './voice'
@@ -288,6 +288,16 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
       // lecture/pause de l'écran de verrouillage met la sortie en pause : c'est
       // la seule commande qui ait un sens ici.
       let card = false
+      // En automatique : la carte du lecteur prend le relais de l'activité en
+      // direct quand celle-ci n'a pas pris — sauf si une musique joue.
+      if (setting === 'auto' && !started) {
+        const status = await n.lockScreenStatus()
+        if (fallbackCard({ setting, started, otherAudio: status?.otherAudio === true })) {
+          const taken = await n.startRunCard(cardOf(first, { elapsedS: 0 }))
+          card = taken.started
+          if (card) stopControl = n.onRunControl(() => togglePause())
+        }
+      }
       if (setting === 'card') {
         const taken = await n.startRunCard(cardOf(first, { elapsedS: 0 }))
         card = taken.started

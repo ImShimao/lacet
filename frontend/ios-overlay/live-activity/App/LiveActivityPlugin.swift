@@ -232,6 +232,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         var result: [String: Any] = [
             "extension": Self.hasExtension,
             "nested": Self.extensionNested,
+            // Une musique joue-t-elle ? La carte du lecteur la couperait : en
+            // mode automatique, c'est ce qui décide.
+            "otherAudio": NowPlayingCard.shared.otherAudioPlaying,
             // Les deux identifiants en clair : c'est ce qu'on lit, téléphone en
             // main, pour savoir si l'installateur a renommé l'app.
             "bundle": Bundle.main.bundleIdentifier ?? "",

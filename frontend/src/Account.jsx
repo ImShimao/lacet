@@ -449,9 +449,15 @@ function LockScreenSetting() {
 
   return (
     <>
-      <p className="muted small">
-        <b>Écran verrouillé.</b> {text}
-      </p>
+      {/* En clair et en évidence quand quelque chose bloque : la ligne grise
+          se lisait comme un détail, et personne n'y cherchait la cause. */}
+      {live || mode !== 'auto' ? (
+        <p className="muted small">
+          <b>Écran verrouillé.</b> {text}
+        </p>
+      ) : (
+        <div className="notice notice--warn">{text}</div>
+      )}
       {/* Le choix, parce que l'activité en direct peut être acceptée par iOS et
           ne s'afficher nulle part — une app installée hors App Store n'a aucune
           garantie de ce côté. « Notification » donne alors quelque chose qui

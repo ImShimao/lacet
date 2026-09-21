@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cardOf, lockScreenMode, lockScreenState, noticeOf, paceEstimate, shortDistance, shouldRefresh, wantsActivity, wantsNotice } from './lockScreen'
+import { cardOf, fallbackCard, lockScreenMode, lockScreenState, noticeOf, paceEstimate, shortDistance, shouldRefresh, wantsActivity, wantsNotice } from './lockScreen'
 import { bearing, buildTrack, headingAt } from './routeTracker'
 
 /**
@@ -239,6 +239,20 @@ describe('la carte du lecteur', () => {
     expect(lockScreenMode({ setting: 'card', started: false, noticeAllowed: true, card: true })).toBe('card')
     // Refusée par iOS : la notification prend le relais plutôt que rien.
     expect(lockScreenMode({ setting: 'card', started: false, noticeAllowed: true, card: false })).toBe('notice')
+  })
+})
+
+describe('le mode automatique', () => {
+  it('prend la carte du lecteur quand l’activité échoue et que rien ne joue', () => {
+    expect(fallbackCard({ setting: 'auto', started: false, otherAudio: false })).toBe(true)
+  })
+
+  it('ne coupe pas la musique de quelqu’un qui court en musique', () => {
+    expect(fallbackCard({ setting: 'auto', started: false, otherAudio: true })).toBe(false)
+  })
+
+  it('ne la prend pas quand l’activité en direct s’affiche', () => {
+    expect(fallbackCard({ setting: 'auto', started: true, otherAudio: false })).toBe(false)
   })
 })
 

@@ -121,9 +121,11 @@ export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
  * @param {boolean} o.seen        l'activité a déjà été vue sur cet iPhone
  */
 export function lockScreenMode({ setting, started, noticeAllowed, seen, card = false }) {
-  // La carte du lecteur ne se devine pas : on ne prend le lecteur du téléphone
-  // — et la musique avec — que si on l'a demandé.
+  // La carte du lecteur ne se devine pas tout à fait : elle confisque le
+  // lecteur du téléphone. En automatique, on ne la prend que faute d'activité
+  // en direct **et** si aucune musique ne joue (voir `fallbackCard`).
   if (setting === 'card') return card ? 'card' : noticeAllowed ? 'notice' : null
+  if (!started && card) return 'card'
   if (!started) return noticeAllowed ? 'notice' : null
   if (seen) return 'activity'
   return noticeAllowed ? 'both' : 'activity'
@@ -131,6 +133,16 @@ export function lockScreenMode({ setting, started, noticeAllowed, seen, card = f
 
 /** L'activité en direct doit-elle être tentée, vu le réglage ? */
 export const wantsActivity = (setting) => setting === 'auto'
+
+/**
+ * En automatique, faut-il se rabattre sur la carte du lecteur ?
+ *
+ * Oui quand l'activité en direct n'a pas pris — c'est le plus lisible des
+ * replis — mais **seulement si rien ne joue** : couper la musique de quelqu'un
+ * qui court en musique serait pire que la notification silencieuse.
+ */
+export const fallbackCard = ({ setting, started, otherAudio }) =>
+  setting === 'auto' && !started && !otherAudio
 
 /**
  * Faut-il la notification, avant même de savoir si elle est autorisée ?
