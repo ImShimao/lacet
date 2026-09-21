@@ -41,11 +41,18 @@ prévue**.
 elles se téléchargent une fois et restent. Le fond de carte se garde parcours
 par parcours. Une sortie en montagne, sans antenne, fonctionne.
 
+**Il garde ce que tu as couru.** À l'arrivée, un écran de fin : distance, temps,
+allure, dénivelé, l'écart avec le parcours prévu, et **ta trace réelle** sur la
+carte — exportable en GPX vers une montre ou Strava. Et si l'app est fermée en
+plein effort, par iOS ou par une batterie vide, elle propose de reprendre la
+sortie là où elle s'est arrêtée.
+
 **Il n'envoie rien.** Pas de compte, pas de serveur, pas de suivi. Tes favoris,
 tes sorties et tes réglages ne quittent pas l'appareil — une sauvegarde
 s'exporte en un fichier si tu veux les emporter.
 
-Et le reste, qui compte le jour où il sert : pause automatique aux feux, alerte
+Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
+« Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
 position, export GPX vers une montre ou Strava, profil de dénivelé consultable
 en pleine sortie, historique avec totaux mensuels.

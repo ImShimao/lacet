@@ -27,21 +27,22 @@ struct LacetWidgetBundle: WidgetBundle {
     }
 }
 
-/// Une petite vignette pour l'écran d'accueil.
+/// La vignette d'écran d'accueil : une sortie à une touche.
 ///
-/// Elle sert d'abord de **preuve** : un widget se pose à la main depuis la
-/// galerie d'iOS. S'il s'affiche, l'extension tourne, et un écran de
-/// verrouillage vide ne peut venir que de l'activité elle-même. S'il n'apparaît
-/// même pas dans la galerie, c'est l'extension qu'iOS refuse de lancer — et
-/// aucune ligne de code ne l'y forcera : c'est la signature de l'installation.
+/// Elle ne montre **pas** les kilomètres de la semaine, et ce n'est pas un
+/// oubli : un widget vit dans son propre processus, et ne peut lire les données
+/// de l'app qu'à travers un « app group » — une capacité qu'un compte Apple
+/// gratuit ne peut pas signer. Avec un compte payant, elle afficherait la
+/// dernière sortie et le total de la semaine ; en attendant, elle fait ce
+/// qu'elle peut faire honnêtement : ouvrir l'app, là où l'on cherche sa boucle.
 struct LacetShortcut: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LacetShortcut", provider: ShortcutProvider()) { _ in
             ShortcutView()
         }
         .configurationDisplayName("Lacet")
-        .description("Ouvrir Lacet pour lancer une sortie.")
-        .supportedFamilies([.systemSmall])
+        .description("Une boucle depuis ta porte, en une touche.")
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 
@@ -62,20 +63,64 @@ struct ShortcutProvider: TimelineProvider {
 }
 
 struct ShortcutView: View {
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("LACET")
-                .font(.system(size: 15, weight: .black))
-                .foregroundColor(accent)
-            Text("Trouver ma boucle")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-            Spacer(minLength: 0)
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("LACET")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundColor(accent)
+                Text("Trouver ma boucle")
+                    .font(.system(size: family == .systemMedium ? 20 : 15, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                if family == .systemMedium {
+                    Text("Des boucles sûres depuis ta porte, sans longer la nationale.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Label("Ouvrir", systemImage: "figure.run")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(accent)
+            }
+            if family == .systemMedium {
+                Spacer(minLength: 0)
+                // Le tracé d'une boucle, dessiné : la vignette dit ce que fait
+                // l'app sans avoir à lire.
+                LoopMark()
+                    .stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    .frame(width: 96, height: 96)
+                    .opacity(0.9)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
         .lacetBackground()
+        .widgetURL(URL(string: "lacet://explore"))
+    }
+}
+
+/// Une boucle stylisée : on part d'un point, on tourne, on revient au même.
+struct LoopMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        path.move(to: CGPoint(x: w * 0.2, y: h * 0.82))
+        path.addCurve(
+            to: CGPoint(x: w * 0.82, y: h * 0.3),
+            control1: CGPoint(x: w * 0.05, y: h * 0.35),
+            control2: CGPoint(x: w * 0.5, y: h * 0.02)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.2, y: h * 0.82),
+            control1: CGPoint(x: w * 1.05, y: h * 0.6),
+            control2: CGPoint(x: w * 0.6, y: h * 0.72)
+        )
+        return path
     }
 }
 

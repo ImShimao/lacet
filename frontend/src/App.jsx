@@ -4,6 +4,8 @@ import MapView from './MapView.jsx'
 import FiltersSheet, { DEFAULTS, SPORTS, estimateKm, formatKm, raceOf } from './FiltersSheet.jsx'
 import SearchBar from './SearchBar.jsx'
 import LiveRun from './LiveRun.jsx'
+import RunSummary from './RunSummary.jsx'
+import PlaceSheet from './PlaceSheet.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import Account from './Account.jsx'
@@ -13,6 +15,7 @@ import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
 import { load, save, slim } from './storage'
+import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
 import { clearEngineData, prefetchOnDevice } from './engine/client'
 import { useAppMode } from './platform'
@@ -191,6 +194,11 @@ export default function App() {
   // des sorties — on part sans savoir où l'on va — et le refuser obligeait à
   // choisir une boucle pour pouvoir simplement démarrer le chronomètre.
   const [freeRun, setFreeRun] = useState(false)
+  // Une sortie interrompue retrouvée au lancement, et celle qu'on reprend.
+  const [pending, setPending] = useState(() => loadRun())
+  const [resume, setResume] = useState(null)
+  // La sortie qui vient de se terminer : ses chiffres, et sa trace sur la carte.
+  const [summary, setSummary] = useState(null)
   const [livePosition, setLivePosition] = useState(null)
   // La direction de course, pour la carte orientée comme un GPS de voiture.
   const [liveHeading, setLiveHeading] = useState(null)
@@ -205,6 +213,9 @@ export default function App() {
   const [overviewAt, setOverviewAt] = useState(0)
   const [northAt, setNorthAt] = useState(0)
   const [startMenu, setStartMenu] = useState(false)
+  // Les départs qu'on garde : chez soi, le bureau, le club.
+  const [places, setPlaces] = useState(stored.places || [])
+  const [naming, setNaming] = useState(false)
   const stageRef = useRef(null)
   const compassRef = useRef(null)
 
@@ -270,6 +281,20 @@ export default function App() {
     }
     pendingLocate.current = true
     geo.locate()
+  }
+
+  const keepPlace = (name) => {
+    if (!start) return
+    const next = [{ id: `p${Date.now()}`, name, lat: start.lat, lon: start.lon }, ...places].slice(0, 8)
+    setPlaces(next)
+    save({ places: next })
+    setNaming(false)
+  }
+
+  const dropPlace = (id) => {
+    const next = places.filter((p) => p.id !== id)
+    setPlaces(next)
+    save({ places: next })
   }
 
   const startFromHere = () => {
@@ -476,22 +501,46 @@ export default function App() {
     save({ favorites: next })
   }
 
+  /** Construit l'entrée d'historique d'une sortie terminée. */
+  function runEntry(stats, { route, free, sport: ranWith }) {
+    const base = free ? freeRunEntry({ ...params, sport: ranWith }) : slim(route)
+    return {
+      ...base,
+      ranAt: new Date().toISOString(),
+      actual_distance_m: Math.round(stats.distance),
+      actual_duration_s: Math.round(stats.elapsed),
+      actual_ascent_m: stats.ascent ?? null,
+      // Ce qu'on a réellement couru, allégé — voir `trail.js`.
+      track: stats.trail?.length > 1 ? stats.trail : null,
+      rerouted: Boolean(stats.rerouted),
+      free: Boolean(free),
+      sport: ranWith,
+    }
+  }
+
+  /**
+   * Range une sortie dans l'historique.
+   *
+   * Les traces ne sont gardées que pour les sorties récentes : une trace pèse
+   * quelques dizaines de kilooctets, et le stockage du navigateur finirait par
+   * refuser d'écrire — en emportant un favori plutôt qu'une vieille trace.
+   */
+  function remember(entry) {
+    const next = [entry, ...history].map((run, i) => (i < 25 ? run : { ...run, track: null }))
+    const kept = next.slice(0, 200)
+    setHistory(kept)
+    save({ history: kept })
+    return entry
+  }
+
   function finishRun(stats) {
     // Une sortie de moins de cent mètres est un démarrage par erreur, pas une
     // sortie : l'enregistrer polluerait les statistiques et l'historique.
     if (stats.distance >= 100) {
-      const base = freeRun ? freeRunEntry(params) : slim(selected)
-      const entry = {
-        ...base,
-        ranAt: new Date().toISOString(),
-        actual_distance_m: Math.round(stats.distance),
-        actual_duration_s: Math.round(stats.elapsed),
-        sport: params.sport,
-      }
-      const next = [entry, ...history].slice(0, 200)
-      setHistory(next)
-      save({ history: next })
+      setSummary(remember(runEntry(stats, { route: selected, free: freeRun, sport: params.sport })))
     }
+    clearRun()
+    setResume(null)
     setRunning(false)
     setFreeRun(false)
     setLivePosition(null)
@@ -523,7 +572,7 @@ export default function App() {
   const sport = SPORTS.find((s) => s.key === params.sport)
   const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
-  const sheetMode = running ? 'live' : tab !== 'explore' ? 'page' : sheet
+  const sheetMode = running ? 'live' : summary || tab !== 'explore' ? 'page' : sheet
   const sheetGesture = useSheetDrag(sheetMode, setSheet, shellRef)
 
   const announcement = busy
@@ -545,7 +594,15 @@ export default function App() {
         <MapView
           styleKey={mapStyle}
           start={start}
-          route={running && freeRun ? null : running ? liveRoute ?? selected : selected}
+          route={
+            summary?.track
+              ? { ...summary, geometry: summary.track, segments: [], crossings: [] }
+              : running && freeRun
+                ? null
+                : running
+                  ? liveRoute ?? selected
+                  : selected
+          }
           ghost={!running ? result?.routes : null}
           position={running ? livePosition : geo.position}
           accuracy={geo.accuracy}
@@ -659,6 +716,28 @@ export default function App() {
               {startMenu && (
                 <div className="startmenu" role="menu">
                   <b>Point de départ</b>
+                  {places.map((place) => (
+                    <div className="startmenu__row" key={place.id}>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setStartMenu(false)
+                          applyStart({ lat: place.lat, lon: place.lon }, place.name, true)
+                        }}
+                      >
+                        <Icon name="heart" size={17} />
+                        {place.name}
+                      </button>
+                      <button
+                        className="startmenu__drop"
+                        onClick={() => dropPlace(place.id)}
+                        aria-label={`Oublier ${place.name}`}
+                        title="Oublier"
+                      >
+                        <Icon name="close" size={13} />
+                      </button>
+                    </div>
+                  ))}
                   <button role="menuitem" onClick={startFromHere}>
                     <Icon name="locate" size={17} />
                     Partir de ma position
@@ -673,6 +752,18 @@ export default function App() {
                     <Icon name="pin" size={17} />
                     Choisir sur la carte
                   </button>
+                  {start && (
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setStartMenu(false)
+                        setNaming(true)
+                      }}
+                    >
+                      <Icon name="plus" size={17} />
+                      Enregistrer ce départ
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -727,6 +818,64 @@ export default function App() {
         </div>
 
         <div className="side__body" {...sheetGesture(true)}>
+          {pending && !running && !summary && tab === 'explore' && (
+            <div className="banner banner--resume">
+              <Icon name="refresh" size={16} />
+              <span>
+                <b>Sortie interrompue.</b>{' '}
+                <span className="banner__more">
+                  {km(pending.covered, 1).replace('.', ',')} km en {Math.round(pending.elapsed / 60)} min,
+                  {' '}
+                  {Math.round((Date.now() - pending.at) / 60000)} min plus tôt.
+                </span>
+              </span>
+              <button
+                className="banner__act"
+                onClick={() => {
+                  const route = pending.route
+                  if (route) {
+                    setSelected(route)
+                    setResult({ routes: [route], rejected: [], meta: {} })
+                  }
+                  setFreeRun(!route)
+                  setResume(pending)
+                  setPending(null)
+                  setRunning(true)
+                }}
+              >
+                Reprendre
+              </button>
+              <button
+                className="banner__act"
+                onClick={() => {
+                  // Reprise impossible ou pas voulue : on garde au moins ce qui
+                  // a été couru, plutôt que de le jeter.
+                  setSummary(
+                    remember(
+                      runEntry(
+                        { distance: pending.covered, elapsed: pending.elapsed, trail: pending.trail },
+                        { route: pending.route, free: !pending.route, sport: pending.sport || params.sport },
+                      ),
+                    ),
+                  )
+                  clearRun()
+                  setPending(null)
+                }}
+              >
+                Enregistrer
+              </button>
+              <button
+                className="banner__close"
+                onClick={() => {
+                  clearRun()
+                  setPending(null)
+                }}
+                aria-label="Oublier"
+              >
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+          )}
           {geoNoticeOpen && geo.status === 'denied' && (running || tab === 'explore') && (
             <div className="banner">
               <Icon name="warning" size={16} />
@@ -759,11 +908,14 @@ export default function App() {
               </button>
             </div>
           )}
-          {running ? (
+          {summary ? (
+            <RunSummary entry={summary} onClose={() => setSummary(null)} />
+          ) : running ? (
             <LiveRun
               route={freeRun ? null : selected}
               request={freeRun ? null : detourRequest}
               sport={params.sport}
+              resuming={resume}
               stage={stageRef.current}
               speaking={speaking}
               onPosition={(point, heading) => {
@@ -871,6 +1023,9 @@ export default function App() {
 
       {filtersOpen && (
         <FiltersSheet value={params} onApply={search} onClose={() => setFiltersOpen(false)} />
+      )}
+      {naming && (
+        <PlaceSheet suggestion={startLabel || ''} onSave={keepPlace} onClose={() => setNaming(false)} />
       )}
       {stylesOpen && (
         <MapStyleSheet

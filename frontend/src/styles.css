@@ -3501,3 +3501,83 @@ html[data-turn] .maplibregl-control-container {
   }
 }
 
+/* ══ après la sortie ══════════════════════════════════════════════════════ */
+
+.origin__pin--done {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--safe);
+}
+.summary__big {
+  text-align: center;
+  margin: 2px 0 2px;
+}
+.summary__big b {
+  display: block;
+  font-size: 58px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.summary__big span {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+.summary .row {
+  margin-top: 2px;
+}
+
+/* La sortie interrompue, retrouvée au lancement : violette et non rouge — ce
+   n'est pas une panne, c'est quelque chose à récupérer. */
+.banner--resume {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--text-2);
+}
+.banner--resume .icon {
+  color: var(--accent-text);
+}
+.banner--resume .banner__act {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+/* Ce que dit le détail — « 3,2 km en 18 min » — est précisément ce qui permet
+   de décider : il reste lisible même sur un écran étroit, contrairement aux
+   explications des autres bandeaux. */
+.banner--resume .banner__more {
+  display: inline;
+}
+.banner--resume .banner__act:last-of-type {
+  background: none;
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
+
+/* ══ les départs enregistrés ══════════════════════════════════════════════ */
+
+.startmenu__row {
+  display: flex;
+  align-items: center;
+}
+.startmenu__row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.startmenu__drop {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-3);
+}
+.startmenu__drop:hover,
+.startmenu__drop:focus-visible {
+  color: var(--risk);
+  background: var(--surface-2);
+}
+

@@ -65,6 +65,12 @@ def info_plist() -> None:
     # temps restant, lisibles sans déverrouiller. Voir `live_activity()`.
     plist["NSSupportsLiveActivities"] = True
 
+    # `lacet://` : l'adresse que la vignette d'écran d'accueil ouvre. Sans ce
+    # schéma déclaré, toucher le widget n'ouvre rien du tout.
+    plist["CFBundleURLTypes"] = [
+        {"CFBundleURLName": "fr.lacet.app", "CFBundleURLSchemes": ["lacet"]}
+    ]
+
     with path.open("wb") as fh:
         plistlib.dump(plist, fh)
     print(f"Info.plist réglé ({path})")

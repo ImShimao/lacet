@@ -13,6 +13,8 @@ import { isNative } from './platform'
 import { watchPosition } from './position'
 import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
+import { simplify, trailRecorder } from './trail'
+import { clearRun, saveRun } from './runState'
 
 // Distance à laquelle on prévient d'une traversée à venir.
 const CROSSING_ALERT_M = 120
@@ -57,7 +59,10 @@ const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
  * `request` est la demande qui a produit le parcours : c'est avec elle qu'un
  * chemin de retour se calcule quand on s'est écarté.
  */
-export default function LiveRun({ route, request, sport, stage, speaking, onPosition, onReroute, onStop }) {
+// `resuming` et non `resume` : une fonction interne porte déjà ce nom, et en
+// JavaScript une déclaration de fonction écrase le paramètre de même nom — la
+// sortie reprise repartait alors de zéro, sans une erreur.
+export default function LiveRun({ route, request, sport, resuming, stage, speaking, onPosition, onReroute, onStop }) {
   const [state, setState] = useState({ distance: 0, elapsed: 0, points: 0 })
   const [error, setError] = useState(null)
   const [alert, setAlert] = useState(null)
@@ -114,6 +119,23 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
   const trail = useRef([])
   const autoPause = useRef(load().autoPause !== false)
+  // La trace réellement suivie, et le dénivelé qu'elle a coûté (voir `trail.js`).
+  const trace = useRef(null)
+  if (!trace.current) trace.current = trailRecorder(resuming?.trail ?? [])
+  // Une sortie reprise après une coupure repart de ses propres chiffres.
+  const resumed = useRef(false)
+  if (!resumed.current) {
+    resumed.current = true
+    if (resuming) {
+      covered.current = resuming.covered ?? 0
+      pausedMs.current = 0
+      startedAt.current = Date.now() - (resuming.elapsed ?? 0) * 1000
+      lastSplit.current = Math.floor(covered.current / 1000)
+    }
+  }
+  // La sortie est écrite sur le disque de loin en loin : fermée par iOS ou par
+  // une batterie vide, elle se retrouve au lancement suivant.
+  const savedAt = useRef(0)
 
   const plannedM = route?.distance_m || 0
   const canDetour = Boolean(route && request && route.geometry?.length > 1)
@@ -172,6 +194,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
   useEffect(() => {
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: movingSeconds() }))
+      keepRun()
     }, 1000)
 
     // `background` : dans l'app native, le suivi continue écran verrouillé,
@@ -229,6 +252,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
           while (trail.current.length && now - trail.current[0].t > 20_000) trail.current.shift()
         }
         last.current = point
+        trace.current.push(point, position.coords.altitude ?? null)
         if (route) {
           followRoute(point)
           warnCrossing(point)
@@ -283,6 +307,26 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
+
+  /**
+   * Écrit la sortie sur le disque, toutes les dix secondes.
+   *
+   * Assez souvent pour ne rien perdre d'utile, assez rare pour que l'écriture —
+   * qui sérialise aussi l'historique et les favoris — ne se sente pas.
+   */
+  function keepRun(force = false) {
+    const now = Date.now()
+    if (!force && now - savedAt.current < 10_000) return
+    savedAt.current = now
+    saveRun({
+      route: route ? { ...route, segments: [] } : null,
+      free: !route,
+      sport,
+      covered: covered.current,
+      elapsed: movingSeconds(now),
+      trail: trace.current.points,
+    })
+  }
 
   /** Le temps en mouvement, pauses déduites — celui qui fait l'allure. */
   function movingSeconds(now = Date.now()) {
@@ -536,7 +580,18 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
     setTimeout(() => setAlert(null), 8000)
   }
 
-  const finish = () => onStop({ ...state, elapsed: movingSeconds() })
+  const finish = () => {
+    clearRun()
+    onStop({
+      ...state,
+      elapsed: movingSeconds(),
+      // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
+      // reprendre, et un point tous les huit mètres y suffit.
+      trail: simplify(trace.current.points),
+      ascent: trace.current.points.length > 2 ? trace.current.ascent : null,
+      rerouted: Boolean(guideRef.current.route?.rerouted),
+    })
+  }
 
   const bike = sport === 'bike'
   const moving = state.distance > 50 ? state.elapsed / (state.distance / 1000) : 0
