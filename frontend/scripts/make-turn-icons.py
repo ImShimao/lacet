@@ -24,12 +24,29 @@ from PIL import Image, ImageDraw
 SIZE = 220
 STROKE = 24
 WHITE = (255, 255, 255, 255)
+# La tuile finale, et son fond. **Opaque, et sombre** : ces images servent aussi
+# de pochette à la carte du lecteur, qu'iOS pose sur un fond clair — une flèche
+# blanche sur du transparent y devenait un carré blanc vide.
+TILE = 512
+BACKDROP = (14, 12, 22, 255)
+RING = (124, 58, 237, 255)
 OUT = Path(__file__).resolve().parent.parent / "public" / "turns"
 
 
 def canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     return image, ImageDraw.Draw(image)
+
+
+def tile(arrow: Image.Image) -> Image.Image:
+    """La flèche, posée au centre d'une tuile sombre aux coins arrondis."""
+    out = Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(out)
+    draw.rounded_rectangle([0, 0, TILE - 1, TILE - 1], radius=96, fill=BACKDROP, outline=RING, width=6)
+    drawn = round(TILE * 0.62)
+    scaled = arrow.resize((drawn, drawn), Image.LANCZOS)
+    out.alpha_composite(scaled, ((TILE - drawn) // 2, (TILE - drawn) // 2))
+    return out
 
 
 def stroke(draw: ImageDraw.ImageDraw, points: list[tuple[float, float]]) -> None:
@@ -157,5 +174,5 @@ ICONS = {
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     for name, draw_icon in ICONS.items():
-        draw_icon().save(OUT / f"{name}.png")
+        tile(draw_icon()).save(OUT / f"{name}.png")
     print(f"{len(ICONS)} flèches écrites dans {OUT}")

@@ -171,7 +171,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             let started = card.start(
                 title: call.getString("title") ?? "Sortie",
                 subtitle: call.getString("subtitle") ?? "",
-                icon: call.getString("icon")
+                icon: call.getString("icon"),
+                elapsed: call.getDouble("elapsed") ?? 0,
+                duration: call.getDouble("duration") ?? 0
             )
             // `interrupted` : une musique jouait, et elle vient de s'arrêter —
             // l'app le dit plutôt que de laisser croire à une panne.
@@ -185,7 +187,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 title: call.getString("title") ?? "Sortie",
                 subtitle: call.getString("subtitle") ?? "",
                 icon: call.getString("icon"),
-                paused: call.getBool("paused") ?? false
+                paused: call.getBool("paused") ?? false,
+                elapsed: call.getDouble("elapsed") ?? 0,
+                duration: call.getDouble("duration") ?? 0
             )
             call.resolve()
         }

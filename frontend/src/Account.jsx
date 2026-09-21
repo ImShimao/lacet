@@ -346,6 +346,8 @@ function LockScreenSetting() {
         title: 'Tourne à droite sur Rue de la Gare',
         subtitle: '120 m · reste 4,2 km',
         icon: 'right',
+        elapsed: 18 * 60,
+        duration: 44 * 60,
       })
       setResult(
         started

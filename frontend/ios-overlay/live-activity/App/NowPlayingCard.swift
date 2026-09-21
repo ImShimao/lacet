@@ -39,7 +39,7 @@ final class NowPlayingCard {
     /// Prend la carte. Rend `false` si le silence n'a pas pu être joué — sans
     /// audio qui sort, iOS ne donne la carte à personne.
     @discardableResult
-    func start(title: String, subtitle: String, icon: String?) -> Bool {
+    func start(title: String, subtitle: String, icon: String?, elapsed: Double = 0, duration: Double = 0) -> Bool {
         let session = AVAudioSession.sharedInstance()
         do {
             // Exclusive, et sans `.mixWithOthers` : c'est la condition pour
@@ -62,19 +62,27 @@ final class NowPlayingCard {
 
         wireCommands()
         UIApplication.shared.beginReceivingRemoteControlEvents()
-        update(title: title, subtitle: subtitle, icon: icon, paused: false)
+        update(title: title, subtitle: subtitle, icon: icon, paused: false, elapsed: elapsed, duration: duration)
         return true
     }
 
-    func update(title: String, subtitle: String, icon: String?, paused: Bool) {
+    func update(title: String, subtitle: String, icon: String?, paused: Bool, elapsed: Double = 0, duration: Double = 0) {
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: title,
             MPMediaItemPropertyArtist: subtitle,
             MPMediaItemPropertyAlbumTitle: "Lacet",
-            // Sans durée connue : pas de barre de progression trompeuse.
-            MPNowPlayingInfoPropertyIsLiveStream: true,
             MPNowPlayingInfoPropertyPlaybackRate: paused ? 0.0 : 1.0,
         ]
+        // La barre du lecteur devient celle de la sortie : le temps couru d'un
+        // côté, l'arrivée estimée de l'autre. Sans durée, iOS écrit « EN DIRECT »
+        // sur une barre vide, qui n'apprend rien.
+        if duration > elapsed, duration > 1 {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
+            info[MPNowPlayingInfoPropertyIsLiveStream] = false
+        } else {
+            info[MPNowPlayingInfoPropertyIsLiveStream] = true
+        }
         if let icon, let art = Self.artwork(named: icon) {
             info[MPMediaItemPropertyArtwork] = art
         }

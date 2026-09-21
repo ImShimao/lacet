@@ -217,15 +217,20 @@ describe('la carte du lecteur', () => {
   }
 
   it('met la consigne en titre et la distance en sous-titre', () => {
-    expect(cardOf(state)).toEqual({
+    const now = Date.now()
+    expect(cardOf({ ...state, arrival: now + 26 * 60_000 }, { elapsedS: 18 * 60, now })).toEqual({
       title: 'Tourne à droite sur Rue de la Gare',
       subtitle: '120 m · reste 4,2 km',
       icon: 'right',
+      // La barre du lecteur : 18 minutes courues sur 44 estimées.
+      elapsed: 18 * 60,
+      duration: 44 * 60,
     })
   })
 
   it('dit la pause et le hors-parcours à la place de la consigne', () => {
     expect(cardOf({ ...state, paused: true }).title).toBe('Sortie en pause')
+    expect(cardOf({ ...state, paused: true }).duration).toBeGreaterThanOrEqual(0)
     expect(cardOf({ ...state, offRoute: true }).icon).toBe('warning')
   })
 

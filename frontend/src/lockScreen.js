@@ -147,18 +147,25 @@ export const wantsNotice = ({ started, seen }) => !started || !seen
  * C'est la place d'un titre et d'un artiste : deux lignes, la première en gras.
  * Elles tombent juste sur ce qu'on lit en courant.
  */
-export function cardOf(state) {
+export function cardOf(state, { elapsedS = 0, now = Date.now() } = {}) {
+  // La barre du lecteur devient celle de la sortie : le temps déjà couru, et
+  // la durée jusqu'à l'arrivée estimée.
+  const timing = {
+    elapsed: Math.max(0, Math.round(elapsedS)),
+    duration: Math.max(0, Math.round(elapsedS + Math.max(0, (state.arrival - now) / 1000))),
+  }
   if (state.offRoute) {
-    return { title: 'Hors parcours', subtitle: 'Reviens sur le tracé', icon: 'warning' }
+    return { title: 'Hors parcours', subtitle: 'Reviens sur le tracé', icon: 'warning', ...timing }
   }
   if (state.paused) {
-    return { title: 'Sortie en pause', subtitle: `Reste ${state.remaining}`, icon: 'start' }
+    return { title: 'Sortie en pause', subtitle: `Reste ${state.remaining}`, icon: 'start', ...timing }
   }
   const near = state.distance === 'maintenant' ? 'Maintenant' : state.distance
   return {
     title: state.instruction,
     subtitle: `${near} · reste ${state.remaining}`,
     icon: state.turn || 'straight',
+    ...timing,
   }
 }
 

@@ -289,7 +289,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
       // la seule commande qui ait un sens ici.
       let card = false
       if (setting === 'card') {
-        const taken = await n.startRunCard(cardOf(first))
+        const taken = await n.startRunCard(cardOf(first, { elapsedS: 0 }))
         card = taken.started
         if (card) stopControl = n.onRunControl(() => togglePause())
         if (taken.interrupted) setCardNote(true)
@@ -408,7 +408,7 @@ export default function LiveRun({ route, request, sport, stage, speaking, onPosi
     const mode = lockMode.current
     import('./native').then((n) => {
       if (mode === 'card') {
-        n.updateRunCard({ ...cardOf(next), paused: next.paused })
+        n.updateRunCard({ ...cardOf(next, { elapsedS: movingSeconds() }), paused: next.paused })
         return
       }
       if (mode !== 'notice') n.updateLiveActivity(next)
