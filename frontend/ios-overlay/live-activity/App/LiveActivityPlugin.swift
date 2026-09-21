@@ -1,7 +1,6 @@
 import ActivityKit
 import Capacitor
 import Foundation
-import UserNotifications
 
 /// L'activité en direct d'une sortie : la consigne à venir et le temps restant,
 /// sur l'écran de verrouillage et dans la Dynamic Island.
@@ -9,13 +8,6 @@ import UserNotifications
 /// Elle est mise à jour par l'app elle-même, qui tourne en arrière-plan pendant
 /// toute la sortie (mode de fond « location ») : pas de notifications push, donc
 /// pas de serveur, et rien qui passe par Apple en dehors du téléphone.
-///
-/// **Et une notification de secours.** L'activité en direct demande une
-/// extension à part, que l'installation hors App Store peut retirer, et que
-/// Réglages permet de couper. Sans elle, l'écran de verrouillage restait vide :
-/// la consigne passe alors dans une notification **passive** — elle ne sonne
-/// pas, n'allume pas l'écran, et se remplace elle-même à chaque consigne : il
-/// n'y en a jamais qu'une, toujours à jour, qu'on lit en allumant l'écran.
 ///
 /// Côté JavaScript : `registerPlugin('LiveActivity')`, dans `src/native.js`.
 @objc(LiveActivityPlugin)
@@ -29,15 +21,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "activities", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "noticePermission", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "notice", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearNotice", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "cardStart", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "cardUpdate", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "cardStop", returnType: CAPPluginReturnPromise),
     ]
-
-    private static let noticeId = "lacet-run"
 
     /// Le paquet de l'extension qui dessine l'activité, s'il est là.
     ///
@@ -170,53 +154,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // === la carte du lecteur ===================================================
-    //
-    // L'autre façon de tenir l'écran de verrouillage, sans extension : Lacet
-    // devient le lecteur du téléphone et y affiche la consigne. Voir
-    // `NowPlayingCard.swift` pour ce que ça implique.
-
-    @objc func cardStart(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            let card = NowPlayingCard.shared
-            let music = card.otherAudioPlaying
-            card.onToggle = { [weak self] in
-                self?.notifyListeners("runControl", data: ["action": "toggle"])
-            }
-            let started = card.start(
-                title: call.getString("title") ?? "Sortie",
-                subtitle: call.getString("subtitle") ?? "",
-                icon: call.getString("icon"),
-                elapsed: call.getDouble("elapsed") ?? 0,
-                duration: call.getDouble("duration") ?? 0
-            )
-            // `interrupted` : une musique jouait, et elle vient de s'arrêter —
-            // l'app le dit plutôt que de laisser croire à une panne.
-            call.resolve(["started": started, "interrupted": started && music])
-        }
-    }
-
-    @objc func cardUpdate(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            NowPlayingCard.shared.update(
-                title: call.getString("title") ?? "Sortie",
-                subtitle: call.getString("subtitle") ?? "",
-                icon: call.getString("icon"),
-                paused: call.getBool("paused") ?? false,
-                elapsed: call.getDouble("elapsed") ?? 0,
-                duration: call.getDouble("duration") ?? 0
-            )
-            call.resolve()
-        }
-    }
-
-    @objc func cardStop(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            NowPlayingCard.shared.stop()
-            call.resolve()
-        }
-    }
-
     /// Ce qu'iOS dit des activités vivantes : combien, et dans quel état.
     ///
     /// La question qui tranche : si iOS en compte une « active » et que
@@ -247,9 +184,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         var result: [String: Any] = [
             "extension": Self.hasExtension,
             "nested": Self.extensionNested,
-            // Une musique joue-t-elle ? La carte du lecteur la couperait : en
-            // mode automatique, c'est ce qui décide.
-            "otherAudio": NowPlayingCard.shared.otherAudioPlaying,
             // Les profils de signature, app et extension : voir `provisioned`.
             "signedApp": Self.provisioned(Bundle.main),
             "signedExtension": Self.provisioned(Self.extensionBundle),
@@ -265,79 +199,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             result["supported"] = false
             result["enabled"] = false
         }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            switch settings.authorizationStatus {
-            case .authorized, .provisional, .ephemeral:
-                result["notifications"] = "granted"
-            case .denied:
-                result["notifications"] = "denied"
-            default:
-                result["notifications"] = "prompt"
-            }
-            call.resolve(result)
-        }
-    }
-
-    @objc func noticePermission(_ call: CAPPluginCall) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
-            call.resolve(["granted": granted])
-        }
-    }
-
-    /// Pose — ou remplace — la notification de la sortie.
-    @objc func notice(_ call: CAPPluginCall) {
-        let center = UNUserNotificationCenter.current()
-        let content = UNMutableNotificationContent()
-        content.title = call.getString("title") ?? "Lacet"
-        let subtitle = call.getString("subtitle") ?? ""
-        if !subtitle.isEmpty { content.subtitle = subtitle }
-        content.body = call.getString("body") ?? ""
-        content.sound = nil
-        content.threadIdentifier = Self.noticeId
-        // La flèche du virage, en vignette : c'est elle qui distingue une
-        // consigne de navigation d'une ligne de texte de plus.
-        if let icon = call.getString("icon"), let arrow = Self.attachment(named: icon) {
-            content.attachments = [arrow]
-        }
-        if #available(iOS 15.0, *) {
-            content.interruptionLevel = .passive
-        }
-        // Retirée puis reposée : une seule notification, toujours la dernière
-        // consigne, plutôt qu'une pile à faire défiler.
-        center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
-        // `delay` sert à l'essai depuis « Mon compte » : posée pendant qu'on
-        // regarde l'app, iOS ne la montre pas — elle doit arriver une fois
-        // l'écran verrouillé.
-        let delay = call.getDouble("delay") ?? 0
-        let trigger = delay > 0 ? UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false) : nil
-        let request = UNNotificationRequest(identifier: Self.noticeId, content: content, trigger: trigger)
-        center.add(request) { _ in call.resolve() }
-    }
-
-    @objc func clearNotice(_ call: CAPPluginCall) {
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [Self.noticeId])
-        center.removeDeliveredNotifications(withIdentifiers: [Self.noticeId])
-        call.resolve()
-    }
-
-    /// La flèche du virage, copiée hors du paquet de l'app.
-    ///
-    /// Le système **déplace** le fichier d'une pièce jointe dans son propre
-    /// stockage : lui donner directement une ressource de l'app la ferait
-    /// disparaître du paquet. On lui donne donc une copie jetable.
-    private static func attachment(named name: String) -> UNNotificationAttachment? {
-        guard let source = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "public/turns") else {
-            return nil
-        }
-        let copy = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lacet-\(name)-\(UUID().uuidString).png")
-        do {
-            try FileManager.default.copyItem(at: source, to: copy)
-            return try UNNotificationAttachment(identifier: "turn", url: copy, options: nil)
-        } catch {
-            return nil
-        }
+        call.resolve(result)
     }
 
     @available(iOS 16.1, *)

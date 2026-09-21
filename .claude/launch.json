@@ -35,6 +35,17 @@
       ],
       "cwd": "backend",
       "port": 8000
+    },
+    {
+      "name": "lacet-ipa",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765"
+      ],
+      "cwd": ".",
+      "port": 8765
     }
   ]
 }

@@ -218,53 +218,48 @@ réussie → **Artifacts** → `Lacet-ipa`, ou en ligne de commande :
 gh run download --name Lacet-ipa
 ```
 
-Elle n'est **pas signée** : c'est Sideloadly qui la signe, avec ton identifiant
-Apple, au moment de l'installer. Le dossier `ios/` n'est pas versionné — il est
-régénéré à chaque compilation, et tout ce qui distingue Lacet d'un projet
-Capacitor vierge tient dans `customize.py`, où chaque réglage dit pourquoi.
+Elle n'est **pas signée** : c'est l'installateur qui la signe, avec ton
+identifiant Apple, au moment de l'installer. Le dossier `ios/` n'est pas
+versionné — il est régénéré à chaque compilation, et tout ce qui distingue
+Lacet d'un projet Capacitor vierge tient dans `customize.py`, où chaque réglage
+dit pourquoi.
 
-### L'installer avec Sideloadly
+### L'installer avec AltStore
 
-1. Branche l'iPhone en USB, ouvre Sideloadly, glisse `Lacet.ipa` dedans.
-2. Entre ton identifiant Apple et lance **Start**.
-3. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
-   identifiant → **Faire confiance**.
-4. Depuis iOS 16 : **Réglages → Confidentialité et sécurité → Mode
-   développeur** → activer, puis redémarrer.
+**Avec AltStore, pas Sideloadly.** Les deux installent l'app aussi bien ; un
+seul signe **l'extension** qu'elle contient. L'activité en direct de l'écran de
+verrouillage est dessinée par `LacetWidgets.appex`, et iOS ne lance une
+extension que si elle a reçu **son propre** profil de signature, à côté de celui
+de l'app. Sideloadly signe l'app et pas son extension : elle reste dans le
+paquet, complète et rattachée, et le système l'ignore — pas de vignette dans la
+galerie de widgets, une activité en direct acceptée par ActivityKit et dessinée
+par personne, écran de verrouillage noir, aucun message. Une soirée entière y
+est passée avant que l'app ne sache le dire elle-même.
 
-Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours** : il faut
-la réinstaller (Sideloadly sait le faire automatiquement tant que le PC est
-allumé sur le même Wi-Fi). Trois apps installées ainsi au maximum.
+1. Installe AltServer sur le PC et AltStore sur l'iPhone (iTunes et iCloud
+   doivent venir du site d'Apple, pas du Microsoft Store).
+2. Mets l'IPA sur le téléphone. Sans entrée « Sideload .ipa » dans AltServer, le
+   plus simple est de la servir sur le réseau local — `python -m http.server`
+   à la racine du dépôt — puis de l'ouvrir dans Safari : elle arrive dans
+   **Fichiers → Téléchargements**.
+3. **AltStore → Mes apps → +** → `Lacet.ipa`. AltServer doit tourner : c'est lui
+   qui signe.
+4. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
+   identifiant → **Faire confiance** ; puis **Confidentialité et sécurité →
+   Mode développeur** → activer et redémarrer.
 
-**Deux réglages de Sideloadly décident de l'écran de verrouillage.** L'activité
-en direct est dessinée par une extension (`LacetWidgets.appex`) rangée dans
-l'app, et iOS ne la lance qu'à deux conditions :
+Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours** ; AltStore
+la renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi. Trois apps
+actives au maximum, et **l'extension en consomme une** : Lacet en prend donc
+deux.
 
-- l'extension doit être **dans le paquet installé**. Certains outils
-  d'installation la retirent d'office — une option « remove app extensions » ou
-  « remove plugins » — parce que chaque extension consomme un identifiant d'app
-  supplémentaire, et qu'un compte gratuit en a dix par semaine. Décoche-la ;
-- l'app doit garder son **identifiant d'origine, `fr.lacet.app`**. iOS n'accepte
-  de lancer une extension que si son identifiant est un *enfant* de celui de
-  l'app : `fr.lacet.app` → `fr.lacet.app.widgets`. Si le champ « Bundle ID » de
-  Sideloadly est modifié — c'est parfois automatique quand l'identifiant est
-  déjà pris par une installation précédente — le lien se rompt **sans rien
-  retirer du paquet** : l'app s'installe, iOS accepte l'activité en direct, et
-  personne ne la dessine. Écran de verrouillage vide, barre noire dans la
-  Dynamic Island, aucun message.
-
-Les deux se lisent depuis le téléphone : **Mon compte → Écran verrouillé** donne
-les quatre conditions en clair (`iOS · activités · extension · notifications`),
-nomme les deux identifiants réellement installés, et dit « extension détachée »
-quand c'est ce lien-là qui manque. La preuve indépendante : poser le widget
-**Lacet** depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension
-tourne ; s'il n'apparaît même pas dans la galerie, iOS refuse de la lancer, et
-c'est l'installation qu'il faut reprendre — aucune ligne de code n'y changera
-rien.
-
-Rien de tout cela n'empêche de courir : sans activité en direct, Lacet bascule
-sur une **notification silencieuse** qui dit la même chose, et qu'on peut
-choisir d'emblée dans le même réglage.
+**Ce que le téléphone sait dire.** « Mon compte → Écran verrouillé » vérifie les
+cinq conditions d'une activité en direct — iOS 16.2, activités autorisées dans
+Réglages, extension dans le paquet, extension **rattachée** à l'app
+(`fr.lacet.app` → `fr.lacet.app.widgets`, sinon iOS refuse de la lancer), et
+extension **signée** — et n'écrit que ce qui manque. Un bouton la montre vingt
+secondes sans partir courir. La preuve indépendante : poser le widget **Lacet**
+depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
 
 ### Ce que l'app native ajoute
 
@@ -285,25 +280,17 @@ choisir d'emblée dans le même réglage.
   la carte : il n'y a pas de service worker dans une app native, et sans ce
   chemin une carte « gardée » restait noire une fois dehors.
 - **L'écran de verrouillage guide.** Pendant une sortie guidée, une activité en
-  direct affiche la consigne à venir, sa distance, ce qui reste et un compte à
-  rebours jusqu'à l'arrivée — aussi dans la Dynamic Island. C'est une extension
-  iOS à part (`frontend/ios-overlay/live-activity/`), greffée au projet Xcode par
-  `add_live_activity.rb` pendant la compilation. Elle demande iOS 16.2, et les
-  « Activités en direct » autorisées dans Réglages → Lacet. **Et une
-  notification de secours** : passive — ni son, ni écran allumé — et remplacée
-  à chaque consigne, elle dit la même chose. « Mon compte » indique laquelle
-  des deux l'iPhone utilisera (et pourquoi), et un bouton la montre vingt
-  secondes sans partir courir.
+  direct affiche la consigne à venir, sa distance, l'avancée de la boucle, ce
+  qui reste et l'heure d'arrivée — aussi dans la Dynamic Island, et sans
+  toucher à l'audio : la musique continue. C'est une extension iOS à part
+  (`frontend/ios-overlay/live-activity/`), greffée au projet Xcode par
+  `add_live_activity.rb` pendant la compilation, et son identifiant se **déduit**
+  de celui de l'app pour que le lien ne puisse pas se rompre en silence.
 
-  **Les deux, jusqu'à preuve du contraire.** iOS accepte une activité en direct
-  dès que l'extension est dans le paquet de l'app ; il ne dit jamais s'il a
-  réussi à la *dessiner*. Une installation hors App Store qui n'enregistre pas
-  l'extension donne donc une demande acceptée, un écran de verrouillage noir, et
-  pas un mot — l'app se croyait tirée d'affaire et ne posait pas la
-  notification. Tant que personne n'a confirmé, dans « Mon compte », avoir vu
-  l'activité sur cet iPhone, une sortie tient donc **les deux** à jour. Une
-  réponse suffit à arrêter la redondance. Voir `lockScreenMode` dans
-  `src/lockScreen.js`.
+  Elle est écrite pour ne jamais rendre du vide : chaque valeur a un repli, la
+  vue porte son propre fond (`containerBackground`, exigé depuis iOS 17), et
+  rien n'y peut échouer à l'affichage — un `Text(timerInterval:)` sur une
+  arrivée déjà dépassée suffisait à laisser une carte noire, sans trace.
 
 ### En course, la carte suit comme un GPS
 
