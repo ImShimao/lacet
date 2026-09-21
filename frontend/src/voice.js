@@ -33,6 +33,8 @@ const synth = !native && typeof window !== 'undefined' ? window.speechSynthesis 
 let voice = null
 let enabled = false
 let unlocked = false
+// Nombre de consignes en train d'être dites : voir `speak`.
+let speaking = 0
 
 export const available = native || Boolean(synth)
 
@@ -86,7 +88,24 @@ export function setEnabled(value) {
  */
 export function speak(text, { priority = true } = {}) {
   if (native) {
-    if (enabled && text) nativeModule.then((n) => n.speakNative(text, { priority }))
+    if (enabled && text) {
+      nativeModule.then(async (n) => {
+        // La musique baisse le temps de la phrase, et se relève après. Le
+        // compteur sert aux consignes qui s'enchaînent : la première à finir ne
+        // doit pas remonter le son pendant que la suivante parle.
+        speaking += 1
+        await n.duckAudio()
+        try {
+          await n.speakNative(text, { priority })
+        } finally {
+          speaking -= 1
+          if (speaking <= 0) {
+            speaking = 0
+            n.unduckAudio()
+          }
+        }
+      })
+    }
     return
   }
   if (!synth || !enabled || !text) return
@@ -111,7 +130,11 @@ export function speak(text, { priority = true } = {}) {
 
 export function stop() {
   if (native) {
-    nativeModule.then((n) => n.stopSpeechNative())
+    nativeModule.then((n) => {
+      n.stopSpeechNative()
+      speaking = 0
+      n.unduckAudio()
+    })
     return
   }
   try {

@@ -60,9 +60,12 @@ function SheetGrabber({ open, onSet }) {
 /**
  * Tirer la feuille de détail vers le bas pour la refermer.
  *
- * Trois choses en font un vrai geste plutôt qu'un raccourci : la feuille suit
+ * Quatre choses en font un vrai geste plutôt qu'un raccourci : la feuille suit
  * le doigt pendant qu'on tire, elle ne se referme qu'au-delà d'un seuil — sinon
- * elle revient en place — et un simple appui sur la poignée suffit aussi.
+ * elle revient en place —, elle **glisse vers le bas** en se refermant au lieu
+ * de disparaître d'un coup, et le geste part de **n'importe où** : de l'en-tête,
+ * ou du contenu lui-même quand il est déjà en haut de sa course. C'est ce que
+ * fait n'importe quelle feuille d'iOS, et c'est ce qu'on essaie sans y penser.
  *
  * Les distances sont mesurées **dans le sens de l'app** : téléphone couché,
  * elle a pivoté d'un quart de tour, et « vers le bas » n'est plus le bas de
@@ -70,48 +73,83 @@ function SheetGrabber({ open, onSet }) {
  */
 function useSheetDrag(mode, setSheet, shellRef) {
   const drag = useRef(null)
-  const CLOSE_M = 60
+  const CLOSE_M = 64
+  // Au-delà de ce glissement, on sait que le doigt descend : avant, ce peut
+  // être un défilement qui commence.
+  const COMMIT_M = 12
 
-  const shift = (px) => {
+  const shift = (px, closing = false) => {
     const shell = shellRef.current
     if (!shell) return
     if (px === null) {
       shell.style.removeProperty('--sheet-drag')
       delete shell.dataset.dragging
-    } else {
-      shell.style.setProperty('--sheet-drag', `${px}px`)
-      shell.dataset.dragging = 'yes'
+      delete shell.dataset.closing
+      return
     }
+    shell.style.setProperty('--sheet-drag', `${px}px`)
+    if (closing) shell.dataset.closing = 'yes'
+    else shell.dataset.dragging = 'yes'
   }
 
   const travel = (e) =>
     appDeltaY(currentTurn(), e.clientX - drag.current.x, e.clientY - drag.current.y)
 
-  return {
+  /**
+   * `fromBody` : le geste part du contenu, qui défile. On ne prend la main
+   * qu'une fois sûr qu'il descend **et** que la liste est déjà en haut ;
+   * autrement on laisserait la feuille partir pendant qu'on lit.
+   */
+  const handlers = (fromBody = false) => ({
     onPointerDown: (e) => {
       if (mode !== 'full') return
       if (e.target instanceof Element && e.target.closest('input, textarea, select')) return
-      drag.current = { x: e.clientX, y: e.clientY, grip: e.target instanceof Element && Boolean(e.target.closest('.grabber')) }
-      e.currentTarget.setPointerCapture?.(e.pointerId)
+      const scroller = fromBody ? e.currentTarget : null
+      if (scroller && scroller.scrollTop > 0) return
+      drag.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scroller,
+        live: !fromBody,
+        grip: e.target instanceof Element && Boolean(e.target.closest('.grabber')),
+      }
+      if (!fromBody) e.currentTarget.setPointerCapture?.(e.pointerId)
     },
     onPointerMove: (e) => {
       if (!drag.current) return
+      const dy = travel(e)
+      if (!drag.current.live) {
+        if (dy < COMMIT_M || drag.current.scroller?.scrollTop > 0) return
+        drag.current.live = true
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+      }
       // Vers le haut, rien ne bouge : la feuille est déjà en butée.
-      shift(Math.max(0, travel(e)))
+      shift(Math.max(0, dy))
     },
     onPointerUp: (e) => {
       if (!drag.current) return
       const dy = travel(e)
-      const { grip } = drag.current
+      const { grip, live } = drag.current
       drag.current = null
+      if ((live && dy > CLOSE_M) || (grip && Math.abs(dy) < 8)) {
+        // La feuille finit sa course avant de rendre la place : fermée d'un
+        // coup, on ne comprend pas ce qui vient de se passer.
+        shift(Math.max(dy, CLOSE_M) + 260, true)
+        setTimeout(() => {
+          setSheet('peek')
+          shift(null)
+        }, 180)
+        return
+      }
       shift(null)
-      if (dy > CLOSE_M || (grip && Math.abs(dy) < 8)) setSheet('peek')
     },
     onPointerCancel: () => {
       drag.current = null
       shift(null)
     },
-  }
+  })
+
+  return handlers
 }
 
 export default function App() {
@@ -486,7 +524,7 @@ export default function App() {
   const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
   const sheetMode = running ? 'live' : tab !== 'explore' ? 'page' : sheet
-  const sheetDrag = useSheetDrag(sheetMode, setSheet, shellRef)
+  const sheetGesture = useSheetDrag(sheetMode, setSheet, shellRef)
 
   const announcement = busy
     ? 'Recherche des itinéraires en cours.'
@@ -663,7 +701,7 @@ export default function App() {
         {/* En course, pas d'en-tête : l'activité et ses réglages ne se changent
             plus, et chaque ligne rendue à la carte compte. */}
         {!running && (
-        <header className="side__head" {...sheetDrag}>
+        <header className="side__head" {...sheetGesture()}>
           <SheetGrabber open={sheetMode === 'full'} onSet={setSheet} />
           <div className="brand">
             Lacet<span>.</span>
@@ -688,7 +726,7 @@ export default function App() {
           {announcement}
         </div>
 
-        <div className="side__body">
+        <div className="side__body" {...sheetGesture(true)}>
           {geoNoticeOpen && geo.status === 'denied' && (running || tab === 'explore') && (
             <div className="banner">
               <Icon name="warning" size={16} />

@@ -1,4 +1,5 @@
 import ActivityKit
+import AVFoundation
 import Capacitor
 import Foundation
 
@@ -20,7 +21,8 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "activities", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "duck", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "unduck", returnType: CAPPluginReturnPromise),
     ]
 
     /// Le paquet de l'extension qui dessine l'activité, s'il est là.
@@ -154,31 +156,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// Ce qu'iOS dit des activités vivantes : combien, et dans quel état.
-    ///
-    /// La question qui tranche : si iOS en compte une « active » et que
-    /// l'écran de verrouillage reste vide, ce n'est pas la demande qui échoue,
-    /// c'est l'extension qui ne la dessine pas.
-    @objc func activities(_ call: CAPPluginCall) {
-        guard #available(iOS 16.2, *) else {
-            call.resolve(["count": 0, "states": ""])
-            return
-        }
-        Task { @MainActor in
-            let live = Activity<LacetRunAttributes>.activities
-            let states = live.map { activity -> String in
-                switch activity.activityState {
-                case .active: return "active"
-                case .dismissed: return "écartée"
-                case .ended: return "terminée"
-                case .stale: return "périmée"
-                @unknown default: return "inconnue"
-                }
-            }
-            call.resolve(["count": live.count, "states": states.joined(separator: ", ")])
-        }
-    }
-
     /// Ce que l'écran de verrouillage peut afficher, pour « Mon compte ».
     @objc func status(_ call: CAPPluginCall) {
         var result: [String: Any] = [
@@ -200,6 +177,28 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             result["enabled"] = false
         }
         call.resolve(result)
+    }
+
+    // === la voix par-dessus la musique ========================================
+
+    /// Baisse la musique le temps d'une consigne, et la remet ensuite.
+    ///
+    /// La session audio de l'app mélange avec ce qui joue déjà : sans rien de
+    /// plus, la voix se perd dans le refrain, précisément au carrefour où l'on
+    /// avait besoin d'elle. `.duckOthers` baisse l'autre app pendant que la
+    /// nôtre est active — d'où l'activation juste avant la phrase et la
+    /// désactivation juste après, plutôt qu'une musique en sourdine toute la
+    /// sortie. `notifyOthersOnDeactivation` lui rend son volume tout de suite.
+    @objc func duck(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers, .duckOthers])
+        try? session.setActive(true)
+        call.resolve()
+    }
+
+    @objc func unduck(_ call: CAPPluginCall) {
+        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        call.resolve()
     }
 
     @available(iOS 16.1, *)

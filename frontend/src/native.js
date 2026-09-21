@@ -131,6 +131,15 @@ export function speakNative(text, { priority = true } = {}) {
 
 export const stopSpeechNative = () => TextToSpeech.stop().catch(() => {})
 
+/**
+ * Baisse la musique le temps d'une consigne, et la remet ensuite.
+ *
+ * Sans ça, la voix passe *par-dessus* le morceau sans le baisser : au volume
+ * où l'on écoute en courant, « tourne à droite » se perd dans le refrain.
+ */
+export const duckAudio = () => LiveActivity.duck().catch(() => {})
+export const unduckAudio = () => LiveActivity.unduck().catch(() => {})
+
 // --- écran, vibration ---------------------------------------------------------
 
 export const keepScreenOn = () => KeepAwake.keepAwake().catch(() => {})
@@ -185,9 +194,6 @@ export const endLiveActivity = () => LiveActivity.end().catch(() => {})
  * - `bundle`, `extensionBundle` : les deux identifiants, pour le dire en clair.
  */
 export const lockScreenStatus = () => LiveActivity.status().catch(() => null)
-
-/** Ce qu'iOS dit des activités en cours : `{ count, states }`. */
-export const liveActivities = () => LiveActivity.activities().catch(() => null)
 
 /**
  * La version de l'app installée : `{ version, build }`.

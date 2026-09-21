@@ -2771,6 +2771,12 @@ input.field:focus {
     transform: translateY(var(--sheet-drag, 0px));
     transition: none;
   }
+  /* La fermeture : la feuille finit sa course vers le bas, puis rend la place.
+     Disparaître d'un coup donnait l'impression d'un écran qui saute. */
+  .shell[data-sheet='full'][data-closing] .side {
+    transform: translateY(var(--sheet-drag, 0px));
+    transition: transform 0.18s cubic-bezier(0.4, 0, 1, 1);
+  }
   /* L'en-tête est la zone de préhension : le doigt doit y glisser sans que la
      page tente de défiler. */
   .shell[data-sheet='full'] .side__head {
@@ -3382,5 +3388,116 @@ html[data-turn] .maplibregl-control-container {
 }
 .races .chip:disabled {
   opacity: 0.35;
+}
+
+/* ══ mouvements ═══════════════════════════════════════════════════════════
+   Rien de décoratif : chaque animation dit d'où vient ce qui apparaît, ou
+   confirme qu'un appui a été pris. Toutes se coupent si le système demande
+   moins de mouvement. */
+
+/* L'appui, senti plutôt que deviné : sur un écran tactile, il n'y a ni survol
+   ni curseur pour dire qu'une cible a répondu. */
+.btn,
+.tool,
+.chip,
+.tab,
+.runctl__side,
+.runctl__main,
+.sportpill {
+  transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.btn:active,
+.tool:active,
+.chip:active,
+.tab:active,
+.runctl__side:active,
+.sportpill:active {
+  transform: scale(0.97);
+}
+.runctl__main:active {
+  transform: scale(0.94);
+}
+
+/* Ce qui arrive sur la carte se pose : la feuille monte, le bandeau descend,
+   les propositions montent d'un cran. */
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+@keyframes drop {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.runbar {
+  animation: drop 0.24s ease-out;
+}
+.rcard {
+  animation: rise 0.26s ease-out backwards;
+}
+/* Décalées de quelques centièmes : la liste se remplit au lieu d'apparaître. */
+.cards__track > *:nth-child(2) .rcard {
+  animation-delay: 0.04s;
+}
+.cards__track > *:nth-child(3) .rcard {
+  animation-delay: 0.08s;
+}
+.cards__track > *:nth-child(n + 4) .rcard {
+  animation-delay: 0.12s;
+}
+.panel .strip,
+.panel .stats,
+.notice {
+  animation: fade 0.2s ease-out;
+}
+.startmenu {
+  animation: rise 0.16s ease-out;
+}
+.live__paused,
+.live__alert {
+  animation: rise 0.2s ease-out;
+}
+
+@container lacet (max-width: 999px) {
+  /* La feuille de détail monte de sous l'écran, comme celle des filtres. */
+  .shell[data-sheet='full'] .side {
+    animation: sheet-up 0.24s ease-out;
+  }
+  .shell[data-sheet='full'][data-dragging] .side,
+  .shell[data-sheet='full'][data-closing] .side {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runbar,
+  .rcard,
+  .panel .strip,
+  .panel .stats,
+  .notice,
+  .startmenu,
+  .live__paused,
+  .live__alert,
+  .shell[data-sheet='full'] .side {
+    animation: none;
+  }
+  .btn:active,
+  .tool:active,
+  .chip:active,
+  .tab:active,
+  .runctl__side:active,
+  .runctl__main:active,
+  .sportpill:active {
+    transform: none;
+  }
 }
 

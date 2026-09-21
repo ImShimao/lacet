@@ -1,47 +1,87 @@
----
-title: Lacet
-emoji: 🏃
-colorFrom: purple
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Lacet
 
-Génère des boucles de course à pied et de vélo depuis ta porte, en écartant les
-itinéraires qui longent une route rapide sans trottoir.
+**Des boucles de course qui reviennent à ta porte — sans longer la nationale.**
 
-Ce n'est pas un tracé au hasard : chaque candidat est mesuré, noté, et **rejeté**
-s'il ne passe pas le contrôle. L'app dit aussi ce qu'elle a écarté, et pourquoi.
+Tu sors courir 10 km. Tu ne veux pas réfléchir à l'itinéraire, tu ne veux pas
+finir sur un bas-côté à 80 km/h, et tu veux revenir chez toi. Lacet fait ça :
+tu donnes une distance, il propose des boucles, il te dit lesquelles sont sûres,
+et il te guide à la voix pendant que tu cours.
 
-Jusqu'à **douze propositions** par recherche, choisies pour partir dans des
-directions différentes. Guidage vocal tour par tour, alerte avant chaque
-traversée, bouton d'alerte à un proche, course libre sans itinéraire, et suivi
-des sorties.
+```
+Distance ou durée  →  jusqu'à 12 boucles notées A, B ou C  →  guidage vocal, écran verrouillé
+```
 
 ---
 
-## Ce que c'est, techniquement
+## Ce qu'il fait
 
-**Une app iPhone et un site web, sur la même base de code.** Le site s'ouvre
-dans n'importe quel navigateur et s'installe comme une app (PWA) ; l'app iPhone
-est ce même site, emballé par Capacitor, avec ce qu'une page web ne peut pas
-faire : GPS et guidage vocal écran verrouillé.
+**Il trouve des boucles, pas des allers-retours.** Douze propositions par
+recherche au plus, choisies pour partir dans des directions différentes, à la
+distance demandée — 10 km, un semi au mètre près (21,0975 km), ou une durée.
+Chaque boucle est mesurée, notée, et **rejetée** si elle ne passe pas le
+contrôle : l'app dit aussi ce qu'elle a écarté, et pourquoi.
 
-**Les itinéraires se calculent sur l'appareil.** Le moteur — données
-OpenStreetMap, graphe, sécurité, génération, notation — tourne en JavaScript
-dans un *worker*, sur le téléphone ou le PC qui affiche l'app. Aucun serveur à
-lancer, à héberger ni à payer : l'app va chercher elle-même les rues sur
-Overpass, l'altitude à l'IGN, le vent chez Open-Meteo, et garde ce qu'elle a
-téléchargé pour les recherches suivantes.
+**Il refuse les routes dangereuses.** Chaque tronçon est évalué : vitesse de la
+voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées ou non.
+Une boucle notée **A** est presque entièrement protégée ; une **C** demande de
+la vigilance, et l'app montre exactement où.
 
-**Deux versions, selon l'appareil.** Sur un ordinateur on prépare : chercher,
-comparer, lire la sécurité, garder ses favoris, exporter un GPX. Lancer une
-sortie, le suivi GPS, le SOS et l'historique n'y ont aucun sens et n'y
-apparaissent pas. Sur un téléphone, tout. La détection se force dans « Mon
-compte » si elle se trompe (tablette, PC tactile).
+**Il guide comme un GPS.** La carte suit ta course, inclinée dans ton sens. Le
+prochain virage s'affiche en grand, et la voix l'annonce deux fois — à l'avance,
+puis au moment d'agir — en baissant ta musique le temps de parler. Écran
+verrouillé, la consigne, la distance et l'heure d'arrivée restent lisibles dans
+une activité en direct.
+
+**Il ne te lâche pas si tu t'écartes.** Un virage raté, une rue barrée : au bout
+de vingt secondes hors du tracé, il calcule un nouveau chemin depuis là où tu
+es — sur le téléphone, sans réseau — en essayant de **tenir la distance
+prévue**.
+
+**Il marche sans réseau.** Les rues d'Alsace sont livrées avec l'app ; ailleurs,
+elles se téléchargent une fois et restent. Le fond de carte se garde parcours
+par parcours. Une sortie en montagne, sans antenne, fonctionne.
+
+**Il n'envoie rien.** Pas de compte, pas de serveur, pas de suivi. Tes favoris,
+tes sorties et tes réglages ne quittent pas l'appareil — une sauvegarde
+s'exporte en un fichier si tu veux les emporter.
+
+Et le reste, qui compte le jour où il sert : pause automatique aux feux, alerte
+avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
+position, export GPX vers une montre ou Strava, profil de dénivelé consultable
+en pleine sortie, historique avec totaux mensuels.
+
+## L'installer
+
+**Sur iPhone.** L'app se compile toute seule sur GitHub et s'installe avec
+[AltStore](https://altstore.io) — pas besoin de Mac.
+
+```bash
+gh run download --name Lacet-ipa   # récupère Lacet.ipa
+```
+
+Puis AltStore → **Mes apps → +** → `Lacet.ipa`. Le détail, et pourquoi AltStore
+plutôt qu'un autre installateur, est dans [L'app iPhone](#lapp-iphone).
+
+**Dans un navigateur.** `npm install && npm run dev` dans `frontend/`, ou
+n'importe quel hébergement de fichiers statiques : il n'y a pas de serveur à
+faire tourner.
+
+## Comment c'est fait
+
+**Tout tourne sur l'appareil.** Le moteur — données OpenStreetMap, graphe,
+sécurité, génération, notation — est écrit en JavaScript et s'exécute dans un
+*worker*, sur le téléphone ou le PC qui affiche l'app. Rien à héberger, rien à
+payer : l'app va chercher elle-même les rues sur Overpass, l'altitude à l'IGN,
+le vent chez Open-Meteo, et garde ce qu'elle a téléchargé.
+
+**Une app iPhone et un site web, une seule base de code.** Le site s'ouvre dans
+n'importe quel navigateur et s'installe comme une app ; l'app iPhone est ce même
+site, emballé par Capacitor, avec ce qu'une page web ne peut pas faire : GPS et
+voix écran verrouillé, activité en direct, vibrations.
+
+**Deux versions, selon l'appareil.** Sur ordinateur on prépare — chercher,
+comparer, lire la sécurité, garder ses favoris, exporter un GPX. Sur téléphone,
+tout, y compris la sortie elle-même. La détection se force dans « Mon compte ».
 
 ```
 frontend/             React + MapLibre — l'app, et le moteur (src/engine/)
@@ -50,23 +90,33 @@ backend/              Python + FastAPI — le moteur de référence
 .github/workflows/    compilation de l'IPA sur un Mac de GitHub
 ```
 
-**Pourquoi garder le moteur Python ?** C'est la référence. Le portage
+**Pourquoi un moteur Python en plus ?** C'est la référence. Le portage
 JavaScript note la *sécurité* des parcours : subtilement faux, il proposerait un
-« A » là où il faudrait un « C », et rien à l'écran ne le montrerait. Le script
-`backend/scripts/parity_dump.py` fait tourner Python sur dix cas réels (Beaune,
-Lyon, damiers artificiels ; jour, nuit, vent, vélo, tours) et
+« A » là où il faudrait un « C », et rien à l'écran ne le montrerait.
+`backend/scripts/parity_dump.py` fait tourner Python sur dix cas réels — Beaune,
+Lyon, damiers artificiels ; jour, nuit, vent, vélo, tours — et
 `frontend/src/engine/parity.test.js` exige du JavaScript le même graphe, les
-mêmes candidats arête par arête et la même réponse. Les nombres sont comparés à
-1e-9 près : sinus et arc-tangente diffèrent d'une unité de précision entre les
-bibliothèques mathématiques des deux plateformes. Tout le reste doit être
-identique — ce qui a demandé de reproduire l'arithmétique de CPython (modulo
-flottant, arrondi au pair, `sum` compensée, `math.hypot`).
+mêmes candidats arête par arête et la même réponse, à 1e-9 près. Ce qui a
+demandé de reproduire l'arithmétique de CPython jusqu'au modulo flottant et à
+l'arrondi au pair.
 
-Aucune clé d'API. Données © OpenStreetMap (Overpass), altitude IGN et
-OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche de lieux Photon
-(Komoot) et Nominatim — plus Mapbox pour les commerces, si un token est présent :
-OpenStreetMap ignore les enseignes ouvertes trop récemment, et une salle de
-sport de l'année n'y est pas encore.
+Aucune clé d'API n'est nécessaire. Données © OpenStreetMap (Overpass), altitude
+IGN et OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche de lieux
+Photon (Komoot) et Nominatim — plus Mapbox pour les commerces, si un token est
+présent : OpenStreetMap ignore les enseignes ouvertes trop récemment.
+
+## Le détail, section par section
+
+| | |
+|---|---|
+| [Démarrer](#démarrer-première-fois) · [Lancer](#lancer) · [Tester](#tester-dans-vs-code) | installer les dépendances, lancer l'app, faire tourner les tests |
+| [L'app iPhone](#lapp-iphone) | compiler l'IPA, l'installer avec AltStore, ce que le natif ajoute |
+| [Le moteur de sécurité](#le-moteur-de-sécurité) · [La note A, B, C](#la-note-a-b-c) | comment un tronçon est jugé, et d'où vient la note |
+| [L'algorithme de génération](#lalgorithme-de-génération) · [Le choix des propositions](#le-choix-des-propositions) | comment les boucles naissent, et lesquelles survivent |
+| [Les tours](#quand-la-distance-ne-tient-pas--les-tours) · [Le vent](#le-vent) · [Le dénivelé](#la-préférence-de-dénivelé) | les cas particuliers |
+| [Le guidage](#le-guidage) · [La sortie](#la-sortie) | les consignes, le suivi GPS, le hors-parcours |
+| [Interface](#interface) · [Réglages](#réglages) | ce qui se voit et ce qui se règle |
+| [Performances](#performances) · [Limites](#limites-dites-franchement) | ce que ça coûte, et ce que ça ne sait pas faire |
 
 ---
 

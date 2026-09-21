@@ -74,6 +74,13 @@ export const RACES = [
 /** La distance de course qui correspond, à dix mètres près. */
 export const raceOf = (km) => RACES.find((r) => Math.abs(r.km - km) < 0.01) ?? null
 
+/**
+ * Les durées qu'on se donne vraiment : la demi-heure de semaine, les
+ * trois quarts d'heure, l'heure, et la sortie longue. Composer 1 h 30 au pas de
+ * cinq minutes demandait dix-huit appuis.
+ */
+export const DURATIONS = [30, 45, 60, 90]
+
 export const DEFAULTS = {
   sport: 'run',
   mode: 'distance',
@@ -231,6 +238,22 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 canUp={draft.distance_km < maxKm}
               />
             ) : (
+              <>
+              <div className="races" role="group" aria-label="Durées courantes">
+                {DURATIONS.map((minutes) => {
+                  const on = draft.duration_min === minutes
+                  return (
+                    <button
+                      key={minutes}
+                      className={`chip ${on ? 'chip--on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => set({ duration_min: minutes })}
+                    >
+                      {formatMinutes(minutes)}
+                    </button>
+                  )
+                })}
+              </div>
               <Stepper
                 text={formatMinutes(draft.duration_min)}
                 onStep={(d) =>
@@ -245,6 +268,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 canDown={draft.duration_min > MIN_MIN}
                 canUp={draft.duration_min < MAX_MIN}
               />
+              </>
             )}
             {draft.mode === 'distance' && (
               <>
@@ -269,8 +293,9 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             )}
             <p className="field__hint">
               {draft.mode === 'duration'
-                ? `Converti en distance selon l'allure : environ ${formatKm(
-                    estimateKm(draft),
+                ? // Une estimation à trois décimales se lirait comme une promesse.
+                  `Converti en distance selon l'allure : environ ${formatKm(
+                    Math.round(estimateKm(draft) * 10) / 10,
                   )} km.`
                 : `Pas de ${formatKm(distanceStep(draft.distance_km))} km · jusqu'à ${maxKm} km ${
                     isBike ? 'à vélo' : 'à pied'

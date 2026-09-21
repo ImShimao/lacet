@@ -270,8 +270,6 @@ function AutoPauseSetting() {
  */
 function LockScreenSetting() {
   const [status, setStatus] = useState(undefined)
-  const [testing, setTesting] = useState(false)
-  const [result, setResult] = useState(null)
 
   useEffect(() => {
     if (!isNative()) return
@@ -279,10 +277,6 @@ function LockScreenSetting() {
   }, [])
 
   if (!isNative() || status === undefined) return null
-
-  const ready = Boolean(
-    status?.supported && status?.enabled && status?.extension && status?.nested && status?.signedExtension !== false,
-  )
 
   let problem = null
   if (!status) problem = "Cette version de l'app n'a pas le module d'écran verrouillé."
@@ -296,32 +290,6 @@ function LockScreenSetting() {
       "L'extension n'a pas reçu de signature : l'outil d'installation a signé l'app et pas son extension. Réinstalle avec AltStore, qui la signe."
   }
 
-  const test = async () => {
-    const n = await import('./native')
-    setResult(null)
-    setTesting(true)
-    const { started, reason } = await n.startLiveActivity({
-      name: 'Essai',
-      instruction: 'Tourne à droite sur Rue de la Gare',
-      distance: '120 m',
-      turn: 'right',
-      remaining: '4,2 km',
-      arrival: Date.now() + 26 * 60_000,
-      progress: 0.4,
-      offRoute: false,
-      paused: false,
-    })
-    setResult(
-      started
-        ? "Verrouille l'écran : l'essai s'y affiche, et s'efface dans 20 secondes."
-        : `iOS a refusé : ${reason}.`,
-    )
-    setTimeout(() => {
-      n.endLiveActivity()
-      setTesting(false)
-    }, 20_000)
-  }
-
   return (
     <>
       <p className="muted small">
@@ -330,13 +298,6 @@ function LockScreenSetting() {
         verrouillé et dans la Dynamic Island. La musique continue.
       </p>
       {problem && <div className="notice notice--warn">{problem}</div>}
-      <div className="row">
-        <button className="btn" onClick={test} disabled={testing || !ready}>
-          <Icon name="play" size={15} />
-          {testing ? 'Essai en cours — verrouille ton téléphone…' : "Tester l'écran verrouillé"}
-        </button>
-      </div>
-      {result && <p className="muted small">{result}</p>}
     </>
   )
 }
