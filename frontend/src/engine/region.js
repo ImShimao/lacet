@@ -75,6 +75,49 @@ export function fromRegionTile(data) {
   }
 }
 
+/**
+ * Écrit une tuile au format des tuiles livrées.
+ *
+ * C'est aussi ce que le cache de l'appareil garde (`overpass.js`) : un texte,
+ * et non des objets JavaScript. Trois raisons, mesurées sur une tuile de
+ * Guebwiller de 4 Mo : le texte pèse trois fois moins que la même tuile rangée
+ * par IndexedDB, il se relit en 44 ms au lieu de 100, et sa taille se connaît
+ * exactement — ce qui permet de tenir un budget plutôt que de laisser le cache
+ * gonfler jusqu'à ce qu'iOS le vide en entier, un jour de pluie, sans prévenir.
+ */
+export function toRegionTile(extract) {
+  return {
+    w: extract.ways.map((way) => [way.id, way.tags, delta(way.nodes), pair(way.flat)]),
+    l: extract.landuse.map((area) => [area.id, pair(area.flat)]),
+    c: extract.crossings.map((c) => [c.id, Math.round(c.lon * 1e7), Math.round(c.lat * 1e7), c.tags]),
+  }
+}
+
+function delta(values) {
+  const out = new Array(values.length)
+  let previous = 0
+  for (let i = 0; i < values.length; i += 1) {
+    out[i] = values[i] - previous
+    previous = values[i]
+  }
+  return out
+}
+
+function pair(flat) {
+  const out = new Array(flat.length)
+  let x = 0
+  let y = 0
+  for (let i = 0; i < flat.length; i += 2) {
+    const lx = Math.round(flat[i] * 1e7)
+    const ly = Math.round(flat[i + 1] * 1e7)
+    out[i] = lx - x
+    out[i + 1] = ly - y
+    x = lx
+    y = ly
+  }
+  return out
+}
+
 function undelta(values) {
   const out = new Array(values.length)
   let current = 0

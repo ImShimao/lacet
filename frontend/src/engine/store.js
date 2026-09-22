@@ -61,8 +61,15 @@ function run(db, name, mode, action) {
   })
 }
 
+// Le repli en mémoire, un par magasin et non par appel : deux modules qui
+// ouvrent `store('osm')` doivent voir les mêmes données, comme ils le feraient
+// avec IndexedDB. Sans ça, le cache des rues et son journal vivaient chacun
+// dans leur coin dès qu'IndexedDB manquait — un test, un navigateur verrouillé.
+const fallbacks = new Map()
+
 export function store(name) {
-  const memory = new Map()
+  if (!fallbacks.has(name)) fallbacks.set(name, new Map())
+  const memory = fallbacks.get(name)
   return {
     async get(key) {
       const db = await openDb()

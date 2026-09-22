@@ -26,6 +26,7 @@ import { bboxAround } from './geo'
 import { pyFixed } from './py'
 import { regionTile } from './region'
 import { store } from './store'
+import { clearTiles as forgetTiles, readTile, touchTiles, writeTile } from './tilestore'
 
 export const TILE_DEG = 0.05
 const TTL_MS = 14 * 86_400_000
@@ -344,10 +345,12 @@ export async function fetchArea(args) {
     })
   }
 
+  const served = []
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     const cached = found.get(tile)
     const age = cached ? now() - cached.at : Infinity
+    if (cached?.key) served.push(cached.key)
     if (age < freshMs) {
       obtained.set(key, cached.extract)
     } else if (age < usableMs) {
@@ -489,7 +492,7 @@ export async function fetchArea(args) {
               const key = tileKey(level, [ix, iy])
               // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
               // veut pas le figer pour deux semaines.
-              if (part.ways.length) written.push(tiles.set(key, { at: now(), extract: part }))
+              if (part.ways.length) written.push(writeTile(key, now(), part))
               if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
             }
             report()
@@ -503,6 +506,9 @@ export async function fetchArea(args) {
     await Promise.all(written)
   })()
 
+  // Ce qui a servi ici ne sera pas jeté de sitôt : le budget du cache écarte
+  // d'abord les tuiles dont on ne s'est pas servi depuis le plus longtemps.
+  touchTiles(served, now())
   await settle(download, { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs })
   // L'étape est finie, même s'il manque une bordure : la barre ne doit pas
   // rester plantée à 80 % pendant que la recherche, elle, est repartie.
@@ -609,7 +615,7 @@ function learnTileBytes(level, bytes) {
 async function cachedTile(level, tile) {
   const levels = []
   for (let l = level; l >= 0; l -= 1) levels.push(l)
-  const copies = await Promise.all(levels.map((l) => tiles.get(tileKey(l, tile))))
+  const copies = await Promise.all(levels.map((l) => readTile(tileKey(l, tile))))
   let best = null
   let bestLevel = level
   for (let k = 0; k < levels.length; k += 1) {
@@ -621,7 +627,11 @@ async function cachedTile(level, tile) {
   }
   if (!best) return null
   // Le passage au niveau demandé ne se fait qu'une fois, sur la copie retenue.
-  return { at: best.at, extract: bestLevel === level ? best.extract : deriveLevel(best.extract, level) }
+  return {
+    at: best.at,
+    key: tileKey(bestLevel, tile),
+    extract: bestLevel === level ? best.extract : deriveLevel(best.extract, level),
+  }
 }
 
 // Les tuiles de bordure sur lesquelles on a déjà renoncé à attendre, le temps de
@@ -933,5 +943,6 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 /** Oublie les tuiles gardées — appelé par l'effacement des données. */
 export const clearTiles = () => {
   refreshing.clear()
-  return tiles.clear()
+  abandoned.clear()
+  return forgetTiles()
 }

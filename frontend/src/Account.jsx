@@ -99,6 +99,11 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
         </>
       )}
 
+      {/* Hors du bloc réservé au téléphone : les rues se gardent aussi sur
+          l'ordinateur, et c'est là qu'on se demande ce que l'app occupe. */}
+      <h4 className="section">Rues gardées</h4>
+      <KeptStreets key={version} />
+
       <h4 className="section">Sauvegarde</h4>
       <BackupRows />
 
@@ -147,6 +152,45 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
  * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
  * finit par être vidé par le navigateur — au pire moment, sans prévenir.
  */
+/**
+ * Les rues déjà sur l'appareil, et le plafond qu'elles ne dépasseront pas.
+ *
+ * Il n'y a rien à épingler ni à choisir : les rues d'un endroit s'enregistrent
+ * toutes seules quand on y cherche une boucle, et quand le budget est atteint,
+ * ce sont celles dont on ne s'est pas servi depuis le plus longtemps qui
+ * partent. Le dire évite deux inquiétudes : que l'app mange le téléphone, et
+ * qu'il faille préparer quoi que ce soit avant de partir en voyage.
+ */
+function KeptStreets() {
+  const [usage, setUsage] = useState(null)
+
+  useEffect(() => {
+    let vivant = true
+    import('./engine/tilestore').then(({ tileUsage }) =>
+      tileUsage().then((u) => {
+        if (vivant) setUsage(u)
+      }),
+    )
+    return () => {
+      vivant = false
+    }
+  }, [])
+
+  return (
+    <>
+      <div className="rows">
+        <Row label="Espace occupé" value={usage ? offline.formatBytes(usage.bytes) : '—'} />
+        <Row label="Plafond" value={usage ? offline.formatBytes(usage.budget) : '—'} />
+      </div>
+      <p className="muted small">
+        Les rues d'un coin se gardent toutes seules dès qu'on y cherche une boucle, et y
+        restent trois mois. Au plafond, les plus anciennement utilisées laissent la place —
+        rien à préparer avant un voyage, rien à effacer au retour.
+      </p>
+    </>
+  )
+}
+
 function OfflineStorage() {
   const [total, setTotal] = useState(() => offline.totalBytes())
   const [count, setCount] = useState(() => offline.storedCount())
