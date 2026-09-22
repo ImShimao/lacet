@@ -111,7 +111,7 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     const fetched = performance.now()
     const graph = buildGraph(extract, { allowTrail, sport })
     lastLoad = { fetch: (fetched - startedAt) / 1000, graph: (performance.now() - fetched) / 1000 }
-    remember({ level, sport, allowTrail, tiles: new Set(needed), ...area, graph })
+    remember({ level, sport, allowTrail, ...area, graph })
     return graph
   })()
   loads.push(entry)

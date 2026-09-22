@@ -333,7 +333,11 @@ function SearchProgress({ progress }) {
           ? "Les serveurs OpenStreetMap sont lents en ce moment — Lacet interroge leurs miroirs. Ça aboutit en général en moins d'une minute."
           : stage === 'data'
             ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
-            : 'Le calcul se fait sur ton appareil, sans serveur.'}
+            : stage === 'elevation'
+              ? // La seule étape qui attend encore quelqu'un d'autre : autant le
+                // dire, plutôt que de promettre un calcul sans serveur.
+                "Les altitudes viennent de l'IGN, en un seul envoi — et sont gardées pour les prochaines boucles du coin."
+              : 'Le calcul se fait sur ton appareil, sans serveur.'}
       </p>
     </div>
   )
