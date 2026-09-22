@@ -402,6 +402,7 @@ export default function App() {
               total: payload.meta.elapsed_s,
               ...payload.meta.timings_s,
               nodes: payload.meta.graph_nodes,
+              sources: payload.meta.sources ?? null,
             },
           })
         }

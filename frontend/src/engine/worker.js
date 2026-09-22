@@ -74,6 +74,10 @@ let lastLoad = { fetch: 0, graph: 0 }
 // restée chez Overpass, qui tardait trop pour qu'on l'attende.
 let lastPartial = false
 
+// D'où venaient les rues de la dernière zone chargée : « livrée », « archives »,
+// « Overpass », « appareil ».
+let lastSources = null
+
 async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress) {
   const level = detailLevel(targetM)
   const area = { lat, lon, radiusM }
@@ -82,6 +86,7 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
   if (cached) {
     lastLoad = { fetch: 0, graph: 0 }
     lastPartial = false
+    lastSources = null
     return cached
   }
 
@@ -120,6 +125,7 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     // tardaient finissent d'arriver en fond, et la recherche suivante doit en
     // profiter plutôt que de réutiliser un réseau tronqué.
     lastPartial = Boolean(extract.partial)
+    lastSources = extract.sources ?? null
     if (!extract.partial) remember({ level, sport, allowTrail, ...area, graph })
     return graph
   })()
@@ -150,6 +156,7 @@ self.onmessage = async ({ data }) => {
         timings.fetch = Math.max(0, Math.round((timings.fetch - timings.graph) * 100) / 100)
       }
       if (result?.meta && lastPartial) result.meta.partial = true
+      if (result?.meta && lastSources) result.meta.sources = lastSources
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })

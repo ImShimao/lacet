@@ -363,8 +363,16 @@ export async function fetchArea(args) {
   // transactions IndexedDB à la file, et sur un téléphone chacune coûte le
   // décodage d'un extrait de plusieurs mégaoctets.
   const found = new Map()
+  // D'où vient chaque tuile. Ça ne change rien au calcul, mais « c'est lent »
+  // n'a pas le même sens selon que les rues viennent de l'appareil, de la carte
+  // livrée, des archives ou d'Overpass — et c'est la première question à se
+  // poser quand quelqu'un le signale, téléphone en main.
+  const origins = new Map()
   const copies = await Promise.all(wanted.map((tile) => cachedTile(level, tile)))
-  wanted.forEach((tile, k) => found.set(tile, copies[k]))
+  wanted.forEach((tile, k) => {
+    found.set(tile, copies[k])
+    if (copies[k]) origins.set(tile, 'appareil')
+  })
   const isFresh = (copy) => Boolean(copy) && now() - copy.at < freshMs
 
   if (useRegion) {
@@ -374,6 +382,7 @@ export async function fetchArea(args) {
       const copy = shipped[k]
       if (copy && !(found.get(tile)?.at >= copy.at)) {
         found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), prepared: true })
+        origins.set(tile, 'livrée')
       }
     })
   }
@@ -396,6 +405,7 @@ export async function fetchArea(args) {
         // l'affaire : elle promettrait des rues qu'elle ne contient pas.
         if (copy && copy.level <= level && !(found.get(tile)?.at >= copy.at)) {
           found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), prepared: true })
+          origins.set(tile, 'archives')
           keep.push([tileKey(copy.level, tile), copy])
         }
       }
@@ -571,7 +581,11 @@ export async function fetchArea(args) {
               // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
               // veut pas le figer pour deux semaines.
               if (part.ways.length) written.push(writeTile(key, now(), part))
-              if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
+              const voulue = wanted.find(([wx, wy]) => wx === ix && wy === iy)
+              if (voulue) {
+                obtained.set(key, part)
+                origins.set(voulue, 'Overpass')
+              }
             }
             report()
           }
@@ -598,6 +612,12 @@ export async function fetchArea(args) {
   // Les tuiles gardées restent entières — c'est ce qui les rend réutilisables
   // pour le départ d'à côté. Seul ce qu'on rend ici est ramené au disque voulu.
   const out = clipToDisk(merged, lon, lat, radiusM)
+  out.sources = {}
+  for (const tile of wanted) {
+    if (!obtained.has(tileKey(level, tile))) continue
+    const origine = origins.get(tile) ?? 'appareil'
+    out.sources[origine] = (out.sources[origine] ?? 0) + 1
+  }
   // Dit au reste du moteur qu'il manque une bordure : le graphe qui en sort ne
   // sera pas gardé pour les recherches suivantes, qui, elles, auront tout.
   if (obtained.size < wanted.length) out.partial = true

@@ -410,10 +410,19 @@ function LastSearch() {
     `itinéraires ${s(last.routing)}`,
     last.elevation ? `altitude ${s(last.elevation)}` : null,
   ].filter(Boolean)
+  // D'où venaient les rues : la carte livrée, les archives en ligne, Overpass,
+  // ou l'appareil. C'est la première question quand une recherche traîne.
+  const venues = last.sources
+    ? Object.entries(last.sources)
+        .map(([quoi, n]) => `${n} ${quoi}`)
+        .join(', ')
+    : null
+
   return (
     <p className="muted small">
       Dernier calcul : {last.km} km en {s(last.total)} — {parts.join(' · ')}
       {last.nodes ? ` (${last.nodes.toLocaleString('fr-FR')} nœuds)` : ''}
+      {venues ? ` · rues : ${venues}` : ''}
     </p>
   )
 }
