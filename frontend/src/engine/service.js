@@ -257,9 +257,34 @@ export async function planLoops(input, deps) {
   let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace)
 
   let relaxed = false
+  let salvaged = null
   if (!unique.length && req.safety === 'safe') {
     ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace)
     relaxed = unique.length > 0
+  }
+
+  // **Rien ne passe les seuils, mais des trajets existent.** C'est le cas d'un
+  // village : les seules routes longent le trafic, ou ne se referment pas. Mesuré
+  // à Bligny-lès-Beaune, 200 habitants — six candidats, tous écartés, et un écran
+  // vide devant quelqu'un en tenue. On propose donc les meilleurs d'entre eux,
+  // en disant franchement ce qui cloche : c'est à la personne de juger si elle
+  // veut faire cet aller-retour, pas au programme de décider à sa place.
+  if (!unique.length) {
+    const repechables = rejected.filter((r) => r.cand).map((r) => r.cand)
+    sortByKey(repechables, (cand) => -preliminaryScore(cand, targetM, req.tolerance))
+    const gardes = []
+    for (const cand of repechables) {
+      if (gardes.some((autre) => similarity(cand, autre) > DUPLICATE_THRESHOLD)) continue
+      gardes.push(cand)
+      if (gardes.length >= req.limit) break
+    }
+    if (gardes.length) {
+      unique = gardes
+      // La raison la plus fréquente : c'est elle qu'on explique.
+      const comptes = {}
+      for (const r of rejected) comptes[r.reason] = (comptes[r.reason] ?? 0) + 1
+      salvaged = Object.entries(comptes).sort((a, b) => b[1] - a[1])[0][0]
+    }
   }
 
   const shortlist = unique.slice(0, shortlistSize(req.limit))
@@ -323,14 +348,21 @@ export async function planLoops(input, deps) {
     lambda: profile.lam,
     engine: 'local',
   }
-  if (relaxed) {
+  if (salvaged) {
+    meta.relaxed = true
+    meta.salvaged = salvaged
+    meta.message = SALVAGED_MESSAGE[salvaged] ?? SALVAGED_MESSAGE.default
+  } else if (relaxed) {
     meta.message =
       "Aucun itinéraire d'ici ne tient les seuils du mode Sûr : le réseau impose de longer la route. Voici ce qui existe malgré tout, avec le détail des portions exposées — à toi de juger."
   } else if (!routes.length) {
     meta.message = noResultMessage(req, rejected, offTarget)
   }
 
-  return { routes, rejected: rejected.slice(0, 6), meta }
+  // Le candidat attaché à chaque rejet ne sort pas d'ici : c'est un objet
+  // lourd, qui n'a rien à faire dans la réponse ni dans le passage d'un fil à
+  // l'autre.
+  return { routes, rejected: rejected.slice(0, 6).map(({ cand, ...reste }) => reste), meta }
 }
 
 /**
@@ -395,6 +427,20 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace) {
   return out
 }
 
+// Ce qu'on dit quand on repêche : la vérité, et ce qu'elle laisse comme choix.
+const SALVAGED_MESSAGE = {
+  shape:
+    "Il n'y a pas de vraie boucle d'ici à cette distance — le réseau n'en offre pas. Voici les meilleurs trajets possibles : ils reviennent en partie par le même chemin.",
+  exposed_share:
+    "Tout ce qui part d'ici longe la route plus que les seuils ne l'autorisent. Voici les moins exposés, avec le détail des portions concernées — à toi de juger.",
+  longest_exposed_m:
+    "Chaque trajet d'ici comporte une longue portion au contact du trafic. Voici les plus courtes, avec le détail — à toi de juger.",
+  unprotected_crossings:
+    "Les trajets d'ici traversent des routes sans passage protégé. Voici ceux qui en comptent le moins, avec le détail — à toi de juger.",
+  default:
+    "Aucun itinéraire d'ici ne tient les seuils. Voici ce qui existe malgré tout, avec le détail de ce qui cloche — à toi de juger.",
+}
+
 function applyGate(raw, lo, hi, mode, sport) {
   const passed = []
   const rejected = []
@@ -405,17 +451,26 @@ function applyGate(raw, lo, hi, mode, sport) {
       offTarget += 1
       continue
     }
+    // Le candidat reste attaché à son rejet : dans un village, ce sont parfois
+    // les seuls trajets qui existent, et un écran vide ne vaut pas mieux qu'un
+    // aller-retour annoncé comme tel. Il est retiré avant de rendre la réponse.
     if (cand.roundness < MIN_ROUNDNESS) {
       rejected.push({
         reason: 'shape',
         label: "aller-retour déguisé plutôt qu'une vraie boucle",
         distance_m: pyRoundInt(stats.distanceM),
+        cand,
       })
       continue
     }
     const gate = runGate(stats, mode, sport)
     if (!gate.passed) {
-      rejected.push({ reason: gate.failures[0].code, label: gate.firstLabel, distance_m: pyRoundInt(stats.distanceM) })
+      rejected.push({
+        reason: gate.failures[0].code,
+        label: gate.firstLabel,
+        distance_m: pyRoundInt(stats.distanceM),
+        cand,
+      })
       continue
     }
     passed.push(cand)

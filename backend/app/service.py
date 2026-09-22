@@ -264,20 +264,40 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     # Une boucle plus courte parcourue deux fois qui tient le mode Sûr vaut
     # mieux qu'une boucle entière qui ne le tient pas — et l'inverse afficherait
     # « rien ne tient les seuils » au-dessus d'un itinéraire noté A.
-    unique, rejected, off_target = _collect(
+    unique, rejected, off_target, spurned = _collect(
         raw, lo, hi, req.safety.value, req, graph, start, profile, target_m
     )
 
     relaxed = False
+    salvaged: str | None = None
     if not unique and req.safety is SafetyMode.safe:
         # Ni boucle entière ni tour répété : là, et seulement là, on montre ce
         # qui existe en le disant.
-        unique, _rejected, _off = _collect(
+        unique, _rejected, _off, _spurned = _collect(
             raw, lo, hi, SafetyMode.standard.value, req, graph, start, profile, target_m
         )
         relaxed = bool(unique)
         if relaxed:
             log.info("mode Sûr sans solution : repli annoncé sur les seuils Standard")
+
+    # Rien ne passe les seuils, mais des trajets existent : c'est le cas d'un
+    # village, dont les seules routes longent le trafic ou ne se referment pas.
+    # Mesuré à Bligny-lès-Beaune, 200 habitants : six candidats, tous écartés, et
+    # un écran vide devant quelqu'un en tenue. On propose donc les meilleurs en
+    # disant franchement ce qui cloche — c'est à la personne de juger.
+    if not unique and spurned:
+        spurned.sort(key=lambda c: -preliminary_score(c, target_m, req.tolerance))
+        gardes: list[Candidate] = []
+        for cand in spurned:
+            if any(similarity(cand, kept) > DUPLICATE_THRESHOLD for kept in gardes):
+                continue
+            gardes.append(cand)
+            if len(gardes) >= req.limit:
+                break
+        if gardes:
+            unique = gardes
+            salvaged = Counter(r.reason for r in rejected).most_common(1)[0][0]
+            log.info("aucun itinéraire aux seuils : %s repêchés (%s)", len(gardes), salvaged)
 
     # On garde une réserve au-delà du nombre demandé : la note finale intègre le
     # dénivelé, inconnu à ce stade, et le choix diversifié a besoin de matière
@@ -349,7 +369,11 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         "timings_s": timings,
         "lambda": profile.lam,
     }
-    if relaxed:
+    if salvaged:
+        meta["relaxed"] = True
+        meta["salvaged"] = salvaged
+        meta["message"] = _SALVAGED_MESSAGE.get(salvaged, _SALVAGED_MESSAGE["default"])
+    elif relaxed:
         meta["message"] = (
             "Aucun itinéraire d'ici ne tient les seuils du mode Sûr : le réseau "
             "impose de longer la route. Voici ce qui existe malgré tout, avec le "
@@ -371,14 +395,14 @@ def _collect(
     start: int,
     profile,
     target_m: float,
-) -> tuple[list[Candidate], list[Rejected], int]:
+) -> tuple[list[Candidate], list[Rejected], int, list[Candidate]]:
     """Tout ce qu'on peut proposer sous un mode de sécurité donné.
 
     D'abord les boucles entières, dédoublonnées. Puis, s'il en manque, des
     boucles plus courtes à parcourir plusieurs fois — à seuils **identiques**,
     jamais relâchés.
     """
-    passed, rejected, off_target = _apply_gate(raw, lo, hi, mode, req.sport.value)
+    passed, rejected, off_target, spurned = _apply_gate(raw, lo, hi, mode, req.sport.value)
     passed.sort(key=lambda c: -preliminary_score(c, target_m, req.tolerance))
 
     unique: list[Candidate] = []
@@ -395,7 +419,7 @@ def _collect(
             log.info("boucles répétées proposées : %s tours", sorted({c.laps for c in looped}))
         unique.extend(looped)
 
-    return unique, rejected, off_target
+    return unique, rejected, off_target, spurned
 
 
 def _lap_options(
@@ -435,7 +459,7 @@ def _lap_options(
         )
         lo = lap_target * (1 - req.tolerance)
         hi = lap_target * (1 + req.tolerance)
-        passed, _rejected, _off = _apply_gate(raw, lo, hi, mode, req.sport.value)
+        passed, _rejected, _off, _spurned = _apply_gate(raw, lo, hi, mode, req.sport.value)
         passed.sort(key=lambda c: -preliminary_score(c, lap_target, req.tolerance))
 
         for cand in passed:
@@ -454,9 +478,34 @@ def _lap_options(
     return out
 
 
+# Ce qu'on dit quand on repêche : la vérité, et ce qu'elle laisse comme choix.
+_SALVAGED_MESSAGE = {
+    "shape": (
+        "Il n'y a pas de vraie boucle d'ici à cette distance — le réseau n'en offre pas. "
+        "Voici les meilleurs trajets possibles : ils reviennent en partie par le même chemin."
+    ),
+    "exposed_share": (
+        "Tout ce qui part d'ici longe la route plus que les seuils ne l'autorisent. Voici les "
+        "moins exposés, avec le détail des portions concernées — à toi de juger."
+    ),
+    "longest_exposed_m": (
+        "Chaque trajet d'ici comporte une longue portion au contact du trafic. Voici les plus "
+        "courtes, avec le détail — à toi de juger."
+    ),
+    "unprotected_crossings": (
+        "Les trajets d'ici traversent des routes sans passage protégé. Voici ceux qui en "
+        "comptent le moins, avec le détail — à toi de juger."
+    ),
+    "default": (
+        "Aucun itinéraire d'ici ne tient les seuils. Voici ce qui existe malgré tout, avec le "
+        "détail de ce qui cloche — à toi de juger."
+    ),
+}
+
+
 def _apply_gate(
     raw: list[Candidate], lo: float, hi: float, mode: str, sport: str
-) -> tuple[list[Candidate], list[Rejected], int]:
+) -> tuple[list[Candidate], list[Rejected], int, list[Candidate]]:
     """Filtre distance, forme et sécurité.
 
     Deux natures de rejet, à ne pas mélanger. Les tracés hors fourchette sont du
@@ -467,6 +516,10 @@ def _apply_gate(
     """
     passed: list[Candidate] = []
     rejected: list[Rejected] = []
+    # Les candidats écartés, gardés à part : dans un village, ce sont parfois les
+    # seuls trajets qui existent, et `plan_loops` les repêche plutôt que de
+    # rendre un écran vide.
+    spurned: list[Candidate] = []
     off_target = 0
 
     for cand in raw:
@@ -485,6 +538,7 @@ def _apply_gate(
                     distance_m=round(stats.distance_m),
                 )
             )
+            spurned.append(cand)
             continue
 
         gate = run_gate(stats, mode, sport)
@@ -496,11 +550,12 @@ def _apply_gate(
                     distance_m=round(stats.distance_m),
                 )
             )
+            spurned.append(cand)
             continue
 
         passed.append(cand)
 
-    return passed, rejected, off_target
+    return passed, rejected, off_target, spurned
 
 
 # --- notation -------------------------------------------------------------

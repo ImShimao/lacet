@@ -59,3 +59,43 @@ describe('le relief', () => {
     expect(result.routes[0].elevation_profile).toBeNull()
   }, 20_000)
 })
+
+describe('un village sans boucle', () => {
+  /**
+   * Bligny-lès-Beaune, deux cents habitants : six trajets possibles, tous
+   * écartés — ils longent la route départementale plus que les seuils ne
+   * l'autorisent. L'app affichait « aucun itinéraire ne satisfait les
+   * critères », c'est-à-dire un écran vide devant quelqu'un en tenue, alors
+   * qu'elle avait de quoi proposer. Elle propose maintenant, en disant ce qui
+   * cloche : c'est à la personne de juger, pas au programme.
+   */
+  const dir = new URL('./__fixtures__/parity/', import.meta.url)
+  const extract = fromCompact(
+    JSON.parse(gunzipSync(readFileSync(new URL('extract-bligny.json.gz', dir))).toString('utf8')),
+  )
+  const graph = buildGraph(extract, { sport: 'run' })
+  const bligny = { lat: 46.966, lon: 4.834 }
+
+  it('propose les moins mauvais plutôt que rien', async () => {
+    const result = await planLoops(
+      { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false },
+      { loadGraph: async () => graph, wind: async () => null },
+    )
+    expect(result.routes.length).toBeGreaterThan(0)
+    expect(result.meta.salvaged).toBe('exposed_share')
+    // Et le dit : l'avertissement est le même que pour un repli de mode.
+    expect(result.meta.relaxed).toBe(true)
+    expect(result.meta.message).toMatch(/longe la route/i)
+  }, 30_000)
+
+  it('ne fait pas passer un repêchage pour une recommandation', async () => {
+    const result = await planLoops(
+      { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false },
+      { loadGraph: async () => graph, wind: async () => null },
+    )
+    // La note de sécurité reste celle du trajet : on ne l'embellit pas.
+    expect(['A', 'B', 'C']).toContain(result.routes[0].safety.grade)
+    // Et les motifs d'écart restent visibles.
+    expect(Object.keys(result.meta.rejected_by).length).toBeGreaterThan(0)
+  }, 30_000)
+})
