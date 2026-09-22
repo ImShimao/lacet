@@ -81,6 +81,12 @@ const CORE_SHARE = 0.6
 // des six tuiles d'une recherche de 5 km manquaient à la carte livrée, et la
 // barre restait à 80 % le temps qu'Overpass réponde — une minute, ou jamais.
 // Quatre tuiles suffisaient pourtant à tracer la boucle.
+// Âge à partir duquel une copie déjà sur l'appareil vaut la peine d'être
+// comparée aux archives. Les archives sont refaites tous les mois : en deçà, la
+// copie locale est au moins aussi bonne, et l'aller-retour ne rapporterait
+// qu'une seconde d'attente — y compris chez soi, où la carte livrée suffit.
+const ARCHIVE_AFTER_MS = 30 * 86_400_000
+
 const PERIPHERAL_WAIT_MS = 6_000
 // **Le temps qu'on s'autorise à attendre les rues, en tout.**
 //
@@ -377,7 +383,10 @@ export async function fetchArea(args) {
   // l'octet près. Ce qui n'y est pas — l'étranger, pour l'instant — reste à
   // Overpass, qui met dix fois plus de temps à le calculer.
   if (useArchive && !only) {
-    const unfresh = wanted.filter((tile) => !isFresh(found.get(tile)))
+    const unfresh = wanted.filter((tile) => {
+      const copy = found.get(tile)
+      return !copy || now() - copy.at >= ARCHIVE_AFTER_MS
+    })
     if (unfresh.length) {
       const archived = await fetchArchived(unfresh, { fetchImpl: archiveFetch })
       const keep = []
