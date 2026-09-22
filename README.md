@@ -1111,6 +1111,18 @@ géométries au bit près. Seules les tuiles entièrement dans la région sont
 livrées : une tuile à cheval sur la limite n'aurait que la moitié de ses rues.
 Hors de la région, rien ne change.
 
+**On ne charge que ce qu'une boucle peut atteindre.** Une boucle de longueur L
+ne s'éloigne jamais de plus de L/2 à vol d'oiseau : c'est tout ce qu'il faut
+charger, et le rayon suit maintenant l'écart toléré au lieu d'une marge fixe
+prise pour le mode le plus souple. Les rues arrivent par carreaux de 0,05°, pris
+dès qu'ils **effleurent** ce disque : le débord — plus de la moitié de la
+surface — est écarté avant la construction du graphe, sans jamais couper une rue
+en deux. Mesuré à Guebwiller, 10 km : 16 carreaux et 14 062 voies avant, 11
+carreaux et 5 833 voies après ; le graphe passe de 18 499 à 7 493 nœuds, et
+l'ensemble rues + graphe de 0,59 s à 0,19 s sur un PC de bureau — un peu plus du
+double sur un iPhone. Les carreaux, eux, restent gardés **entiers** : c'est ce
+qui rend immédiate la recherche suivante, deux rues plus loin.
+
 **Ailleurs, deux serveurs font la course.** Hors de la région livrée, les rues
 viennent d'Overpass. Mesuré le 19 septembre 2026 sur la France, la Suisse,
 l'Italie, l'Espagne et l'Allemagne : l'instance principale répondait en 1,6 s…
@@ -1138,7 +1150,11 @@ secondes d'attente auparavant.
 
 **Le relief part en un seul envoi.** L'IGN met en file les requêtes simultanées :
 mille points passent en moins d'une seconde en un POST, en plus de cinq en dix
-petits envois parallèles.
+petits envois parallèles. Et c'est la requête qui coûte, pas les points —
+remesuré le 22 septembre 2026 : 3,3 s pour trois cents points, 3,1 s pour mille,
+3,7 s pour cinq mille, et un refus au-delà. Cinq itinéraires de 10 km, qui
+partaient en deux envois, tiennent donc dans un seul : c'est, une fois les rues
+sur l'appareil, le plus gros de ce qui reste à attendre.
 
 Les rues sont gardées par carreaux de 0,05° dans IndexedDB. Fraîches quatorze
 jours ; ensuite, et jusqu'à trois mois, elles sont servies tout de suite et

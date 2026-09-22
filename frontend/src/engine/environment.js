@@ -138,7 +138,13 @@ const BATCH = 100
 // un seul POST, moins d'une seconde à deux ; dix GET de cent en parallèle, plus
 // de cinq ; deux POST de cinq cents en parallèle, dix. Le service met les
 // requêtes simultanées en file : on envoie donc de gros lots, l'un après l'autre.
-const IGN_BATCH = 1000
+//
+// **Cinq mille, et non mille.** Remesuré le 22 septembre 2026 : trois cents
+// points coûtent 3,3 s, mille 3,1 s, cinq mille 3,7 s — le prix est celui de la
+// requête, pas des points. Au-delà, le service refuse (« HTTP 400 » à six
+// mille). Un lot de mille faisait donc partir deux requêtes, et attendre deux
+// fois, pour cinq itinéraires de 10 km ; tout tient maintenant dans une.
+const IGN_BATCH = 5000
 const ROUND = 5
 const ELEVATION_TILE = 0.05
 const ASCENT_THRESHOLD_M = 2
@@ -158,12 +164,17 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
     for (const c of coords) wanted.set(roundKey(c), null)
   }
 
-  const tiles = new Map()
-  for (const key of wanted.keys()) {
+  // Les tuiles d'altitude déjà connues, lues **ensemble** : une par une, c'est
+  // autant de transactions IndexedDB à la file avant la moindre requête.
+  const tileOf = (key) => {
     const [lon, lat] = key.split(',').map(Number)
-    const tile = `${Math.floor(lon / ELEVATION_TILE)}_${Math.floor(lat / ELEVATION_TILE)}`
-    if (!tiles.has(tile)) tiles.set(tile, (await elevationStore.get(tile)) ?? {})
-    const known = tiles.get(tile)[key]
+    return `${Math.floor(lon / ELEVATION_TILE)}_${Math.floor(lat / ELEVATION_TILE)}`
+  }
+  const names = [...new Set([...wanted.keys()].map(tileOf))]
+  const stored = await Promise.all(names.map((tile) => elevationStore.get(tile)))
+  const tiles = new Map(names.map((tile, i) => [tile, stored[i] ?? {}]))
+  for (const key of wanted.keys()) {
+    const known = tiles.get(tileOf(key))[key]
     if (known !== undefined) wanted.set(key, known)
   }
 

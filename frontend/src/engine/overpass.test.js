@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { clipToDisk } from './extract'
 import {
   MIRRORS,
   TILE_DEG,
@@ -56,6 +57,24 @@ function payloadFor([s, w, n, e]) {
     }
   }
   return { elements }
+}
+
+/**
+ * Les tuiles dont la fausse voie — posée au centre — est à portée du départ.
+ *
+ * Les tuiles demandées débordent toujours le disque voulu : elles sont prises
+ * dès qu'elles l'effleurent. Ce qui est **rendu**, lui, est ramené au disque
+ * (`clipToDisk`), et c'est ce compte-là qu'on attend.
+ */
+function inReach({ lat, lon }, radiusM) {
+  const kx = Math.cos((lat * Math.PI) / 180) * 111_320
+  return tilesFor(lat, lon, radiusM).filter(([ix, iy]) => {
+    const west = (ix + 0.5) * TILE_DEG
+    const south = (iy + 0.5) * TILE_DEG
+    const dx = (Math.min(Math.max(lon, west), west + 0.001) - lon) * kx
+    const dy = (Math.min(Math.max(lat, south), south + 0.001) - lat) * 110_540
+    return Math.hypot(dx, dy) <= radiusM
+  }).length
 }
 
 /** Réseau simulé : `behaviour(url)` rend 'ok', 'empty', 'error' ou 'silent'. */
@@ -294,6 +313,45 @@ describe('les miroirs', () => {
 // --- la zone complète ---------------------------------------------------------
 
 describe('le téléchargement d’une zone', () => {
+  it('ne rend que les rues à portée, en gardant les tuiles entières', async () => {
+    // Les tuiles couvrent bien plus large que le disque demandé — elles sont
+    // prises dès qu'elles l'effleurent — et ce débord n'a rien à faire dans le
+    // graphe. Il doit rester dans le cache, en revanche : c'est lui qui rendra
+    // la recherche suivante, deux rues plus loin, immédiate.
+    const { fetchImpl } = fakeNetwork()
+    const large = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
+    expect(large.ways.length).toBe(inReach(BEAUNE, 7000))
+    expect(large.ways.length).toBeLessThan(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
+
+    // Deux kilomètres plus à l'est, sans réseau : tout doit venir du cache.
+    const next = { lat: BEAUNE.lat, lon: BEAUNE.lon + 0.03 }
+    const near = await fetchArea({
+      ...next,
+      radiusM: 2000,
+      targetM: 3000,
+      fetchImpl: async () => {
+        throw new TypeError('Pas de réseau')
+      },
+    })
+    expect(near.ways.length).toBe(inReach(next, 2000))
+  })
+
+  it('garde une voie qui ne fait que traverser le disque', async () => {
+    // La découpe se fait sur l'emprise de la voie, pas sur ses points : une rue
+    // dont les deux bouts sont dehors mais qui passe au milieu reste entière.
+    const traversante = {
+      ways: [
+        { id: 1, tags: { highway: 'residential' }, nodes: [], flat: Float64Array.of(4.5, 47.0245, 5.2, 47.0245) },
+        { id: 2, tags: { highway: 'residential' }, nodes: [], flat: Float64Array.of(5.4, 47.5, 5.5, 47.6) },
+      ],
+      landuse: [],
+      crossings: [],
+    }
+    const kept = clipToDisk(traversante, BEAUNE.lon, BEAUNE.lat, 3000)
+    expect(kept.ways.map((w) => w.id)).toEqual([1])
+    expect(kept.ways[0].flat.length).toBe(4)
+  })
+
   it('ne fait que quelques requêtes pour une petite ville', async () => {
     // Quinze tuiles : la première seule, pour mesurer la densité, puis le reste
     // d'un bloc — au lieu de quinze requêtes.
@@ -301,7 +359,7 @@ describe('le téléchargement d’une zone', () => {
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
     // Deux lots au plus — chacun demandé à deux miroirs à la fois.
     expect(new Set(calls.map((c) => c.bbox.join())).size).toBeLessThanOrEqual(2)
-    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
+    expect(extract.ways.length).toBe(inReach(BEAUNE, 7000))
   })
 
   it('commence par la tuile du départ', async () => {
@@ -356,7 +414,7 @@ describe('le téléchargement d’une zone', () => {
       return base.fetchImpl(url, options)
     }
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl })
-    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
+    expect(extract.ways.length).toBe(inReach(BEAUNE, 7000))
     expect(Math.max(...tailles.filter((t) => t <= 12))).toBeGreaterThan(1)
   }, 20_000)
 
@@ -411,7 +469,7 @@ describe('le téléchargement d’une zone', () => {
     }
     // Des lots d'environ trois tuiles, comme en plein Paris.
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl, chunkBytes: 1200 })
-    expect(extract.ways.length).toBe(tilesFor(BEAUNE.lat, BEAUNE.lon, 7000).length)
+    expect(extract.ways.length).toBe(inReach(BEAUNE, 7000))
     expect(peak.get(MIRRORS[0])).toBe(2)
     expect(Math.max(...peak.values())).toBe(2)
   })

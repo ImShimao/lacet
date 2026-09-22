@@ -128,9 +128,21 @@ export function normalizeRequest(input) {
   return req
 }
 
-/** Rayon de l'extrait à télécharger — celui de `plan_loops`. */
-export function extractRadiusM(targetM) {
-  return Math.ceil(Math.max(1500, targetM * 0.62) / 1000) * 1000
+/**
+ * Rayon de l'extrait à télécharger — celui de `plan_loops`.
+ *
+ * Une boucle de longueur L ne s'éloigne jamais de plus de L/2 à vol d'oiseau, et
+ * la plus longue acceptée vaut la distance visée plus l'écart toléré : c'est
+ * tout ce qu'il faut charger. Le rayon fixe d'avant — 0,62 fois la distance —
+ * prenait la marge du mode le plus souple pour tout le monde, et chargeait un
+ * tiers de surface en trop à chaque recherche.
+ *
+ * Arrondi au kilomètre supérieur : sans ça, faire glisser la distance de 10 à
+ * 10,5 km changerait d'extrait et jetterait le cache alors que la zone est la
+ * même. On télécharge un peu plus, une seule fois.
+ */
+export function extractRadiusM(targetM, tolerance = 0.1) {
+  return Math.ceil(Math.max(1500, (targetM * (1 + tolerance)) / 2) / 1000) * 1000
 }
 
 /** Ce que la recherche demande au chargeur de graphe : la zone, le détail, le sport. */
@@ -139,7 +151,7 @@ function graphArgs(req) {
   return {
     lat: req.lat,
     lon: req.lon,
-    radiusM: extractRadiusM(targetM),
+    radiusM: extractRadiusM(targetM, req.tolerance),
     targetM,
     sport: req.sport,
     allowTrail: req.surface === 'trail',

@@ -22,6 +22,7 @@ la main.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -60,6 +61,42 @@ class Extract:
 
     def __bool__(self) -> bool:
         return bool(self.ways)
+
+
+def clip_to_disk(extract: Extract, lon: float, lat: float, radius_m: float) -> Extract:
+    """Ne garde que ce qui touche le disque demandé.
+
+    Overpass rend un rectangle, et une voie entière dès qu'elle l'effleure : un
+    quart de la surface reçue est hors d'atteinte d'une boucle qui, par
+    construction, ne s'éloigne jamais de plus de la moitié de sa longueur. Tout
+    ce débord était construit en graphe puis parcouru par Dijkstra pour rien.
+
+    Une voie qui déborde est gardée **entière** : on ne coupe pas les rues, on
+    écarte seulement celles qui sont hors d'atteinte de bout en bout. Même
+    découpe que `clipToDisk` dans `frontend/src/engine/extract.js` — les deux
+    moteurs doivent partir du même extrait.
+    """
+    kx = math.cos(math.radians(lat)) * 111_320.0
+    ky = 110_540.0
+
+    def reaches(coords: list[Coord]) -> bool:
+        west = min(c[0] for c in coords)
+        east = max(c[0] for c in coords)
+        south = min(c[1] for c in coords)
+        north = max(c[1] for c in coords)
+        dx = (min(max(lon, west), east) - lon) * kx
+        dy = (min(max(lat, south), north) - lat) * ky
+        return dx * dx + dy * dy <= radius_m * radius_m
+
+    return Extract(
+        ways=[way for way in extract.ways if way.coords and reaches(way.coords)],
+        landuse=[ring for ring in extract.landuse if ring and reaches(ring)],
+        crossings=[
+            node
+            for node in extract.crossings
+            if ((node.lon - lon) * kx) ** 2 + ((node.lat - lat) * ky) ** 2 <= radius_m * radius_m
+        ],
+    )
 
 
 def from_overpass(payload: dict[str, Any]) -> Extract:

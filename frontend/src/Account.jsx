@@ -104,6 +104,7 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
 
       <h4 className="section">L'app</h4>
       <BuildStamp />
+      <LastSearch />
       <ModePicker mode={mode} />
       <p className="muted small">
         Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.
@@ -337,6 +338,38 @@ function BuildStamp() {
           rouvre-la ; si ça persiste, réinstalle-la.
         </>
       )}
+    </p>
+  )
+}
+
+/**
+ * Où est passé le temps de la dernière recherche.
+ *
+ * Tout se calcule ici, sur l'appareil, et « c'est long » peut vouloir dire trois
+ * choses très différentes : les rues qui arrivent mal, le graphe qui se
+ * construit, ou les altitudes qu'un service public met des secondes à rendre.
+ * Le détail tient en une ligne et se lit en bas de chez soi, réseau du moment
+ * compris — c'est ce qui permet d'aller corriger le bon endroit.
+ */
+function LastSearch() {
+  const last = load().lastSearch
+  if (!last) return null
+  // Deux décimales sous la seconde : c'est là que se jouent les étapes qu'on
+  // cherche à raccourcir, et « 0,0 s » n'apprend rien.
+  const s = (v) => `${(v ?? 0).toFixed(v >= 1 ? 1 : 2).replace('.', ',')} s`
+  // Les rues préparées en fond ne coûtent rien à la recherche : le dire ainsi
+  // évite de lire deux zéros comme une mesure ratée.
+  const ready = !last.fetch && !last.graph
+  const parts = [
+    ready ? 'rues déjà prêtes' : `rues ${s(last.fetch)}`,
+    ready ? null : `graphe ${s(last.graph)}`,
+    `itinéraires ${s(last.routing)}`,
+    last.elevation ? `altitude ${s(last.elevation)}` : null,
+  ].filter(Boolean)
+  return (
+    <p className="muted small">
+      Dernier calcul : {last.km} km en {s(last.total)} — {parts.join(' · ')}
+      {last.nodes ? ` (${last.nodes.toLocaleString('fr-FR')} nœuds)` : ''}
     </p>
   )
 }

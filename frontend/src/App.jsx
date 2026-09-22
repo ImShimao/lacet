@@ -386,6 +386,22 @@ export default function App() {
           }
         }
         if (token !== searchToken.current) return
+        // Le détail du temps passé, gardé pour « Mon compte ». Mesurer sur le
+        // téléphone est le seul moyen de savoir ce qui traîne vraiment : un PC
+        // de bureau construit un graphe trois fois plus vite qu'un iPhone, et
+        // une recherche lente en 4G n'a rien à voir avec une recherche lente
+        // dans un village sans réseau.
+        if (payload.meta?.timings_s) {
+          save({
+            lastSearch: {
+              at: Date.now(),
+              km: active.distance_km,
+              total: payload.meta.elapsed_s,
+              ...payload.meta.timings_s,
+              nodes: payload.meta.graph_nodes,
+            },
+          })
+        }
         // La demande reste attachée au résultat : c'est avec elle qu'un chemin
         // de retour se calcule, en course, si l'on s'écarte du parcours.
         setResult({ ...payload, request })

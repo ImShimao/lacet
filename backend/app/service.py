@@ -171,11 +171,12 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     target_m = req.distance_km * 1000.0
 
     # --- données ----------------------------------------------------------
-    # Une boucle de longueur L ne s'éloigne jamais de plus de L/2 à vol d'oiseau.
+    # Une boucle de longueur L ne s'éloigne jamais de plus de L/2 à vol d'oiseau,
+    # et la plus longue acceptée vaut la distance visée plus l'écart toléré.
     # Le rayon est arrondi au kilomètre supérieur : sans ça, faire glisser la
     # distance de 10 à 10,5 km changerait d'extrait et invaliderait le cache
     # alors que la zone est la même. On télécharge un peu plus, une seule fois.
-    radius_m = math.ceil(max(1500.0, target_m * 0.62) / 1000.0) * 1000.0
+    radius_m = math.ceil(max(1500.0, target_m * (1.0 + req.tolerance) / 2.0) / 1000.0) * 1000.0
     allow_trail = req.surface is SurfacePref.trail
     cache_key = (area_key(req.lat, req.lon, radius_m, target_m), req.sport.value, allow_trail)
 

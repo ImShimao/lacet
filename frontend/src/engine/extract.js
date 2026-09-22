@@ -54,6 +54,51 @@ export function fromCompact(data) {
   }
 }
 
+/**
+ * Ne garde que ce qui touche le disque demandé.
+ *
+ * Les rues arrivent par tuiles de 0,05°, et une tuile est prise dès qu'elle
+ * **effleure** le disque : autour d'un départ, les tuiles couvrent deux fois la
+ * surface demandée, et tout ce débord était construit en graphe puis parcouru
+ * par Dijkstra pour rien — une boucle ne s'éloigne jamais de plus de la moitié
+ * de sa longueur, et le rayon est déjà calculé pour ça. Mesuré à Guebwiller,
+ * pour 10 km : 14 062 voies reçues, 7 550 à portée, et un graphe construit en
+ * 144 ms au lieu de 251.
+ *
+ * Une voie qui déborde est gardée **entière** : on ne coupe pas les rues, on
+ * écarte seulement celles qui sont hors d'atteinte de bout en bout.
+ */
+export function clipToDisk(extract, lon, lat, radiusM) {
+  const kx = Math.cos((lat * Math.PI) / 180) * 111_320
+  const ky = 110_540
+  // Le point de l'emprise le plus proche du départ : s'il est trop loin, toute
+  // la géométrie l'est.
+  const reaches = (flat) => {
+    let west = Infinity
+    let south = Infinity
+    let east = -Infinity
+    let north = -Infinity
+    for (let i = 0; i < flat.length; i += 2) {
+      if (flat[i] < west) west = flat[i]
+      if (flat[i] > east) east = flat[i]
+      if (flat[i + 1] < south) south = flat[i + 1]
+      if (flat[i + 1] > north) north = flat[i + 1]
+    }
+    const dx = (Math.min(Math.max(lon, west), east) - lon) * kx
+    const dy = (Math.min(Math.max(lat, south), north) - lat) * ky
+    return dx * dx + dy * dy <= radiusM * radiusM
+  }
+  return {
+    ways: extract.ways.filter((way) => reaches(way.flat)),
+    landuse: extract.landuse.filter((area) => reaches(area.flat)),
+    crossings: extract.crossings.filter((c) => {
+      const dx = (c.lon - lon) * kx
+      const dy = (c.lat - lat) * ky
+      return dx * dx + dy * dy <= radiusM * radiusM
+    }),
+  }
+}
+
 /** Couple (lon, lat) du i-ème point d'une géométrie à plat. */
 export const pointAt = (flat, i) => [flat[2 * i], flat[2 * i + 1]]
 

@@ -21,7 +21,7 @@
 // Les tuiles gardées servent ensuite à toutes les recherches voisines : changer
 // de distance ou partir de la rue d'à côté ne retélécharge que ce qui manque.
 
-import { emptyExtract, fromOverpass, mergeExtracts } from './extract'
+import { clipToDisk, emptyExtract, fromOverpass, mergeExtracts } from './extract'
 import { bboxAround } from './geo'
 import { pyFixed } from './py'
 import { regionTile } from './region'
@@ -269,7 +269,12 @@ const SILENT =
   "Aucun miroir OpenStreetMap n'a répondu. Vérifie ta connexion, ou réessaie dans une minute : ces serveurs sont publics et gratuits, et ils saturent régulièrement aux heures ouvrées."
 
 /**
- * L'extrait couvrant la zone. `onProgress(fraction)` suit les tuiles obtenues.
+ * Les rues à portée du départ. `onProgress(fraction)` suit les tuiles obtenues.
+ *
+ * Les tuiles sont demandées et gardées **entières** — elles resserviront au
+ * départ d'à côté — mais ce qui est rendu est ramené au disque de rayon
+ * `radiusM` : le débord des tuiles fait plus de la moitié de la surface, et il
+ * n'a rien à faire dans le graphe (`clipToDisk`).
  */
 export async function fetchArea(args) {
   const {
@@ -303,8 +308,12 @@ export async function fetchArea(args) {
   // Ce qu'on a déjà : sur l'appareil, à ce niveau ou à un niveau plus fin ; puis,
   // pour ce qui n'y est pas frais, dans la carte régionale — la plus récente des
   // deux copies l'emporte.
+  // En parallèle : seize tuiles lues l'une après l'autre, c'est seize
+  // transactions IndexedDB à la file, et sur un téléphone chacune coûte le
+  // décodage d'un extrait de plusieurs mégaoctets.
   const found = new Map()
-  for (const tile of wanted) found.set(tile, await cachedTile(level, tile))
+  const copies = await Promise.all(wanted.map((tile) => cachedTile(level, tile)))
+  wanted.forEach((tile, k) => found.set(tile, copies[k]))
   const isFresh = (copy) => Boolean(copy) && now() - copy.at < freshMs
 
   if (useRegion) {
@@ -364,6 +373,10 @@ export async function fetchArea(args) {
   let bytesPerTile = null
   let cap = Infinity
   let silent = false
+  // Les tuiles rangées sur l'appareil : lancées ensemble, attendues à la fin.
+  // Attendre chaque écriture avant de découper la suivante ajoutait, sur un
+  // téléphone, le temps de recopier quinze extraits avant de rendre la main.
+  const written = []
   const ticker = missing.length ? setInterval(report, PROGRESS_TICK_MS) : null
   try {
     while (missing.length) {
@@ -441,7 +454,7 @@ export async function fetchArea(args) {
           const key = tileKey(level, [ix, iy])
           // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
           // veut pas le figer pour deux semaines.
-          if (part.ways.length) await tiles.set(key, { at: now(), extract: part })
+          if (part.ways.length) written.push(tiles.set(key, { at: now(), extract: part }))
           if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
         }
         report()
@@ -451,9 +464,13 @@ export async function fetchArea(args) {
   } finally {
     if (ticker) clearInterval(ticker)
   }
+  await Promise.all(written)
   report()
 
-  return mergeExtracts(wanted.map((tile) => obtained.get(tileKey(level, tile)) ?? emptyExtract()))
+  const merged = mergeExtracts(wanted.map((tile) => obtained.get(tileKey(level, tile)) ?? emptyExtract()))
+  // Les tuiles gardées restent entières — c'est ce qui les rend réutilisables
+  // pour le départ d'à côté. Seul ce qu'on rend ici est ramené au disque voulu.
+  return clipToDisk(merged, lon, lat, radiusM)
 }
 
 const waitFraction = (elapsedMs) => WAIT_SHARE * (1 - Math.exp(-elapsedMs / WAIT_TAU_MS))
@@ -491,14 +508,21 @@ function learnTileBytes(level, bytes) {
  * plus fin dont on retire le superflu — la plus récente l'emporte.
  */
 async function cachedTile(level, tile) {
+  const levels = []
+  for (let l = level; l >= 0; l -= 1) levels.push(l)
+  const copies = await Promise.all(levels.map((l) => tiles.get(tileKey(l, tile))))
   let best = null
-  for (let l = level; l >= 0; l -= 1) {
-    const copy = await tiles.get(tileKey(l, tile))
+  let bestLevel = level
+  for (let k = 0; k < levels.length; k += 1) {
+    const copy = copies[k]
     if (copy && !(best?.at >= copy.at)) {
-      best = { at: copy.at, extract: l === level ? copy.extract : deriveLevel(copy.extract, level) }
+      best = copy
+      bestLevel = levels[k]
     }
   }
-  return best
+  if (!best) return null
+  // Le passage au niveau demandé ne se fait qu'une fois, sur la copie retenue.
+  return { at: best.at, extract: bestLevel === level ? best.extract : deriveLevel(best.extract, level) }
 }
 
 // Les tuiles dont un rafraîchissement est déjà prévu ou en cours : deux

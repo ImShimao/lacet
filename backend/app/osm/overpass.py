@@ -22,7 +22,7 @@ import httpx
 
 from ..config import settings
 from ..geo import bbox_around
-from .extract import Extract, read as read_extract, to_cache
+from .extract import Extract, clip_to_disk, read as read_extract, to_cache
 
 log = logging.getLogger(__name__)
 
@@ -146,9 +146,18 @@ async def fetch_area(
     `target_m` sert à choisir la finesse du réseau demandé : plus la boucle est
     longue, moins on a besoin du détail des rues de desserte.
 
-    Les résultats sont mis en cache sur disque : la deuxième génération au même
-    endroit est instantanée, ce qui rend le développement supportable.
+    Overpass ne connaît que les rectangles : on lui demande donc le carré qui
+    entoure le disque, on garde ce carré en cache — il resservira au départ d'à
+    côté — et on ne rend que ce qui est à portée.
     """
+    extract = await _fetch_bbox(lat, lon, radius_m, target_m=target_m)
+    return clip_to_disk(extract, lon, lat, radius_m)
+
+
+async def _fetch_bbox(
+    lat: float, lon: float, radius_m: float, *, target_m: float = 0.0
+) -> Extract:
+    """Le carré entier, tel qu'Overpass le rend — mis en cache sur disque."""
     extra = detail_filter(target_m or radius_m * 2)
     key = _cache_key(lat, lon, radius_m, extra)
     cached = _read_cache(key)

@@ -7,7 +7,7 @@
 //
 // Les graphes déjà construits restent en mémoire ici, d'une recherche à
 // l'autre : changer la distance ou le terrain ne refait ni le téléchargement ni
-// la construction. Un graphe couvrant **au moins** les tuiles demandées suffit —
+// la construction. Un graphe couvrant **au moins** le disque demandé suffit —
 // raccourcir la distance réutilise celui de la recherche précédente.
 //
 // **Et ils se préparent d'avance.** Le téléchargement des rues faisait l'essentiel
@@ -19,6 +19,7 @@
 // ou le rejoint en cours de route au lieu de le recommencer.
 
 import { buildGraph } from './graph'
+import { haversineM } from './geo'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
 import { currentWind } from './environment'
@@ -30,9 +31,21 @@ import { graphRequest, planDetour, planLoops } from './service'
 const MAX_NODES = 400_000
 const graphs = []
 
-function findGraph(level, sport, allowTrail, needed) {
+/**
+ * Un graphe déjà construit qui couvre la zone demandée.
+ *
+ * Sur le **disque** couvert, et non sur les tuiles : le graphe est ramené au
+ * rayon utile de sa recherche (`clipToDisk`), et deux recherches peuvent
+ * demander les mêmes tuiles sans que la seconde tienne dans la première —
+ * raccourcir la distance réutilise, s'éloigner du point de départ reconstruit.
+ */
+function findGraph(level, sport, allowTrail, { lat, lon, radiusM }) {
   const index = graphs.findIndex(
-    (g) => g.level === level && g.sport === sport && g.allowTrail === allowTrail && needed.every((k) => g.tiles.has(k)),
+    (g) =>
+      g.level === level &&
+      g.sport === sport &&
+      g.allowTrail === allowTrail &&
+      haversineM([g.lon, g.lat], [lon, lat]) + radiusM <= g.radiusM,
   )
   if (index < 0) return null
   const [entry] = graphs.splice(index, 1)
@@ -51,11 +64,21 @@ function remember(entry) {
 // Les chargements en cours : leur zone, et qui attend de leurs nouvelles.
 const loads = []
 
+// Le temps du dernier chargement, en deux parts : les rues, puis le graphe.
+// `planLoops` ne voit qu'un `loadGraph` opaque et compte tout comme du
+// téléchargement ; sans ce partage, impossible de savoir, téléphone en main, si
+// une recherche lente attend le réseau ou calcule.
+let lastLoad = { fetch: 0, graph: 0 }
+
 async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress) {
   const level = detailLevel(targetM)
+  const area = { lat, lon, radiusM }
   const needed = tilesFor(lat, lon, radiusM).map(([ix, iy]) => `${ix}:${iy}`)
-  const cached = findGraph(level, sport, allowTrail, needed)
-  if (cached) return cached
+  const cached = findGraph(level, sport, allowTrail, area)
+  if (cached) {
+    lastLoad = { fetch: 0, graph: 0 }
+    return cached
+  }
 
   // Un chargement déjà en cours sur ces rues — celui lancé d'avance, le plus
   // souvent : on le rejoint, et sa progression devient la nôtre. Le relancer en
@@ -67,7 +90,7 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     for (const l of overlapping) l.listeners.add(progress)
     await Promise.allSettled(overlapping.map((l) => l.promise))
     for (const l of overlapping) l.listeners.delete(progress)
-    const ready = findGraph(level, sport, allowTrail, needed)
+    const ready = findGraph(level, sport, allowTrail, area)
     if (ready) return ready
     // Pas tout à fait la même zone, ou un autre sport : on construit le nôtre,
     // mais les tuiles communes sont désormais sur l'appareil.
@@ -79,13 +102,16 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
   }
   entry.promise = (async () => {
     notify('data', 0)
+    const startedAt = performance.now()
     const extract = await fetchArea({
       lat, lon, radiusM, targetM,
       onProgress: (fraction) => notify('data', fraction),
     })
     notify('graph', 0)
+    const fetched = performance.now()
     const graph = buildGraph(extract, { allowTrail, sport })
-    remember({ level, sport, allowTrail, tiles: new Set(needed), graph })
+    lastLoad = { fetch: (fetched - startedAt) / 1000, graph: (performance.now() - fetched) / 1000 }
+    remember({ level, sport, allowTrail, tiles: new Set(needed), ...area, graph })
     return graph
   })()
   loads.push(entry)
@@ -102,10 +128,18 @@ self.onmessage = async ({ data }) => {
 
   if (type === 'plan') {
     try {
+      lastLoad = { fetch: 0, graph: 0 }
       const result = await planLoops(payload, {
         loadGraph: (args) => loadGraph(args, progress),
         onProgress: progress,
       })
+      // `planLoops` a compté tout le chargement comme du téléchargement : on lui
+      // rend le détail, arrondi comme le reste de ses mesures.
+      const timings = result?.meta?.timings_s
+      if (timings) {
+        timings.graph = Math.round(lastLoad.graph * 100) / 100
+        timings.fetch = Math.max(0, Math.round((timings.fetch - timings.graph) * 100) / 100)
+      }
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })

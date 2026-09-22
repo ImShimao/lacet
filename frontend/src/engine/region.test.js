@@ -54,6 +54,21 @@ function tileExtract([ix, iy]) {
   }
 }
 
+/**
+ * Les tuiles dont la voie — posée au centre — est à portée du départ : les
+ * tuiles demandées débordent le disque, ce qui est rendu y est ramené.
+ */
+function inReach({ lat, lon }, radiusM) {
+  const kx = Math.cos((lat * Math.PI) / 180) * 111_320
+  return tilesFor(lat, lon, radiusM).filter(([ix, iy]) => {
+    const west = q7(ix * TILE_DEG + TILE_DEG / 2)
+    const south = q7(iy * TILE_DEG + TILE_DEG / 2)
+    const dx = (Math.min(Math.max(lon, west), q7(west + 0.001)) - lon) * kx
+    const dy = (Math.min(Math.max(lat, south), q7(south + 0.001)) - lat) * 110_540
+    return Math.hypot(dx, dy) <= radiusM
+  }).length
+}
+
 /** La carte régionale d'un ensemble de tuiles, servie comme par l'app. */
 function region(tiles, builtAt = Date.now()) {
   const files = new Map(tiles.map((t) => [`/region/${t[0]}_${t[1]}.json`, encodeTile(tileExtract(t))]))
@@ -114,7 +129,7 @@ describe('la carte régionale', () => {
     const area = { ...BEAUNE, radiusM: 3000, targetM: 6000 }
     const { regionFetch } = region(tilesFor(area.lat, area.lon, area.radiusM))
     const extract = await fetchArea({ ...area, fetchImpl: noNetwork, regionFetch })
-    expect(extract.ways.length).toBe(tilesFor(area.lat, area.lon, area.radiusM).length * 2)
+    expect(extract.ways.length).toBe(inReach(area, area.radiusM) * 2)
     expect(extract.crossings.length).toBeGreaterThan(0)
   })
 
@@ -134,7 +149,7 @@ describe('la carte régionale', () => {
     const net = overpass()
     const extract = await fetchArea({ ...area, fetchImpl: net.fetchImpl, regionFetch })
     expect(net.calls.length).toBeGreaterThan(0)
-    expect(extract.ways.length).toBe(tiles.length * 2)
+    expect(extract.ways.length).toBe(inReach(area, area.radiusM) * 2)
   })
 
   it('cède la place à une copie plus récente déjà sur l’appareil', async () => {

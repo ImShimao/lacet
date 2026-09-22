@@ -19,7 +19,10 @@ import pytest
 
 from app.osm.extract import (
     FORMAT_VERSION,
+    CrossingNode,
     Extract,
+    Way,
+    clip_to_disk,
     from_cache,
     from_overpass,
     read,
@@ -144,3 +147,41 @@ class TestPoids:
         plat = premiere[3]
         assert all(isinstance(v, float) for v in plat)
         assert len(plat) % 2 == 0
+
+
+class TestDecoupe:
+    """La découpe au disque : ce qui est hors d'atteinte n'entre pas dans le graphe.
+
+    Overpass ne connaît que les rectangles, et rend une voie entière dès qu'elle
+    effleure celui qu'on lui demande : un quart de ce qui arrive est hors de
+    portée d'une boucle qui, par construction, ne s'éloigne jamais de plus de la
+    moitié de sa longueur. Même règle que `clipToDisk` côté JavaScript.
+    """
+
+    def _extrait(self) -> Extract:
+        return Extract(
+            ways=[
+                Way(id=1, tags={"highway": "residential"}, nodes=[], coords=[(4.84, 47.02), (4.845, 47.025)]),
+                # Un coin de rectangle : dedans pour la bbox, dehors pour le disque.
+                Way(id=2, tags={"highway": "residential"}, nodes=[], coords=[(4.95, 47.12), (4.955, 47.125)]),
+                # Deux bouts dehors, mais qui traverse : gardée entière.
+                Way(id=3, tags={"highway": "residential"}, nodes=[], coords=[(4.70, 47.02), (5.00, 47.02)]),
+            ],
+            landuse=[[(4.84, 47.02), (4.845, 47.02), (4.845, 47.025)]],
+            crossings=[
+                CrossingNode(id=10, lon=4.84, lat=47.02, tags={"highway": "crossing"}),
+                CrossingNode(id=11, lon=4.95, lat=47.12, tags={"highway": "crossing"}),
+            ],
+        )
+
+    def test_ecarte_ce_qui_est_hors_datteinte(self):
+        garde = clip_to_disk(self._extrait(), 4.8395, 47.0245, 3000.0)
+        assert [w.id for w in garde.ways] == [1, 3]
+        assert [c.id for c in garde.crossings] == [10]
+        assert len(garde.landuse) == 1
+
+    def test_ne_coupe_jamais_une_voie(self):
+        """La rue qui traverse garde ses deux bouts : on écarte, on ne tronque pas."""
+        garde = clip_to_disk(self._extrait(), 4.8395, 47.0245, 3000.0)
+        traversante = next(w for w in garde.ways if w.id == 3)
+        assert traversante.coords == [(4.70, 47.02), (5.00, 47.02)]

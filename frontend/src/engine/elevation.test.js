@@ -53,9 +53,11 @@ describe("l'altitude", () => {
   })
 
   it('découpe les très longues sorties en gros lots, jamais en même temps', async () => {
+    // Le service refuse au-delà de cinq mille points par envoi (« HTTP 400 »),
+    // et met les requêtes simultanées en file : au-delà, on enchaîne.
     const ign = fakeIgn()
-    await fetchMany([points(2500, 2)], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
-    expect(ign.calls.map((c) => c.points)).toEqual([1000, 1000, 500])
+    await fetchMany([points(12_000, 2)], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
+    expect(ign.calls.map((c) => c.points)).toEqual([5000, 5000, 2000])
     expect(ign.peak()).toBe(1)
   })
 
