@@ -203,40 +203,58 @@ export async function fetchArchived(tiles, { fetchImpl = fetch, onTile = null } 
 
   await Promise.all(
     [...byBlock.values()].map(async ({ bx, by, tiles: wanted }) => {
-      const book = await directory(bx, by, fetchImpl).catch(() => null)
-      if (!book) return
-      const { builtAt, level, entries } = book
-
-      const found = wanted
-        .map(([ix, iy]) => ({ ix, iy, entry: entries.get(`${ix}:${iy}`) }))
-        .filter((tile) => tile.entry)
-        .sort((a, b) => a.entry.offset - b.entry.offset)
-      if (!found.length) return
-
-      await Promise.all(
-        runsFor(found).map(async (run) => {
-          const buffer = await get(`${bx}_${by}.lct`, [run.start, run.end], fetchImpl)
-          if (!buffer) return
-          for (const tile of run.tiles) {
-            const from = tile.entry.offset - run.start
-            if (from + tile.entry.length > buffer.byteLength) continue
-            try {
-              const text = await gunzip(buffer.slice(from, from + tile.entry.length))
-              out.set(`${tile.ix}:${tile.iy}`, {
-                at: builtAt,
-                level,
-                extract: fromRegionTile(JSON.parse(text)),
-              })
-              onTile?.(out.size)
-            } catch {
-              /* une tuile illisible n'empêche pas les autres */
-            }
-          }
-        }),
-      )
+      const lus = await lireBloc(bx, by, wanted, fetchImpl, out, onTile)
+      // Zéro tuile lue alors que le répertoire en annonçait : il est périmé.
+      // Les archives sont refaites tous les mois, et les positions changent —
+      // un répertoire gardé une semaine désignerait alors n'importe quoi. Plutôt
+      // que de laisser l'app retomber sur Overpass sans savoir pourquoi, on
+      // l'oublie et on relit une fois.
+      if (lus === 0) {
+        directories.delete(`${bx}_${by}`)
+        await meta.delete(`meta:dir:${bx}_${by}`)
+        await lireBloc(bx, by, wanted, fetchImpl, out, onTile)
+      }
     }),
   )
   return out
+}
+
+/** Lit d'un bloc les tuiles voulues. Rend leur nombre, ou `null` sans répertoire. */
+async function lireBloc(bx, by, wanted, fetchImpl, out, onTile) {
+  const book = await directory(bx, by, fetchImpl).catch(() => null)
+  if (!book) return null
+  const { builtAt, level, entries } = book
+
+  const found = wanted
+    .map(([ix, iy]) => ({ ix, iy, entry: entries.get(`${ix}:${iy}`) }))
+    .filter((tile) => tile.entry)
+    .sort((a, b) => a.entry.offset - b.entry.offset)
+  if (!found.length) return null
+
+  let lus = 0
+  await Promise.all(
+    runsFor(found).map(async (run) => {
+      const buffer = await get(`${bx}_${by}.lct`, [run.start, run.end], fetchImpl)
+      if (!buffer) return
+      for (const tile of run.tiles) {
+        const from = tile.entry.offset - run.start
+        if (from + tile.entry.length > buffer.byteLength) continue
+        try {
+          const text = await gunzip(buffer.slice(from, from + tile.entry.length))
+          out.set(`${tile.ix}:${tile.iy}`, {
+            at: builtAt,
+            level,
+            extract: fromRegionTile(JSON.parse(text)),
+          })
+          lus += 1
+          onTile?.(out.size)
+        } catch {
+          /* une tuile illisible n'empêche pas les autres */
+        }
+      }
+    }),
+  )
+  return lus
 }
 
 /** Pour les tests : oublie les répertoires lus. */

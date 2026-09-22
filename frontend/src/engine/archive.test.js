@@ -125,6 +125,35 @@ describe('les archives de rues', () => {
     expect(got.size).toBe(0)
   })
 
+  it('oublie un répertoire périmé au lieu de lire de travers', async () => {
+    // Les archives sont refaites tous les mois et les positions changent. Un
+    // répertoire gardé sur l'appareil désignerait alors n'importe quoi : aucune
+    // tuile ne se décode, et l'app retomberait sur Overpass sans savoir
+    // pourquoi. Elle doit le relire une fois.
+    const cdn = fakeCdn()
+    await fetchArchived([[140, 940]], { fetchImpl: cdn.fetchImpl })
+    resetArchives()
+
+    // La même archive, mais décalée : les positions gardées ne valent plus rien.
+    const decalee = Buffer.concat([Buffer.alloc(8), archive])
+    const bancal = {
+      fetchImpl: async (url, { headers } = {}) => {
+        const [, from, to] = headers.Range.match(/bytes=(\d+)-(\d+)/).map(Number)
+        const part = decalee.subarray(from, Math.min(to + 1, decalee.length))
+        return {
+          ok: true,
+          status: 206,
+          arrayBuffer: async () => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength),
+        }
+      },
+    }
+    // Rien de lisible aux anciennes positions ; la relecture du répertoire, elle,
+    // échoue proprement sur l'en-tête décalé — l'important est qu'on ne rende
+    // pas de tuile fausse.
+    const got = await fetchArchived([[140, 940]], bancal)
+    expect(got.size).toBe(0)
+  })
+
   it('ne redemande pas un répertoire déjà lu', async () => {
     const cdn = fakeCdn()
     await fetchArchived([[140, 940]], { fetchImpl: cdn.fetchImpl })
