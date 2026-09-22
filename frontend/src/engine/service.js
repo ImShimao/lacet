@@ -18,7 +18,7 @@ import { buildProfile } from './weights'
 import { planRejoin } from './reroute'
 import { ascentDescent, currentWind, fetchMany, isNight, smooth, tailwindFinish } from './environment'
 
-export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: 100 }
+export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: 100, elevationBudgetMs: null }
 
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
 const ELEVATION_TOLERANCE_PER_KM = 5
@@ -38,6 +38,13 @@ const GRADE_RANK = { A: 0, B: 1, C: 2 }
 const CROSSINGS_REFERENCE = 3
 const GOOD_ROUNDNESS = 0.55
 const MAX_ELEVATION_SAMPLES = 300
+// Ce qu'on accorde au relief avant de s'en passer. L'IGN répond en deux à
+// quatre secondes ; mais quand il refuse, le repli part en dizaines de petites
+// requêtes, puis chez un autre fournisseur qui met les siennes en file — et le
+// dénivelé, qui n'est qu'un complément, finit par coûter plus cher que tout le
+// reste de la recherche. Passé ce délai, on rend les boucles sans profil ; les
+// altitudes continuent d'arriver et seront gardées pour la prochaine fois.
+const ELEVATION_BUDGET_MS = 15_000
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
 
 const shortlistSize = (limit) => limit + Math.max(6, limit)
@@ -260,10 +267,19 @@ export async function planLoops(input, deps) {
   onProgress('elevation', 0)
   const profiles = new Map()
   const sampleM = Math.max(settings.elevationSampleM, targetM / MAX_ELEVATION_SAMPLES)
+  let elevationGaveUp = false
   if (req.with_elevation && shortlist.length) {
     const sampled = shortlist.map((cand) => resample(cand.geometry, sampleM).map(([, c]) => c))
-    const fetched = await fetchElevations(sampled)
-    fetched.forEach((elevations, i) => {
+    let timer = null
+    const fetched = await Promise.race([
+      Promise.resolve(fetchElevations(sampled)).catch(() => null),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(null), settings.elevationBudgetMs ?? ELEVATION_BUDGET_MS)
+      }),
+    ])
+    if (timer) clearTimeout(timer)
+    elevationGaveUp = fetched === null
+    ;(fetched ?? []).forEach((elevations, i) => {
       if (elevations && elevations.length) {
         const smoothed = smooth(elevations)
         profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM)])
@@ -301,6 +317,7 @@ export async function planLoops(input, deps) {
       wind !== null && wind.matters
         ? { bearing: pyRoundInt(wind.bearing), speed_kmh: pyRound(wind.speedKmh, 1) }
         : null,
+    elevation_skipped: elevationGaveUp || undefined,
     elapsed_s: pyRound((performance.now() - started) / 1000, 2),
     timings_s: timings,
     lambda: profile.lam,

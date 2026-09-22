@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { extractRadiusM } from './service'
+import { fromCompact } from './extract'
+import { buildGraph } from './graph'
+import { SETTINGS, extractRadiusM, planLoops } from './service'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -28,4 +32,30 @@ describe("le rayon de l'extrait", () => {
   it("garde un minimum pour les très petites distances", () => {
     expect(extractRadiusM(1000, 0.1)).toBe(2000)
   })
+})
+
+describe('le relief', () => {
+  const dir = new URL('./__fixtures__/parity/', import.meta.url)
+  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL('extract-beaune.json.gz', dir))).toString('utf8')))
+  const graph = buildGraph(extract, { sport: 'run' })
+
+  it("rend les boucles sans profil plutôt que de faire attendre", async () => {
+    // L'IGN répond en deux à quatre secondes ; mais quand il refuse, le repli
+    // part en dizaines de petites requêtes, puis chez un fournisseur qui met les
+    // siennes en file. Le dénivelé est un complément : il ne doit pas coûter la
+    // recherche.
+    const jamais = () => new Promise(() => {})
+    const result = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3 },
+      {
+        loadGraph: async () => graph,
+        fetchElevations: jamais,
+        wind: async () => null,
+        settings: { ...SETTINGS, elevationBudgetMs: 50 },
+      },
+    )
+    expect(result.routes.length).toBeGreaterThan(0)
+    expect(result.meta.elevation_skipped).toBe(true)
+    expect(result.routes[0].elevation_profile).toBeNull()
+  }, 20_000)
 })

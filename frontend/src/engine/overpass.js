@@ -81,6 +81,23 @@ const CORE_SHARE = 0.6
 // barre restait à 80 % le temps qu'Overpass réponde — une minute, ou jamais.
 // Quatre tuiles suffisaient pourtant à tracer la boucle.
 const PERIPHERAL_WAIT_MS = 6_000
+// **Le temps qu'on s'autorise à attendre les rues, en tout.**
+//
+// Sans plafond, le pire cas s'additionne : quatre miroirs relancés l'un après
+// l'autre, deux tours, une file d'attente d'une minute sur chacun, et tout ça
+// autant de fois qu'il y a de lots à demander. Constaté sur un téléphone :
+// vingt minutes devant l'écran de chargement. Une attente pareille ne se
+// rattrape pas — quelqu'un en tenue a déjà refermé l'app.
+//
+// Passé `DATA_BUDGET_MS`, on cherche donc avec ce qui est arrivé, pourvu que la
+// tuile du départ en fasse partie et qu'il y ait de quoi tracer. Passé
+// `DATA_HARD_MS`, on s'en contente quoi qu'il arrive, et s'il n'y a rien, on le
+// dit. Ce qui continue d'arriver est rangé pour la recherche suivante.
+const DATA_BUDGET_MS = 40_000
+const DATA_HARD_MS = 90_000
+// En dessous de cette part de la zone, chercher n'aurait pas de sens : mieux
+// vaut attendre encore un peu.
+const ENOUGH_SHARE = 0.34
 // Au-delà de ce poids attendu, la zone part en deux temps : le cœur, puis le
 // bord. En dessous — une petite ville, un village —, tout tient dans une requête
 // dont le coût est surtout fixe, et la couper en deux ferait payer ce coût deux
@@ -89,7 +106,10 @@ const SPLIT_BYTES = 8_000_000
 
 const RETRY_DELAY_MS = 1_500
 const MAX_RETRIES = 2
-const MAX_SLOT_WAIT_S = 60
+// Un créneau annoncé au-delà de vingt secondes ne vaut plus la peine : c'est la
+// moitié du temps qu'on s'accorde pour toute la zone, et un autre miroir répond
+// souvent plus vite que celui qui fait patienter.
+const MAX_SLOT_WAIT_S = 20
 // Trente secondes, et non quatre-vingt-dix : passé ce délai, la requête ne va
 // pas aboutir, et sur un téléphone c'est une barre figée avec quelqu'un qui
 // attend en bas de chez lui, chaussures aux pieds. Et un serveur Overpass
@@ -315,6 +335,8 @@ export async function fetchArea(args) {
     regionFetch = fetch,
     tileBytesGuess = null,
     peripheralWaitMs = PERIPHERAL_WAIT_MS,
+    dataBudgetMs = DATA_BUDGET_MS,
+    hardBudgetMs = DATA_HARD_MS,
   } = args
   const level = detailLevel(targetM)
   const wanted = only ?? tilesFor(lat, lon, radiusM)
@@ -430,7 +452,7 @@ export async function fetchArea(args) {
           // réseau coupé, ou tous les miroirs tombés. Relancer deux tours de tentatives
           // pour chaque tuile faisait attendre des dizaines de secondes pour rien.
           const answers = await Promise.all(
-            batch.map(async ({ chunk, rect }) => {
+            batch.map(async ({ chunk, rect }, k) => {
               if (silent) return null
               const job = {
                 tiles: chunk.length,
@@ -440,14 +462,21 @@ export async function fetchArea(args) {
               }
               inflight.add(job)
               try {
-                return await queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect)), (bytes) => {
-                  if (!job.firstByteAt) {
-                    job.firstByteAt = Date.now()
-                    job.base = waitFraction(job.firstByteAt - job.startedAt)
-                  }
-                  job.received = Math.max(job.received, bytes)
-                  reportSoon()
-                })
+                // Deux lots en vol : chacun part sur son serveur — `mirrorOrder`.
+                return await queryMirrors(
+                  query(level, rectBbox(rect)),
+                  fetchImpl,
+                  hedgeDelayFor(rectSize(rect)),
+                  (bytes) => {
+                    if (!job.firstByteAt) {
+                      job.firstByteAt = Date.now()
+                      job.base = waitFraction(job.firstByteAt - job.startedAt)
+                    }
+                    job.received = Math.max(job.received, bytes)
+                    reportSoon()
+                  },
+                  k * RACE_WIDTH,
+                )
               } finally {
                 inflight.delete(job)
               }
@@ -498,7 +527,7 @@ export async function fetchArea(args) {
             report()
           }
           if (!refused) cap = Infinity
-      }
+        }
       }
     } finally {
       if (ticker) clearInterval(ticker)
@@ -509,7 +538,9 @@ export async function fetchArea(args) {
   // Ce qui a servi ici ne sera pas jeté de sitôt : le budget du cache écarte
   // d'abord les tuiles dont on ne s'est pas servi depuis le plus longtemps.
   touchTiles(served, now())
-  await settle(download, { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs })
+  await settle(download, {
+    wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs, dataBudgetMs, hardBudgetMs,
+  })
   // L'étape est finie, même s'il manque une bordure : la barre ne doit pas
   // rester plantée à 80 % pendant que la recherche, elle, est repartie.
   onProgress(1)
@@ -522,6 +553,52 @@ export async function fetchArea(args) {
   // sera pas gardé pour les recherches suivantes, qui, elles, auront tout.
   if (obtained.size < wanted.length) out.partial = true
   return out
+}
+
+/**
+ * Attend le cœur de la zone, mais pas éternellement.
+ *
+ * On ne peut pas se passer du cœur : sans lui, il n'y a pas d'itinéraire. On
+ * peut, en revanche, se passer de la moitié de la zone, et il vaut mieux des
+ * boucles un peu moins variées tout de suite qu'une zone complète dans un quart
+ * d'heure. Le téléchargement, lui, continue : ce qui arrive après est rangé, et
+ * la recherche suivante au même endroit aura tout.
+ */
+async function deadline(download, { wanted, obtained, level, lat, lon, dataBudgetMs, hardBudgetMs }) {
+  const home = tileKey(level, [Math.floor(lon / TILE_DEG), Math.floor(lat / TILE_DEG)])
+  const enough = () => obtained.has(home) && obtained.size >= Math.ceil(wanted.length * ENOUGH_SHARE)
+
+  let timer = null
+  const after = (ms) =>
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve('délai'), ms)
+    })
+  // Le téléchargement l'emporte presque toujours ; les deux plafonds ne servent
+  // qu'aux jours où les serveurs publics d'OpenStreetMap sont à genoux.
+  let failure = null
+  const task = download.then(
+    () => 'fini',
+    (error) => {
+      failure = error
+      return 'panne'
+    },
+  )
+  let issue = await Promise.race([task, after(dataBudgetMs)])
+  if (timer) clearTimeout(timer)
+  if (issue === 'délai' && !enough()) {
+    issue = await Promise.race([task, after(Math.max(0, hardBudgetMs - dataBudgetMs))])
+    if (timer) clearTimeout(timer)
+  }
+  if (issue === 'fini') return undefined
+
+  // Sans la tuile du départ, il n'y a rien à chercher : une panne reste une
+  // panne, et un délai dépassé se dit de la même façon.
+  if (!obtained.has(home)) throw failure ?? new OverpassError(SILENT)
+  for (const tile of wanted) {
+    const key = tileKey(level, tile)
+    if (!obtained.has(key)) abandoned.add(key)
+  }
+  return undefined
 }
 
 /** Distance du départ au point le plus proche d'une tuile. */
@@ -549,13 +626,14 @@ function nearestTileDistance(lat, lon) {
  * la même raison : mieux vaut les boucles du cœur de la zone qu'un écran
  * d'erreur devant quelqu'un en tenue.
  */
-async function settle(download, { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs }) {
+async function settle(download, args) {
+  const { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs } = args
   const absent = wanted.filter((tile) => !obtained.has(tileKey(level, tile)))
   if (!absent.length) return download
 
   const near = nearestTileDistance(lat, lon)
   const core = absent.some((tile) => near(tile) < CORE_SHARE * radiusM)
-  if (core || !obtained.size) return download
+  if (core || !obtained.size) return deadline(download, args)
 
   // Les tuiles sur lesquelles on a déjà renoncé dans cette session ne coûtent
   // plus d'attente : elles se téléchargent en fond, comme les autres.
@@ -735,21 +813,31 @@ export function takeChunk(missing, budget) {
 const DEMOTE_MS = 10 * 60_000
 const demotedUntil = new Map()
 
-export function mirrorOrder(now = Date.now()) {
+/**
+ * Les miroirs, les valides d'abord. `offset` décale le départ parmi eux.
+ *
+ * Deux lots partent ensemble dans une grande ville : sans décalage, ils
+ * attaquaient le même serveur, qui met les requêtes simultanées dans la même
+ * file — deux lots, deux fois l'attente. Décalés, chacun a sa file, et les
+ * deux arrivent dans le temps d'un seul.
+ */
+export function mirrorOrder(now = Date.now(), offset = 0) {
   const healthy = MIRRORS.filter((url) => !(demotedUntil.get(url) > now))
   const demoted = MIRRORS.filter((url) => demotedUntil.get(url) > now)
-  return [...healthy, ...demoted]
+  const shift = healthy.length ? ((offset % healthy.length) + healthy.length) % healthy.length : 0
+  return [...healthy.slice(shift), ...healthy.slice(0, shift), ...demoted]
 }
 
 const demote = (url) => demotedUntil.set(url, Date.now() + DEMOTE_MS)
 const restore = (url) => demotedUntil.delete(url)
 export const resetMirrorHealth = () => demotedUntil.clear()
 
-async function queryMirrors(body, fetchImpl, hedgeDelayMs = HEDGE_DELAY_MS, onBytes = null) {
+async function queryMirrors(body, fetchImpl, hedgeDelayMs = HEDGE_DELAY_MS, onBytes = null, offset = 0) {
   let empty = null
   for (let attempt = 0; attempt < ROUNDS; attempt += 1) {
     if (attempt) await sleep(2000 * 2 ** (attempt - 1) + Math.random() * 1000)
-    const answer = await hedgedRound(mirrorOrder(), body, fetchImpl, hedgeDelayMs, RETRY_DELAY_MS, onBytes)
+    const mirrors = mirrorOrder(Date.now(), offset)
+    const answer = await hedgedRound(mirrors, body, fetchImpl, hedgeDelayMs, RETRY_DELAY_MS, onBytes)
     if (answer !== null) {
       if (answer.payload.elements.length) return answer
       empty = answer

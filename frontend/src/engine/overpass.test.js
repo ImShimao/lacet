@@ -315,6 +315,29 @@ describe('les miroirs', () => {
 // --- la zone complète ---------------------------------------------------------
 
 describe('le téléchargement d’une zone', () => {
+  it('rend la main même quand les serveurs traînent', async () => {
+    // Le pire cas s'additionnait : quatre miroirs relancés l'un après l'autre,
+    // deux tours, une file d'attente sur chacun, et autant de fois qu'il y a de
+    // lots. Constaté sur un téléphone : vingt minutes d'écran de chargement.
+    // Passé le plafond, on cherche avec ce qui est arrivé.
+    const { fetchImpl } = fakeNetwork()
+    await fetchArea({ ...BEAUNE, radiusM: 2000, targetM: 3000, fetchImpl })
+
+    const muet = fakeNetwork(() => 'silent')
+    const started = Date.now()
+    const extract = await fetchArea({
+      ...BEAUNE,
+      radiusM: 7000,
+      targetM: 10_000,
+      fetchImpl: muet.fetchImpl,
+      dataBudgetMs: 200,
+      hardBudgetMs: 400,
+    })
+    expect(Date.now() - started).toBeLessThan(3000)
+    expect(extract.ways.length).toBeGreaterThan(0)
+    expect(extract.partial).toBe(true)
+  })
+
   it('demande le cœur de la zone avant son bord quand elle est lourde', async () => {
     // En ville, une requête sur toute la zone met une quinzaine de secondes, et
     // les trois quarts de ce qu'elle rapporte sont des rues qu'aucune boucle
@@ -527,28 +550,37 @@ describe('le téléchargement d’une zone', () => {
     expect(second.calls.length).toBeGreaterThan(0)
   })
 
-  it('envoie deux lots à la fois dans une grande ville, jamais plus de deux par serveur', async () => {
+  it('envoie deux lots à la fois, chacun sur son serveur', async () => {
     // Overpass accorde deux requêtes simultanées par adresse : deux lots en
-    // parallèle divisent l'attente, un troisième serait refusé. Chaque lot fait
-    // la course sur deux serveurs, chacun reçoit donc au plus deux requêtes.
+    // parallèle divisent l'attente, un troisième serait refusé. Et les deux
+    // lots partent sur des serveurs différents — envoyés au même, ils entraient
+    // dans la même file d'attente et arrivaient l'un après l'autre.
     const base = fakeNetwork()
     const inFlight = new Map()
     const peak = new Map()
+    let together = 0
+    let ensemble = 0
     const fetchImpl = async (url, options) => {
       inFlight.set(url, (inFlight.get(url) ?? 0) + 1)
       peak.set(url, Math.max(peak.get(url) ?? 0, inFlight.get(url)))
+      together += 1
+      ensemble = Math.max(ensemble, together)
       await new Promise((resolve) => setTimeout(resolve, 20))
       try {
         return await base.fetchImpl(url, options)
       } finally {
         inFlight.set(url, inFlight.get(url) - 1)
+        together -= 1
       }
     }
     // Des lots d'environ trois tuiles, comme en plein Paris.
     const extract = await fetchArea({ ...BEAUNE, radiusM: 7000, targetM: 10_000, fetchImpl, chunkBytes: 1200 })
     expect(extract.ways.length).toBe(inReach(BEAUNE, 7000))
-    expect(peak.get(MIRRORS[0])).toBe(2)
-    expect(Math.max(...peak.values())).toBe(2)
+    expect(ensemble).toBeGreaterThanOrEqual(2)
+    expect(Math.max(...peak.values())).toBeLessThanOrEqual(2)
+    // Le premier serveur ne voit qu'une requête à la fois : le second lot est
+    // parti ailleurs.
+    expect(peak.get(MIRRORS[0])).toBe(1)
   })
 
   it('préfère une copie périmée à un échec quand tout est muet', async () => {

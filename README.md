@@ -1148,6 +1148,18 @@ téléchargement, alors que les rues déjà gardées contenaient tout. Elles son
 maintenant filtrées sur place. Et quand seule la couronne extérieure manque, on
 ne redemande qu'elle, en bandes, sans le centre.
 
+**Rien n'attend plus indéfiniment.** Le pire cas s'additionnait sans plafond :
+quatre miroirs relancés l'un après l'autre, deux tours, une file d'attente d'une
+minute sur chacun, et tout ça autant de fois qu'il y a de lots à demander —
+vingt minutes d'écran de chargement, constatées sur un téléphone. Le chargement
+des rues a maintenant un budget : **quarante secondes**, puis on cherche avec ce
+qui est arrivé (pourvu que la tuile du départ en fasse partie et qu'il y ait un
+tiers de la zone), et quatre-vingt-dix secondes en tout avant de dire
+honnêtement que les serveurs ne répondent pas. Le relief a le sien, quinze
+secondes : c'est un complément, il ne doit pas coûter la recherche. Et les deux
+lots qui partent ensemble vont désormais sur **deux serveurs différents**, au
+lieu d'entrer dans la même file d'attente.
+
 **Le cœur de la zone arrive avant son bord.** Une boucle reste bien à l'intérieur
 du rayon demandé, et les tuiles du bord ne servent qu'à celles qui vont
 l'effleurer. Quand la zone est lourde — une ville —, elle part donc en deux
@@ -1174,7 +1186,16 @@ remesuré le 22 septembre 2026 : 3,3 s pour trois cents points, 3,1 s pour mille
 partaient en deux envois, tiennent donc dans un seul : c'est, une fois les rues
 sur l'appareil, le plus gros de ce qui reste à attendre.
 
-Les rues sont gardées par carreaux de 0,05° dans IndexedDB. Fraîches quatorze
+Les rues sont gardées par carreaux de 0,05° dans IndexedDB, **au format serré
+des tuiles livrées** : trois fois moins de place que les mêmes objets rangés
+tels quels, 44 ms pour relire une tuile de 4 Mo au lieu de 100, et une taille
+connue — sans quoi aucun plafond n'est possible. Le cache en a un : deux cent
+cinquante mégaoctets, ou le quart de ce que le navigateur accorde s'il promet
+moins, et les carreaux dont on ne s'est pas servi depuis le plus longtemps
+laissent la place. Soit environ trois fois l'Alsace : son coin, celui du
+travail, deux ou trois endroits de vacances. Il n'y a rien à épingler, rien à
+préparer avant de partir — et surtout plus de cache sans fin, que le système
+finit par vider **en entier** au pire moment. Fraîches quatorze
 jours ; ensuite, et jusqu'à trois mois, elles sont servies tout de suite et
 rafraîchies en fond après la recherche. Une zone voisine ne retélécharge que
 les carreaux qui lui manquent, et dans une grande ville deux lots partent en
