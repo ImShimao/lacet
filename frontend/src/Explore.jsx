@@ -32,6 +32,7 @@ export default function Explore({
   detail,
   params,
   streetsReady = false,
+  streetsLoading = false,
   isFavorite,
   onSelect,
   onToggleDetail,
@@ -114,11 +115,18 @@ export default function Explore({
         {/* Les rues se préparent en fond dès que le départ est connu : le dire
             explique pourquoi la recherche est soudain instantanée — et qu'elle
             le restera, même sans réseau. */}
-        {streetsReady && (
+        {streetsReady ? (
           <p className="ready small">
             <Icon name="check" size={14} />
             Rues du coin prêtes : la recherche sera presque instantanée.
           </p>
+        ) : (
+          streetsLoading && (
+            <p className="ready ready--busy small">
+              <Icon name="download" size={14} />
+              Préparation des rues de ce coin…
+            </p>
+          )
         )}
         <p className="muted small">
           Fais glisser le repère, touche la carte en mode placement, ou cherche une
@@ -179,6 +187,16 @@ export default function Explore({
       {/* Les avertissements viennent après les cartes : ils nuancent une
           proposition, ils ne doivent pas la pousser sous le pli. */}
       {meta.relaxed && <div className="notice notice--warn">{meta.message}</div>}
+      {/* Une bordure de la zone n'est pas arrivée à temps — la carte livrée
+          s'arrête à la limite de la région, et Overpass tardait. Plutôt que de
+          faire attendre devant une barre figée, on a cherché avec le reste ; le
+          dire évite de croire que le coin n'a rien de mieux à offrir. */}
+      {meta.partial && (
+        <div className="notice">
+          Le bord de la zone n'est pas encore arrivé : ces boucles sont tracées sur les rues
+          déjà là. Relance la recherche dans un instant pour en profiter.
+        </div>
+      )}
       {meta.wind && <WindNote wind={meta.wind} />}
 
       {selected.laps > 1 && (

@@ -70,6 +70,10 @@ const loads = []
 // une recherche lente attend le réseau ou calcule.
 let lastLoad = { fetch: 0, graph: 0 }
 
+// Vrai quand la dernière zone chargée n'a pas toutes ses tuiles : une bordure
+// restée chez Overpass, qui tardait trop pour qu'on l'attende.
+let lastPartial = false
+
 async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress) {
   const level = detailLevel(targetM)
   const area = { lat, lon, radiusM }
@@ -77,6 +81,7 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
   const cached = findGraph(level, sport, allowTrail, area)
   if (cached) {
     lastLoad = { fetch: 0, graph: 0 }
+    lastPartial = false
     return cached
   }
 
@@ -111,7 +116,11 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     const fetched = performance.now()
     const graph = buildGraph(extract, { allowTrail, sport })
     lastLoad = { fetch: (fetched - startedAt) / 1000, graph: (performance.now() - fetched) / 1000 }
-    remember({ level, sport, allowTrail, ...area, graph })
+    // Un graphe à qui il manque une bordure n'est pas gardé : les tuiles qui
+    // tardaient finissent d'arriver en fond, et la recherche suivante doit en
+    // profiter plutôt que de réutiliser un réseau tronqué.
+    lastPartial = Boolean(extract.partial)
+    if (!extract.partial) remember({ level, sport, allowTrail, ...area, graph })
     return graph
   })()
   loads.push(entry)
@@ -140,6 +149,7 @@ self.onmessage = async ({ data }) => {
         timings.graph = Math.round(lastLoad.graph * 100) / 100
         timings.fetch = Math.max(0, Math.round((timings.fetch - timings.graph) * 100) / 100)
       }
+      if (result?.meta && lastPartial) result.meta.partial = true
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })

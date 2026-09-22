@@ -70,6 +70,22 @@ const MAX_HEDGE_DELAY_MS = 30_000
 
 const hedgeDelayFor = (tiles) =>
   Math.min(MAX_HEDGE_DELAY_MS, HEDGE_DELAY_MS + HEDGE_PER_TILE_MS * Math.max(0, tiles - 1))
+// Le cœur du disque : ce dont une recherche a vraiment besoin. Le rayon est
+// calculé pour la plus longue boucle acceptée, et les tuiles du bord ne servent
+// qu'aux rares boucles qui vont l'effleurer.
+const CORE_SHARE = 0.6
+// Ce qu'on accorde à Overpass pour ces tuiles de bordure avant de chercher sans
+// elles. Mesuré chez quelqu'un à deux kilomètres de la limite de l'Alsace : deux
+// des six tuiles d'une recherche de 5 km manquaient à la carte livrée, et la
+// barre restait à 80 % le temps qu'Overpass réponde — une minute, ou jamais.
+// Quatre tuiles suffisaient pourtant à tracer la boucle.
+const PERIPHERAL_WAIT_MS = 6_000
+// Au-delà de ce poids attendu, la zone part en deux temps : le cœur, puis le
+// bord. En dessous — une petite ville, un village —, tout tient dans une requête
+// dont le coût est surtout fixe, et la couper en deux ferait payer ce coût deux
+// fois pour gagner une seconde.
+const SPLIT_BYTES = 8_000_000
+
 const RETRY_DELAY_MS = 1_500
 const MAX_RETRIES = 2
 const MAX_SLOT_WAIT_S = 60
@@ -297,6 +313,7 @@ export async function fetchArea(args) {
     useRegion = true,
     regionFetch = fetch,
     tileBytesGuess = null,
+    peripheralWaitMs = PERIPHERAL_WAIT_MS,
   } = args
   const level = detailLevel(targetM)
   const wanted = only ?? tilesFor(lat, lon, radiusM)
@@ -370,6 +387,22 @@ export async function fetchArea(args) {
   const homeIndex = missing.findIndex(([ix, iy]) => ix === home[0] && iy === home[1])
   if (homeIndex > 0) missing.unshift(...missing.splice(homeIndex, 1))
 
+  // **Le cœur avant le bord, quand la zone est lourde.** Une boucle reste bien à
+  // l'intérieur du rayon demandé, et les tuiles du bord ne servent qu'à celles
+  // qui vont l'effleurer : les demander dans la même requête que le reste, en
+  // ville, c'est faire attendre quinze secondes pour des rues dont on n'a pas
+  // besoin. Le cœur arrive donc d'abord, la recherche part avec (voir `settle`),
+  // et le bord continue pendant qu'on lit les propositions.
+  const distanceTo = nearestTileDistance(lat, lon)
+  const weight = tileBytesGuess ?? (await learnedTileBytes(level))
+  const phases =
+    missing.length * weight > SPLIT_BYTES
+      ? [
+          missing.filter((tile) => distanceTo(tile) < CORE_SHARE * radiusM),
+          missing.filter((tile) => distanceTo(tile) >= CORE_SHARE * radiusM),
+        ].filter((phase) => phase.length)
+      : [missing].filter((phase) => phase.length)
+
   let bytesPerTile = null
   let cap = Infinity
   let silent = false
@@ -377,100 +410,166 @@ export async function fetchArea(args) {
   // Attendre chaque écriture avant de découper la suivante ajoutait, sur un
   // téléphone, le temps de recopier quinze extraits avant de rendre la main.
   const written = []
-  const ticker = missing.length ? setInterval(report, PROGRESS_TICK_MS) : null
-  try {
-    while (missing.length) {
-      const budget = Math.min(cap, firstBudget(bytesPerTile, missing.length, level, chunkBytes))
-      const batch = [takeChunk(missing, budget)]
-      // Overpass accorde deux requêtes simultanées par adresse. Une fois la densité
-      // de la zone mesurée, deux lots partent donc ensemble : dans une grande
-      // ville, découpée en plusieurs lots, c'est l'attente divisée par deux. Avant
-      // la mesure, on ne sait pas ce que pèse un lot, et on n'en risque qu'un.
-      if (bytesPerTile !== null && !silent && missing.length) batch.push(takeChunk(missing, budget))
+  const ticker = phases.length ? setInterval(report, PROGRESS_TICK_MS) : null
+  const download = (async () => {
+    try {
+      for (const queue of phases) {
+        while (queue.length) {
+          const budget = Math.min(cap, firstBudget(bytesPerTile, queue.length, level, chunkBytes))
+          const batch = [takeChunk(queue, budget)]
+          // Overpass accorde deux requêtes simultanées par adresse. Une fois la densité
+          // de la zone mesurée, deux lots partent donc ensemble : dans une grande
+          // ville, découpée en plusieurs lots, c'est l'attente divisée par deux. Avant
+          // la mesure, on ne sait pas ce que pèse un lot, et on n'en risque qu'un.
+          if (bytesPerTile !== null && !silent && queue.length) batch.push(takeChunk(queue, budget))
 
-      // Quand un lot entier est resté sans réponse, les suivants le resteraient :
-      // réseau coupé, ou tous les miroirs tombés. Relancer deux tours de tentatives
-      // pour chaque tuile faisait attendre des dizaines de secondes pour rien.
-      const answers = await Promise.all(
-        batch.map(async ({ chunk, rect }) => {
-          if (silent) return null
-          const job = {
-            tiles: chunk.length,
-            startedAt: Date.now(),
-            received: 0,
-            expected: (bytesPerTile ?? tileBytesGuess ?? (await learnedTileBytes(level))) * rectSize(rect),
-          }
-          inflight.add(job)
-          try {
-            return await queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect)), (bytes) => {
-              if (!job.firstByteAt) {
-                job.firstByteAt = Date.now()
-                job.base = waitFraction(job.firstByteAt - job.startedAt)
+          // Quand un lot entier est resté sans réponse, les suivants le resteraient :
+          // réseau coupé, ou tous les miroirs tombés. Relancer deux tours de tentatives
+          // pour chaque tuile faisait attendre des dizaines de secondes pour rien.
+          const answers = await Promise.all(
+            batch.map(async ({ chunk, rect }) => {
+              if (silent) return null
+              const job = {
+                tiles: chunk.length,
+                startedAt: Date.now(),
+                received: 0,
+                expected: (bytesPerTile ?? tileBytesGuess ?? (await learnedTileBytes(level))) * rectSize(rect),
               }
-              job.received = Math.max(job.received, bytes)
-              reportSoon()
-            })
-          } finally {
-            inflight.delete(job)
+              inflight.add(job)
+              try {
+                return await queryMirrors(query(level, rectBbox(rect)), fetchImpl, hedgeDelayFor(rectSize(rect)), (bytes) => {
+                  if (!job.firstByteAt) {
+                    job.firstByteAt = Date.now()
+                    job.base = waitFraction(job.firstByteAt - job.startedAt)
+                  }
+                  job.received = Math.max(job.received, bytes)
+                  reportSoon()
+                })
+              } finally {
+                inflight.delete(job)
+              }
+            }),
+          )
+
+          let refused = false
+          for (let b = 0; b < batch.length; b += 1) {
+            const { chunk, rect } = batch[b]
+            const answer = answers[b]
+
+            // Mais un lot refusé n'est pas forcément un réseau coupé : une requête
+            // large est aussi ce qu'un miroir déjà chargé abandonne en premier, et la
+            // même zone passe en deux morceaux. On repose donc les tuiles et on réduit
+            // de moitié avant de conclure. Une tuile seule qui échoue, elle, est un
+            // vrai échec.
+            if (answer === null && chunk.length > 1) {
+              queue.unshift(...chunk)
+              cap = Math.max(1, Math.floor(chunk.length / 2))
+              refused = true
+              continue
+            }
+
+            if (answer === null) {
+              silent = true
+              // Tous les miroirs sont muets : une copie périmée vaut mieux qu'un échec.
+              for (const tile of chunk) {
+                const key = tileKey(level, tile)
+                if (!stale.has(key)) throw new OverpassError(SILENT)
+                obtained.set(key, stale.get(key))
+              }
+              report()
+              continue
+            }
+
+            bytesPerTile = answer.bytes / rectSize(rect)
+            learnTileBytes(level, bytesPerTile)
+            const extract = fromOverpass(answer.payload)
+            const parts = splitIntoTiles(extract, rect)
+            for (const [cell, part] of parts) {
+              const [ix, iy] = cell.split(':').map(Number)
+              const key = tileKey(level, [ix, iy])
+              // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
+              // veut pas le figer pour deux semaines.
+              if (part.ways.length) written.push(tiles.set(key, { at: now(), extract: part }))
+              if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
+            }
+            report()
           }
-        }),
-      )
-
-      let refused = false
-      for (let b = 0; b < batch.length; b += 1) {
-        const { chunk, rect } = batch[b]
-        const answer = answers[b]
-
-        // Mais un lot refusé n'est pas forcément un réseau coupé : une requête
-        // large est aussi ce qu'un miroir déjà chargé abandonne en premier, et la
-        // même zone passe en deux morceaux. On repose donc les tuiles et on réduit
-        // de moitié avant de conclure. Une tuile seule qui échoue, elle, est un
-        // vrai échec.
-        if (answer === null && chunk.length > 1) {
-          missing.unshift(...chunk)
-          cap = Math.max(1, Math.floor(chunk.length / 2))
-          refused = true
-          continue
-        }
-
-        if (answer === null) {
-          silent = true
-          // Tous les miroirs sont muets : une copie périmée vaut mieux qu'un échec.
-          for (const tile of chunk) {
-            const key = tileKey(level, tile)
-            if (!stale.has(key)) throw new OverpassError(SILENT)
-            obtained.set(key, stale.get(key))
-          }
-          report()
-          continue
-        }
-
-        bytesPerTile = answer.bytes / rectSize(rect)
-        learnTileBytes(level, bytesPerTile)
-        const extract = fromOverpass(answer.payload)
-        const parts = splitIntoTiles(extract, rect)
-        for (const [cell, part] of parts) {
-          const [ix, iy] = cell.split(':').map(Number)
-          const key = tileKey(level, [ix, iy])
-          // Une tuile vide n'est pas gardée : si le vide venait d'une panne, on ne
-          // veut pas le figer pour deux semaines.
-          if (part.ways.length) written.push(tiles.set(key, { at: now(), extract: part }))
-          if (wanted.some(([wx, wy]) => wx === ix && wy === iy)) obtained.set(key, part)
-        }
-        report()
+          if (!refused) cap = Infinity
       }
-      if (!refused) cap = Infinity
+      }
+    } finally {
+      if (ticker) clearInterval(ticker)
     }
-  } finally {
-    if (ticker) clearInterval(ticker)
-  }
-  await Promise.all(written)
-  report()
+    await Promise.all(written)
+  })()
+
+  await settle(download, { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs })
+  // L'étape est finie, même s'il manque une bordure : la barre ne doit pas
+  // rester plantée à 80 % pendant que la recherche, elle, est repartie.
+  onProgress(1)
 
   const merged = mergeExtracts(wanted.map((tile) => obtained.get(tileKey(level, tile)) ?? emptyExtract()))
   // Les tuiles gardées restent entières — c'est ce qui les rend réutilisables
   // pour le départ d'à côté. Seul ce qu'on rend ici est ramené au disque voulu.
-  return clipToDisk(merged, lon, lat, radiusM)
+  const out = clipToDisk(merged, lon, lat, radiusM)
+  // Dit au reste du moteur qu'il manque une bordure : le graphe qui en sort ne
+  // sera pas gardé pour les recherches suivantes, qui, elles, auront tout.
+  if (obtained.size < wanted.length) out.partial = true
+  return out
+}
+
+/** Distance du départ au point le plus proche d'une tuile. */
+function nearestTileDistance(lat, lon) {
+  const kx = Math.cos((lat * Math.PI) / 180) * 111_320
+  return ([ix, iy]) => {
+    const x = (Math.min(Math.max(lon, ix * TILE_DEG), (ix + 1) * TILE_DEG) - lon) * kx
+    const y = (Math.min(Math.max(lat, iy * TILE_DEG), (iy + 1) * TILE_DEG) - lat) * 110_540
+    return Math.hypot(x, y)
+  }
+}
+
+/**
+ * Attend le téléchargement — mais pas indéfiniment pour des tuiles de bordure.
+ *
+ * Sans le cœur de la zone, il n'y a rien à chercher : on attend, aussi longtemps
+ * qu'il le faut. Mais quand seules manquent des tuiles du bord — la carte livrée
+ * s'arrête à la limite de la région, et une maison à deux kilomètres de cette
+ * limite en demande deux ou trois à Overpass —, les tuiles en main suffisent à
+ * tracer la boucle. On leur laisse quelques secondes, puis on cherche sans
+ * elles ; le téléchargement, lui, continue en fond et les range pour la fois
+ * suivante.
+ *
+ * Une panne franche d'Overpass ne fait pas échouer la recherche non plus, pour
+ * la même raison : mieux vaut les boucles du cœur de la zone qu'un écran
+ * d'erreur devant quelqu'un en tenue.
+ */
+async function settle(download, { wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs }) {
+  const absent = wanted.filter((tile) => !obtained.has(tileKey(level, tile)))
+  if (!absent.length) return download
+
+  const near = nearestTileDistance(lat, lon)
+  const core = absent.some((tile) => near(tile) < CORE_SHARE * radiusM)
+  if (core || !obtained.size) return download
+
+  // Les tuiles sur lesquelles on a déjà renoncé dans cette session ne coûtent
+  // plus d'attente : elles se téléchargent en fond, comme les autres.
+  const delay = absent.every((tile) => abandoned.has(tileKey(level, tile))) ? 0 : peripheralWaitMs
+  let timer = null
+  const gaveUp = await Promise.race([
+    // Une erreur vaut ici un abandon, pas un échec : le cœur est là.
+    download.then(() => false, () => true),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(true), delay)
+    }),
+  ])
+  if (timer) clearTimeout(timer)
+  if (gaveUp) {
+    for (const tile of wanted) {
+      const key = tileKey(level, tile)
+      if (!obtained.has(key)) abandoned.add(key)
+    }
+  }
+  return undefined
 }
 
 const waitFraction = (elapsedMs) => WAIT_SHARE * (1 - Math.exp(-elapsedMs / WAIT_TAU_MS))
@@ -524,6 +623,14 @@ async function cachedTile(level, tile) {
   // Le passage au niveau demandé ne se fait qu'une fois, sur la copie retenue.
   return { at: best.at, extract: bestLevel === level ? best.extract : deriveLevel(best.extract, level) }
 }
+
+// Les tuiles de bordure sur lesquelles on a déjà renoncé à attendre, le temps de
+// la session. Sans cette mémoire, chaque recherche au même endroit reperdait les
+// mêmes six secondes à attendre les mêmes tuiles absentes.
+const abandoned = new Set()
+
+/** Pour les tests : oublie les tuiles abandonnées. */
+export const resetAbandoned = () => abandoned.clear()
 
 // Les tuiles dont un rafraîchissement est déjà prévu ou en cours : deux
 // recherches coup sur coup au même endroit ne doivent pas les demander deux fois.

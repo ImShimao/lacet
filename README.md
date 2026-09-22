@@ -1107,9 +1107,17 @@ télécharge l'extrait OpenStreetMap de la région chez Geofabrik (l'Alsace, dan
 la région lit ses rues sur place : **0,04 s** au lieu de vingt secondes à
 plusieurs minutes chez Overpass, et même sans réseau. Les tuiles sont identiques
 à ce qu'Overpass aurait rendu — vérifié voie par voie, étiquettes, nœuds et
-géométries au bit près. Seules les tuiles entièrement dans la région sont
-livrées : une tuile à cheval sur la limite n'aurait que la moitié de ses rues.
-Hors de la région, rien ne change.
+géométries au bit près.
+
+**Et elle déborde de six kilomètres.** Une carte qui s'arrête pile à la limite
+administrative laisse sans rues quiconque habite près d'elle : constaté à
+Bréchaumont, à deux kilomètres du Territoire de Belfort, où deux des six tuiles
+d'une sortie de 5 km manquaient et partaient chez Overpass. La compilation coupe
+donc les extraits des régions voisines — Lorraine, Franche-Comté, Bade-Wurtemberg,
+Rhénanie-Palatinat, Suisse — à une emprise commune, les fusionne, et ne livre que
+les tuiles qui y tiennent **entièrement** : le débord est aussi complet que le
+reste. Depuis n'importe où en Alsace, y compris sur la frontière, les sorties de
+5 et 10 km n'ont plus rien à demander à personne.
 
 **On ne charge que ce qu'une boucle peut atteindre.** Une boucle de longueur L
 ne s'éloigne jamais de plus de L/2 à vol d'oiseau : c'est tout ce qu'il faut
@@ -1139,6 +1147,16 @@ demande moins de détail (plus de voies de service) : c'était un autre
 téléchargement, alors que les rues déjà gardées contenaient tout. Elles sont
 maintenant filtrées sur place. Et quand seule la couronne extérieure manque, on
 ne redemande qu'elle, en bandes, sans le centre.
+
+**Le cœur de la zone arrive avant son bord.** Une boucle reste bien à l'intérieur
+du rayon demandé, et les tuiles du bord ne servent qu'à celles qui vont
+l'effleurer. Quand la zone est lourde — une ville —, elle part donc en deux
+temps : le cœur d'abord, la recherche commence avec lui, le bord continue
+pendant qu'on lit les propositions. Et si ce bord tarde, ou si aucun miroir ne
+répond, la recherche ne reste pas bloquée : elle cherche avec ce qu'elle a, le
+dit, et le graphe tronqué n'est pas gardé — la recherche suivante aura tout.
+C'est ce qui manquait le plus : une barre figée à 80 % pendant qu'il y avait,
+déjà sur l'appareil, de quoi tracer la boucle.
 
 **Les rues se préparent en fond.** Dès que le point de départ est connu — à
 l'ouverture, ou quand on choisit une adresse —, l'app télécharge les rues de la

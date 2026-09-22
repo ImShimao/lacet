@@ -1,6 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { TILE_DEG, clearTiles, deriveLevel, fetchArea, resetMirrorHealth, takeChunk, tilesFor } from './overpass'
+import {
+  TILE_DEG,
+  clearTiles,
+  deriveLevel,
+  fetchArea,
+  resetAbandoned,
+  resetMirrorHealth,
+  takeChunk,
+  tilesFor,
+} from './overpass'
 import { fromRegionTile, resetRegion } from './region'
 
 /**
@@ -120,6 +129,7 @@ function overpass() {
 
 beforeEach(async () => {
   resetRegion()
+  resetAbandoned()
   resetMirrorHealth()
   await clearTiles()
 })

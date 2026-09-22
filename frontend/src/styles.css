@@ -1803,6 +1803,30 @@ input.field:focus {
   font-size: 12.5px;
 }
 
+/* Pendant qu'elles arrivent : la même ligne, en violet et non en vert — ce
+   n'est pas encore une bonne nouvelle, c'est une nouvelle. L'icône respire
+   doucement pour dire que quelque chose travaille. */
+.ready--busy {
+  color: var(--accent-text);
+}
+.ready--busy .icon {
+  animation: ready-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ready-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ready--busy .icon {
+    animation: none;
+  }
+}
+
 /* En pause, on le voit d'un coup d'œil : un bandeau, et les chiffres éteints. */
 .live__paused {
   display: flex;

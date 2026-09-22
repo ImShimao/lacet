@@ -33,13 +33,32 @@ jobs:
   # pour ne plus rien attendre d'Overpass quand on court chez soi. Voir
   # frontend/scripts/region_tiles.py. Calculée une fois par semaine : les
   # compilations de la même semaine reprennent le résultat en cache.
+  #
+  # **Et elle déborde de la limite administrative.** Une carte qui s'arrête pile
+  # à la frontière laisse sans rues quiconque habite près d'elle : constaté à
+  # Bréchaumont, à deux kilomètres du Territoire de Belfort, où deux des six
+  # tuiles d'une sortie de 5 km manquaient. Les extraits des régions voisines
+  # sont donc coupés à une même emprise, fusionnés, et seules les tuiles qui y
+  # tiennent entièrement sont livrées — le débord est aussi complet que le reste.
   region:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       # Le chemin de l'extrait chez Geofabrik (download.geofabrik.de/europe/…).
       REGION: france/alsace
       REGION_NAME: Alsace
+      # Ce qui entoure la région, pour remplir la marge. L'Alsace touche la
+      # Lorraine, la Franche-Comté, deux Länder allemands et la Suisse.
+      NEIGHBOURS: >-
+        france/lorraine
+        france/franche-comte
+        germany/baden-wuerttemberg
+        germany/rheinland-pfalz
+        switzerland
+      # Six kilomètres : de quoi couvrir une sortie de 10 km depuis une maison
+      # posée sur la limite. Au-delà, la carte double encore de poids pour des
+      # distances qu'on ne court presque jamais depuis le bord.
+      MARGIN_M: 6000
     steps:
       - uses: actions/checkout@v4
 
@@ -51,20 +70,45 @@ jobs:
         id: cache
         with:
           path: region
-          key: region-${{ env.REGION }}-${{ steps.week.outputs.week }}-${{ hashFiles('frontend/scripts/region_tiles.py') }}
+          key: region-${{ env.REGION }}-m${{ env.MARGIN_M }}-${{ steps.week.outputs.week }}-${{ hashFiles('frontend/scripts/region_tiles.py', 'frontend/scripts/region_bbox.py') }}
 
       - uses: actions/setup-python@v5
         if: steps.cache.outputs.cache-hit != 'true'
         with:
           python-version: '3.12'
 
-      - name: Rues de la région
+      - name: Rues de la région et de ses abords
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq osmium-tool
           pip install --quiet osmium
-          curl -sSfL -o region.osm.pbf "https://download.geofabrik.de/europe/${REGION}-latest.osm.pbf"
+
           curl -sSfL -o region.poly "https://download.geofabrik.de/europe/${REGION}.poly"
-          python frontend/scripts/region_tiles.py region.osm.pbf region.poly region --name "$REGION_NAME"
+          BBOX="$(python frontend/scripts/region_bbox.py region.poly "$MARGIN_M")"
+          echo "emprise à couvrir : $BBOX"
+
+          # Chaque extrait est coupé à cette emprise dès son arrivée, puis
+          # effacé : le disque du runner ne tient pas les originaux ensemble.
+          n=0
+          for zone in "$REGION" $NEIGHBOURS; do
+            n=$((n + 1))
+            echo "::group::$zone"
+            curl -sSfL -o source.osm.pbf "https://download.geofabrik.de/europe/${zone}-latest.osm.pbf"
+            osmium extract --bbox "$BBOX" --set-bounds --overwrite -o "part-$n.osm.pbf" source.osm.pbf
+            rm source.osm.pbf
+            ls -lh "part-$n.osm.pbf"
+            echo "::endgroup::"
+          done
+
+          # Les objets présents des deux côtés d'une limite ne sont gardés
+          # qu'une fois : c'est ce que fait `osmium merge`.
+          osmium merge --overwrite -o region.osm.pbf part-*.osm.pbf
+          rm part-*.osm.pbf
+          ls -lh region.osm.pbf
+
+          python frontend/scripts/region_tiles.py region.osm.pbf region.poly region             --name "$REGION_NAME" --margin "$MARGIN_M" --source-bbox "$BBOX"
           du -sh region
 
       - uses: actions/upload-artifact@v4

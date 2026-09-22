@@ -14,9 +14,14 @@ de détail 0) : mêmes filtres, mêmes étiquettes, mêmes géométries. Les fil
 sont recopiés ici, et un test (`region.test.js`) vérifie qu'ils n'ont pas
 divergé. Comparé sur Andorre : 596 voies sur 596 identiques, au bit près.
 
-**Seules les tuiles entièrement dans le territoire sont gardées.** Une tuile à
-cheval sur une frontière n'aurait que la moitié de ses rues — l'autre moitié
-est dans l'extrait du voisin. Ces tuiles-là restent à Overpass.
+**Une tuile n'est gardée que si la source la couvre entièrement.** Une tuile à
+cheval sur le bord des données n'aurait que la moitié de ses rues. Avec un seul
+extrait régional, cela revient à ne garder que les tuiles entièrement dans le
+territoire — et la carte s'arrête alors net à la limite administrative, ce qui
+laisse sans rues quelqu'un qui habite à deux kilomètres de cette limite. En
+donnant au script un extrait plus large (la région **et ses voisines**, coupées
+à une emprise commune) et `--margin`, la carte déborde de quelques kilomètres
+tout autour, et ce débord est aussi complet que le reste.
 
 **Un format serré.** Coordonnées en entiers de 1e-7 degré, chaque point écrit
 comme l'écart au précédent ; même chose pour les numéros de nœuds.
@@ -37,8 +42,6 @@ import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
-
-import osmium
 
 TILE_DEG = 0.05
 EDGE = 1e-9
@@ -90,6 +93,78 @@ def crossings_at(lat: float, rings) -> list[float]:
             j = i
     xs.sort()
     return xs
+
+
+def point_to_ring_m(lon: float, lat: float, ring) -> float:
+    """Distance du point à la ligne brisée, en mètres (plan local)."""
+    kx = math.cos(math.radians(lat)) * 111_320.0
+    ky = 110_540.0
+    best = float("inf")
+    ax, ay = ring[-1]
+    ax, ay = (ax - lon) * kx, (ay - lat) * ky
+    for bx, by in ring:
+        bx, by = (bx - lon) * kx, (by - lat) * ky
+        dx, dy = bx - ax, by - ay
+        if dx or dy:
+            t = max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(ax + t * dx, ay + t * dy))
+        else:
+            best = min(best, math.hypot(ax, ay))
+        ax, ay = bx, by
+    return best
+
+
+def shipped_tiles(outer, holes, margin_m: float, source) -> set[tuple[int, int]]:
+    """Les tuiles à livrer : le territoire, sa marge, et rien d'incomplet.
+
+    `source` est l'emprise (w, s, e, n) réellement couverte par l'extrait donné,
+    ou `None` quand il ne couvre que le territoire. Une tuile n'est livrée que si
+    elle y tient **entièrement** : c'est la garantie qu'elle contient les mêmes
+    rues qu'Overpass aurait rendues.
+    """
+    tiles = complete_tiles(outer, holes)
+    if margin_m <= 0 and source is None:
+        return tiles
+
+    if margin_m > 0:
+        # Le territoire lui-même, tuile par tuile, puis sa marge : on ne mesure
+        # la distance que pour ce qui n'est pas déjà dedans.
+        dlat = margin_m / 110_540.0
+        vertices = [v for ring in outer + holes for v in ring]
+        lons = [v[0] for v in vertices]
+        lats = [v[1] for v in vertices]
+        dlon = margin_m / (math.cos(math.radians(sum(lats) / len(lats))) * 111_320.0)
+        ix0 = math.floor((min(lons) - dlon) / TILE_DEG)
+        ix1 = math.floor((max(lons) + dlon) / TILE_DEG)
+        iy0 = math.floor((min(lats) - dlat) / TILE_DEG)
+        iy1 = math.floor((max(lats) + dlat) / TILE_DEG)
+        for ix in range(ix0, ix1 + 1):
+            for iy in range(iy0, iy1 + 1):
+                if (ix, iy) in tiles:
+                    continue
+                coins = [
+                    (ix * TILE_DEG, iy * TILE_DEG),
+                    ((ix + 1) * TILE_DEG, iy * TILE_DEG),
+                    (ix * TILE_DEG, (iy + 1) * TILE_DEG),
+                    ((ix + 1) * TILE_DEG, (iy + 1) * TILE_DEG),
+                    ((ix + 0.5) * TILE_DEG, (iy + 0.5) * TILE_DEG),
+                ]
+                if any(min(point_to_ring_m(x, y, ring) for ring in outer) <= margin_m for x, y in coins):
+                    tiles.add((ix, iy))
+
+    if source is not None:
+        w, s, e, n = source
+        # `EDGE` parce que 142 × 0,05 vaut 7,100000000000001 : sans cette marge,
+        # une emprise pourtant alignée sur la grille perdait sa rangée du bord.
+        tiles = {
+            (ix, iy)
+            for ix, iy in tiles
+            if ix * TILE_DEG >= w - EDGE
+            and (ix + 1) * TILE_DEG <= e + EDGE
+            and iy * TILE_DEG >= s - EDGE
+            and (iy + 1) * TILE_DEG <= n + EDGE
+        }
+    return tiles
 
 
 def complete_tiles(outer, holes) -> set[tuple[int, int]]:
@@ -193,6 +268,8 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
     # Le filtre ne laisse remonter en Python que ce qui porte une de ces clés :
     # quelques millions d'objets au lieu de centaines de millions de nœuds. Les
     # positions, elles, sont retenues avant le filtre.
+    import osmium  # ici, et non en tête : le choix des tuiles se teste sans lui.
+
     processor = (
         osmium.FileProcessor(str(pbf))
         .with_locations(locations)
@@ -272,11 +349,23 @@ def main() -> None:
     # La position de chaque nœud, le temps de reconstituer les voies. En mémoire
     # pour une région ; sur disque pour plus grand (« sparse_file_array,chemin »).
     parser.add_argument("--locations", default="flex_mem", help="index des positions de nœuds (pyosmium)")
+    parser.add_argument(
+        "--margin",
+        type=float,
+        default=0.0,
+        help="mètres de débord autour du territoire (exige un extrait qui les couvre)",
+    )
+    parser.add_argument(
+        "--source-bbox",
+        default=None,
+        help="emprise réellement couverte par l'extrait, « w,s,e,n » — au format d'osmium extract",
+    )
     args = parser.parse_args()
 
     started = time.time()
     outer, holes = read_poly(args.poly)
-    keep = complete_tiles(outer, holes)
+    source = tuple(float(v) for v in args.source_bbox.split(",")) if args.source_bbox else None
+    keep = shipped_tiles(outer, holes, args.margin, source)
     args.out.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as scratch:
@@ -294,6 +383,8 @@ def main() -> None:
                 written.append(key)
 
     index = {"v": 3, "name": args.name, "builtAt": int(time.time() * 1000), "tileDeg": TILE_DEG, "tiles": written}
+    if args.margin:
+        index["marginM"] = args.margin
     (args.out / "index.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
     print(f"{args.name} : {len(written)} tuiles, {total / 1e6:.1f} Mo, {ways} voies, en {time.time() - started:.0f} s")
 

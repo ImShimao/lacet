@@ -7,6 +7,7 @@ import {
   fetchArea,
   hedgedRound,
   mirrorOrder,
+  resetAbandoned,
   resetMirrorHealth,
   splitIntoTiles,
   takeChunk,
@@ -108,6 +109,7 @@ function fakeNetwork(behaviour = () => 'ok') {
 }
 
 beforeEach(async () => {
+  resetAbandoned()
   resetMirrorHealth()
   await clearTiles()
 })
@@ -313,6 +315,81 @@ describe('les miroirs', () => {
 // --- la zone complète ---------------------------------------------------------
 
 describe('le téléchargement d’une zone', () => {
+  it('demande le cœur de la zone avant son bord quand elle est lourde', async () => {
+    // En ville, une requête sur toute la zone met une quinzaine de secondes, et
+    // les trois quarts de ce qu'elle rapporte sont des rues qu'aucune boucle
+    // n'atteindra. Le cœur part donc seul d'abord : la recherche peut commencer
+    // avec lui pendant que le bord arrive.
+    const { fetchImpl, calls } = fakeNetwork()
+    const extract = await fetchArea({
+      ...BEAUNE,
+      radiusM: 7000,
+      targetM: 10_000,
+      fetchImpl,
+      tileBytesGuess: 5_000_000,
+    })
+    const demandes = calls.filter((c) => c.bbox).map((c) => c.bbox)
+    const [s0, w0, n0, e0] = demandes[0]
+    // Le départ est dedans…
+    expect(s0).toBeLessThanOrEqual(BEAUNE.lat)
+    expect(n0).toBeGreaterThanOrEqual(BEAUNE.lat)
+    expect(w0).toBeLessThanOrEqual(BEAUNE.lon)
+    expect(e0).toBeGreaterThanOrEqual(BEAUNE.lon)
+    // …mais pas toute la zone : le bord viendra après.
+    const toute = demandes.reduce(
+      ([s, w, n, e], b) => [Math.min(s, b[0]), Math.min(w, b[1]), Math.max(n, b[2]), Math.max(e, b[3])],
+      demandes[0],
+    )
+    expect((n0 - s0) * (e0 - w0)).toBeLessThan((toute[2] - toute[0]) * (toute[3] - toute[1]))
+    // Et à la fin, tout est là.
+    expect(extract.partial).toBeUndefined()
+  })
+
+  it('cherche sans les tuiles de bordure quand elles tardent', async () => {
+    // Le cas d'une maison à deux kilomètres de la limite de la carte livrée :
+    // le cœur de la zone est sur l'appareil, deux tuiles du bord restent à
+    // Overpass — qui ne répond pas. Rester bloqué à 80 % pendant qu'il y a de
+    // quoi tracer la boucle est le pire des deux mondes.
+    const { fetchImpl } = fakeNetwork()
+    await fetchArea({ ...BEAUNE, radiusM: 5000, targetM: 10_000, fetchImpl })
+
+    const muet = fakeNetwork(() => 'silent')
+    const started = Date.now()
+    const extract = await fetchArea({
+      ...BEAUNE,
+      radiusM: 7000,
+      targetM: 10_000,
+      fetchImpl: muet.fetchImpl,
+      peripheralWaitMs: 150,
+    })
+    expect(muet.calls.length).toBeGreaterThan(0)
+    expect(Date.now() - started).toBeLessThan(2000)
+    expect(extract.ways.length).toBeGreaterThan(0)
+    // Et il le dit : le graphe qui en sortira ne sera pas gardé pour la suite.
+    expect(extract.partial).toBe(true)
+
+    // Une deuxième recherche au même endroit ne reperd pas ce délai : ces
+    // tuiles-là se téléchargent en fond, on ne les attend plus.
+    const encore = Date.now()
+    await fetchArea({
+      ...BEAUNE,
+      radiusM: 7000,
+      targetM: 10_000,
+      fetchImpl: fakeNetwork(() => 'silent').fetchImpl,
+      peripheralWaitMs: 5000,
+    })
+    expect(Date.now() - encore).toBeLessThan(1000)
+  })
+
+  it('attend, en revanche, les rues du cœur de la zone', async () => {
+    // Sans elles, il n'y a pas de recherche : une panne franche doit rester une
+    // erreur, pas une boucle tracée sur rien.
+    const mort = fakeNetwork(() => 'error')
+    await expect(
+      fetchArea({ ...BEAUNE, radiusM: 3000, targetM: 5000, fetchImpl: mort.fetchImpl, peripheralWaitMs: 150 }),
+    ).rejects.toThrow(/miroir/i)
+  }, 20_000)
+
   it('ne rend que les rues à portée, en gardant les tuiles entières', async () => {
     // Les tuiles couvrent bien plus large que le disque demandé — elles sont
     // prises dès qu'elles l'effleurent — et ce débord n'a rien à faire dans le

@@ -29,7 +29,10 @@ const PRECISE_TOLERANCE = 0.025
 
 // Le temps de laisser finir un repère qu'on fait glisser, ou une adresse qu'on
 // choisit, avant de préparer les rues : on ne prépare que là où l'on s'arrête.
-const PREFETCH_DELAY_MS = 1200
+// Une demi-seconde suffit à ça, et c'est une demi-seconde de moins à rattraper
+// pour qui ouvre l'app et lance sa recherche dans la foulée — le cas d'un coin
+// jamais visité, justement celui où les rues sont longues à venir.
+const PREFETCH_DELAY_MS = 600
 
 /**
  * La poignée de la feuille, sur téléphone.
@@ -432,6 +435,7 @@ export default function App() {
     return JSON.stringify(toRequest(params, start))
   }, [start, params])
   const [prepared, setPrepared] = useState(null)
+  const [preparing, setPreparing] = useState(false)
 
   useEffect(() => {
     if (!prefetchKey || running) return undefined
@@ -439,11 +443,18 @@ export default function App() {
     if (network.onLine === false || network.connection?.saveData) return undefined
     let cancelled = false
     const timer = setTimeout(async () => {
+      // Le dire pendant que ça se fait : dans un coin jamais visité, la
+      // préparation dure quelques secondes, et une app qui s'active sans rien
+      // annoncer inquiète plus qu'elle ne rassure.
+      setPreparing(true)
       const ready = await prefetchOnDevice(JSON.parse(prefetchKey))
-      if (!cancelled && ready) setPrepared(prefetchKey)
+      if (cancelled) return
+      setPreparing(false)
+      if (ready) setPrepared(prefetchKey)
     }, PREFETCH_DELAY_MS)
     return () => {
       cancelled = true
+      setPreparing(false)
       clearTimeout(timer)
     }
   }, [prefetchKey, running])
@@ -995,6 +1006,7 @@ export default function App() {
               detail={detail}
               params={params}
               streetsReady={prefetchKey !== null && prepared === prefetchKey}
+              streetsLoading={preparing && prepared !== prefetchKey}
               isFavorite={isFavorite}
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
