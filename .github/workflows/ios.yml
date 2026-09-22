@@ -189,8 +189,12 @@ jobs:
       - name: Synchronisation
         run: npx cap sync ios
 
+      # `APP_VERSION` porte le numéro de compilation : deux paquets de même
+      # version se distinguent alors sans dépendre de `buildVersion`, que les
+      # anciennes versions d'AltStore ignorent — et la mise à jour s'y voit.
       - name: Réglages de Lacet
         env:
+          APP_VERSION: 1.0.${{ github.run_number }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: python3 ios-overlay/customize.py ios/App
 
@@ -199,6 +203,7 @@ jobs:
       # ios-overlay/add_live_activity.rb.
       - name: Activité en direct (écran verrouillé)
         env:
+          APP_VERSION: 1.0.${{ github.run_number }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           ruby -e 'require "xcodeproj"' 2>/dev/null || gem install xcodeproj --no-document

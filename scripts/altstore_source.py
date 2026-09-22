@@ -54,9 +54,15 @@ def main() -> None:
     with zipfile.ZipFile(IPA) as ipa:
         plist = plistlib.loads(ipa.read("Payload/Lacet.app/Info.plist"))
     build = plist.get("CFBundleVersion", "1")
-    marketing = plist.get("CFBundleShortVersionString", "1.0")
-    # AltStore compare des versions : le numéro de compilation les ordonne.
-    version = f"{marketing}.{build}"
+    # **Exactement ce que porte le paquet.** AltStore télécharge l'IPA, lit son
+    # `Info.plist` et refuse d'installer si la version ne correspond pas à celle
+    # annoncée ici : « The downloaded version does not match the version
+    # specified by the source ». Annoncer « 1.0.42 » pour un paquet qui dit
+    # « 1.0 » (compilation 42) suffit à tout bloquer.
+    #
+    # Le numéro de compilation, lui, va dans `buildVersion` : c'est ce qui
+    # distingue deux paquets de même version et déclenche la mise à jour.
+    version = plist.get("CFBundleShortVersionString", "1.0")
     size = IPA.stat().st_size
     date = datetime.fromtimestamp(IPA.stat().st_mtime, timezone.utc).isoformat()
 
@@ -69,8 +75,9 @@ def main() -> None:
         "iconURL": f"{base}/frontend/public/icon-192.png",
         "tintColor": "7C3AED",
         "screenshotURLs": [],
-        # AltStore 1 lit ces trois clés à la racine de l'app…
+        # AltStore 1 lit ces clés à la racine de l'app…
         "version": version,
+        "buildVersion": build,
         "versionDate": date,
         "versionDescription": f"Compilation {build}.",
         "downloadURL": f"{base}/Lacet.ipa",
@@ -79,6 +86,7 @@ def main() -> None:
         "versions": [
             {
                 "version": version,
+                "buildVersion": build,
                 "date": date,
                 "localizedDescription": f"Compilation {build}.",
                 "downloadURL": f"{base}/Lacet.ipa",
@@ -98,7 +106,7 @@ def main() -> None:
     }
 
     OUT.write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"{OUT} écrit — compilation {build}")
+    print(f"{OUT} écrit — version {version}, compilation {build}")
     print(f"À ajouter dans AltStore : {base}/source.json")
 
 
