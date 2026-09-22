@@ -55,10 +55,14 @@ jobs:
         germany/baden-wuerttemberg
         germany/rheinland-pfalz
         switzerland
-      # Six kilomètres : de quoi couvrir une sortie de 10 km depuis une maison
-      # posée sur la limite. Au-delà, la carte double encore de poids pour des
-      # distances qu'on ne court presque jamais depuis le bord.
-      MARGIN_M: 6000
+      # Mille cinq cents mètres : de quoi que **toutes** les tuiles que la limite
+      # traverse soient livrées entières — c'est là qu'était le trou, pas plus
+      # loin. Mesuré depuis Bréchaumont, à deux kilomètres du Territoire de
+      # Belfort : plus une seule tuile manquante pour une sortie de 10 km, et la
+      # carte pèse onze mégaoctets de moins qu'avec six kilomètres de marge. Ce
+      # qui dépasse encore — un semi-marathon lancé depuis la frontière — vient
+      # des archives en ligne, en une seconde.
+      MARGIN_M: 1500
     steps:
       - uses: actions/checkout@v4
 
