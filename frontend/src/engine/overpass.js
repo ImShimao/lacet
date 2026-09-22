@@ -24,6 +24,7 @@
 import { clipToDisk, emptyExtract, fromOverpass, mergeExtracts } from './extract'
 import { bboxAround } from './geo'
 import { pyFixed } from './py'
+import { fetchArchived, resetArchives } from './archive'
 import { regionTile } from './region'
 import { store } from './store'
 import { clearTiles as forgetTiles, readTile, touchTiles, writeTile } from './tilestore'
@@ -333,6 +334,10 @@ export async function fetchArea(args) {
     // rafraîchissement : on veut alors les données du jour, pas celles livrées.
     useRegion = true,
     regionFetch = fetch,
+    // Les archives en ligne (`archive.js`). Jamais pour un rafraîchissement, qui
+    // veut les données du jour, ni quand l'appelant les a déjà écartées.
+    useArchive = true,
+    archiveFetch = fetch,
     tileBytesGuess = null,
     peripheralWaitMs = PERIPHERAL_WAIT_MS,
     dataBudgetMs = DATA_BUDGET_MS,
@@ -362,12 +367,41 @@ export async function fetchArea(args) {
     unfresh.forEach((tile, k) => {
       const copy = shipped[k]
       if (copy && !(found.get(tile)?.at >= copy.at)) {
-        found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level) })
+        found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), prepared: true })
       }
     })
   }
 
   const served = []
+  // Puis les archives en ligne : le reste du pays, préparé d'avance et lu à
+  // l'octet près. Ce qui n'y est pas — l'étranger, pour l'instant — reste à
+  // Overpass, qui met dix fois plus de temps à le calculer.
+  if (useArchive && !only) {
+    const unfresh = wanted.filter((tile) => !isFresh(found.get(tile)))
+    if (unfresh.length) {
+      const archived = await fetchArchived(unfresh, { fetchImpl: archiveFetch })
+      const keep = []
+      for (const tile of unfresh) {
+        const copy = archived.get(`${tile[0]}:${tile[1]}`)
+        // Une archive moins détaillée que ce qu'on demande ne ferait pas
+        // l'affaire : elle promettrait des rues qu'elle ne contient pas.
+        if (copy && copy.level <= level && !(found.get(tile)?.at >= copy.at)) {
+          found.set(tile, { at: copy.at, extract: deriveLevel(copy.extract, level), prepared: true })
+          keep.push([tileKey(copy.level, tile), copy])
+        }
+      }
+      // Gardées sur l'appareil, comme celles d'Overpass : c'est ce qui rend la
+      // zone utilisable hors ligne, et la recherche suivante immédiate. Après
+      // coup : encoder dix tuiles coûte deux dixièmes de seconde, et la
+      // recherche n'a pas à les attendre.
+      if (keep.length) {
+        setTimeout(() => {
+          for (const [key, copy] of keep) writeTile(key, copy.at, copy.extract).catch(() => {})
+        }, 0)
+      }
+    }
+  }
+
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     const cached = found.get(tile)
@@ -377,7 +411,12 @@ export async function fetchArea(args) {
       obtained.set(key, cached.extract)
     } else if (age < usableMs) {
       obtained.set(key, cached.extract)
-      aged.push(tile)
+      // Une tuile venue d'une carte préparée — celle livrée avec l'app, ou les
+      // archives en ligne — n'est pas rafraîchie chez Overpass : elle date du
+      // dernier découpage, et c'est lui qui la remettra à jour. Sans cette
+      // exception, chaque recherche relançait en fond ce qu'on cherchait
+      // justement à ne plus demander.
+      if (!cached.prepared) aged.push(tile)
     } else {
       missing.push(tile)
       if (cached) stale.set(key, cached.extract)
@@ -420,8 +459,9 @@ export async function fetchArea(args) {
   // et le bord continue pendant qu'on lit les propositions.
   const distanceTo = nearestTileDistance(lat, lon)
   const weight = tileBytesGuess ?? (await learnedTileBytes(level))
+  const heavy = missing.length * weight > SPLIT_BYTES
   const phases =
-    missing.length * weight > SPLIT_BYTES
+    heavy
       ? [
           missing.filter((tile) => distanceTo(tile) < CORE_SHARE * radiusM),
           missing.filter((tile) => distanceTo(tile) >= CORE_SHARE * radiusM),
@@ -440,7 +480,7 @@ export async function fetchArea(args) {
     try {
       for (const queue of phases) {
         while (queue.length) {
-          const budget = Math.min(cap, firstBudget(bytesPerTile, queue.length, level, chunkBytes))
+          const budget = Math.min(cap, firstBudget(bytesPerTile, queue.length, level, chunkBytes, heavy))
           const batch = [takeChunk(queue, budget)]
           // Overpass accorde deux requêtes simultanées par adresse. Une fois la densité
           // de la zone mesurée, deux lots partent donc ensemble : dans une grande
@@ -537,7 +577,7 @@ export async function fetchArea(args) {
 
   // Ce qui a servi ici ne sera pas jeté de sitôt : le budget du cache écarte
   // d'abord les tuiles dont on ne s'est pas servi depuis le plus longtemps.
-  touchTiles(served, now())
+  touchTiles(served, now()).catch(() => {})
   await settle(download, {
     wanted, obtained, level, lat, lon, radiusM, peripheralWaitMs, dataBudgetMs, hardBudgetMs,
   })
@@ -591,9 +631,11 @@ async function deadline(download, { wanted, obtained, level, lat, lon, dataBudge
   }
   if (issue === 'fini') return undefined
 
-  // Sans la tuile du départ, il n'y a rien à chercher : une panne reste une
-  // panne, et un délai dépassé se dit de la même façon.
-  if (!obtained.has(home)) throw failure ?? new OverpassError(SILENT)
+  // Rien du tout : une panne reste une panne, et un délai dépassé se dit de la
+  // même façon. Mais s'il est arrivé des tuiles, même pas celle du départ, on
+  // cherche avec : le départ se raccroche au réseau jusqu'à deux kilomètres,
+  // souvent dans la tuile d'à côté.
+  if (!obtained.size) throw failure ?? new OverpassError(SILENT)
   for (const tile of wanted) {
     const key = tileKey(level, tile)
     if (!obtained.has(key)) abandoned.add(key)
@@ -753,8 +795,12 @@ function refreshLater(args, level, aged, schedule) {
 // courtes distances, les seuls où six tuiles pèsent à coup sûr peu.
 const ONE_SHOT_TILES = 6
 
-function firstBudget(bytesPerTile, remaining, level, chunkBytes = CHUNK_BYTES) {
-  if (bytesPerTile === null) return remaining <= ONE_SHOT_TILES && level <= 1 ? remaining : 1
+function firstBudget(bytesPerTile, remaining, level, chunkBytes = CHUNK_BYTES, heavy = false) {
+  // `heavy` : la zone a déjà été jugée lourde et coupée en deux (le coeur, puis
+  // le bord). Son coeur tient souvent en cinq ou six tuiles, et le raccourci du
+  // « tout d'un coup » les demanderait ensemble — soixante mégaoctets de Paris
+  // dans une seule requête, ce que la mesure de densité existe pour éviter.
+  if (bytesPerTile === null) return !heavy && remaining <= ONE_SHOT_TILES && level <= 1 ? remaining : 1
   return Math.max(1, Math.min(MAX_CHUNK_TILES, Math.floor(chunkBytes / Math.max(bytesPerTile, 1))))
 }
 
@@ -1032,5 +1078,6 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 export const clearTiles = () => {
   refreshing.clear()
   abandoned.clear()
+  resetArchives()
   return forgetTiles()
 }

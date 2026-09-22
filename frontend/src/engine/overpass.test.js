@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { setArchiveSources } from './archive'
 import { clipToDisk } from './extract'
 import {
   MIRRORS,
@@ -109,12 +111,36 @@ function fakeNetwork(behaviour = () => 'ok') {
 }
 
 beforeEach(async () => {
+  // Aucune archive en ligne dans les tests : on vérifie ici le chemin Overpass.
+  setArchiveSources([])
   resetAbandoned()
   resetMirrorHealth()
   await clearTiles()
 })
 
 const BEAUNE = { lat: 47.0245, lon: 4.8395 }
+
+// Un coin couvert par l'archive d'essai (voir `archive.test.js`).
+const ARCHIVE = readFileSync(new URL('./__fixtures__/archive/14_94.lct', import.meta.url))
+const ARCHIVE_POINT = { lat: 47.02, lon: 7.02 }
+
+/** Un CDN qui sert l'archive d'essai par plages d'octets. */
+function fakeArchive() {
+  const calls = []
+  return {
+    calls,
+    fetchImpl: async (url, { headers } = {}) => {
+      calls.push(String(url))
+      const [, from, to] = headers.Range.match(/bytes=(\d+)-(\d+)/).map(Number)
+      const part = ARCHIVE.subarray(from, Math.min(to + 1, ARCHIVE.length))
+      return {
+        ok: true,
+        status: 206,
+        arrayBuffer: async () => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength),
+      }
+    },
+  }
+}
 
 // --- les tuiles ---------------------------------------------------------------
 
@@ -367,6 +393,33 @@ describe('le téléchargement d’une zone', () => {
     // Et à la fin, tout est là.
     expect(extract.partial).toBeUndefined()
   })
+
+  it('garde sur l’appareil ce qu’elle a tiré des archives', async () => {
+    // Les rues d'un coin traversé une fois doivent y rester : c'est ce qui rend
+    // la recherche suivante immédiate, et la zone utilisable sans réseau.
+    setArchiveSources(['https://exemple.test/packs'])
+    const cdn = fakeArchive()
+    const mort = fakeNetwork(() => 'error')
+    const zone = { ...ARCHIVE_POINT, radiusM: 1500, targetM: 3000, peripheralWaitMs: 50 }
+
+    const premier = await fetchArea({ ...zone, fetchImpl: mort.fetchImpl, archiveFetch: cdn.fetchImpl })
+    expect(premier.ways.length).toBeGreaterThan(0)
+    expect(cdn.calls.length).toBeGreaterThan(0)
+
+    // L'écriture est différée pour ne pas retarder la recherche.
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    // Plus d'archive, plus de réseau : tout doit venir de l'appareil.
+    setArchiveSources([])
+    const second = await fetchArea({
+      ...zone,
+      fetchImpl: mort.fetchImpl,
+      archiveFetch: async () => {
+        throw new TypeError('Pas de réseau')
+      },
+    })
+    expect(second.ways.length).toBe(premier.ways.length)
+  }, 20_000)
 
   it('cherche sans les tuiles de bordure quand elles tardent', async () => {
     // Le cas d'une maison à deux kilomètres de la limite de la carte livrée :

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { setArchiveSources } from './archive'
 import {
   TILE_DEG,
   clearTiles,
@@ -128,6 +129,8 @@ function overpass() {
 }
 
 beforeEach(async () => {
+  // Aucune archive en ligne dans les tests : on vérifie ici le chemin Overpass.
+  setArchiveSources([])
   resetRegion()
   resetAbandoned()
   resetMirrorHealth()
