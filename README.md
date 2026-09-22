@@ -1131,7 +1131,29 @@ l'ensemble rues + graphe de 0,59 s à 0,19 s sur un PC de bureau — un peu plus
 double sur un iPhone. Les carreaux, eux, restent gardés **entiers** : c'est ce
 qui rend immédiate la recherche suivante, deux rues plus loin.
 
-**Ailleurs, deux serveurs font la course.** Hors de la région livrée, les rues
+**Ailleurs, des archives préparées d'avance.** Overpass n'est pas un service de
+téléchargement : c'est un moteur de requêtes, qui *calcule* l'extraction des
+rues à la volée sur des serveurs publics. C'est la cause de fond de toutes les
+lenteurs hors de la région livrée. Les rues, elles, ne changent pas d'une heure
+à l'autre : elles sont donc découpées une fois par mois dans le dépôt public
+[`lacet-data`](https://github.com/ImShimao/lacet-data), en archives d'un
+demi-degré, et l'app **n'en lit que ce dont elle a besoin** — un répertoire de
+quelques kilooctets, puis les tuiles voulues par plages d'octets (`Range`).
+GitHub sert les
+deux et autorise l'app à les lire (« HTTP 206 » et
+« Access-Control-Allow-Origin : * », vérifié avant d'écrire une ligne — et
+jsDelivr écarté au même moment, parce que ses plages d'octets portent sur une
+version encodée du fichier et ne rendent pas les octets demandés). Une sortie de 10 km dans une ville jamais visitée : trois ou quatre
+requêtes, trois mégaoctets, environ une seconde au lieu d'une minute. Ce qui en
+vient est gardé sur l'appareil comme le reste — la zone devient utilisable hors
+ligne — et n'est pas rafraîchi chez Overpass, puisque c'est le découpage mensuel
+qui le remet à jour. Le format est décrit en tête de
+`frontend/scripts/pack_tiles.py`, relu par `src/engine/archive.js`, et un test
+lit une archive fabriquée par le Python : un décalage d'un octet se voit là
+plutôt que sur le téléphone.
+
+**Overpass reste le dernier recours.** Pour l'étranger, et pour les trous.
+Deux serveurs y font la course. Hors de la région livrée, les rues
 viennent d'Overpass. Mesuré le 19 septembre 2026 sur la France, la Suisse,
 l'Italie, l'Espagne et l'Allemagne : l'instance principale répondait en 1,6 s…
 ou en « 504 » au bout de 14 s, selon la minute ; celle d'OpenStreetMap France,

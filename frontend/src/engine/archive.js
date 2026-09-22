@@ -34,12 +34,22 @@ export const BLOCK_DEG = 0.5
 const TILE_DEG = 0.05
 const PER_BLOCK = Math.round(BLOCK_DEG / TILE_DEG)
 
-// Où sont les archives. jsDelivr est un CDN : il met en cache et sert vite, sans
-// les limites d'usage de `raw.githubusercontent`, qui reste le recours quand le
-// premier ne répond pas.
+// Où sont les archives.
+//
+// **Et pourquoi pas jsDelivr**, alors que c'est le CDN naturel d'un dépôt
+// GitHub. Mesuré le 22 septembre 2026 : il répond bien « HTTP 206 » à une
+// demande de plage, mais les octets rendus ne sont **pas** ceux du fichier. Il
+// sert une version encodée et applique la plage dessus — il annonce d'ailleurs
+// une taille totale de douze octets supérieure à la vraie. Le fichier entier
+// est identique ; seules les plages mentent. Une archive lue ainsi donnerait des
+// tuiles illisibles, silencieusement, et l'app retomberait sur Overpass sans
+// que rien n'explique pourquoi.
+//
+// `raw.githubusercontent` rend, lui, exactement les octets demandés — vérifié au
+// milieu d'un fichier, pas seulement au début — et autorise l'app à les lire
+// (« Access-Control-Allow-Origin : * »). C'est donc lui, et c'est aussi un CDN.
 const SOURCES = [
   import.meta.env?.VITE_TILES_URL,
-  'https://cdn.jsdelivr.net/gh/ImShimao/lacet-data@main/packs',
   'https://raw.githubusercontent.com/ImShimao/lacet-data/main/packs',
 ].filter(Boolean)
 
