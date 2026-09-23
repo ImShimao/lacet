@@ -191,6 +191,16 @@ export default function Explore({
           déjà là. Relance la recherche dans un instant pour en profiter.
         </div>
       )}
+      {/* Sans altitude, le dénivelé n'est pas seulement absent de l'affichage :
+          il n'a pas pu servir au classement. Demander « des côtes » et recevoir
+          cinq boucles plates sans un mot serait incompréhensible. */}
+      {meta.elevation_skipped && (
+        <div className="notice">
+          Le relief n'a pas répondu à temps : ces boucles sont classées sans lui, et leur
+          dénivelé reste inconnu. Relance la recherche — les altitudes arrivées entre-temps
+          sont gardées.
+        </div>
+      )}
       {meta.wind && <WindNote wind={meta.wind} />}
 
       {selected.laps > 1 && (

@@ -3,6 +3,8 @@
 // le stockage peut être refusé (navigation privée, réglages du navigateur) et
 // l'app doit continuer de fonctionner sans.
 
+import { haversineM } from './engine/geo'
+
 const KEY = 'lacet.v1'
 
 const DEFAULTS = { favorites: [], history: [], params: null, recentPlaces: [] }
@@ -31,20 +33,15 @@ export function rememberPlace(place) {
     at: Date.now(),
   }
   if (!kept.label) return
-  const others = (load().recentPlaces || []).filter((other) => distanceM(other, kept) > SAME_START_M)
+  const others = (load().recentPlaces || []).filter(
+    (other) => haversineM([other.lon, other.lat], [kept.lon, kept.lat]) > SAME_START_M,
+  )
   save({ recentPlaces: [kept, ...others].slice(0, RECENT_MAX) })
 }
 
 /** Les départs déjà choisis, du plus récent au plus ancien. */
 export const recentPlaces = () => load().recentPlaces || []
 
-function distanceM(a, b) {
-  const rad = Math.PI / 180
-  const dLat = (b.lat - a.lat) * rad
-  const dLon = (b.lon - a.lon) * rad
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2
-  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)))
-}
 
 export function load() {
   try {
