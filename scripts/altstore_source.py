@@ -43,6 +43,50 @@ def lan_address() -> str:
         return probe.getsockname()[0]
 
 
+# Ce qu'AltStore sait nommer, et la clé du paquet qui le déclenche. Il compare
+# ce que l'app demande à ce que la source annonce, et prévient quand ça diffère —
+# « Lacet requires additional permissions not specified by the source ». C'est
+# une bonne chose : on ne veut pas installer une app qui demande plus que ce
+# qu'elle dit. Autant que la source dise vrai, en le lisant dans le paquet.
+PRIVACY_KEYS = {
+    "NSLocationAlwaysAndWhenInUseUsageDescription": "location",
+    "NSLocationWhenInUseUsageDescription": "location",
+    "NSLocationAlwaysUsageDescription": "location",
+    "NSMotionUsageDescription": "motion",
+    "NSMicrophoneUsageDescription": "microphone",
+    "NSCameraUsageDescription": "camera",
+    "NSPhotoLibraryUsageDescription": "photos",
+    "NSContactsUsageDescription": "contacts",
+    "NSCalendarsUsageDescription": "calendars",
+    "NSBluetoothAlwaysUsageDescription": "bluetooth",
+}
+
+BACKGROUND_MODES = {
+    "audio": ("background-audio", "Le guidage vocal continue pendant la sortie, écran éteint."),
+    "fetch": ("background-fetch", "L'app se met à jour en fond."),
+    "location": (
+        "location",
+        "Pendant une sortie, la position continue d'être suivie écran verrouillé.",
+    ),
+}
+
+
+def declared(plist: dict) -> list[dict]:
+    """Les autorisations que le paquet demande vraiment, dans l'ordre stable."""
+    found: dict[str, str] = {}
+    for key, kind in PRIVACY_KEYS.items():
+        texte = plist.get(key)
+        # La plus explicite l'emporte : « toujours et à l'usage » décrit mieux
+        # que « à l'usage » ce que l'app fait réellement.
+        if texte and (kind not in found or len(texte) > len(found[kind])):
+            found[kind] = texte
+    for mode in plist.get("UIBackgroundModes", []) or []:
+        kind, texte = BACKGROUND_MODES.get(mode, (None, None))
+        if kind and kind not in found:
+            found[kind] = texte
+    return [{"type": kind, "usageDescription": found[kind]} for kind in sorted(found)]
+
+
 def main() -> None:
     host = sys.argv[1] if len(sys.argv) > 1 else lan_address()
     port = sys.argv[2] if len(sys.argv) > 2 else "8765"
@@ -53,6 +97,7 @@ def main() -> None:
 
     with zipfile.ZipFile(IPA) as ipa:
         plist = plistlib.loads(ipa.read("Payload/Lacet.app/Info.plist"))
+    permissions = declared(plist)
     build = plist.get("CFBundleVersion", "1")
     # **Exactement ce que porte le paquet.** AltStore télécharge l'IPA, lit son
     # `Info.plist` et refuse d'installer si la version ne correspond pas à celle
@@ -75,6 +120,7 @@ def main() -> None:
         "iconURL": f"{base}/frontend/public/icon-192.png",
         "tintColor": "7C3AED",
         "screenshotURLs": [],
+        "permissions": permissions,
         # AltStore 1 lit ces clés à la racine de l'app…
         "version": version,
         "buildVersion": build,
@@ -91,6 +137,7 @@ def main() -> None:
                 "localizedDescription": f"Compilation {build}.",
                 "downloadURL": f"{base}/Lacet.ipa",
                 "size": size,
+                "permissions": permissions,
             }
         ],
     }
