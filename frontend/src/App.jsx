@@ -164,6 +164,10 @@ export default function App() {
   const [params, setParams] = useState({ ...DEFAULTS, ...(stored.params || {}) })
   const [mapStyle, setMapStyle] = useState(stored.mapStyle || DEFAULT_STYLE)
   const [start, setStart] = useState(null)
+  // `applyStart` ne dépend de rien pour rester stable d'un rendu à l'autre ;
+  // elle a pourtant besoin du départ courant, et le lit donc ici.
+  const startRef = useRef(null)
+  startRef.current = start
   const [startLabel, setStartLabel] = useState(null)
   const [placing, setPlacing] = useState(false)
 
@@ -231,20 +235,19 @@ export default function App() {
   // `recenter` distingue les deux gestes : choisir un lieu amène la carte
   // dessus, déplacer le repère la laisse où elle est.
   const applyStart = useCallback(async (point, label, recenter = false) => {
-    setStart((previous) => {
-      // Les boucles proposées partent toutes du point précédent : dès qu'il
-      // bouge, elles ne répondent plus à la question posée. Elles restaient
-      // pourtant à l'écran — on choisissait Grimisuat et la carte montrait le
-      // Valais sous une carte intitulée « Boucle sud-ouest · avenue des
-      // Gobelins ». Dix mètres de tolérance pour le doigt qui replace le
-      // repère sans vraiment le déplacer.
-      if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
-        setResult(null)
-        setSelected(null)
-        setScrub(null)
-      }
-      return point
-    })
+    // Les boucles proposées partent toutes du point précédent : dès qu'il
+    // bouge, elles ne répondent plus à la question posée. Elles restaient
+    // pourtant à l'écran — on choisissait un village suisse et la carte montrait
+    // le Valais sous une carte intitulée « Boucle sud-ouest · avenue des
+    // Gobelins ». Dix mètres de tolérance pour le doigt qui replace le repère
+    // sans vraiment le déplacer.
+    const previous = startRef.current
+    if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
+      setResult(null)
+      setSelected(null)
+      setScrub(null)
+    }
+    setStart(point)
     setStartLabel(label ?? null)
     setPlacing(false)
     if (recenter) setFocus({ ...point, at: Date.now() })
