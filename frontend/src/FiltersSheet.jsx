@@ -195,7 +195,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </div>
           </Field>
 
-          <Field label="Paramètres">
+          <Field label="Longueur">
             <Segmented
               options={[
                 { key: 'duration', label: 'Durée' },

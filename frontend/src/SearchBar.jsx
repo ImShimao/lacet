@@ -22,6 +22,11 @@ export default function SearchBar({ onPick, near = null }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [searching, setSearching] = useState(false)
+  // Ce qu'on a cherché quand la liste est revenue, et si ça s'est mal passé.
+  // Sans ça, « aucun lieu de ce nom » et « pas de réseau » se ressemblaient :
+  // dans les deux cas, rien ne s'affichait, et on retapait la même chose.
+  const [answered, setAnswered] = useState(null)
+  const [failed, setFailed] = useState(false)
   const controller = useRef(null)
   const field = useRef(null)
   // Lue au moment de chercher, sans relancer la recherche à chaque relevé GPS.
@@ -32,6 +37,8 @@ export default function SearchBar({ onPick, near = null }) {
     if (query.trim().length < 3) {
       setResults([])
       setSearching(false)
+      setAnswered(null)
+      setFailed(false)
       return undefined
     }
     // On attend que la frappe se calme avant d'interroger, et on annule la
@@ -40,12 +47,21 @@ export default function SearchBar({ onPick, near = null }) {
     const timer = setTimeout(async () => {
       controller.current?.abort()
       controller.current = new AbortController()
+      const asked = query.trim()
       try {
         setResults(await searchPlaces(query, controller.current.signal, nearRef.current))
         setActive(0)
+        setAnswered(asked)
+        setFailed(false)
         setOpen(true)
-      } catch {
-        /* requête annulée ou hors ligne : on laisse la liste en l'état */
+      } catch (error) {
+        // Une frappe qui continue annule la précédente : ce n'est pas une
+        // panne, et l'annoncer ferait clignoter une erreur à chaque lettre.
+        if (error?.name === 'AbortError') return
+        setResults([])
+        setAnswered(asked)
+        setFailed(true)
+        setOpen(true)
       } finally {
         setSearching(false)
       }
@@ -56,6 +72,8 @@ export default function SearchBar({ onPick, near = null }) {
   const clear = () => {
     setQuery('')
     setResults([])
+    setAnswered(null)
+    setFailed(false)
     setOpen(false)
     controller.current?.abort()
     // Le champ garde le curseur : on efface pour retaper, pas pour partir.
@@ -66,6 +84,8 @@ export default function SearchBar({ onPick, near = null }) {
     onPick({ lat: place.lat, lon: place.lon, label: place.short })
     setQuery('')
     setResults([])
+    setAnswered(null)
+    setFailed(false)
     setOpen(false)
   }
 
@@ -91,7 +111,10 @@ export default function SearchBar({ onPick, near = null }) {
     }
   }
 
-  const visible = open && results.length > 0
+  // La réponse concerne bien ce qui est tapé en ce moment : sinon, effacer une
+  // lettre laisserait « aucun lieu » affiché sous une recherche en cours.
+  const empty = answered !== null && answered === query.trim() && results.length === 0
+  const visible = open && (results.length > 0 || empty)
 
   return (
     <div className="search">
@@ -139,6 +162,15 @@ export default function SearchBar({ onPick, near = null }) {
       )}
       {visible && (
         <div className="search__results" id="search-results" role="listbox">
+          {empty && (
+            <p className="search__empty">
+              {failed
+                ? // Tout se calcule sur l'appareil, sauf ceci : trouver un lieu
+                  // par son nom demande un annuaire, et il est en ligne.
+                  'La recherche de lieux n’a pas répondu. Sans réseau, place le départ à la main sur la carte.'
+                : `Aucun lieu trouvé pour « ${answered} ». Essaie le nom de la commune, ou place le départ à la main sur la carte.`}
+            </p>
+          )}
           {results.map((place, i) => (
             <button
               key={`${place.lat},${place.lon},${i}`}

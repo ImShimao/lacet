@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandNicknames, fromMapbox, fromPhoton, rankPlaces, search } from './geocode'
+import { expandNicknames, fromMapbox, fromPhoton, rankPlaces, search, shorten, similarity } from './geocode'
 
 /**
  * Chercher un lieu comme on le dit : « macdo guebwiller », « one fitness ».
@@ -157,3 +157,152 @@ describe('les deux sources', () => {
   })
 })
 
+/**
+ * La ressemblance : ce qui décide du classement.
+ *
+ * Deux sens, et c'est le second qui manquait. Ce qu'on a tapé doit se retrouver
+ * dans le résultat — sinon « stade de france » répond le stade de l'Ill, à vingt
+ * kilomètres. Mais le nom ne doit pas dire grand-chose de plus — sinon
+ * « Ancienne Gare de Lyon-Saint-Clair » vaut « Gare de Lyon », et l'hôtel devant
+ * le parc vaut le parc.
+ */
+describe('la ressemblance', () => {
+  const lieu = (short, label = '') => ({ short, label })
+
+  it('préfère le nom exact à celui qui en dit plus', () => {
+    expect(similarity('gare de lyon', lieu('Gare de Lyon', 'Paris'))).toBeGreaterThan(
+      similarity('gare de lyon', lieu('Ancienne Gare de Lyon-Saint-Clair', 'Caluire-et-Cuire')),
+    )
+    expect(similarity('colmar', lieu('Colmar'))).toBeGreaterThan(similarity('colmar', lieu('Colmar-Ribeauvillé')))
+  })
+
+  it('pardonne une faute, et d’autant plus que le mot est long', () => {
+    expect(similarity('mulouse', lieu('Mulhouse'))).toBeGreaterThan(0.8)
+    expect(similarity('guebwiler', lieu('Guebwiller'))).toBeGreaterThan(0.8)
+  })
+
+  it('reconnaît un mot commencé, sans le confondre avec un cousin', () => {
+    // On tape au fil des touches : « guebwil » doit valoir Guebwiller.
+    expect(similarity('guebwil', lieu('Guebwiller'))).toBeGreaterThan(0.7)
+    // Mais « versaille » vaut mieux Versailles que Versailleux.
+    expect(similarity('chateau de versaille', lieu('Château de Versailles'))).toBeGreaterThan(
+      similarity('chateau de versaille', lieu('Château de Versailleux')),
+    )
+  })
+
+  it('cherche aussi dans l’adresse, pas seulement dans le nom', () => {
+    expect(similarity('rue de rivoli paris', lieu('Rue de Rivoli', '75004 Paris'))).toBeGreaterThan(0.9)
+  })
+})
+
+/**
+ * La seconde chance : Photon cherche par préfixe, donc une faute au milieu d'un
+ * mot est fatale — « rivolli » ne trouve rien, « rivol » trouve la rue de
+ * Rivoli. Amputer le mot le plus long ramène la faute hors du préfixe.
+ */
+describe('le mot raccourci', () => {
+  it('ampute le mot le plus long de deux lettres', () => {
+    expect(shorten('rue de rivolli paris')).toBe('rue de rivol paris')
+    expect(shorten('chateau de versaille')).toBe('chateau de versail')
+    expect(shorten('stade de franse')).toBe('stade de fran')
+  })
+
+  it('laisse tranquilles les mots trop courts pour qu’on les ampute', () => {
+    expect(shorten('nice')).toBeNull()
+    expect(shorten('rue de la gare')).toBeNull()
+    expect(shorten('')).toBeNull()
+  })
+})
+
+describe('le classement par ressemblance', () => {
+  const GUEBWILLER_LOIN = { lat: 47.9097, lon: 7.2106 }
+
+  it('met le lieu connu devant son homonyme du coin', () => {
+    // « stade de france » depuis l'Alsace : le stade de l'Ill est à vingt
+    // kilomètres, le Stade de France à trois cent soixante-quinze. C'est le
+    // second qu'on cherchait.
+    const places = [
+      fromPhoton(feature('Stade de l’Ill', [7.34, 47.748], { city: 'Mulhouse' })),
+      fromPhoton(feature('Stade de France', [2.36, 48.924], { city: 'Saint-Denis' })),
+    ]
+    const ranked = rankPlaces(places, GUEBWILLER_LOIN, 'stade de france')
+    expect(ranked[0].short).toBe('Stade de France')
+  })
+
+  it('garde, à noms égaux, la plus proche devant', () => {
+    const places = [
+      fromPhoton(feature('Burger King', [7.34, 47.748])), // Mulhouse, 20 km
+      fromPhoton(feature('Burger King', [7.161, 47.795])), // Cernay, 13 km
+    ]
+    const ranked = rankPlaces(places, GUEBWILLER_LOIN, 'burger king')
+    expect(ranked.map((p) => Math.round(p.distance_m / 1000))).toEqual([13, 20])
+  })
+
+  it('met la ville devant le commerce qui porte son nom', () => {
+    const places = [
+      fromPhoton(feature('Paris', [7.583, 48.029], { osm_key: 'shop', osm_value: 'hairdresser' })),
+      fromPhoton(feature('Paris', [2.348, 48.853], { osm_key: 'place', osm_value: 'city', state: 'Île-de-France' })),
+    ]
+    expect(rankPlaces(places, GUEBWILLER_LOIN, 'paris')[0].kind).toBe('Ville')
+  })
+})
+
+describe('quand rien ne répond', () => {
+  it('laisse passer la panne, au lieu de la faire passer pour un lieu introuvable', async () => {
+    // Le champ doit pouvoir dire « la recherche n'a pas répondu » plutôt que
+    // « aucun lieu de ce nom » : on ne retape pas la même chose dans les deux
+    // cas. Tout le reste de l'app marche sans réseau ; pas ceci.
+    const fetchImpl = async () => {
+      throw new TypeError('Failed to fetch')
+    }
+    await expect(search('colmar', { near: GUEBWILLER, fetchImpl })).rejects.toThrow()
+  })
+
+  it('rend une liste vide quand les serveurs répondent, mais ne connaissent rien', async () => {
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ features: [] }) })
+    expect(await search('zzzzqxwv', { near: GUEBWILLER, fetchImpl })).toEqual([])
+  })
+})
+
+describe('le second tour', () => {
+  const answering = (byQuery) => {
+    const asked = []
+    const fetchImpl = async (url) => {
+      const q = new URL(url).searchParams.get('q')
+      asked.push(q)
+      return { ok: true, json: async () => ({ features: byQuery[q] ?? [] }) }
+    }
+    return { asked, fetchImpl }
+  }
+
+  it('n’a pas lieu quand le premier tour répond juste', async () => {
+    const { asked, fetchImpl } = answering({
+      guebwiller: [feature('Guebwiller', [7.2106, 47.9097], { osm_key: 'place', osm_value: 'town' })],
+    })
+    const results = await search('guebwiller', { near: GUEBWILLER, fetchImpl })
+    expect(results[0].short).toBe('Guebwiller')
+    expect(asked).toEqual(['guebwiller'])
+  })
+
+  it('repart sans biais et avec le mot raccourci quand rien ne ressemble', async () => {
+    const { asked, fetchImpl } = answering({
+      'rue de rivolli paris': [feature('Rue de Paris', [7.25, 47.86], { city: 'Ungersheim' })],
+      'rue de rivol paris': [feature('Rue de Rivoli', [2.34, 48.856], { city: 'Paris', postcode: '75004' })],
+    })
+    const results = await search('rue de rivolli paris', { near: GUEBWILLER, fetchImpl })
+    expect(asked).toEqual(['rue de rivolli paris', 'rue de rivolli paris', 'rue de rivol paris'])
+    expect(results[0].short).toBe('Rue de Rivoli')
+  })
+
+  it('repart aussi quand le seul nom exact est à l’autre bout du monde', async () => {
+    // « tour eifel » : une école de Bingerville porte exactement la faute, à
+    // quatre mille huit cents kilomètres. On cherche un départ de course.
+    const { asked, fetchImpl } = answering({
+      'tour eifel': [feature('Groupe scolaire la tour eifel', [-3.88, 5.35], { city: 'Bingerville', country: "Côte d’Ivoire" })],
+      'tour eif': [feature('Tour Eiffel', [7.21, 47.92], { city: 'Buhl' })],
+    })
+    const results = await search('tour eifel', { near: GUEBWILLER, fetchImpl })
+    expect(asked).toHaveLength(3)
+    expect(results[0].short).toBe('Tour Eiffel')
+  })
+})

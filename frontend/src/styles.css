@@ -390,6 +390,15 @@ input:focus-visible {
   overflow: hidden;
   box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.9);
 }
+/* Une liste qui ne s'ouvre que pour dire qu'elle est vide : même cadre, mais
+   du texte, pas une ligne cliquable. */
+.search__empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
 .search__row {
   display: block;
   width: 100%;

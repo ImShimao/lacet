@@ -24,6 +24,25 @@
 //
 // **Et les surnoms.** Personne ne tape « McDonald's » : on tape « macdo ». Aucun
 // géocodeur ne le devine ; une petite table les traduit avant d'interroger.
+//
+// **Un second tour, quand le premier ne ressemble à rien.** La question posée
+// d'abord est « près d'ici » : neuf recherches sur dix visent le coin, et une
+// seule requête suffit. Mais quand rien de ce qui revient ne ressemble à ce qui
+// a été tapé, deux autres partent ensemble :
+//
+// - *sans biais de proximité* — depuis l'Alsace, « stade de france » répondait
+//   le stade de l'Ill à Mulhouse, et « gare de lyon » la route de Lyon à
+//   Erstein : classés par distance, les lieux connus n'avaient aucune chance ;
+// - *avec le mot le plus long raccourci de deux lettres* — Photon cherche par
+//   préfixe, donc une faute en fin de mot se pardonne, mais pas au milieu :
+//   « rivolli » ne trouve pas la rue de Rivoli, « rivol » oui.
+//
+// Les listes sont fondues, puis **classées par ressemblance avec ce qui a été
+// tapé**, la distance n'intervenant qu'entre résultats comparables. C'est ce
+// classement qui rend la seconde chance inoffensive : ses résultats, plus
+// lâches, ne remontent que là où rien de mieux n'existe. Et attendre d'en avoir
+// besoin garde la main légère sur un service gratuit — une requête par
+// recherche dans le cas courant, trois seulement quand ça coince.
 
 const PHOTON_URL = 'https://photon.komoot.io/api/'
 const MAPBOX_URL = 'https://api.mapbox.com/search/searchbox/v1/forward'
@@ -70,14 +89,107 @@ const fold = (text) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/[’`]/g, "'")
 
+/**
+ * Ce qui, dans un résultat, ressemble à ce qu'on a tapé — de 0 à 1.
+ *
+ * Deux questions, pas une. **Ce qu'on a tapé s'y retrouve-t-il ?** Mot à mot :
+ * chaque mot cherche son meilleur correspondant dans le nom et l'adresse du
+ * lieu, et pèse selon sa longueur — « paris » compte plus que « de », une faute
+ * sur un mot long coûte moins qu'une faute sur un mot court. **Et le nom
+ * dit-il autre chose ?** Sans cette seconde question, « Ancienne Gare de
+ * Lyon-Saint-Clair » collait aussi bien que « Gare de Lyon » à qui tapait
+ * « gare de lyon », « Colmar-Ribeauvillé » aussi bien que Colmar, et l'hôtel
+ * devant le parc de la Tête d'Or aussi bien que le parc. Ce qui déborde du nom
+ * compte donc contre lui — sans l'écraser : on cherche souvent un lieu par un
+ * bout de son nom.
+ */
+export function similarity(query, place) {
+  const asked = words(query)
+  const name = words(place.short ?? '')
+  const haystack = [...name, ...words(place.label ?? '')]
+  if (!asked.length || !haystack.length) return 0
+  const retrouvé = coverage(asked, haystack)
+  const expliqué = name.length ? coverage(name, asked) : 1
+  return retrouvé * (0.8 + 0.2 * expliqué)
+}
+
+/** La part de `mots` qui se retrouve dans `parmi`, au poids des lettres. */
+function coverage(mots, parmi) {
+  let total = 0
+  let weight = 0
+  for (const mot of mots) {
+    let best = 0
+    for (const candidat of parmi) {
+      best = Math.max(best, closeness(mot, candidat))
+      if (best === 1) break
+    }
+    total += best * mot.length
+    weight += mot.length
+  }
+  return weight ? total / weight : 0
+}
+
+const words = (text) => fold(text).split(/[^a-z0-9]+/).filter(Boolean)
+
+/** Deux mots : 1 s'ils sont le même, 0 s'ils n'ont rien à voir. */
+function closeness(asked, found) {
+  if (asked === found) return 1
+  // Un mot commencé, pas encore fini : « guebwil » vaut Guebwiller — mais moins
+  // qu'un mot entier, et d'autant moins qu'il en reste. C'est ce qui sépare
+  // Versailles de Versailleux quand on tape « versaille ».
+  if (found.startsWith(asked)) return 0.5 + (0.5 * asked.length) / found.length
+  const longest = Math.max(asked.length, found.length)
+  return Math.max(0, 1 - editDistance(asked, found) / longest)
+}
+
+/** Levenshtein, sur deux lignes : les mots comparés ici font dix lettres. */
+function editDistance(a, b) {
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i]
+    for (let j = 1; j <= b.length; j += 1) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
+    }
+    previous = current
+  }
+  return previous[b.length]
+}
+
+/**
+ * La seconde chance : le mot le plus long, amputé de deux lettres.
+ *
+ * Photon cherche par préfixe, donc une faute en fin de mot se pardonne d'elle-
+ * même — mais pas une faute au milieu. Amputer ramène la faute hors du préfixe :
+ * « rivolli » → « rivol » retrouve la rue de Rivoli, « franse » → « fran » le
+ * Stade de France. Le mot le plus long est le plus distinctif, et c'est aussi
+ * celui qu'on écorche. Rend `null` quand il n'y a rien à raccourcir.
+ */
+export function shorten(query) {
+  const parts = query.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return null
+  let index = -1
+  for (let i = 0; i < parts.length; i += 1) {
+    if (fold(parts[i]).replace(/[^a-z0-9]/g, '').length < 5) continue
+    if (index === -1 || parts[i].length > parts[index].length) index = i
+  }
+  if (index === -1) return null
+  const cut = parts[index].slice(0, -2)
+  const shortened = [...parts.slice(0, index), cut, ...parts.slice(index + 1)].join(' ')
+  return shortened === query.trim() ? null : shortened
+}
+
 /** Une requête par seconde au plus vers Nominatim, tous appels confondus. */
-function throttled(url, params, signal) {
+function throttled(url, params, signal, fetchImpl = fetch) {
   const run = chain.then(async () => {
     const wait = 1050 - (Date.now() - lastCall)
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
     if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
     lastCall = Date.now()
-    const response = await fetch(`${url}?${new URLSearchParams(params)}`, {
+    const response = await fetchImpl(`${url}?${new URLSearchParams(params)}`, {
       headers: { 'Accept-Language': 'fr' },
       signal,
     })
@@ -108,28 +220,63 @@ export async function search(query, { limit = 7, near = null, signal, fetchImpl 
   const asked = expandNicknames(text)
   // Les deux sources partent ensemble : l'attente est celle de la plus lente,
   // pas leur somme. Celle qui échoue ne fait pas échouer la recherche.
-  const [free, extra] = await Promise.all([
+  const found = await Promise.all([
     attempt(() => photon(asked, { limit, near, signal, fetchImpl })),
     token ? attempt(() => mapbox(asked, { limit, near, signal, fetchImpl, token })) : Promise.resolve(null),
   ])
   if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
 
-  let results
-  if (free === null && extra === null) {
-    // Photon muet et pas de renfort : Nominatim, sur les mêmes données.
+  const lists = [...found]
+  let results = merge(lists, near, asked, limit)
+  if (!good(results, asked)) {
+    const retry = shorten(asked)
+    const second = await Promise.all([
+      near ? attempt(() => photon(asked, { limit, near: null, signal, fetchImpl })) : Promise.resolve(null),
+      retry ? attempt(() => photon(retry, { limit, near, signal, fetchImpl })) : Promise.resolve(null),
+    ])
+    if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
+    lists.push(...second)
+    results = merge(lists, near, asked, limit)
+  }
+  if (!results.length) {
+    // Personne n'a répondu, ou personne n'a rien trouvé : Nominatim, sur les
+    // mêmes données mais un autre index — il lui arrive de trouver seul.
     try {
-      results = await nominatim(asked, { limit, near, signal })
+      results = await nominatim(asked, { limit, near, signal, fetchImpl })
     } catch (error) {
       if (error.name === 'AbortError') throw error
+      // Si personne n'a répondu, ce n'est pas « aucun lieu de ce nom » : c'est
+      // une panne, et le champ doit pouvoir le dire plutôt que d'envoyer
+      // chercher ailleurs un nom qui existe peut-être.
+      if (lists.every((list) => list === null)) throw error
       return []
     }
-  } else {
-    results = rankPlaces([...(free ?? []), ...(extra ?? [])], near).slice(0, limit)
   }
 
   cache.set(key, results)
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value)
   return results
+}
+
+const merge = (lists, near, query, limit) =>
+  rankPlaces(lists.filter(Boolean).flat(), near, query).slice(0, limit)
+
+// En dessous, le meilleur résultat ne ressemble pas assez à ce qui a été tapé
+// pour qu'on s'en contente : un mot entier de travers, ou un nom qui déborde
+// largement. Au-dessus, poser deux questions de plus ne changerait que l'ordre.
+const GOOD_ENOUGH = 0.9
+
+// Et un lieu à l'autre bout du monde ne clôt pas la question, même s'il porte
+// exactement ce qu'on a tapé : « tour eifel » répondait une école de Bingerville
+// — qui s'appelle bel et bien ainsi, faute comprise — à quatre mille huit cents
+// kilomètres, pendant qu'un « Tour Eiffel » dort à trois kilomètres d'ici. On
+// cherche un départ de course, pas une destination de voyage.
+const FAR_M = 1_000_000
+
+function good(results, query) {
+  const best = results[0]
+  if (!best || similarity(query, best) < GOOD_ENOUGH) return false
+  return best.distance_m == null || best.distance_m <= FAR_M
 }
 
 /** Rend `null` plutôt que d'échouer — sauf si la frappe a continué. */
@@ -225,7 +372,7 @@ const MAPBOX_KINDS = {
   mountain: 'Sommet',
 }
 
-async function nominatim(text, { limit, near, signal }) {
+async function nominatim(text, { limit, near, signal, fetchImpl = fetch }) {
   const params = { q: text.slice(0, 120), format: 'jsonv2', limit: String(limit), addressdetails: '1' }
   // Une préférence, pas une frontière : `bounded` à 0 laisse passer Paris
   // quand on cherche Paris depuis Colmar.
@@ -233,7 +380,7 @@ async function nominatim(text, { limit, near, signal }) {
     params.viewbox = [near.lon - 0.5, near.lat + 0.3, near.lon + 0.5, near.lat - 0.3].map((v) => v.toFixed(4)).join(',')
     params.bounded = '0'
   }
-  const raw = await throttled(NOMINATIM_URL, params, signal)
+  const raw = await throttled(NOMINATIM_URL, params, signal, fetchImpl)
   const places = raw
     .filter((item) => item.lat && item.lon)
     .map((item) => ({
@@ -294,34 +441,70 @@ export function fromPhoton(feature) {
 }
 
 /**
- * Le classement final.
+ * L'éloignement, en douceur : de 1 sur place à 0,82 à l'autre bout du monde.
  *
- * L'ordre de Photon mêle pertinence et proximité ; il est gardé, à une
- * exception près : **entre lieux du même nom et du même genre**, le plus
- * proche passe devant. Quand on cherche une enseigne, c'est celle d'à côté
- * qu'on veut — quelle que soit la façon dont le géocodeur a départagé. Le
- * nom seul ne suffirait pas : « Paris » la ville et « Paris » le coiffeur de
- * la rue d'à côté ne se comparent pas.
+ * Un seuil aurait tranché au mauvais endroit — « la boulangerie à 9 km bat
+ * celle à 11 km » est vrai, « le Stade de France à 375 km perd contre le stade
+ * de l'Ill à 20 km » ne l'est pas. En multipliant la ressemblance par ce
+ * facteur, la distance ne départage que ce qui se ressemble déjà : il faut à
+ * peu près quatre cents kilomètres pour rattraper un nom qui colle un peu mieux.
+ */
+const nearness = (metres) => 1 - 0.18 * (1 - Math.exp(-metres / 600_000))
+
+// Une ville ou un village passe devant le commerce qui en porte le nom : c'est
+// le lieu qu'on cherchait dans neuf cas sur dix. Le bonus vaut environ cinq
+// cents kilomètres — au-delà, le commerce d'à côté repasse devant, et c'est
+// juste : on ne part pas courir à l'autre bout du monde.
+const PLACE_BONUS = 1.12
+
+/**
+ * Le classement final : ce qui ressemble le plus, puis ce qui est le plus près.
+ *
+ * Les listes arrivent de trois questions différentes et leurs ordres ne se
+ * comparent pas ; c'est ici qu'on décide. Un seul nombre, et pas de tranches :
+ * la ressemblance avec ce qui a été tapé, amortie par l'éloignement, majorée
+ * pour une ville. Le Stade de France passe devant le stade de l'Ill, « Paris »
+ * la capitale devant « Paris » le coiffeur — mais le Burger King de Cernay
+ * reste devant celui de Mulhouse.
+ *
+ * Sans `query`, l'ordre reçu est gardé — seules la distance, à nom et genre
+ * égaux, et la fusion des doublons s'appliquent.
  *
  * Et les doublons partent : même nom, à moins de 150 m.
  */
-export function rankPlaces(places, near) {
-  const withDistance = places.map((p) => ({ ...p, distance_m: near ? metres(near, p) : null }))
+export function rankPlaces(places, near, query = null) {
+  const scored = places.map((place, index) => ({
+    ...place,
+    distance_m: near ? metres(near, place) : null,
+    index,
+    match: query ? similarity(query, place) : 0,
+  }))
   const groups = new Map()
-  for (const place of withDistance) {
+  for (const place of scored) {
     const key = place.group ?? `${fold(place.short)}|`
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(place)
   }
-  const out = []
+  const kept = []
   for (const members of groups.values()) {
     if (near) members.sort((a, b) => a.distance_m - b.distance_m)
     for (const place of members) {
-      const twin = out.some((kept) => fold(kept.short) === fold(place.short) && metres(kept, place) < SAME_PLACE_M)
-      if (!twin) out.push(place)
+      const twin = kept.some((other) => fold(other.short) === fold(place.short) && metres(other, place) < SAME_PLACE_M)
+      if (!twin) kept.push(place)
     }
   }
-  return out.map(({ group, ...place }) => place)
+  if (query) {
+    for (const place of kept) {
+      place.score =
+        place.match *
+        (place.distance_m == null ? 1 : nearness(place.distance_m)) *
+        (place.group?.endsWith('|lieu') ? PLACE_BONUS : 1)
+    }
+    // À égalité parfaite — deux fois le même lieu, vu par deux sources —,
+    // l'ordre d'arrivée tranche : il est stable d'une frappe à l'autre.
+    kept.sort((a, b) => b.score - a.score || a.index - b.index)
+  }
+  return kept.map(({ group, index, match, score, ...place }) => place)
 }
 
 // Le genre d'un lieu, en mots de tous les jours. Ce qui manque ici reste sans

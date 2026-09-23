@@ -195,8 +195,9 @@ function SearchSettings({ params, onProfile }) {
           onChange={(time_of_day) => onProfile({ time_of_day })}
         />
         <p className="field__hint">
-          La nuit, les rues éclairées et passantes passent devant les chemins isolés.
-          « Auto » regarde l'heure qu'il est au moment du calcul.
+          La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
+          quand ils raccourcissent. « Auto » compare l'heure du calcul au coucher du
+          soleil, calculé pour le point de départ et pour aujourd'hui.
         </p>
       </div>
 

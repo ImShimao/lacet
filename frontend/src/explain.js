@@ -102,27 +102,6 @@ const safety = (sport) => {
   }
 }
 
-const MOMENT = {
-  title: 'Moment de la sortie',
-  items: [
-    {
-      icon: 'compass',
-      label: 'Auto',
-      text: "Jour ou nuit selon l'heure du coucher du soleil au point de départ, calculée pour aujourd'hui.",
-    },
-    {
-      icon: 'sun',
-      label: 'Jour',
-      text: 'Tous les chemins comptent, éclairés ou non.',
-    },
-    {
-      icon: 'moon',
-      label: 'Nuit',
-      text: 'Priorité aux rues éclairées et fréquentées. Les chemins isolés et sans éclairage sont évités, même quand ils raccourcissent.',
-    },
-  ],
-}
-
 const SPORT = {
   title: 'Activité',
   items: [
@@ -143,5 +122,5 @@ const SPORT = {
 export function explain(topic, sport = 'run') {
   if (topic === 'terrain') return sport === 'bike' ? TERRAIN_BIKE : TERRAIN_RUN
   if (topic === 'safety') return safety(sport)
-  return { relief: RELIEF, moment: MOMENT, sport: SPORT }[topic] ?? null
+  return { relief: RELIEF, sport: SPORT }[topic] ?? null
 }

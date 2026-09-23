@@ -243,11 +243,12 @@ function OfflineControl({ route, mapStyle }) {
 /**
  * Bilan des sorties enregistrées.
  *
- * Les dépenses en énergie et le nombre de pas sont des **estimations**, et le
- * disent. Aucune app n'a accès à autre chose : sans capteur cardiaque ni
- * accéléromètre, on ne peut que multiplier une distance par un coefficient et
- * une masse. Les afficher comme des mesures serait un mensonge confortable ;
- * les cacher priverait d'un repère que tout le monde utilise pour se situer.
+ * La dépense en énergie est une **estimation**, et le dit. Sans capteur
+ * cardiaque, on ne peut que multiplier une distance par un coefficient et une
+ * masse : l'afficher comme une mesure serait un mensonge confortable, la cacher
+ * priverait d'un repère que tout le monde utilise pour se situer. Le nombre de
+ * pas, lui, est parti : il valait la distance multipliée par une constante,
+ * c'est-à-dire la même information présentée comme une seconde.
  */
 function Totals({ history, profile }) {
   const sums = history.reduce(
