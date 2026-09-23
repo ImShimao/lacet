@@ -190,8 +190,11 @@ export default function SearchBar({ onPick, near = null }) {
             <p className="search__empty">
               {failed
                 ? // Tout se calcule sur l'appareil, sauf ceci : trouver un lieu
-                  // par son nom demande un annuaire, et il est en ligne.
-                  'La recherche de lieux n’a pas répondu. Sans réseau, place le départ à la main sur la carte.'
+                  // par son nom demande un annuaire, et il est en ligne. Les
+                  // départs déjà choisis, eux, sont là — d'où le rappel.
+                  `La recherche de lieux n’a pas répondu.${
+                    recents.length ? ' Vide le champ pour retrouver tes derniers départs, ou place' : ' Sans réseau, place'
+                  } le départ à la main sur la carte.`
                 : `Aucun lieu trouvé pour « ${answered} ». Essaie le nom de la commune, ou place le départ à la main sur la carte.`}
             </p>
           )}
