@@ -229,12 +229,23 @@ export default function Explore({
 
       {detail && (
         <>
-          <SafetyPanel
-            safety={selected.safety}
-            surfaces={selected.surfaces}
-            distance={selected.distance_m}
-            sport={params.sport}
-          />
+          {selected.safety ? (
+            <SafetyPanel
+              safety={selected.safety}
+              surfaces={selected.surfaces}
+              distance={selected.distance_m}
+              sport={params.sport}
+            />
+          ) : (
+            // Un tracé de secours : le détail de la note n'existe pas, et un
+            // panneau vide laisserait croire à une évaluation réussie.
+            <div className="notice">
+              Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de
+              ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni
+              traversées. Reste attentif, et relance la recherche plus tard pour une vraie
+              note.
+            </div>
+          )}
           {rejected?.length > 0 && <RejectedList rejected={rejected} />}
           <p className="disclaimer">
             Les itinéraires privilégient les voies protégées d'après OpenStreetMap. Les
@@ -457,7 +468,15 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail }) {
                 <span className="rcard__dir">
                   {r.laps > 1 ? `${km(r.lap_distance_m, 1)} km × ${r.laps}` : r.direction}
                 </span>
-                <span className={`grade grade--${r.safety.grade}`}>{r.safety.grade}</span>
+                {/* Sans analyse — un tracé de secours —, pas de note : un tiret
+                    dit « on ne sait pas », là où un « A » mentirait. */}
+                {r.safety ? (
+                  <span className={`grade grade--${r.safety.grade}`}>{r.safety.grade}</span>
+                ) : (
+                  <span className="grade grade--unknown" title="Sécurité non évaluée">
+                    —
+                  </span>
+                )}
                 {on && (
                   <span className="rcard__more">
                     Détails
@@ -477,7 +496,15 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail }) {
                   D+ <b>{r.ascent_m === null ? '—' : `${Math.round(r.ascent_m)} m`}</b>
                 </span>
                 <span>
-                  <b>{Math.round(r.safety.protected_share * 100)} %</b> protégé
+                  {r.safety ? (
+                    <>
+                      <b>{Math.round(r.safety.protected_share * 100)} %</b> protégé
+                    </>
+                  ) : (
+                    <>
+                      <b>—</b> non évalué
+                    </>
+                  )}
                 </span>
               </span>
             </button>

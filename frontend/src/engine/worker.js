@@ -23,7 +23,8 @@ import { haversineM } from './geo'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
 import { currentWind } from './environment'
-import { graphRequest, planDetour, planLoops } from './service'
+import { graphRequest, normalizeRequest, planDetour, planLoops } from './service'
+import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
 // extrait parisien compte 352 000 nœuds et occupe 260 Mo. Au-delà d'une grande
@@ -142,6 +143,18 @@ self.onmessage = async ({ data }) => {
   const progress = (stage, fraction) => self.postMessage({ id, type: 'progress', stage, fraction })
 
   if (type === 'plan') {
+    // Le filet : quand les rues ne sont pas là et qu'aucun miroir ne répond, un
+    // calculateur public rend un tracé plutôt que rien. Annoncé pour ce qu'il
+    // est — voir `remote.js`.
+    const secours = async () => {
+      progress('routing', 0)
+      try {
+        return await planRemote(normalizeRequest(payload))
+      } catch {
+        return null
+      }
+    }
+
     try {
       lastLoad = { fetch: 0, graph: 0 }
       const result = await planLoops(payload, {
@@ -157,8 +170,24 @@ self.onmessage = async ({ data }) => {
       }
       if (result?.meta && lastPartial) result.meta.partial = true
       if (result?.meta && lastSources) result.meta.sources = lastSources
+
+      // Le moteur a tourné mais n'a rien trouvé : le réseau du coin est peut-être
+      // trop maigre dans ce qu'on a pu en charger. On essaie le secours avant de
+      // rendre un écran vide.
+      if (!result?.routes?.length) {
+        const replacement = await secours()
+        if (replacement?.routes?.length) {
+          self.postMessage({ id, type: 'result', result: replacement })
+          return
+        }
+      }
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
+      const replacement = await secours()
+      if (replacement?.routes?.length) {
+        self.postMessage({ id, type: 'result', result: replacement })
+        return
+      }
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
     }
     return

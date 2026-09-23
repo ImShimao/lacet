@@ -17,11 +17,12 @@ const SURFACE_COLORS = {
   trail: '#C58B4A',
   unknown: '#6B747D',
 }
-const LEVEL_COLORS = { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45' }
+const LEVEL_COLORS = { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', unknown: '#9B7BF0' }
 const LEVEL_LABELS = {
   safe: 'voie protégée',
   caution: 'vigilance',
   risk: 'exposé au trafic',
+  unknown: 'non évalué',
 }
 
 const W = 660

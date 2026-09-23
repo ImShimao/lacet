@@ -610,6 +610,7 @@ const colorExpression = (c) => [
   'safe', c.safe,
   'caution', c.caution,
   'risk', c.risk,
+  'unknown', c.unknown,
   c.safe,
 ]
 

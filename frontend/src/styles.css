@@ -500,6 +500,14 @@ input:focus-visible {
   border-color: rgba(255, 106, 69, 0.28);
 }
 
+/* Pas de note du tout : un tracé de secours, que Lacet n'a pas pu juger. En
+   violet, la couleur de l'app — ni encouragement ni avertissement. */
+.grade--unknown {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

@@ -345,7 +345,10 @@ export function offlineStyleFor(key) {
 
 // Couleurs du tracé selon le niveau de risque. Le jeu « light » est plus
 // saturé : sur un fond clair, un vert pâle disparaît.
+// `unknown` : un tracé venu d'un calculateur public, que Lacet n'a pas pu
+// juger. Ni vert ni rouge — les trois autres couleurs sont un avis, et il n'y
+// en a pas ici. Le violet de l'app dit « c'est un tracé », rien de plus.
 export const TRACE_COLORS = {
-  dark: { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', halo: '#0A0910' },
-  light: { safe: '#0F8A2E', caution: '#B37400', risk: '#C42D0B', halo: '#FFFFFF' },
+  dark: { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', unknown: '#9B7BF0', halo: '#0A0910' },
+  light: { safe: '#0F8A2E', caution: '#B37400', risk: '#C42D0B', unknown: '#6D4FD0', halo: '#FFFFFF' },
 }

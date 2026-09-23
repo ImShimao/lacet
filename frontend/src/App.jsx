@@ -612,7 +612,9 @@ export default function App() {
           ? `${result.routes.length} itinéraire${result.routes.length > 1 ? 's' : ''} ` +
             `proposé${result.routes.length > 1 ? 's' : ''}. ` +
             `Le premier : ${result.routes[0].name}, ${km(result.routes[0].distance_m, 1)} ` +
-            `kilomètres, note ${result.routes[0].safety.grade}.`
+            (result.routes[0].safety
+              ? `kilomètres, note ${result.routes[0].safety.grade}.`
+              : 'kilomètres, sécurité non évaluée.')
           : 'Aucun itinéraire ne convient depuis ce point.'
         : ''  
 
