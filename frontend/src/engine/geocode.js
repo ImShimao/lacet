@@ -25,6 +25,9 @@
 // **Et les surnoms.** Personne ne tape « McDonald's » : on tape « macdo ». Aucun
 // géocodeur ne le devine ; une petite table les traduit avant d'interroger.
 //
+// **Deux nombres collés sont un point**, pas une recherche : ils ne partent pas
+// sur le réseau.
+//
 // **Un second tour, quand le premier ne ressemble à rien.** La question posée
 // d'abord est « près d'ici » : neuf recherches sur dix visent le coin, et une
 // seule requête suffit. Mais quand rien de ce qui revient ne ressemble à ce qui
@@ -182,6 +185,56 @@ export function shorten(query) {
   return shortened === query.trim() ? null : shortened
 }
 
+/**
+ * Deux nombres collés dans le champ : un point, pas une recherche.
+ *
+ * « 46.2578, 7.3856 » — c'est ce qu'on reçoit d'un ami, d'une capture d'écran,
+ * d'une trace GPX ouverte ailleurs. Aucun géocodeur n'en fait rien : Photon
+ * répondait « FUEL MAXX 46 ». On les reconnaît donc avant de partir sur le
+ * réseau, dans l'ordre des cartes — latitude d'abord —, virgule décimale
+ * comprise quand le séparateur lève l'ambiguïté (« 46,2578 ; 7,3856 »).
+ *
+ * Rend `null` dès que ce n'est pas exactement ça : mieux vaut chercher un nom
+ * que poser un départ au milieu de nulle part.
+ */
+export function asCoordinates(text) {
+  const parts = separate(text.trim())
+  if (!parts) return null
+  const [lat, lon] = parts.map((part) => Number(part.replace(',', '.')))
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null
+  // Deux entiers, ce n'est pas une position : c'est un numéro de rue, une année,
+  // un code postal. On exige au moins une décimale quelque part.
+  if (!/[.,]/.test(parts[0]) && !/[.,]/.test(parts[1])) return null
+  return {
+    // Au dix-millième de degré près, soit une dizaine de mètres : au-delà, les
+    // zéros de `toFixed` donnaient « 46,25780 », qui se lit mal et promet une
+    // précision que personne n'a tapée.
+    short: `${degré(lat)} · ${degré(lon)}`,
+    label: 'coordonnées',
+    kind: 'Point',
+    lat,
+    lon,
+    distance_m: null,
+  }
+}
+
+const degré = (v) => String(Number(v.toFixed(5))).replace('.', ',')
+
+/** Les deux nombres, sans confondre la virgule décimale et le séparateur. */
+function separate(text) {
+  const nombre = /^-?\d{1,3}(?:[.,]\d+)?$/
+  // « 46,2578 ; 7,3856 » ou « 46.2578 ; 7.3856 » : le point-virgule tranche.
+  for (const sep of [';', /\s+/]) {
+    const parts = text.split(sep).map((part) => part.trim()).filter(Boolean)
+    if (parts.length === 2 && parts.every((part) => nombre.test(part))) return parts
+  }
+  // « 46.2578, 7.3856 » : la virgule sépare, donc le point décime.
+  const parts = text.split(',').map((part) => part.trim())
+  if (parts.length === 2 && parts.every((part) => /^-?\d{1,3}(?:\.\d+)?$/.test(part))) return parts
+  return null
+}
+
 /** Une requête par seconde au plus vers Nominatim, tous appels confondus. */
 function throttled(url, params, signal, fetchImpl = fetch) {
   const run = chain.then(async () => {
@@ -207,6 +260,8 @@ function throttled(url, params, signal, fetchImpl = fetch) {
 export async function search(query, { limit = 7, near = null, signal, fetchImpl = fetch, token = MAPBOX_TOKEN } = {}) {
   const text = query.trim()
   if (text.length < 2) return []
+  const point = asCoordinates(text)
+  if (point) return [point]
   // La position entre dans la clé, arrondie au kilomètre : la même recherche
   // faite ailleurs ne rend pas les mêmes « plus proches ».
   const key = `${fold(text)}|${near ? `${near.lat.toFixed(2)},${near.lon.toFixed(2)}` : ''}`

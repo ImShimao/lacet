@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { expandNicknames, fromMapbox, fromPhoton, rankPlaces, search, shorten, similarity } from './geocode'
+import {
+  asCoordinates,
+  expandNicknames,
+  fromMapbox,
+  fromPhoton,
+  rankPlaces,
+  search,
+  shorten,
+  similarity,
+} from './geocode'
 
 /**
  * Chercher un lieu comme on le dit : « macdo guebwiller », « one fitness ».
@@ -32,6 +41,35 @@ describe('les surnoms', () => {
 
   it('laisse une saisie ordinaire telle quelle, accents compris', () => {
     expect(expandNicknames('12 rue de la  République')).toBe('12 rue de la République')
+  })
+})
+
+describe('des coordonnées collées', () => {
+  it('reconnaît les écritures courantes, latitude d’abord', () => {
+    for (const texte of ['46.2578, 7.3856', '46.2578 7.3856', '46,2578 ; 7,3856', '  46.2578,7.3856  ']) {
+      const point = asCoordinates(texte)
+      expect(point.lat).toBeCloseTo(46.2578, 4)
+      expect(point.lon).toBeCloseTo(7.3856, 4)
+    }
+  })
+
+  it('ne pose pas un départ au hasard sur ce qui n’en est pas', () => {
+    // Un numéro de rue, un code postal, une année : ce sont des recherches.
+    expect(asCoordinates('12 rue de la gare')).toBeNull()
+    expect(asCoordinates('68500')).toBeNull()
+    expect(asCoordinates('12 14')).toBeNull()
+    // Hors du monde.
+    expect(asCoordinates('146.25, 7.38')).toBeNull()
+    expect(asCoordinates('46.25, 207.38')).toBeNull()
+  })
+
+  it('n’interroge personne : le point est déjà là', async () => {
+    const jamais = async () => {
+      throw new Error('aucune requête ne doit partir')
+    }
+    const results = await search('46.2578, 7.3856', { fetchImpl: jamais })
+    expect(results).toHaveLength(1)
+    expect(results[0].kind).toBe('Point')
   })
 })
 
