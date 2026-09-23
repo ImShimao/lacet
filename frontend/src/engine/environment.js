@@ -2,8 +2,8 @@
 //
 // Les calculs sont fidèles aux modules Python. Les appels réseau, eux, partent
 // désormais du téléphone : même services, mêmes paramètres, mêmes précautions
-// (échec silencieux pour le vent, repli IGN → Valhalla pour l'altitude,
-// une requête par seconde vers OpenTopoData), et le cache vit dans IndexedDB.
+// (échec silencieux pour le vent, repli IGN → Valhalla pour l'altitude, un
+// envoi à la fois vers Valhalla), et le cache vit dans IndexedDB.
 
 import { store } from './store'
 import { degrees, pyFixed, pyHypot, pymod, pyRound, pyRoundInt, pySum, radians } from './py'
@@ -198,8 +198,8 @@ let heightQueue = Promise.resolve()
  * L'IGN couvre la France et répond -99999 partout ailleurs. Prendre ces
  * -99999 pour le niveau de la mer rendait **plate toute boucle hors de
  * France** : cinq itinéraires en Valais, « D+ 0 m » sur les cinq. Pire, la
- * réponse passait pour valide, et OpenTopoData — qui, lui, couvre le monde —
- * n'était jamais interrogé.
+ * réponse passait pour valide, et le fournisseur suivant — celui qui couvre le
+ * monde — n'était jamais interrogé.
  */
 const missing = (z) => z === null || z === undefined || z === -99999 || z === -32768
 
@@ -263,9 +263,8 @@ const roundKey = (c) => `${pyRound(c[0], ROUND)},${pyRound(c[1], ROUND)}`
  *
  * Le second ne remplace pas le premier : il ne reçoit que les points restés
  * sans réponse. Une boucle à cheval sur la frontière garde ainsi le mètre de
- * l'IGN côté français et prend les vingt-cinq mètres d'OpenTopoData côté
- * suisse — et OpenTopoData, qui n'accepte qu'une requête par seconde, n'a que
- * les points manquants à traiter au lieu de tous.
+ * l'IGN côté français et prend Valhalla côté suisse, au lieu de tout redemander
+ * au second et de perdre la précision du premier.
  *
  * Rend `null` si personne n'a rien su dire, et une liste à trous sinon.
  */

@@ -54,6 +54,10 @@ export default function SearchBar({ onPick, near = null }) {
     const timer = setTimeout(async () => {
       controller.current?.abort()
       controller.current = new AbortController()
+      // Cette requête-ci, pour la distinguer de celles qui la remplaceront : la
+      // frappe qui continue annule la précédente, dont la fin éteignait le
+      // témoin d'activité alors que la nouvelle cherchait encore.
+      const mine = controller.current
       const asked = query.trim()
       try {
         setResults(await searchPlaces(query, controller.current.signal, nearRef.current))
@@ -70,7 +74,7 @@ export default function SearchBar({ onPick, near = null }) {
         setFailed(true)
         setOpen(true)
       } finally {
-        setSearching(false)
+        if (controller.current === mine) setSearching(false)
       }
     }, 350)
     return () => clearTimeout(timer)
