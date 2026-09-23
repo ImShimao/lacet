@@ -841,12 +841,20 @@ export default function App() {
           {!running && tab !== 'explore' && (
             <h2 className="side__title">{tab === 'routes' ? 'Mes parcours' : 'Mon compte'}</h2>
           )}
-          <button className="sportpill" onClick={() => setFiltersOpen(true)}>
-            <Icon name={sport?.icon} size={19} />
-            <b>{sport?.label}</b>
-            <span className="sportpill__spec">{summarise(params)}</span>
-            <Icon name="sliders" size={17} className="sportpill__gear" />
-          </button>
+          {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
+              une fois les boucles affichées — le panneau ne montre plus alors
+              que le favori, l'export, la regénération et « Démarrer ». Avant la
+              recherche, le bouton « Filtres » est juste là, sous les yeux, et
+              deux entrées pour le même réglage encombraient le haut de l'écran
+              pour rien. Elle revient donc avec les propositions. */}
+          {tab === 'explore' && result && (
+            <button className="sportpill" onClick={() => setFiltersOpen(true)}>
+              <Icon name={sport?.icon} size={19} />
+              <b>{sport?.label}</b>
+              <span className="sportpill__spec">{summarise(params)}</span>
+              <Icon name="sliders" size={17} className="sportpill__gear" />
+            </button>
+          )}
         </header>
         )}
 
