@@ -2,7 +2,7 @@
 //
 // Les calculs sont fidèles aux modules Python. Les appels réseau, eux, partent
 // désormais du téléphone : même services, mêmes paramètres, mêmes précautions
-// (échec silencieux pour le vent, repli IGN → OpenTopoData pour l'altitude,
+// (échec silencieux pour le vent, repli IGN → Valhalla pour l'altitude,
 // une requête par seconde vers OpenTopoData), et le cache vit dans IndexedDB.
 
 import { store } from './store'
@@ -132,7 +132,24 @@ export function tailwindFinish(geometry, wind) {
 // === Altitude =================================================================
 
 const IGN_URL = 'https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json'
-const OPENTOPO_URL = 'https://api.opentopodata.org/v1/eu_dem25m,srtm30m'
+/**
+ * Le relief hors de France, vu depuis un navigateur.
+ *
+ * L'app interrogeait OpenTopoData. Deux choses l'en empêchaient, et aucune ne
+ * se voyait : le jeu de données était nommé « eu_dem25m » au lieu de
+ * « eudem25m » (HTTP 400, avalé par le repli), et **ce service n'envoie aucun
+ * en-tête CORS** — un navigateur ne peut pas l'appeler, quoi qu'on fasse. Le
+ * repli mondial n'a donc jamais rien rendu dans l'app : hors de France, l'IGN
+ * répondait -99999, ces -99999 passaient pour le niveau de la mer, et toutes
+ * les boucles d'un séjour à l'étranger s'affichaient « D+ 0 m ».
+ *
+ * Valhalla, lui, répond aux navigateurs — c'est déjà le calculateur de secours
+ * pour les itinéraires — et accepte cinq cents points par envoi : mesuré à
+ * 150 ms là où OpenTopoData, limité à une requête par seconde et cent points,
+ * aurait demandé cinq secondes.
+ */
+const VALHALLA_HEIGHT_URL = 'https://valhalla1.openstreetmap.de/height'
+const VALHALLA_BATCH = 500
 const BATCH = 100
 // L'IGN, lui, préfère un gros envoi à plusieurs petits. Mesuré sur mille points :
 // un seul POST, moins d'une seconde à deux ; dix GET de cent en parallèle, plus
@@ -151,13 +168,45 @@ const ASCENT_THRESHOLD_M = 2
 
 const elevationStore = store('elevation')
 
-let opentopoQueue = Promise.resolve()
+// Les altitudes gardées avant la correction des points sans donnée valent zéro
+// mètre là où le fournisseur ne savait pas. Un cache empoisonné : sans ce
+// ménage, l'app continuerait d'annoncer « D+ 0 m » sur toutes les boucles d'un
+// séjour à l'étranger, sans jamais redemander. On le vide une fois, et la
+// marque reste pour ne pas recommencer à chaque recherche.
+const FORMAT_KEY = 'meta:format'
+const FORMAT = 2
+let purge = null
 
+function purgeLegacy() {
+  if (!purge) {
+    purge = (async () => {
+      if ((await elevationStore.get(FORMAT_KEY)) === FORMAT) return
+      await elevationStore.clear()
+      await elevationStore.set(FORMAT_KEY, FORMAT)
+    })()
+  }
+  return purge
+}
+
+// Un envoi à la fois : ce serveur est public, gratuit, et sert déjà les
+// itinéraires de secours. Rien ne presse — cinq cents points passent d'un coup.
+let heightQueue = Promise.resolve()
+
+/**
+ * Un point sans donnée — pas un point à zéro mètre.
+ *
+ * L'IGN couvre la France et répond -99999 partout ailleurs. Prendre ces
+ * -99999 pour le niveau de la mer rendait **plate toute boucle hors de
+ * France** : cinq itinéraires en Valais, « D+ 0 m » sur les cinq. Pire, la
+ * réponse passait pour valide, et OpenTopoData — qui, lui, couvre le monde —
+ * n'était jamais interrogé.
+ */
 const missing = (z) => z === null || z === undefined || z === -99999 || z === -32768
 
 /** Altitudes de plusieurs tracés en une fois — `fetch_many`. */
-export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign', 'opentopodata'] } = {}) {
+export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign', 'valhalla'] } = {}) {
   if (!routes.length) return []
+  await purgeLegacy()
 
   const wanted = new Map()
   for (const coords of routes) {
@@ -186,6 +235,9 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
 
     const dirty = new Set()
     unknown.forEach((key, i) => {
+      // Un point que personne ne connaît n'est pas gardé : le mettre en cache
+      // interdirait de le redemander le jour où un fournisseur l'aura.
+      if (values[i] === null) return
       wanted.set(key, values[i])
       const [lon, lat] = coords[i]
       const tile = `${Math.floor(lon / ELEVATION_TILE)}_${Math.floor(lat / ELEVATION_TILE)}`
@@ -195,21 +247,54 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
     await Promise.all([...dirty].map((tile) => elevationStore.set(tile, tiles.get(tile))))
   }
 
-  return routes.map((coords) => (coords.length ? coords.map((c) => wanted.get(roundKey(c))) : null))
+  // Un tracé dont un seul point manque n'a pas de profil : mieux vaut « D+ — »
+  // qu'un dénivelé calculé sur des trous. Les autres tracés gardent le leur.
+  return routes.map((coords) => {
+    if (!coords.length) return null
+    const elevations = coords.map((c) => wanted.get(roundKey(c)))
+    return elevations.some((z) => z === null || z === undefined) ? null : elevations
+  })
 }
 
 const roundKey = (c) => `${pyRound(c[0], ROUND)},${pyRound(c[1], ROUND)}`
 
+/**
+ * Chaque fournisseur complète ce que le précédent n'a pas su dire.
+ *
+ * Le second ne remplace pas le premier : il ne reçoit que les points restés
+ * sans réponse. Une boucle à cheval sur la frontière garde ainsi le mètre de
+ * l'IGN côté français et prend les vingt-cinq mètres d'OpenTopoData côté
+ * suisse — et OpenTopoData, qui n'accepte qu'une requête par seconde, n'a que
+ * les points manquants à traiter au lieu de tous.
+ *
+ * Rend `null` si personne n'a rien su dire, et une liste à trous sinon.
+ */
 async function fetchWithFallback(coords, providers, fetchImpl) {
+  const values = new Array(coords.length).fill(null)
+  let todo = coords.map((_, i) => i)
+
   for (const provider of providers) {
+    if (!todo.length) break
+    let answer = null
     try {
-      const values = await fetchProvider(provider, coords, fetchImpl)
-      if (values && values.length === coords.length) return values
+      answer = await fetchProvider(
+        provider,
+        todo.map((i) => coords[i]),
+        fetchImpl,
+      )
     } catch {
-      /* fournisseur suivant */
+      continue /* fournisseur suivant */
     }
+    if (!answer || answer.length !== todo.length) continue
+    const rest = []
+    todo.forEach((index, k) => {
+      if (answer[k] === null || answer[k] === undefined) rest.push(index)
+      else values[index] = answer[k]
+    })
+    todo = rest
   }
-  return null
+
+  return todo.length === coords.length ? null : values
 }
 
 async function fetchProvider(provider, coords, fetchImpl) {
@@ -222,18 +307,14 @@ async function fetchProvider(provider, coords, fetchImpl) {
   }
 
   const batches = []
-  for (let i = 0; i < coords.length; i += BATCH) batches.push(coords.slice(i, i + BATCH))
+  for (let i = 0; i < coords.length; i += VALHALLA_BATCH) batches.push(coords.slice(i, i + VALHALLA_BATCH))
 
-  // OpenTopoData : une requête par seconde, tous appels confondus.
-  const run = opentopoQueue.then(async () => {
+  const run = heightQueue.then(async () => {
     const out = []
-    for (let i = 0; i < batches.length; i += 1) {
-      if (i) await new Promise((r) => setTimeout(r, 1050))
-      out.push(...(await opentopoBatch(batches[i], fetchImpl)))
-    }
+    for (const batch of batches) out.push(...(await valhallaHeights(batch, fetchImpl)))
     return out
   })
-  opentopoQueue = run.catch(() => undefined)
+  heightQueue = run.catch(() => undefined)
   return run
 }
 
@@ -250,7 +331,7 @@ const ignQuery = (batch) => ({
 function ignValues(data) {
   return (data.elevations ?? []).map((item) => {
     const z = item !== null && typeof item === 'object' ? item.z : item
-    return missing(z) ? 0 : Number(z)
+    return missing(z) ? null : Number(z)
   })
 }
 
@@ -287,12 +368,20 @@ async function ignBatch(batch, fetchImpl) {
   return ignValues(await response.json())
 }
 
-async function opentopoBatch(batch, fetchImpl) {
-  const locations = batch.map((c) => `${pyFixed(c[1], 6)},${pyFixed(c[0], 6)}`).join('|')
-  const response = await withTimeout(fetchImpl(`${OPENTOPO_URL}?locations=${encodeURIComponent(locations)}`), 20_000)
+async function valhallaHeights(batch, fetchImpl) {
+  const response = await withTimeout(
+    fetchImpl(VALHALLA_HEIGHT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shape: batch.map((c) => ({ lat: c[1], lon: c[0] })), range: false }),
+    }),
+    20_000,
+  )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const data = await response.json()
-  return (data.results ?? []).map((item) => (missing(item.elevation) ? 0 : Number(item.elevation)))
+  const heights = data.height ?? []
+  if (heights.length !== batch.length) throw new Error(`${heights.length} altitudes pour ${batch.length} points`)
+  return heights.map((z) => (missing(z) ? null : Number(z)))
 }
 
 /** D+ et D− avec seuil d'hystérésis — `ascent_descent`. */

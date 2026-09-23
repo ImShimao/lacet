@@ -4,7 +4,11 @@ Deux fournisseurs, tous deux gratuits et sans clé :
 
 * **IGN Géoplateforme** (RGE ALTI, 1 à 5 m) — France uniquement, de loin le plus précis.
 * **OpenTopoData** (EU-DEM 25 m puis SRTM 30 m) — couverture mondiale, limité à
-  1 requête par seconde.
+  1 requête par seconde. Utilisable ici parce qu'on l'appelle depuis un
+  serveur : **ce service n'envoie aucun en-tête CORS**, donc le moteur
+  embarqué, lui, ne peut pas s'en servir — il se replie sur le service
+  d'altitude de Valhalla (voir `environment.js`). C'est la seule divergence
+  assumée entre les deux moteurs.
 
 Point important : le D+ n'est **pas** la somme des variations positives. Un MNT
 est bruité, et ce bruit s'accumule à chaque point — une boucle plate ressort
@@ -37,9 +41,19 @@ log = logging.getLogger(__name__)
 
 IGN_URL = "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json"
 OPENTOPO_URL = "https://api.opentopodata.org/v1/{dataset}"
-OPENTOPO_DATASETS = "eu_dem25m,srtm30m"
+# Le nom exact des jeux de données, vérifié contre `/datasets` : « eudem25m »
+# et non « eu_dem25m ». Avec le tiret bas, le service répond « Dataset not in
+# config » — un HTTP 400 avalé par le repli, et le seul fournisseur mondial
+# était hors service sans que rien ne le dise.
+OPENTOPO_DATASETS = "eudem25m,srtm30m"
 
 BATCH = 100  # points par requête — limite d'OpenTopoData, et prudent pour IGN
+
+# Un point sans donnée — pas un point à zéro mètre. L'IGN couvre la France et
+# répond -99999 partout ailleurs ; prendre ces -99999 pour le niveau de la mer
+# rendait **plate toute boucle hors de France**, et faisait passer la réponse
+# pour valide, si bien qu'OpenTopoData — qui couvre le monde — n'était jamais
+# interrogé.
 _MISSING = {-99999.0, -32768.0, None}
 
 # OpenTopoData n'autorise qu'une requête par seconde, tous appelants confondus.
@@ -81,33 +95,66 @@ async def fetch_many(routes: list[list[Coord]]) -> list[list[float] | None]:
             # Aucun fournisseur n'a répondu. Avec une partie seulement des
             # points, le profil serait faux plutôt qu'absent : on préfère absent.
             return [None] * len(routes)
-        fresh = dict(zip(missing, values))
+        # Un point que personne ne connaît n'est pas gardé : le mettre en cache
+        # interdirait de le redemander le jour où un fournisseur l'aura.
+        fresh = {c: z for c, z in zip(missing, values) if z is not None}
         wanted.update(fresh)
         _cache.store(fresh)
 
-    return [[wanted[_round(c)] for c in coords] if coords else None for coords in routes]
+    # Un tracé dont un seul point manque n'a pas de profil : mieux vaut
+    # « D+ — » qu'un dénivelé calculé sur des trous. Les autres gardent le leur.
+    out: list[list[float] | None] = []
+    for coords in routes:
+        if not coords:
+            out.append(None)
+            continue
+        elevations = [wanted.get(_round(c)) for c in coords]
+        out.append(None if any(z is None for z in elevations) else elevations)
+    return out
 
 
-async def _fetch_with_fallback(coords: list[Coord]) -> list[float] | None:
+async def _fetch_with_fallback(coords: list[Coord]) -> list[float | None] | None:
+    """Chaque fournisseur complète ce que le précédent n'a pas su dire.
+
+    Le second ne remplace pas le premier : il ne reçoit que les points restés
+    sans réponse. Une boucle à cheval sur la frontière garde ainsi le mètre de
+    l'IGN côté français et prend les vingt-cinq mètres d'OpenTopoData côté
+    suisse — et OpenTopoData, limité à une requête par seconde, n'a que les
+    points manquants à traiter au lieu de tous.
+
+    Rend `None` si personne n'a rien su dire, une liste à trous sinon.
+    """
+    values: list[float | None] = [None] * len(coords)
+    todo = list(range(len(coords)))
+
     for provider in (settings.elevation_provider, settings.elevation_fallback):
-        if provider in {"none", ""}:
+        if not todo or provider in {"none", ""}:
             continue
         try:
-            values = await _fetch(provider, coords)
-            if values and len(values) == len(coords):
-                return values
+            answer = await _fetch(provider, [coords[i] for i in todo])
+        except Exception as exc:  # noqa: BLE001 — on tente le fournisseur suivant
+            log.warning("fournisseur d'altitude %s indisponible : %s", provider, exc)
+            continue
+        if not answer or len(answer) != len(todo):
             log.warning(
                 "%s a renvoyé %d valeurs pour %d points",
                 provider,
-                len(values or []),
-                len(coords),
+                len(answer or []),
+                len(todo),
             )
-        except Exception as exc:  # noqa: BLE001 — on tente le fournisseur suivant
-            log.warning("fournisseur d'altitude %s indisponible : %s", provider, exc)
-    return None
+            continue
+        rest = []
+        for k, index in enumerate(todo):
+            if answer[k] is None:
+                rest.append(index)
+            else:
+                values[index] = answer[k]
+        todo = rest
+
+    return None if len(todo) == len(coords) else values
 
 
-async def _fetch(provider: str, coords: list[Coord]) -> list[float]:
+async def _fetch(provider: str, coords: list[Coord]) -> list[float | None]:
     batches = [coords[i : i + BATCH] for i in range(0, len(coords), BATCH)]
     timeout = httpx.Timeout(settings.elevation_timeout_s, connect=10.0)
 
@@ -123,13 +170,13 @@ async def _fetch(provider: str, coords: list[Coord]) -> list[float]:
                         await asyncio.sleep(1.05)
                     results.append(await _opentopo_batch(client, batch))
 
-    flat: list[float] = []
+    flat: list[float | None] = []
     for chunk in results:
         flat.extend(chunk)
     return flat
 
 
-async def _ign_batch(client: httpx.AsyncClient, batch: list[Coord]) -> list[float]:
+async def _ign_batch(client: httpx.AsyncClient, batch: list[Coord]) -> list[float | None]:
     params = {
         "lon": "|".join(f"{c[0]:.6f}" for c in batch),
         "lat": "|".join(f"{c[1]:.6f}" for c in batch),
@@ -143,26 +190,32 @@ async def _ign_batch(client: httpx.AsyncClient, batch: list[Coord]) -> list[floa
     resp.raise_for_status()
     data = resp.json()
 
-    # `zonly=true` rend {"elevations": [z, z, ...]} ; sinon une liste d'objets.
-    raw = data.get("elevations", [])
-    out: list[float] = []
-    for item in raw:
+    return _ign_values(data)
+
+
+def _ign_values(data: dict) -> list[float | None]:
+    """`zonly=true` rend {"elevations": [z, z, …]} ; sinon une liste d'objets."""
+    out: list[float | None] = []
+    for item in data.get("elevations", []):
         z = item.get("z") if isinstance(item, dict) else item
-        out.append(0.0 if z in _MISSING else float(z))
+        out.append(None if z in _MISSING else float(z))
     return out
 
 
-async def _opentopo_batch(client: httpx.AsyncClient, batch: list[Coord]) -> list[float]:
+async def _opentopo_batch(client: httpx.AsyncClient, batch: list[Coord]) -> list[float | None]:
     locations = "|".join(f"{c[1]:.6f},{c[0]:.6f}" for c in batch)
     resp = await client.get(
         OPENTOPO_URL.format(dataset=OPENTOPO_DATASETS), params={"locations": locations}
     )
     resp.raise_for_status()
-    data = resp.json()
-    out: list[float] = []
+    return _opentopo_values(resp.json())
+
+
+def _opentopo_values(data: dict) -> list[float | None]:
+    out: list[float | None] = []
     for item in data.get("results", []):
         z = item.get("elevation")
-        out.append(0.0 if z in _MISSING else float(z))
+        out.append(None if z in _MISSING else float(z))
     return out
 
 
@@ -175,6 +228,11 @@ class ElevationCache:
 
     TILE = 0.05
     MAX_TILES_IN_MEMORY = 64
+    # Les altitudes gardées avant la correction des points sans donnée valent
+    # zéro mètre là où le fournisseur ne savait pas. Un cache empoisonné :
+    # sans ce ménage, le dénivelé resterait nul hors de France sans jamais être
+    # redemandé. Le numéro change quand ce qui est gardé change de sens.
+    FORMAT = 2
 
     def __init__(self, directory: Path) -> None:
         self._dir = directory
@@ -184,6 +242,20 @@ class ElevationCache:
         # dans les mêmes tuiles : sans verrou, deux sorties voisines se
         # marcheraient dessus au moment de l'écriture.
         self._lock = threading.Lock()
+        self._purge_legacy()
+
+    def _purge_legacy(self) -> None:
+        marque = self._dir / "format.json"
+        try:
+            if marque.exists() and json.loads(marque.read_text(encoding="utf-8")) == self.FORMAT:
+                return
+            if self._dir.exists():
+                for path in self._dir.glob("*.json"):
+                    path.unlink()
+            self._dir.mkdir(parents=True, exist_ok=True)
+            marque.write_text(json.dumps(self.FORMAT), encoding="utf-8")
+        except (OSError, json.JSONDecodeError) as exc:  # cache indisponible
+            log.warning("ménage du cache d'altitude impossible : %s", exc)
 
     def _tile(self, c: Coord) -> tuple[int, int]:
         return (math.floor(c[0] / self.TILE), math.floor(c[1] / self.TILE))

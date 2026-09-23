@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
-from app.elevation import ascent_descent, smooth
+from app.elevation import (
+    ElevationCache,
+    _fetch_with_fallback,
+    _ign_values,
+    _opentopo_values,
+    ascent_descent,
+    fetch_many,
+    smooth,
+)
 from app.geo import bearing_deg, haversine_m, point_in_ring, resample
 from app.solar import is_night
 
@@ -108,3 +118,57 @@ class TestSoleil:
         decembre = datetime(2026, 12, 21, 18, 0, tzinfo=timezone.utc)
         assert not is_night(48.85, 2.35, juin)
         assert is_night(48.85, 2.35, decembre)
+
+
+class TestCouverture:
+    """Quand un fournisseur ne couvre pas la région.
+
+    L'IGN couvre la France et répond -99999 ailleurs. Ces -99999 devenaient des
+    zéros : cinq boucles proposées en Valais annonçaient « D+ 0 m », et la
+    réponse passait pour valide, si bien qu'OpenTopoData — mondial — n'était
+    jamais interrogé.
+    """
+
+    @staticmethod
+    def _fournisseurs(monkeypatch, ign, opentopo):
+        async def faux(provider, coords):
+            return ign(coords) if provider == "ign" else opentopo(coords)
+
+        monkeypatch.setattr("app.elevation._fetch", faux)
+
+    def test_pas_de_donnee_n_est_pas_zero_metre(self):
+        # C'est ce -99999, pris pour le niveau de la mer, qui rendait plates
+        # toutes les boucles hors de France.
+        assert _ign_values({"elevations": [120.5, -99999.0, None]}) == [120.5, None, None]
+        assert _ign_values({"elevations": [{"z": -99999.0}, {"z": 88.0}]}) == [None, 88.0]
+        assert _opentopo_values({"results": [{"elevation": None}, {"elevation": 3.0}]}) == [None, 3.0]
+
+    def test_le_second_complete_le_premier(self, monkeypatch):
+        vus = []
+
+        def ign(coords):
+            # Hors de France : pas de donnée, pas zéro mètre.
+            return [c[0] * 100 if c[0] < 7.2 else None for c in coords]
+
+        def opentopo(coords):
+            vus.append(list(coords))
+            return [1000.0] * len(coords)
+
+        self._fournisseurs(monkeypatch, ign, opentopo)
+        coords = [(7.1, 47.5), (7.3, 47.5)]
+        values = asyncio.run(_fetch_with_fallback(coords))
+        assert values == [710.0, 1000.0]
+        # Le second n'a reçu que le point resté sans réponse.
+        assert vus == [[(7.3, 47.5)]]
+
+    def test_sans_profil_plutot_qu_un_faux(self, monkeypatch, tmp_path):
+        def ign(coords):
+            return [None] * len(coords)
+
+        def rien(coords):
+            return [None] * len(coords)
+
+        self._fournisseurs(monkeypatch, ign, rien)
+        monkeypatch.setattr("app.elevation._cache", ElevationCache(tmp_path))
+        routes = [[(7.5, 46.3), (7.51, 46.3)]]
+        assert asyncio.run(fetch_many(routes)) == [None]

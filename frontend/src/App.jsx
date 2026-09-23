@@ -18,6 +18,7 @@ import { load, save, slim } from './storage'
 import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
 import { clearEngineData, prefetchOnDevice } from './engine/client'
+import { haversineM } from './engine/geo'
 import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
 
@@ -230,7 +231,20 @@ export default function App() {
   // `recenter` distingue les deux gestes : choisir un lieu amène la carte
   // dessus, déplacer le repère la laisse où elle est.
   const applyStart = useCallback(async (point, label, recenter = false) => {
-    setStart(point)
+    setStart((previous) => {
+      // Les boucles proposées partent toutes du point précédent : dès qu'il
+      // bouge, elles ne répondent plus à la question posée. Elles restaient
+      // pourtant à l'écran — on choisissait Grimisuat et la carte montrait le
+      // Valais sous une carte intitulée « Boucle sud-ouest · avenue des
+      // Gobelins ». Dix mètres de tolérance pour le doigt qui replace le
+      // repère sans vraiment le déplacer.
+      if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
+        setResult(null)
+        setSelected(null)
+        setScrub(null)
+      }
+      return point
+    })
     setStartLabel(label ?? null)
     setPlacing(false)
     if (recenter) setFocus({ ...point, at: Date.now() })
