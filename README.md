@@ -86,9 +86,12 @@ n'importe quel navigateur et s'installe comme une app ; l'app iPhone est ce mêm
 site, emballé par Capacitor, avec ce qu'une page web ne peut pas faire : GPS et
 voix écran verrouillé, activité en direct, vibrations.
 
-**Deux versions, selon l'appareil.** Sur ordinateur on prépare — chercher,
-comparer, lire la sécurité, garder ses favoris, exporter un GPX. Sur téléphone,
-tout, y compris la sortie elle-même. La détection se force dans « Mon compte ».
+**Une seule version, partout.** Il y en a eu deux — « préparation » sur
+ordinateur, « complète » sur téléphone — avec un réglage pour forcer l'une ou
+l'autre quand la détection se trompait : un réglage de plus à comprendre, pour
+cacher des boutons que personne ne demandait à cacher. Démarrer une sortie,
+l'historique, le fond de carte hors ligne : tout est là sur tous les appareils,
+et c'est à la personne de décider ce qu'elle en fait.
 
 ```
 frontend/             React + MapLibre — l'app, et le moteur (src/engine/)
@@ -107,10 +110,12 @@ mêmes candidats arête par arête et la même réponse, à 1e-9 près. Ce qui a
 demandé de reproduire l'arithmétique de CPython jusqu'au modulo flottant et à
 l'arrondi au pair.
 
-Aucune clé d'API n'est nécessaire. Données © OpenStreetMap (Overpass), altitude
-IGN et OpenTopoData, vent Open-Meteo, fond de carte CARTO, recherche de lieux
-Photon (Komoot) et Nominatim — plus Mapbox pour les commerces, si un token est
-présent : OpenStreetMap ignore les enseignes ouvertes trop récemment.
+Aucune clé d'API n'est nécessaire. Données © OpenStreetMap (Overpass et les
+archives de `lacet-data`), altitude IGN puis Valhalla — OpenTopoData côté
+serveur, qui n'envoie pas d'en-têtes CORS —, itinéraire de secours Valhalla,
+vent Open-Meteo, fond de carte CARTO, recherche de lieux Photon (Komoot) et
+Nominatim — plus Mapbox pour les commerces, si un token est présent :
+OpenStreetMap ignore les enseignes ouvertes trop récemment.
 
 ## Le détail, section par section
 
@@ -1079,11 +1084,12 @@ tes parcours enregistrés restent accessibles dans Mes parcours »*, avec le
 bouton qui y mène. « Réessayer » n'y apparaît pas : cela ne servirait à rien.
 
 **Le suivi** cumule distance, temps, sorties et kilomètres des sept derniers
-jours. Les calories et le nombre de pas sont **estimés** à partir du gabarit, et
-le disent : sans capteur cardiaque ni accéléromètre, on ne peut que multiplier
-une distance par un coefficient. Les afficher comme des mesures serait un
-mensonge confortable ; les cacher priverait d'un repère que tout le monde
-utilise.
+jours. Les calories sont **estimées** à partir du poids, et le disent : sans
+capteur cardiaque, on ne peut que multiplier une distance par un coefficient et
+une masse. Les afficher comme des mesures serait un mensonge confortable ; les
+cacher priverait d'un repère que tout le monde utilise. Le nombre de pas, lui,
+a été retiré : il valait la distance multipliée par une longueur de foulée
+supposée — la même information, présentée comme une seconde.
 
 ---
 
