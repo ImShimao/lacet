@@ -14,7 +14,7 @@ import useGeolocation from './useGeolocation'
 import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
-import { load, save, slim } from './storage'
+import { load, recentPlaces, save, slim } from './storage'
 import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
 import { clearEngineData, prefetchOnDevice } from './engine/client'
@@ -252,7 +252,8 @@ export default function App() {
   }, [])
 
   // Au premier chargement on tente la position ; le refus n'est pas un échec,
-  // c'est un cas normal — on retombe sur Paris et la carte reste utilisable.
+  // c'est un cas normal — on retombe sur le dernier départ choisi, et la carte
+  // reste utilisable.
   useEffect(() => {
     geo.locate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,7 +264,13 @@ export default function App() {
       applyStart({ lat: geo.position[1], lon: geo.position[0] }, undefined, true)
     }
     if ((geo.status === 'denied' || geo.status === 'error') && !start) {
-      applyStart(PARIS, 'Paris', true)
+      // Sans position, le dernier départ choisi vaut mieux que Paris : c'est
+      // presque toujours chez soi, ses rues sont déjà sur l'appareil, et c'est
+      // le seul repère dont on dispose. Paris ne reste que pour une première
+      // ouverture, quand il n'y a encore rien à se rappeler.
+      const dernier = recentPlaces()[0]
+      if (dernier) applyStart({ lat: dernier.lat, lon: dernier.lon }, dernier.label, true)
+      else applyStart(PARIS, 'Paris', true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.status, geo.position])
