@@ -27,3 +27,6 @@ frontend/public/region/
 # La source AltStore porte l’adresse du PC sur le réseau local : elle se
 # régénère (scripts/altstore_source.py) et n’a rien à faire dans le dépôt.
 source.json
+
+# Les copies versionnées servies à AltStore (voir scripts/altstore_source.py).
+Lacet-*.ipa

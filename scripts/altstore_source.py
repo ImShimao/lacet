@@ -111,6 +111,19 @@ def main() -> None:
     size = IPA.stat().st_size
     date = datetime.fromtimestamp(IPA.stat().st_mtime, timezone.utc).isoformat()
 
+    # **Une adresse par version.** Servie toujours sous le même nom, une IPA
+    # déjà téléchargée peut resservir — celle d'hier, alors que la source annonce
+    # celle d'aujourd'hui, et AltStore refuse : « the downloaded version does not
+    # match the version specified by the source ». Le nom porte donc la version,
+    # et les anciennes s'effacent.
+    copie = ROOT / f"Lacet-{version}.ipa"
+    if not copie.exists() or copie.stat().st_size != size:
+        copie.write_bytes(IPA.read_bytes())
+    for vieille in ROOT.glob("Lacet-*.ipa"):
+        if vieille != copie:
+            vieille.unlink()
+    download = f"{base}/{copie.name}"
+
     entry = {
         "name": "Lacet",
         "bundleIdentifier": plist.get("CFBundleIdentifier", "fr.lacet.app"),
@@ -126,7 +139,7 @@ def main() -> None:
         "buildVersion": build,
         "versionDate": date,
         "versionDescription": f"Compilation {build}.",
-        "downloadURL": f"{base}/Lacet.ipa",
+        "downloadURL": download,
         "size": size,
         # …AltStore 2 lit la liste, la plus récente d'abord.
         "versions": [
@@ -135,7 +148,7 @@ def main() -> None:
                 "buildVersion": build,
                 "date": date,
                 "localizedDescription": f"Compilation {build}.",
-                "downloadURL": f"{base}/Lacet.ipa",
+                "downloadURL": download,
                 "size": size,
                 "permissions": permissions,
             }
