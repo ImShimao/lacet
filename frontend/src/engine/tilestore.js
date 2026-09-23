@@ -134,9 +134,17 @@ async function evict(book, limit) {
   }
 }
 
-/** Ce que pèsent les rues gardées, pour l'écran « Mon compte ». */
+/**
+ * Ce que pèsent les rues gardées, pour l'écran « Mon compte ».
+ *
+ * Relu depuis le magasin, sans passer par la copie en mémoire : les tuiles
+ * s'écrivent dans le worker, qui a son propre exemplaire de ce module. L'écran,
+ * lui, a lu le journal en arrivant — souvent avant la première recherche. S'il
+ * s'en contentait, il annoncerait « 0 o » sur un cache de cinquante mégaoctets,
+ * et le dirait encore après dix sorties.
+ */
 export async function tileUsage() {
-  const book = await journal()
+  const book = (await tiles.get(USAGE_KEY)) ?? { total: 0, tiles: {} }
   return { bytes: Math.max(0, book.total), count: Object.keys(book.tiles).length, budget: await allowance() }
 }
 

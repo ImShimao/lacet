@@ -7,14 +7,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { SPORTS } from './FiltersSheet.jsx'
-import { surfaceLabel } from './format'
+import { COUNTS, MOMENTS, SPORTS, Segmented, Stepper, clamp, formatKm, round } from './FiltersSheet.jsx'
+import { pace, surfaceLabel } from './format'
 import { exportAll, importAll, load, save } from './storage'
-import { isNative, readModeSetting, saveTextFile, setModeSetting } from './platform'
+import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 
-export default function Account({ mode = 'full', params, geo, onClearData, onProfile }) {
-  const canRun = mode === 'full'
+export default function Account({ params, geo, onClearData, onProfile }) {
   const [confirm, setConfirm] = useState(false)
   const [contact, setContact] = useState(() => load().emergencyContact || '')
   // L'effacement vide aussi les cartes ; le compteur, lui, a lu le journal en
@@ -49,10 +48,13 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
         />
       </div>
 
-      {canRun && (
-        <>
-      <h4 className="section">Gabarit</h4>
-      <p className="muted small">Sert à estimer les calories et les pas. Rien n'est envoyé.</p>
+      <h4 className="section">Recherche</h4>
+      <SearchSettings params={params} onProfile={onProfile} />
+
+      <h4 className="section">Poids</h4>
+      <p className="muted small">
+        Sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
+      </p>
       <div className="rows">
         <NumberRow
           label="Poids"
@@ -61,14 +63,6 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
           min={30}
           max={200}
           onChange={(weight_kg) => onProfile({ weight_kg })}
-        />
-        <NumberRow
-          label="Taille"
-          unit="cm"
-          value={params.height_cm || 175}
-          min={120}
-          max={230}
-          onChange={(height_cm) => onProfile({ height_cm })}
         />
       </div>
 
@@ -95,14 +89,10 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
       />
 
       <h4 className="section">Cartes hors ligne</h4>
-      <OfflineStorage key={version} />
-        </>
-      )}
+      <OfflineStorage key={`cartes-${version}`} />
 
-      {/* Hors du bloc réservé au téléphone : les rues se gardent aussi sur
-          l'ordinateur, et c'est là qu'on se demande ce que l'app occupe. */}
       <h4 className="section">Rues gardées</h4>
-      <KeptStreets key={version} />
+      <KeptStreets key={`rues-${version}`} />
 
       <h4 className="section">Sauvegarde</h4>
       <BackupRows />
@@ -110,7 +100,6 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
       <h4 className="section">L'app</h4>
       <BuildStamp />
       <LastSearch />
-      <ModePicker mode={mode} />
       <p className="muted small">
         Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.
       </p>
@@ -146,12 +135,87 @@ export default function Account({ mode = 'full', params, geo, onClearData, onPro
 }
 
 /**
- * Ce que les cartes hors ligne occupent, et de quoi tout reprendre.
+ * Les réglages de recherche qu'on choisit une fois.
  *
- * Un chiffre plutôt qu'une promesse : ces fichiers sont les seuls de l'app à se
- * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
- * finit par être vidé par le navigateur — au pire moment, sans prévenir.
+ * Ils vivaient dans le panneau des filtres, au milieu de ce qu'on ajuste à
+ * chaque sortie — la distance, le terrain, le dénivelé. Une allure ou un nombre
+ * de propositions ne changent pas d'un jour à l'autre : ils encombraient le
+ * geste quotidien pour rien. Ici, ils s'appliquent tout de suite, sans bouton
+ * « Appliquer » : on vient les régler, pas les essayer.
  */
+function SearchSettings({ params, onProfile }) {
+  // Le vélo se pense en km/h, la course en min/km — mais un cycliste ne raisonne
+  // jamais en allure, alors que l'inverse arrive. D'où un choix d'unité offert à
+  // pied seulement. La règle est celle qu'applique la requête envoyée au moteur :
+  // à vélo, c'est la vitesse qui compte, quoi qu'affiche le réglage.
+  const isBike = params.sport === 'bike'
+  const speed = isBike || params.speedUnit === 'speed'
+  const secPerKm = params.pace_sec_per_km ?? 390
+  const kmh = params.speed_kmh ?? 20
+  return (
+    <div className="fields">
+      <div className="field">
+        <span className="label">{isBike ? 'Vitesse' : 'Allure'}</span>
+        {!isBike && (
+          <Segmented
+            options={[
+              { key: 'pace', label: 'min/km' },
+              { key: 'speed', label: 'km/h' },
+            ]}
+            value={speed ? 'speed' : 'pace'}
+            onChange={(speedUnit) => onProfile({ speedUnit })}
+          />
+        )}
+        {speed ? (
+          <Stepper
+            text={`${formatKm(kmh)} km/h`}
+            onStep={(d) => onProfile({ speed_kmh: round(clamp(kmh + d * 0.5, 5, 60), 0.5) })}
+            canDown={kmh > 5}
+            canUp={kmh < 60}
+          />
+        ) : (
+          <Stepper
+            text={`${pace(secPerKm)} /km`}
+            onStep={(d) => onProfile({ pace_sec_per_km: clamp(secPerKm + d * 5, 150, 1200) })}
+            canDown={secPerKm > 150}
+            canUp={secPerKm < 1200}
+          />
+        )}
+        <p className="field__hint">
+          Ne change pas le tracé : sert à annoncer la durée d'une boucle, et à convertir
+          une durée demandée en distance.
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="label">Moment</span>
+        <Segmented
+          options={MOMENTS}
+          value={params.time_of_day ?? 'auto'}
+          onChange={(time_of_day) => onProfile({ time_of_day })}
+        />
+        <p className="field__hint">
+          La nuit, les rues éclairées et passantes passent devant les chemins isolés.
+          « Auto » regarde l'heure qu'il est au moment du calcul.
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="label">Propositions</span>
+        <Segmented
+          options={COUNTS}
+          value={params.count ?? 5}
+          onChange={(count) => onProfile({ count })}
+        />
+        <p className="field__hint">
+          Nombre de boucles proposées après une recherche. En demander plus allonge un peu
+          le calcul, et les dernières se ressemblent davantage.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Les rues déjà sur l'appareil, et le plafond qu'elles ne dépasseront pas.
  *
@@ -191,6 +255,13 @@ function KeptStreets() {
   )
 }
 
+/**
+ * Ce que les cartes hors ligne occupent, et de quoi tout reprendre.
+ *
+ * Un chiffre plutôt qu'une promesse : ces fichiers sont les seuls de l'app à se
+ * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
+ * finit par être vidé par le navigateur — au pire moment, sans prévenir.
+ */
 function OfflineStorage() {
   const [total, setTotal] = useState(() => offline.totalBytes())
   const [count, setCount] = useState(() => offline.storedCount())
@@ -243,20 +314,6 @@ function OfflineStorage() {
   )
 }
 
-const MODES = [
-  ['auto', 'Automatique'],
-  ['full', 'Complète'],
-  ['planner', 'Préparation'],
-]
-
-/**
- * Forcer la version complète ou la version de préparation.
- *
- * La détection suffit presque toujours — un téléphone a la version complète,
- * un ordinateur celle qui sert à préparer. Mais elle peut se tromper : une
- * tablette qu'on emporte, un PC à écran tactile. Le réglage reste sur
- * l'appareil, comme tout le reste.
- */
 /**
  * La pause automatique : on la laisse active par défaut, parce que c'est ce
  * que tout le monde attend d'une app de course. On peut la couper — pour une
@@ -477,35 +534,6 @@ function BackupRows() {
         </label>
       </div>
       {message && <p className="muted small">{message}</p>}
-    </>
-  )
-}
-
-function ModePicker({ mode }) {
-  const [setting, setSetting] = useState(readModeSetting)
-  return (
-    <>
-      <div className="seg" role="radiogroup" aria-label="Version de l'app">
-        {MODES.map(([key, label]) => (
-          <button
-            key={key}
-            role="radio"
-            aria-checked={setting === key}
-            aria-pressed={setting === key}
-            onClick={() => {
-              setSetting(key)
-              setModeSetting(key)
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="muted small">
-        {mode === 'full'
-          ? 'Version complète : préparer, lancer un parcours, suivi GPS, guidage vocal, SOS et historique.'
-          : 'Version de préparation : chercher, comparer et exporter des boucles. Les fonctions de course sont réservées au téléphone.'}
-      </p>
     </>
   )
 }

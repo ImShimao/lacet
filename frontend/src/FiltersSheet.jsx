@@ -33,7 +33,7 @@ const SAFETY = [
   { key: 'safe', label: 'Sûr' },
   { key: 'standard', label: 'Standard' },
 ]
-const MOMENTS = [
+export const MOMENTS = [
   { key: 'auto', label: 'Auto' },
   { key: 'day', label: 'Jour' },
   { key: 'night', label: 'Nuit' },
@@ -42,7 +42,7 @@ const MOMENTS = [
 // Nombre d'itinéraires proposés. Trois, c'était trop peu pour choisir : on
 // prend le premier faute d'alternative. Au-delà de huit, la liste cesse d'être
 // un choix et devient un catalogue qu'on ne lit plus.
-const COUNTS = [
+export const COUNTS = [
   { key: 3, label: '3' },
   { key: 5, label: '5' },
   { key: 8, label: '8' },
@@ -90,7 +90,6 @@ export const DEFAULTS = {
   elevation: 'rolling',
   safety: 'safe',
   time_of_day: 'auto',
-  paceCustom: false,
   pace_sec_per_km: 390,
   speed_kmh: 20,
   speedUnit: 'pace',
@@ -98,9 +97,8 @@ export const DEFAULTS = {
   // Distance exacte : ±2,5 % au lieu de ±10 %. Réservé à qui vise une distance
   // précise — plus c'est serré, moins il y a de boucles qui conviennent.
   precise: false,
-  // Servent seulement aux estimations de calories et de pas (onglet compte).
+  // Sert seulement à estimer les calories d'une sortie (onglet compte).
   weight_kg: 70,
-  height_cm: 175,
 }
 
 /**
@@ -121,6 +119,15 @@ function durationStep(min) {
   return min < 120 ? 5 : 15
 }
 
+/**
+ * Ce qui change le tracé, et rien d'autre.
+ *
+ * Le panneau accueillait aussi l'allure, le moment de la journée et le nombre
+ * de propositions : trois réglages qu'on touche une fois puis plus jamais, au
+ * milieu de ceux qu'on ajuste à chaque sortie. Ils sont passés dans « Mon
+ * compte », sous « Recherche ». Ce qui reste ici agit sur les boucles
+ * proposées — l'activité, le terrain, la distance, le dénivelé, la sécurité.
+ */
 export default function FiltersSheet({ value, onApply, onClose }) {
   const [draft, setDraft] = useState(value)
   const panel = useModal(onClose)
@@ -303,59 +310,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </p>
           </Field>
 
-          <Field label={isBike ? 'Vitesse' : 'Allure'}>
-            <Segmented
-              options={[
-                { key: false, label: 'Par défaut' },
-                { key: true, label: 'Personnalisée' },
-              ]}
-              value={draft.paceCustom}
-              onChange={(paceCustom) => set({ paceCustom })}
-            />
-            {draft.paceCustom && (
-              <>
-                <div className="radios">
-                  <button
-                    aria-pressed={draft.speedUnit === 'pace'}
-                    onClick={() => set({ speedUnit: 'pace' })}
-                  >
-                    <span />
-                    min/km
-                  </button>
-                  <button
-                    aria-pressed={draft.speedUnit === 'speed'}
-                    onClick={() => set({ speedUnit: 'speed' })}
-                  >
-                    <span />
-                    km/h
-                  </button>
-                </div>
-                {draft.speedUnit === 'pace' ? (
-                  <Stepper
-                    text={`${pace(draft.pace_sec_per_km)} /km`}
-                    onStep={(d) =>
-                      set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })
-                    }
-                    canDown={draft.pace_sec_per_km > 150}
-                    canUp={draft.pace_sec_per_km < 1200}
-                  />
-                ) : (
-                  <Stepper
-                    text={`${formatKm(draft.speed_kmh)} km/h`}
-                    onStep={(d) => set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })}
-                    canDown={draft.speed_kmh > 5}
-                    canUp={draft.speed_kmh < 60}
-                  />
-                )}
-              </>
-            )}
-            <p className="field__hint">
-              {draft.mode === 'duration'
-                ? 'Convertit la durée en distance, et sert à estimer le temps de sortie.'
-                : 'Ne change pas le tracé — sert à estimer la durée de la sortie.'}
-            </p>
-          </Field>
-
           <Field label="Dénivelé" info="relief" sport={draft.sport}>
             <div className="tiles">
               {RELIEFS.map((r) => (
@@ -383,29 +337,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </p>
           </Field>
 
-          <Field label="Moment" info="moment" sport={draft.sport}>
-            <Segmented
-              options={MOMENTS}
-              value={draft.time_of_day}
-              onChange={(time_of_day) => set({ time_of_day })}
-            />
-            <p className="field__hint">
-              La nuit, priorité aux rues éclairées et fréquentées plutôt qu'aux chemins isolés.
-            </p>
-          </Field>
-
-          <Field label="Propositions">
-            <Segmented
-              options={COUNTS}
-              value={draft.count}
-              onChange={(count) => set({ count })}
-            />
-            <p className="field__hint">
-              L'app génère une trentaine de boucles, écarte celles qui échouent au
-              contrôle, puis retient les meilleures — en veillant à ce qu'elles partent
-              dans des directions différentes. En demander plus allonge un peu le calcul.
-            </p>
-          </Field>
         </div>
 
         <div className="modal__foot">
@@ -448,7 +379,7 @@ function Tile({ label, icon, on, onClick, focusFirst = false }) {
   )
 }
 
-function Segmented({ options, value, onChange }) {
+export function Segmented({ options, value, onChange }) {
   return (
     <div className="seg">
       {options.map((o) => (
@@ -461,7 +392,7 @@ function Segmented({ options, value, onChange }) {
 }
 
 /** Valeur avec incréments, et saisie directe quand elle est autorisée. */
-function Stepper({ text, onStep, canDown, canUp, editable }) {
+export function Stepper({ text, onStep, canDown, canUp, editable }) {
   const [typing, setTyping] = useState(null)
 
   const commit = () => {
@@ -508,11 +439,11 @@ function Stepper({ text, onStep, canDown, canUp, editable }) {
   )
 }
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 // `Math.round(42.295 / 0.1) * 0.1` rend 42.300000000000004 : la division puis
 // la multiplication en binaire ne retombent pas sur le compte. Trois décimales
 // — le mètre — suffisent à une distance de course, et referment la parenthèse.
-const round = (v, step) => Number((Math.round(v / step) * step).toFixed(3))
+export const round = (v, step) => Number((Math.round(v / step) * step).toFixed(3))
 
 /**
  * « 10 » plutôt que « 10.0 », « 10,5 » quand la décimale compte, et

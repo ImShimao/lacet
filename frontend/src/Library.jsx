@@ -13,16 +13,12 @@ import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 
-export default function Library({ mode = 'full', saved, history, onOpen, profile, mapStyle }) {
-  // Sur ordinateur, pas de sorties : on n'y court pas, l'historique y serait
-  // toujours vide. Seuls les favoris, qui sont ce qu'on y prépare.
-  const canRun = mode === 'full'
+export default function Library({ saved, history, onOpen, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
-  const [chosen, setView] = useState(() =>
+  const [view, setView] = useState(() =>
     history.length === 0 && saved.length > 0 ? 'saved' : 'history',
   )
-  const view = canRun ? chosen : 'saved'
   // Les filtres de l'historique : quelle activité, quel mois. Les totaux
   // suivent — « combien ai-je couru en août » est la question qu'on se pose.
   const [sport, setSport] = useState('all')
@@ -38,16 +34,14 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
       {view === 'history' && shown.length > 0 && (
         <Totals history={shown} profile={profile} />
       )}
-      {canRun && (
-        <div className="seg">
-          <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
-            Sorties ({history.length})
-          </button>
-          <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
-            Favoris ({saved.length})
-          </button>
-        </div>
-      )}
+      <div className="seg">
+        <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
+          Sorties ({history.length})
+        </button>
+        <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
+          Favoris ({saved.length})
+        </button>
+      </div>
 
       {view === 'history' && history.length > 0 && (
         <div className="histfilter">
@@ -89,19 +83,13 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
         </div>
       ) : (
         <>
-          {canRun && <p className="muted small">
+          <p className="muted small">
             Le tracé, les consignes et le profil sont déjà sur l'appareil : ces
             parcours s'ouvrent sans réseau. L'icône à droite ajoute <b>le fond de
             carte</b>, la seule pièce qui manque pour se repérer hors couverture —
             compter un à deux mégaoctets à la campagne, une quinzaine en plein
             centre-ville, où chaque tuile porte les bâtiments et les commerces.
-          </p>}
-          {!canRun && (
-            <p className="muted small">
-              Ouvre un favori pour revoir son détail ou l'exporter en GPX — vers une
-              montre, Strava, ou le téléphone avec lequel tu courras.
-            </p>
-          )}
+          </p>
           <div className="list">
             {rows.map((r, i) => (
               <div key={i} className="list__group">
@@ -129,7 +117,7 @@ export default function Library({ mode = 'full', saved, history, onOpen, profile
                     <span className="grade grade--free">libre</span>
                   )}
                 </button>
-                {canRun && <OfflineControl route={r} mapStyle={mapStyle} />}
+                <OfflineControl route={r} mapStyle={mapStyle} />
               </div>
               </div>
             ))}
@@ -300,9 +288,8 @@ function Totals({ history, profile }) {
       </div>
       <p className="muted small">
         Allure moyenne {pace(averagePace)}/km · environ{' '}
-        {Math.round(energy(sums.distance, profile)).toLocaleString('fr-FR')} kcal et{' '}
-        {Math.round(steps(sums.distance, profile)).toLocaleString('fr-FR')} pas —
-        estimés à partir de ta taille et de ton poids, pas mesurés.
+        {Math.round(energy(sums.distance, profile)).toLocaleString('fr-FR')} kcal, estimées
+        à partir de ton poids — pas mesurées.
       </p>
     </>
   )
@@ -314,19 +301,9 @@ function Totals({ history, profile }) {
 // fois moins à distance égale.
 const KCAL_PER_KG_PER_KM = { run: 0.95, bike: 0.30 }
 
-// Longueur de foulée, en fraction de la taille. 0,65 correspond à une foulée de
-// course à allure modérée ; la marche serait plus proche de 0,45.
-const STRIDE_RATIO = 0.65
-
 function energy(distanceM, profile) {
   const factor = KCAL_PER_KG_PER_KM[profile?.sport] ?? KCAL_PER_KG_PER_KM.run
   return (distanceM / 1000) * (profile?.weight_kg || 70) * factor
-}
-
-function steps(distanceM, profile) {
-  if (profile?.sport === 'bike') return 0
-  const stride = ((profile?.height_cm || 175) / 100) * STRIDE_RATIO
-  return distanceM / stride
 }
 
 /** Le mois d'une sortie : « 2026-09 ». */

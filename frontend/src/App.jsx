@@ -18,7 +18,6 @@ import { load, save, slim } from './storage'
 import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
 import { clearEngineData, prefetchOnDevice } from './engine/client'
-import { useAppMode } from './platform'
 import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
 
@@ -226,8 +225,6 @@ export default function App() {
   const [history, setHistory] = useState(stored.history)
 
   const geo = useGeolocation()
-  // 'full' sur téléphone, 'planner' sur ordinateur — voir `platform.js`.
-  const mode = useAppMode()
 
   // --- point de départ ------------------------------------------------------
   // `recenter` distingue les deux gestes : choisir un lieu amène la carte
@@ -957,7 +954,6 @@ export default function App() {
             />
           ) : tab === 'routes' ? (
             <Library
-              mode={mode}
               saved={saved}
               history={history}
               profile={params}
@@ -972,7 +968,6 @@ export default function App() {
             />
           ) : tab === 'account' ? (
             <Account
-              mode={mode}
               params={params}
               geo={geo}
               onProfile={(patch) => {
@@ -997,7 +992,6 @@ export default function App() {
             />
           ) : (
             <Explore
-              mode={mode}
               progress={progress}
               start={start}
               startLabel={startLabel}

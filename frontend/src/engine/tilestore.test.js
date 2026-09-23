@@ -78,6 +78,24 @@ describe('les rues gardées', () => {
     expect(bytes).toBeLessThanOrEqual(seule * 2.5)
   })
 
+  it('annonce ce que pèse le cache même quand il a été rempli ailleurs', async () => {
+    // Les tuiles s'écrivent dans le worker, l'écran « Mon compte » les compte
+    // depuis la page : deux exemplaires du module, un seul magasin. L'écran
+    // affichait « 0 o » sur un cache de cinquante mégaoctets parce qu'il avait
+    // lu le journal en arrivant, avant la première recherche.
+    const vide = await tileUsage()
+    expect(vide.bytes).toBe(0)
+
+    // Le worker range une tuile : un autre exemplaire du module, le même
+    // magasin. La page n'en saura rien si elle se fie à ce qu'elle a en tête.
+    const { store } = await import('./store')
+    await store('osm').set('meta:usage', { total: 4242, tiles: { '0:4:4': { bytes: 4242, used: 1 } } })
+
+    const relu = await tileUsage()
+    expect(relu.bytes).toBe(4242)
+    expect(relu.count).toBe(1)
+  })
+
   it('relit encore les caches rangés par les versions d’avant', async () => {
     // Elles gardaient l'extrait tel quel. Les jeter ferait retélécharger toute
     // une région à la première mise à jour.

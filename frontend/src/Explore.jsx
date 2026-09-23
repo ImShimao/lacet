@@ -20,7 +20,6 @@ import { km } from './format'
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
 
 export default function Explore({
-  mode = 'full',
   progress = null,
   start,
   startLabel,
@@ -48,7 +47,6 @@ export default function Explore({
 }) {
   const [exporting, setExporting] = useState(false)
   // Sur ordinateur, on prépare : rien de ce qui sert pendant la course.
-  const canRun = mode === 'full'
 
   if (busy) {
     return (
@@ -105,12 +103,10 @@ export default function Explore({
             <Icon name="sliders" size={17} />
             Filtres
           </button>
-          {canRun && (
-            <button className="btn btn--ghost" onClick={onFreeRun}>
-              <Icon name="play" size={17} />
-              Courir libre
-            </button>
-          )}
+          <button className="btn btn--ghost" onClick={onFreeRun}>
+            <Icon name="play" size={17} />
+            Courir libre
+          </button>
         </div>
         {/* Les rues se préparent en fond dès que le départ est connu : le dire
             explique pourquoi la recherche est soudain instantanée — et qu'elle
@@ -149,12 +145,10 @@ export default function Explore({
         <button className="btn btn--primary" onClick={onOpenFilters}>
           Modifier les filtres
         </button>
-        {canRun && (
-          <button className="btn btn--ghost" onClick={onFreeRun}>
-            <Icon name="play" size={17} />
-            Courir sans itinéraire
-          </button>
-        )}
+        <button className="btn btn--ghost" onClick={onFreeRun}>
+          <Icon name="play" size={17} />
+          Courir sans itinéraire
+        </button>
       </div>
     )
   }
@@ -254,11 +248,9 @@ export default function Explore({
         </>
       )}
 
-      {canRun && (
-        <button className="linkish" onClick={onFreeRun}>
-          ou courir librement, sans suivre de tracé
-        </button>
-      )}
+      <button className="linkish" onClick={onFreeRun}>
+        ou courir librement, sans suivre de tracé
+      </button>
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
           que soit l'endroit où l'on a fait défiler le détail. Elle était tout en
@@ -273,17 +265,15 @@ export default function Explore({
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
         </button>
-        {canRun && (
-          <button
-            className="btn btn--icon"
-            onClick={exportGpx}
-            disabled={exporting}
-            title="Exporter en GPX"
-            aria-label="Exporter en GPX"
-          >
-            <Icon name="download" size={19} />
-          </button>
-        )}
+        <button
+          className="btn btn--icon"
+          onClick={exportGpx}
+          disabled={exporting}
+          title="Exporter en GPX"
+          aria-label="Exporter en GPX"
+        >
+          <Icon name="download" size={19} />
+        </button>
         <button
           className="btn btn--icon"
           onClick={onRegenerate ?? onSearch}
@@ -292,19 +282,10 @@ export default function Explore({
         >
           <Icon name="refresh" size={19} />
         </button>
-        {canRun ? (
-          <button className="btn btn--primary" onClick={onStart}>
-            <Icon name="play" size={17} />
-            Démarrer
-          </button>
-        ) : (
-          // Sur ordinateur, le geste qui compte est d'emporter le parcours : vers
-          // une montre, Strava, ou le téléphone avec lequel on courra.
-          <button className="btn btn--primary" onClick={exportGpx} disabled={exporting}>
-            <Icon name="download" size={17} />
-            {exporting ? 'Export…' : 'Exporter en GPX'}
-          </button>
-        )}
+        <button className="btn btn--primary" onClick={onStart}>
+          <Icon name="play" size={17} />
+          Démarrer
+        </button>
       </div>
     </div>
   )
