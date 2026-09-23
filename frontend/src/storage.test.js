@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { exportAll, importAll, load, save, slim } from './storage'
+import { exportAll, importAll, load, recentPlaces, rememberPlace, save, slim } from './storage'
 
 /**
  * La persistance locale.
@@ -104,9 +104,31 @@ describe('slim', () => {
   })
 })
 
+describe('les départs récents', () => {
+  it('garde le dernier choisi devant, sans doublon de lieu', () => {
+    rememberPlace({ label: 'Guebwiller', sub: 'Haut-Rhin', lat: 47.9097, lon: 7.2106 })
+    rememberPlace({ label: 'Colmar', sub: 'Haut-Rhin', lat: 48.0794, lon: 7.3585 })
+    // Le même village, cliqué à quelques mètres près : c'est le même départ.
+    rememberPlace({ label: 'Guebwiller centre', sub: '', lat: 47.9098, lon: 7.2107 })
+    expect(recentPlaces().map((p) => p.label)).toEqual(['Guebwiller centre', 'Colmar'])
+  })
+
+  it('n’en garde que cinq : au-delà, la liste demanderait à être lue', () => {
+    for (let i = 0; i < 8; i += 1) rememberPlace({ label: `Lieu ${i}`, lat: 45 + i, lon: 3, sub: '' })
+    expect(recentPlaces().map((p) => p.label)).toEqual(['Lieu 7', 'Lieu 6', 'Lieu 5', 'Lieu 4', 'Lieu 3'])
+  })
+
+  it('ignore ce qui n’a ni nom ni position', () => {
+    rememberPlace({ label: '', lat: 47, lon: 7 })
+    rememberPlace({ label: 'Nulle part', lat: NaN, lon: 7 })
+    rememberPlace(null)
+    expect(recentPlaces()).toEqual([])
+  })
+})
+
 describe('load et save', () => {
   it('rend les valeurs par défaut sur un stockage vide', () => {
-    expect(load()).toEqual({ favorites: [], history: [], params: null })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
   })
 
   it('relit ce qui a été écrit', () => {
@@ -130,7 +152,7 @@ describe('load et save', () => {
         throw new Error('refusé')
       },
     })
-    expect(load()).toEqual({ favorites: [], history: [], params: null })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
     expect(() => save({ favorites: [] })).not.toThrow()
   })
 
@@ -138,7 +160,7 @@ describe('load et save', () => {
     const s = fauxStockage()
     s.setItem('lacet.v1', '{ceci n’est pas du JSON')
     vi.stubGlobal('localStorage', s)
-    expect(load()).toEqual({ favorites: [], history: [], params: null })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
   })
 
   it('sacrifie l’historique quand le quota est atteint', () => {
@@ -158,7 +180,7 @@ describe('load et save', () => {
     const s = fauxStockage({ quota: 10 })
     vi.stubGlobal('localStorage', s)
     const apres = save({ favorites: [{ id: 'trop-gros', bourrage: 'x'.repeat(500) }] })
-    expect(apres).toEqual({ favorites: [], history: [], params: null })
+    expect(apres).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
   })
 })
 

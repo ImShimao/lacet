@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { searchPlaces } from './api'
+import { recentPlaces, rememberPlace } from './storage'
 import { km } from './format'
 
 /**
@@ -8,6 +9,10 @@ import { km } from './format'
  * une ville, ou un lieu par son nom — « macdo guebwiller », « one fitness ».
  * `near` est là où l'on est : les lieux proches passent devant, et chacun dit
  * à quelle distance il se trouve.
+ *
+ * Vide, le champ propose les derniers départs choisis. On revient courir aux
+ * mêmes endroits, et les retaper était d'autant plus pénible que c'est souvent
+ * en déplacement — parfois sans réseau, là où rien ne répondrait.
  *
  * Le champ se pilote entièrement au clavier. Ce n'est pas un raffinement : on
  * arrive ici en tapant une adresse, les doigts sur les touches, et il faut
@@ -22,6 +27,8 @@ export default function SearchBar({ onPick, near = null }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const [searching, setSearching] = useState(false)
+  // Les départs déjà choisis, relus une fois : la liste ne change qu'ici.
+  const [recents, setRecents] = useState(() => recentPlaces())
   // Ce qu'on a cherché quand la liste est revenue, et si ça s'est mal passé.
   // Sans ça, « aucun lieu de ce nom » et « pas de réseau » se ressemblaient :
   // dans les deux cas, rien ne s'affichait, et on retapait la même chose.
@@ -82,6 +89,8 @@ export default function SearchBar({ onPick, near = null }) {
 
   const choose = (place) => {
     onPick({ lat: place.lat, lon: place.lon, label: place.short })
+    rememberPlace({ label: place.short, sub: place.kind || place.label || '', lat: place.lat, lon: place.lon })
+    setRecents(recentPlaces())
     setQuery('')
     setResults([])
     setAnswered(null)
@@ -94,7 +103,7 @@ export default function SearchBar({ onPick, near = null }) {
       setOpen(false)
       return
     }
-    if (!results.length) return
+    if (!shown.length) return
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       // Sinon le curseur saute au début ou à la fin du texte saisi pendant
@@ -102,19 +111,26 @@ export default function SearchBar({ onPick, near = null }) {
       event.preventDefault()
       setOpen(true)
       const step = event.key === 'ArrowDown' ? 1 : -1
-      setActive((i) => (i + step + results.length) % results.length)
+      setActive((i) => (i + step + shown.length) % shown.length)
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      choose(results[Math.min(active, results.length - 1)])
+      choose(shown[Math.min(active, shown.length - 1)])
     }
   }
 
   // La réponse concerne bien ce qui est tapé en ce moment : sinon, effacer une
   // lettre laisserait « aucun lieu » affiché sous une recherche en cours.
   const empty = answered !== null && answered === query.trim() && results.length === 0
-  const visible = open && (results.length > 0 || empty)
+  // Champ vide : on propose les départs déjà choisis plutôt qu'une liste vide.
+  // C'est le cas le plus fréquent — on revient courir aux mêmes endroits — et
+  // le seul qui marche sans réseau.
+  const memories = query.trim().length < 3
+  const shown = memories
+    ? recents.map((place) => ({ ...place, short: place.label, label: place.sub, kind: null }))
+    : results
+  const visible = open && (shown.length > 0 || empty)
 
   return (
     <div className="search">
@@ -133,6 +149,9 @@ export default function SearchBar({ onPick, near = null }) {
         placeholder="Chercher un lieu de départ…"
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setOpen(true)}
+        // Un champ déjà actif ne redonne pas le focus : sans ce clic, après
+        // avoir choisi un départ, retoucher le champ ne rouvrait rien.
+        onClick={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
         aria-label="Chercher un lieu de départ"
@@ -162,6 +181,7 @@ export default function SearchBar({ onPick, near = null }) {
       )}
       {visible && (
         <div className="search__results" id="search-results" role="listbox">
+          {memories && shown.length > 0 && <p className="search__title">Départs récents</p>}
           {empty && (
             <p className="search__empty">
               {failed
@@ -171,7 +191,7 @@ export default function SearchBar({ onPick, near = null }) {
                 : `Aucun lieu trouvé pour « ${answered} ». Essaie le nom de la commune, ou place le départ à la main sur la carte.`}
             </p>
           )}
-          {results.map((place, i) => (
+          {shown.map((place, i) => (
             <button
               key={`${place.lat},${place.lon},${i}`}
               id={`search-result-${i}`}

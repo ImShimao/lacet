@@ -340,7 +340,9 @@ function SearchProgress({ progress }) {
       </div>
       <p className="muted small">
         {long && stage === 'data'
-          ? "Les serveurs OpenStreetMap sont lents en ce moment — Lacet interroge leurs miroirs. Ça aboutit en général en moins d'une minute."
+          ? // Les archives couvrent la France et ses voisins ; ailleurs, il faut
+            // interroger OpenStreetMap en direct, et c'est là que ça traîne.
+            "Ce coin n'est pas dans les archives : Lacet interroge OpenStreetMap en direct, et ses serveurs sont lents en ce moment. Ça aboutit en général en moins d'une minute."
           : stage === 'data'
             ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
             : stage === 'elevation'

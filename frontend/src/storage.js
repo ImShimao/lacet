@@ -5,7 +5,46 @@
 
 const KEY = 'lacet.v1'
 
-const DEFAULTS = { favorites: [], history: [], params: null }
+const DEFAULTS = { favorites: [], history: [], params: null, recentPlaces: [] }
+
+// Assez pour retrouver chez soi, le travail, le coin du dimanche et deux
+// endroits de vacances. Au-delà, la liste demanderait à être lue.
+const RECENT_MAX = 5
+// Deux départs à moins de ça sont le même endroit : on ne garde pas deux fois
+// la même place de village parce qu'on a cliqué à trois mètres près.
+const SAME_START_M = 200
+
+/**
+ * Se souvenir d'un départ choisi.
+ *
+ * On revient courir aux mêmes endroits, et on retapait le même nom à chaque
+ * fois — parfois sans réseau, là où la recherche ne répond pas. Ce qui est
+ * gardé tient en quatre nombres et deux mots : de quoi repartir d'un geste.
+ */
+export function rememberPlace(place) {
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) return
+  const kept = {
+    label: place.label || place.short || '',
+    sub: place.sub || '',
+    lat: place.lat,
+    lon: place.lon,
+    at: Date.now(),
+  }
+  if (!kept.label) return
+  const others = (load().recentPlaces || []).filter((other) => distanceM(other, kept) > SAME_START_M)
+  save({ recentPlaces: [kept, ...others].slice(0, RECENT_MAX) })
+}
+
+/** Les départs déjà choisis, du plus récent au plus ancien. */
+export const recentPlaces = () => load().recentPlaces || []
+
+function distanceM(a, b) {
+  const rad = Math.PI / 180
+  const dLat = (b.lat - a.lat) * rad
+  const dLon = (b.lon - a.lon) * rad
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)))
+}
 
 export function load() {
   try {

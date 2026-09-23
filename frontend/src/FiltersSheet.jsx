@@ -126,7 +126,9 @@ function durationStep(min) {
  * de propositions : trois réglages qu'on touche une fois puis plus jamais, au
  * milieu de ceux qu'on ajuste à chaque sortie. Ils sont passés dans « Mon
  * compte », sous « Recherche ». Ce qui reste ici agit sur les boucles
- * proposées — l'activité, le terrain, la distance, le dénivelé, la sécurité.
+ * proposées, dans l'ordre où on y touche : l'activité, la longueur, le terrain,
+ * le dénivelé, la sécurité. La longueur est passée devant le terrain — c'est le
+ * réglage qu'on vient changer, et il demandait de faire défiler.
  */
 export default function FiltersSheet({ value, onApply, onClose }) {
   const [draft, setDraft] = useState(value)
@@ -176,20 +178,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                       distance_km: Math.min(draft.distance_km, MAX_KM[s.key]),
                     })
                   }
-                />
-              ))}
-            </div>
-          </Field>
-
-          <Field label="Terrain" info="terrain" sport={draft.sport}>
-            <div className="tiles">
-              {TERRAINS[draft.sport].map((t) => (
-                <Tile
-                  key={t.key}
-                  label={t.label}
-                  icon={t.icon}
-                  on={draft.surface === t.key}
-                  onClick={() => set({ surface: t.key })}
                 />
               ))}
             </div>
@@ -308,6 +296,20 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                     isBike ? 'à vélo' : 'à pied'
                   }. Le champ est modifiable au clavier.`}
             </p>
+          </Field>
+
+          <Field label="Terrain" info="terrain" sport={draft.sport}>
+            <div className="tiles">
+              {TERRAINS[draft.sport].map((t) => (
+                <Tile
+                  key={t.key}
+                  label={t.label}
+                  icon={t.icon}
+                  on={draft.surface === t.key}
+                  onClick={() => set({ surface: t.key })}
+                />
+              ))}
+            </div>
           </Field>
 
           <Field label="Dénivelé" info="relief" sport={draft.sport}>
