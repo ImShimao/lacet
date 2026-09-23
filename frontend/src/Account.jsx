@@ -7,8 +7,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, SPORTS, Segmented, Stepper, clamp, formatKm, round } from './FiltersSheet.jsx'
-import { pace, surfaceLabel } from './format'
+import { COUNTS, MOMENTS, SPORTS, Segmented } from './FiltersSheet.jsx'
+import { surfaceLabel } from './format'
 import { exportAll, importAll, load, save } from './storage'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
@@ -135,58 +135,20 @@ export default function Account({ params, geo, onClearData, onProfile }) {
 }
 
 /**
- * Les réglages de recherche qu'on choisit une fois.
+ * Les deux réglages de recherche qu'on choisit une fois.
  *
- * Ils vivaient dans le panneau des filtres, au milieu de ce qu'on ajuste à
- * chaque sortie — la distance, le terrain, le dénivelé. Une allure ou un nombre
- * de propositions ne changent pas d'un jour à l'autre : ils encombraient le
- * geste quotidien pour rien. Ici, ils s'appliquent tout de suite, sans bouton
- * « Appliquer » : on vient les régler, pas les essayer.
+ * Le moment de la sortie et le nombre de propositions ne changent pas d'un jour
+ * à l'autre : au milieu des filtres, ils encombraient le geste quotidien. Ici,
+ * ils s'appliquent tout de suite, sans bouton « Appliquer » — on vient les
+ * régler, pas les essayer.
+ *
+ * L'allure, elle, est repartie dans les filtres, sous la longueur : c'est elle
+ * qui convertit une durée en distance, et on veut voir l'effet du réglage au
+ * moment où on le touche.
  */
 function SearchSettings({ params, onProfile }) {
-  // Le vélo se pense en km/h, la course en min/km — mais un cycliste ne raisonne
-  // jamais en allure, alors que l'inverse arrive. D'où un choix d'unité offert à
-  // pied seulement. La règle est celle qu'applique la requête envoyée au moteur :
-  // à vélo, c'est la vitesse qui compte, quoi qu'affiche le réglage.
-  const isBike = params.sport === 'bike'
-  const speed = isBike || params.speedUnit === 'speed'
-  const secPerKm = params.pace_sec_per_km ?? 390
-  const kmh = params.speed_kmh ?? 20
   return (
     <div className="fields">
-      <div className="field">
-        <span className="label">{isBike ? 'Vitesse' : 'Allure'}</span>
-        {!isBike && (
-          <Segmented
-            options={[
-              { key: 'pace', label: 'min/km' },
-              { key: 'speed', label: 'km/h' },
-            ]}
-            value={speed ? 'speed' : 'pace'}
-            onChange={(speedUnit) => onProfile({ speedUnit })}
-          />
-        )}
-        {speed ? (
-          <Stepper
-            text={`${formatKm(kmh)} km/h`}
-            onStep={(d) => onProfile({ speed_kmh: round(clamp(kmh + d * 0.5, 5, 60), 0.5) })}
-            canDown={kmh > 5}
-            canUp={kmh < 60}
-          />
-        ) : (
-          <Stepper
-            text={`${pace(secPerKm)} /km`}
-            onStep={(d) => onProfile({ pace_sec_per_km: clamp(secPerKm + d * 5, 150, 1200) })}
-            canDown={secPerKm > 150}
-            canUp={secPerKm < 1200}
-          />
-        )}
-        <p className="field__hint">
-          Ne change pas le tracé : sert à annoncer la durée d'une boucle, et à convertir
-          une durée demandée en distance.
-        </p>
-      </div>
-
       <div className="field">
         <span className="label">Moment</span>
         <Segmented

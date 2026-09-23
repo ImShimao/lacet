@@ -1477,6 +1477,17 @@ input.field:focus {
   text-transform: uppercase;
   color: var(--text-3);
 }
+/* L'allure, dans le champ « Longueur » : rattachée à ce qu'elle convertit, mais
+   séparée par un filet pour qu'on la lise comme un réglage à part. */
+.field__pace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
 .field__hint {
   margin: 0;
   font-size: 12px;

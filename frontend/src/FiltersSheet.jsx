@@ -135,6 +135,9 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   const panel = useModal(onClose)
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const isBike = draft.sport === 'bike'
+  // À vélo c'est la vitesse qui part au moteur, quoi qu'affiche le réglage : le
+  // panneau montre donc exactement ce qui sera utilisé.
+  const usesSpeed = isBike || draft.speedUnit === 'speed'
   const maxKm = MAX_KM[draft.sport]
 
   return (
@@ -296,6 +299,51 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                     isBike ? 'à vélo' : 'à pied'
                   }. Le champ est modifiable au clavier.`}
             </p>
+
+            {/* L'allure appartient à ce champ : c'est elle qui convertit une
+                durée en distance, et qui donne la durée annoncée d'une boucle.
+                Elle avait été rangée dans « Mon compte » ; on ne voyait plus
+                l'effet de ce qu'on réglait. Ici, « 1 h à 5:30 » et « 1 h à
+                6:30 » ne font pas la même sortie, et ça se lit tout de suite. */}
+            <div className="field__pace">
+              <span className="label">{isBike ? 'Vitesse' : 'Allure'}</span>
+              {!isBike && (
+                <Segmented
+                  options={[
+                    { key: 'pace', label: 'min/km' },
+                    { key: 'speed', label: 'km/h' },
+                  ]}
+                  value={usesSpeed ? 'speed' : 'pace'}
+                  onChange={(speedUnit) => set({ speedUnit })}
+                />
+              )}
+              {usesSpeed ? (
+                <Stepper
+                  text={`${formatKm(draft.speed_kmh)} km/h`}
+                  onStep={(d) =>
+                    set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })
+                  }
+                  canDown={draft.speed_kmh > 5}
+                  canUp={draft.speed_kmh < 60}
+                />
+              ) : (
+                <Stepper
+                  text={`${pace(draft.pace_sec_per_km)} /km`}
+                  onStep={(d) =>
+                    set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })
+                  }
+                  canDown={draft.pace_sec_per_km > 150}
+                  canUp={draft.pace_sec_per_km < 1200}
+                />
+              )}
+              <p className="field__hint">
+                {draft.mode === 'duration'
+                  ? 'Ne change pas le tracé : elle convertit la durée en distance.'
+                  : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
+                      Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
+                    )} pour cette boucle.`}
+              </p>
+            </div>
           </Field>
 
           <Field label="Terrain" info="terrain" sport={draft.sport}>
@@ -463,10 +511,13 @@ function formatMinutes(total) {
   return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`
 }
 
+/** Le temps au kilomètre effectivement envoyé au moteur. */
+export function secondsPerKm(params) {
+  return params.sport === 'bike' || params.speedUnit === 'speed'
+    ? 3600 / params.speed_kmh
+    : params.pace_sec_per_km
+}
+
 export function estimateKm(params) {
-  const secondsPerKm =
-    params.sport === 'bike' || params.speedUnit === 'speed'
-      ? 3600 / params.speed_kmh
-      : params.pace_sec_per_km
-  return (params.duration_min * 60) / secondsPerKm
+  return (params.duration_min * 60) / secondsPerKm(params)
 }
