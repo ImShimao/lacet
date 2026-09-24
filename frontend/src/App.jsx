@@ -184,6 +184,8 @@ export default function App() {
   const shellRef = useRef(null)
 
   const [result, setResult] = useState(null)
+  // De combien le repère a rejoint la rue, quand c'est assez pour se voir.
+  const [snapped, setSnapped] = useState(null)
   const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(false)
   // L'étape en cours et son avancement. Le calcul se fait sur l'appareil et
@@ -250,6 +252,7 @@ export default function App() {
       setResult(null)
       setSelected(null)
       setScrub(null)
+      setSnapped(null)
     }
     setStart(point)
     setStartLabel(label ?? null)
@@ -381,6 +384,7 @@ export default function App() {
       setError(null)
       setResult(null)
       setSelected(null)
+      setSnapped(null)
       setScrub(null)
       setTab('explore')
       setSheet('peek')
@@ -431,6 +435,30 @@ export default function App() {
             },
           })
         }
+        // **Le repère se pose là où la boucle commence.** Une boucle part et
+        // revient au même point du réseau de rues — exactement, au centimètre —
+        // mais ce point n'est pas celui qu'on a touché sur la carte : il est sur
+        // la chaussée, à la distance qui sépare le repère de la rue la plus
+        // proche. Dix-huit mètres au bord d'un trottoir, cent vingt au milieu
+        // d'un village dont le centre géographique tombe dans un pré. Le repère
+        // restait où on l'avait posé, et la boucle semblait finir avant lui.
+        // Elle finit exactement là où elle commence ; c'est le repère qui
+        // rejoint le départ, et non l'inverse.
+        const commence = payload.routes[0]?.geometry?.[0]
+        if (commence) {
+          const point = { lat: commence[1], lon: commence[0] }
+          const posé = startRef.current
+          const écart = posé ? haversineM([posé.lon, posé.lat], [point.lon, point.lat]) : 0
+          if (écart > 1) {
+            startRef.current = point
+            setStart(point)
+          }
+          // Sous cinquante mètres, le repère bouge de l'épaisseur d'un doigt et
+          // personne ne le remarque. Au-delà, il saute sous les yeux : mieux
+          // vaut dire pourquoi que laisser croire à un bug.
+          setSnapped(écart > 50 ? Math.round(écart) : null)
+        }
+
         // La demande reste attachée au résultat : c'est avec elle qu'un chemin
         // de retour se calcule, en course, si l'on s'écarte du parcours.
         setResult({ ...payload, request })
@@ -1048,6 +1076,7 @@ export default function App() {
             />
           ) : (
             <Explore
+              snapped={snapped}
               progress={progress}
               start={start}
               startLabel={startLabel}

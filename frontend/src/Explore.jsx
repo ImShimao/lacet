@@ -21,6 +21,7 @@ const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ou
 
 export default function Explore({
   progress = null,
+  snapped = null,
   start,
   startLabel,
   geo,
@@ -199,6 +200,14 @@ export default function Explore({
           Le relief n'a pas répondu à temps : ces boucles sont classées sans lui, et leur
           dénivelé reste inconnu. Relance la recherche — les altitudes arrivées entre-temps
           sont gardées.
+        </div>
+      )}
+      {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher
+          pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas. */}
+      {snapped && (
+        <div className="notice">
+          Le départ s'est posé sur la rue la plus proche, à {snapped} m du point demandé :
+          c'est de là que la boucle part, et c'est là qu'elle revient.
         </div>
       )}
       {meta.wind && <WindNote wind={meta.wind} />}
