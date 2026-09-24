@@ -1186,6 +1186,19 @@ html.native textarea {
   background: var(--surface-3);
   overflow: hidden;
 }
+/* Sous la barre : ce qu'elle ne peut pas dire — le temps qui reste, et l'heure
+   à laquelle on rentre. */
+.live__eta {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.live__eta b {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .live__bar i {
   display: block;
   height: 100%;
@@ -1823,21 +1836,105 @@ input.field:focus {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
 /* En course, le point porte une pointe dans le sens de la course : c'est elle
-   qu'on cherche du regard pour savoir où tourner, comme la flèche d'un GPS. */
+   qu'on cherche du regard pour savoir où tourner, comme la flèche d'un GPS.
+   Et il grossit : on le lit à bout de bras, en mouvement, l'écran à moitié
+   éclairé par le soleil — dix-huit pixels de bureau ne suffisaient pas. */
 .dot-live--nav {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
+  border-width: 4px;
+  box-shadow:
+    0 0 0 6px rgba(88, 166, 255, 0.18),
+    0 3px 12px rgba(0, 0, 0, 0.6);
 }
 .dot-live--nav::before {
   content: '';
   position: absolute;
   left: 50%;
-  top: -15px;
+  top: -19px;
   transform: translateX(-50%);
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
-  border-bottom: 13px solid var(--info);
-  filter: drop-shadow(0 -1px 0 #fff) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-bottom: 17px solid var(--info);
+  filter: drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* ══ le compte à rebours ══════════════════════════════════════════════════ */
+
+/* Trois secondes où l'écran ne sert qu'à ça : le reste s'efface derrière. */
+.countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 28px;
+  background: rgba(10, 9, 14, 0.82);
+  backdrop-filter: blur(6px);
+  animation: countdown-in 180ms ease-out;
+}
+
+.countdown__ring {
+  display: grid;
+  place-items: center;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: radial-gradient(circle at 50% 45%, rgba(139, 92, 246, 0.28), transparent 70%);
+  /* Une clé qui change à chaque chiffre relance l'animation : le cercle enfle
+     et s'efface, comme un battement. */
+  animation: countdown-beat 900ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.countdown__n {
+  font-size: 84px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(139, 92, 246, 0.5);
+}
+
+/* « Partez ! » tient en toutes lettres : il lui faut moins de place par lettre
+   qu'un chiffre, et pas de coupure au milieu du mot. */
+.countdown__n--go {
+  font-size: 30px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.countdown__cancel {
+  min-width: 140px;
+}
+
+@keyframes countdown-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes countdown-beat {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.2;
+  }
+  35% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown,
+  .countdown__ring {
+    animation: none;
+  }
 }
 
 /* Les rues de la zone sont déjà sur l'appareil. */

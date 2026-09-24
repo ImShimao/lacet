@@ -604,6 +604,12 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const hasGuidance = Boolean(guide.route?.instructions?.length)
   const rerouteIn = rerouteDue ? Math.max(0, Math.ceil((rerouteDue - Date.now()) / 1000)) : null
 
+  // Le temps qu'il reste : à l'allure tenue depuis le départ tant qu'elle est
+  // mesurée, à celle demandée au moteur avant. Sans l'une ni l'autre, rien —
+  // une estimation tirée de cinquante mètres de course serait une invention.
+  const perKm = moving > 0 ? moving : plannedPerKm(request, bike)
+  const left = remaining !== null && perKm > 0 ? (remaining / 1000) * perKm : null
+
   return (
     <div className="live">
       {stage && route &&
@@ -624,6 +630,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         <div className="live__bar" aria-hidden="true">
           <i style={{ width: `${share * 100}%` }} />
         </div>
+      )}
+
+      {/* « Combien il reste » se lit en kilomètres dans les chiffres ; en
+          courant, la question est plutôt « j'en ai pour combien de temps », et
+          « je rentre à quelle heure ». Les deux se déduisent de l'allure du
+          moment — celle qu'on tient vraiment, pas celle qu'on avait prévue. */}
+      {left !== null && (
+        <p className="live__eta">
+          Reste environ <b>{minutes(Math.round(left / 60))}</b> · fin vers{' '}
+          <b>{clockTime(Date.now() + left * 1000)}</b>
+        </p>
       )}
 
       {paused && (
@@ -795,6 +812,25 @@ function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidanc
     </div>
   )
 }
+
+/** L'allure demandée au moteur, en secondes par kilomètre. */
+function plannedPerKm(request, bike) {
+  if (!request) return 0
+  if (bike || request.speed_kmh) return request.speed_kmh ? 3600 / request.speed_kmh : 0
+  return request.pace_sec_per_km || 0
+}
+
+/** « 42 min », « 1 h 05 » — jamais « 1:05:00 », qu'on lit comme un chrono. */
+function minutes(total) {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (!h) return `${m} min`
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`
+}
+
+/** L'heure qu'il sera, dans l'écriture du téléphone. */
+const clockTime = (at) =>
+  new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
 function roundedDistance(metres) {
   if (metres >= 1000) return `${(metres / 1000).toFixed(1).replace('.', ',')} km`

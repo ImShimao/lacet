@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
+import Countdown from './Countdown.jsx'
 import MapView from './MapView.jsx'
 import FiltersSheet, { DEFAULTS, SPORTS, estimateKm, formatKm, raceOf } from './FiltersSheet.jsx'
 import SearchBar from './SearchBar.jsx'
@@ -197,6 +198,9 @@ export default function App() {
   const [focus, setFocus] = useState(null)
 
   const [running, setRunning] = useState(false)
+  // Le compte à rebours qui précède une sortie : `false`, ou `'route'` /
+  // `'free'` selon ce qui démarrera une fois qu'il sera fini.
+  const [starting, setStarting] = useState(false)
   // Course libre : on enregistre sans itinéraire. C'est ce que fait la moitié
   // des sorties — on part sans savoir où l'on va — et le refuser obligeait à
   // choisir une boucle pour pouvoir simplement démarrer le chronomètre.
@@ -608,6 +612,13 @@ export default function App() {
     return toRequest({ ...params, mode: 'distance', distance_km: distanceKm }, { lat, lon })
   }, [selected, result, params])
 
+  // Le doigt sur « Démarrer » est le seul geste que le navigateur accepte pour
+  // autoriser la voix : c'est ici qu'on la débloque, pas au premier virage.
+  const beginRun = (kind) => {
+    voice.unlock()
+    setStarting(kind)
+  }
+
   const toggleVoice = () => {
     voice.unlock()
     setSpeaking((v) => !v)
@@ -677,6 +688,19 @@ export default function App() {
             if (match) setSelected(match)
           }}
         />
+
+        {/* Par-dessus la carte, et par-dessus tout le reste : pendant ces trois
+            secondes, il n'y a rien d'autre à faire que partir. */}
+        {starting && (
+          <Countdown
+            onCancel={() => setStarting(false)}
+            onDone={() => {
+              setFreeRun(starting === 'free')
+              setStarting(false)
+              setRunning(true)
+            }}
+          />
+        )}
 
         {!running && (
           <div className="stage__top">
@@ -1043,11 +1067,8 @@ export default function App() {
               onRegenerate={() => search(undefined, { regenerate: true })}
               onOpenFilters={() => setFiltersOpen(true)}
               onFavorite={toggleFavorite}
-              onStart={() => setRunning(true)}
-              onFreeRun={() => {
-                setFreeRun(true)
-                setRunning(true)
-              }}
+              onStart={() => beginRun('route')}
+              onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
               onScrub={setScrub}
               onOpenDetail={() => setSheet('full')}

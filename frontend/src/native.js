@@ -151,6 +151,9 @@ export const warnHaptic = () => Haptics.notification({ type: NotificationType.Wa
 /** La pause automatique : un seul coup, franc, distinct de l'alerte de traversée. */
 export const pulseHaptic = () => Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {})
 
+/** Le compte à rebours : un tapotement léger par chiffre, pas un coup. */
+export const tickHaptic = () => Haptics.impact({ style: ImpactStyle.Light }).catch(() => {})
+
 // --- écran de verrouillage ------------------------------------------------------
 
 /**
