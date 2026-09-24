@@ -304,10 +304,11 @@ export async function planLoops(input, deps) {
     ])
     if (timer) clearTimeout(timer)
     elevationGaveUp = fetched === null
-    ;(fetched ?? []).forEach((elevations, i) => {
-      if (elevations && elevations.length) {
-        const smoothed = smooth(elevations)
-        profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM)])
+    ;(fetched ?? []).forEach((relief, i) => {
+      if (relief?.values?.length) {
+        const smoothed = smooth(relief.values)
+        // Le seuil voyage avec le profil : c'est la source qui le fixe.
+        profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM), relief.threshold])
       }
     })
   }
@@ -316,7 +317,7 @@ export async function planLoops(input, deps) {
   const wind = await windTask
   const scored = shortlist.map((cand, i) => {
     const elev = profiles.get(i)
-    const gain = elev ? ascentDescent(elev[0])[0] : null
+    const gain = elev ? ascentDescent(elev[0], elev[2])[0] : null
     return [finalScore(cand, targetM, req, gain, wind), cand, i]
   })
   sortByKey(scored, (t) => -t[0])
@@ -587,7 +588,7 @@ function toModel(cand, score, req, elev, rank, steps, name) {
   let descent = null
   let profilePts = null
   if (elev) {
-    ;[ascent, descent] = ascentDescent(elev[0])
+    ;[ascent, descent] = ascentDescent(elev[0], elev[2])
     profilePts = elev[1]
   }
 

@@ -31,6 +31,7 @@ import logging
 import math
 import threading
 from pathlib import Path
+from typing import NamedTuple
 
 import httpx
 
@@ -48,6 +49,15 @@ OPENTOPO_URL = "https://api.opentopodata.org/v1/{dataset}"
 OPENTOPO_DATASETS = "eudem25m,srtm30m"
 
 BATCH = 100  # points par requête — limite d'OpenTopoData, et prudent pour IGN
+
+# Le seuil d'hystérésis dépend de la finesse de la source. Mesuré sur dix
+# boucles, cache vidé entre les fournisseurs : en montagne, un modèle à 1 m et
+# un modèle à 30 m s'accordent à 1 ou 7 % près ; en ville plate, le grossier
+# annonce 72 m de D+ à Paris contre 17, 35 à Strasbourg contre 8, 23 à Mulhouse
+# contre 2. Ce n'est pas du relief, c'est la grille qui tremble — et deux mètres
+# comptent ce tremblement comme des côtes. Huit l'effacent sans abîmer la
+# montagne (−5 % dans les Vosges).
+COARSE_THRESHOLD_M = 8.0
 
 # Un point sans donnée — pas un point à zéro mètre. L'IGN couvre la France et
 # répond -99999 partout ailleurs ; prendre ces -99999 pour le niveau de la mer
@@ -71,7 +81,14 @@ def _round(c: Coord) -> Coord:
     return (round(c[0], _ROUND), round(c[1], _ROUND))
 
 
-async def fetch_many(routes: list[list[Coord]]) -> list[list[float] | None]:
+class Relief(NamedTuple):
+    """Les altitudes d'un tracé, et le seuil que leur source mérite."""
+
+    values: list[float]
+    threshold: float
+
+
+async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
     """Altitudes de plusieurs tracés d'un coup.
 
     Tous les points de tous les tracés sont mis en commun, dédoublonnés,
@@ -81,7 +98,7 @@ async def fetch_many(routes: list[list[Coord]]) -> list[list[float] | None]:
     if not routes or settings.elevation_provider == "none":
         return [None] * len(routes)
 
-    wanted: dict[Coord, float | None] = {}
+    wanted: dict[Coord, tuple[float, bool] | None] = {}
     for coords in routes:
         for c in coords:
             wanted.setdefault(_round(c), None)
@@ -90,30 +107,52 @@ async def fetch_many(routes: list[list[Coord]]) -> list[list[float] | None]:
     missing = [c for c, v in wanted.items() if v is None]
 
     if missing:
-        values = await _fetch_with_fallback(missing)
-        if values is None:
+        answer = await _fetch_with_fallback(missing)
+        if answer is None:
             # Aucun fournisseur n'a répondu. Avec une partie seulement des
             # points, le profil serait faux plutôt qu'absent : on préfère absent.
             return [None] * len(routes)
+        values, coarse = answer
         # Un point que personne ne connaît n'est pas gardé : le mettre en cache
-        # interdirait de le redemander le jour où un fournisseur l'aura.
-        fresh = {c: z for c, z in zip(missing, values) if z is not None}
+        # interdirait de le redemander le jour où un fournisseur l'aura. La
+        # finesse, elle, est gardée avec la valeur : sans elle, un point relu du
+        # cache retrouverait le seuil fin, et le tremblement avec lui.
+        fresh = {
+            c: (z, gros) for c, z, gros in zip(missing, values, coarse) if z is not None
+        }
         wanted.update(fresh)
         _cache.store(fresh)
 
     # Un tracé dont un seul point manque n'a pas de profil : mieux vaut
     # « D+ — » qu'un dénivelé calculé sur des trous. Les autres gardent le leur.
-    out: list[list[float] | None] = []
+    #
+    # Chaque tracé rend ses altitudes **et le seuil qui leur convient** : le plus
+    # grossier de ses points décide.
+    out: list[Relief | None] = []
     for coords in routes:
         if not coords:
             out.append(None)
             continue
-        elevations = [wanted.get(_round(c)) for c in coords]
-        out.append(None if any(z is None for z in elevations) else elevations)
+        kept = [wanted.get(_round(c)) for c in coords]
+        if any(v is None for v in kept):
+            out.append(None)
+            continue
+        out.append(
+            Relief(
+                values=[v[0] for v in kept],
+                threshold=(
+                    COARSE_THRESHOLD_M
+                    if any(v[1] for v in kept)
+                    else settings.ascent_threshold_m
+                ),
+            )
+        )
     return out
 
 
-async def _fetch_with_fallback(coords: list[Coord]) -> list[float | None] | None:
+async def _fetch_with_fallback(
+    coords: list[Coord],
+) -> tuple[list[float | None], list[bool]] | None:
     """Chaque fournisseur complète ce que le précédent n'a pas su dire.
 
     Le second ne remplace pas le premier : il ne reçoit que les points restés
@@ -122,9 +161,12 @@ async def _fetch_with_fallback(coords: list[Coord]) -> list[float | None] | None
     suisse — et OpenTopoData, limité à une requête par seconde, n'a que les
     points manquants à traiter au lieu de tous.
 
-    Rend `None` si personne n'a rien su dire, une liste à trous sinon.
+    Rend `None` si personne n'a rien su dire ; sinon les altitudes (à trous) et,
+    point par point, si elles viennent d'un modèle grossier.
     """
     values: list[float | None] = [None] * len(coords)
+    # Quels points viennent d'un modèle grossier : c'est ce qui décide du seuil.
+    coarse = [False] * len(coords)
     todo = list(range(len(coords)))
 
     for provider in (settings.elevation_provider, settings.elevation_fallback):
@@ -149,9 +191,10 @@ async def _fetch_with_fallback(coords: list[Coord]) -> list[float | None] | None
                 rest.append(index)
             else:
                 values[index] = answer[k]
+                coarse[index] = provider != "ign"
         todo = rest
 
-    return None if len(todo) == len(coords) else values
+    return None if len(todo) == len(coords) else (values, coarse)
 
 
 async def _fetch(provider: str, coords: list[Coord]) -> list[float | None]:
@@ -232,7 +275,7 @@ class ElevationCache:
     # zéro mètre là où le fournisseur ne savait pas. Un cache empoisonné :
     # sans ce ménage, le dénivelé resterait nul hors de France sans jamais être
     # redemandé. Le numéro change quand ce qui est gardé change de sens.
-    FORMAT = 2
+    FORMAT = 3
 
     def __init__(self, directory: Path) -> None:
         self._dir = directory
@@ -260,12 +303,12 @@ class ElevationCache:
     def _tile(self, c: Coord) -> tuple[int, int]:
         return (math.floor(c[0] / self.TILE), math.floor(c[1] / self.TILE))
 
-    def _load(self, tile: tuple[int, int]) -> dict[str, float]:
+    def _load(self, tile: tuple[int, int]) -> dict[str, list]:
         cached = self._loaded.get(tile)
         if cached is not None:
             return cached
         path = self._dir / f"{tile[0]}_{tile[1]}.json"
-        data: dict[str, float] = {}
+        data: dict[str, list] = {}
         if path.exists():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -274,16 +317,18 @@ class ElevationCache:
         self._loaded[tile] = data
         return data
 
-    def lookup(self, coords: list[Coord]) -> dict[Coord, float]:
-        out: dict[Coord, float] = {}
+    def lookup(self, coords: list[Coord]) -> dict[Coord, tuple[float, bool]]:
+        out: dict[Coord, tuple[float, bool]] = {}
         with self._lock:
             for c in coords:
                 value = self._load(self._tile(c)).get(f"{c[0]},{c[1]}")
                 if value is not None:
-                    out[c] = value
+                    # Les caches d'avant ne rangeaient qu'un nombre : ils
+                    # venaient d'une époque à source unique, donc fine.
+                    out[c] = tuple(value) if isinstance(value, list) else (value, False)
         return out
 
-    def store(self, values: dict[Coord, float]) -> None:
+    def store(self, values: dict[Coord, tuple[float, bool]]) -> None:
         with self._lock:
             for c, z in values.items():
                 tile = self._tile(c)

@@ -164,7 +164,22 @@ const BATCH = 100
 const IGN_BATCH = 5000
 const ROUND = 5
 const ELEVATION_TILE = 0.05
+/**
+ * Le seuil d'hystérésis — et pourquoi il dépend de la source.
+ *
+ * Un modèle d'altitude tremble d'autant plus qu'il est grossier. Mesuré sur dix
+ * boucles, cache vidé entre les deux fournisseurs : en montagne, l'IGN (1 m) et
+ * Valhalla (~30 m) s'accordent à 1 ou 7 % près ; en ville plate, Valhalla
+ * annonce 72 m de D+ à Paris contre 17, 35 à Strasbourg contre 8, 23 à Mulhouse
+ * contre 2. Ce n'est pas du relief, c'est la grille qui tremble — et un seuil
+ * de deux mètres compte ce tremblement comme des côtes.
+ *
+ * Huit mètres l'effacent : Paris retombe à 19, Strasbourg à 8, Mulhouse à 8,
+ * pendant que les Vosges ne perdent que 5 %. Le seuil suit donc la source, et
+ * la France garde ses deux mètres.
+ */
 const ASCENT_THRESHOLD_M = 2
+export const COARSE_THRESHOLD_M = 8
 
 const elevationStore = store('elevation')
 
@@ -174,7 +189,8 @@ const elevationStore = store('elevation')
 // séjour à l'étranger, sans jamais redemander. On le vide une fois, et la
 // marque reste pour ne pas recommencer à chaque recherche.
 const FORMAT_KEY = 'meta:format'
-const FORMAT = 2
+// 3 : les altitudes gardées portent désormais la finesse de leur source.
+const FORMAT = 3
 let purge = null
 
 function purgeLegacy() {
@@ -230,18 +246,21 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
   const unknown = [...wanted].filter(([, v]) => v === null).map(([k]) => k)
   if (unknown.length) {
     const coords = unknown.map((k) => k.split(',').map(Number))
-    const values = await fetchWithFallback(coords, providers, fetchImpl)
-    if (values === null) return routes.map(() => null)
+    const fresh = await fetchWithFallback(coords, providers, fetchImpl)
+    if (fresh === null) return routes.map(() => null)
 
     const dirty = new Set()
     unknown.forEach((key, i) => {
       // Un point que personne ne connaît n'est pas gardé : le mettre en cache
       // interdirait de le redemander le jour où un fournisseur l'aura.
-      if (values[i] === null) return
-      wanted.set(key, values[i])
+      if (fresh.values[i] === null) return
+      // La finesse est gardée avec la valeur : sans elle, un point relu du
+      // cache retrouverait le seuil fin, et le tremblement avec lui.
+      const kept = fresh.coarse[i] ? { z: fresh.values[i], c: 1 } : fresh.values[i]
+      wanted.set(key, kept)
       const [lon, lat] = coords[i]
       const tile = `${Math.floor(lon / ELEVATION_TILE)}_${Math.floor(lat / ELEVATION_TILE)}`
-      tiles.get(tile)[key] = values[i]
+      tiles.get(tile)[key] = kept
       dirty.add(tile)
     })
     await Promise.all([...dirty].map((tile) => elevationStore.set(tile, tiles.get(tile))))
@@ -249,10 +268,18 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
 
   // Un tracé dont un seul point manque n'a pas de profil : mieux vaut « D+ — »
   // qu'un dénivelé calculé sur des trous. Les autres tracés gardent le leur.
+  //
+  // Chaque tracé rend ses altitudes **et le seuil qui leur convient** : le plus
+  // grossier de ses points décide. Une boucle à cheval sur la frontière ne
+  // mérite pas la finesse française sur sa moitié suisse.
   return routes.map((coords) => {
     if (!coords.length) return null
-    const elevations = coords.map((c) => wanted.get(roundKey(c)))
-    return elevations.some((z) => z === null || z === undefined) ? null : elevations
+    const kept = coords.map((c) => wanted.get(roundKey(c)))
+    if (kept.some((v) => v === null || v === undefined)) return null
+    return {
+      values: kept.map((v) => (typeof v === 'object' ? v.z : v)),
+      threshold: kept.some((v) => typeof v === 'object' && v.c) ? COARSE_THRESHOLD_M : ASCENT_THRESHOLD_M,
+    }
   })
 }
 
@@ -270,6 +297,8 @@ const roundKey = (c) => `${pyRound(c[0], ROUND)},${pyRound(c[1], ROUND)}`
  */
 async function fetchWithFallback(coords, providers, fetchImpl) {
   const values = new Array(coords.length).fill(null)
+  // Quels points viennent d'un modèle grossier : c'est ce qui décide du seuil.
+  const coarse = new Array(coords.length).fill(false)
   let todo = coords.map((_, i) => i)
 
   for (const provider of providers) {
@@ -288,12 +317,15 @@ async function fetchWithFallback(coords, providers, fetchImpl) {
     const rest = []
     todo.forEach((index, k) => {
       if (answer[k] === null || answer[k] === undefined) rest.push(index)
-      else values[index] = answer[k]
+      else {
+        values[index] = answer[k]
+        coarse[index] = provider !== 'ign'
+      }
     })
     todo = rest
   }
 
-  return todo.length === coords.length ? null : values
+  return todo.length === coords.length ? null : { values, coarse }
 }
 
 async function fetchProvider(provider, coords, fetchImpl) {

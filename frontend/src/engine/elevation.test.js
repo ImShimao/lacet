@@ -75,8 +75,11 @@ describe("l'altitude hors de la zone couverte", () => {
       [7.3856, 46.2578],
       [7.386, 46.258],
     ]
-    const [values] = await fetchMany([suisse], { fetchImpl, providers })
-    expect(values).toEqual([1000, 1000])
+    const [relief] = await fetchMany([suisse], { fetchImpl, providers })
+    expect(relief.values).toEqual([1000, 1000])
+    // Valhalla tremble à ±1 m : le seuil monte, sinon la ville plate se met à
+    // grimper. Mesuré : 72 m de D+ inventés à Paris.
+    expect(relief.threshold).toBe(8)
   })
 
   it('demande les altitudes lointaines à un service qui répond aux navigateurs', async () => {
@@ -90,9 +93,9 @@ describe("l'altitude hors de la zone couverte", () => {
       const shape = JSON.parse(options.body).shape
       return { ok: true, json: async () => ({ height: shape.map(() => 500) }) }
     }
-    const [values] = await fetchMany([[[8.5, 47.3]]], { fetchImpl, providers: ['valhalla'] })
+    const [relief] = await fetchMany([[[8.5, 47.3]]], { fetchImpl, providers: ['valhalla'] })
     expect(envois).toEqual([{ url: 'https://valhalla1.openstreetmap.de/height', méthode: 'POST' }])
-    expect(values).toEqual([500])
+    expect(relief.values).toEqual([500])
   })
 
   it('envoie les points par lots de cinq cents, un envoi à la fois', async () => {
@@ -120,9 +123,11 @@ describe("l'altitude hors de la zone couverte", () => {
       [7.11, 47.5],
       [7.3, 47.5],
     ]
-    const [values] = await fetchMany([frontière], { fetchImpl, providers })
-    expect(values[0]).toBeCloseTo(710, 3)
-    expect(values[2]).toBe(1000)
+    const [relief] = await fetchMany([frontière], { fetchImpl, providers })
+    expect(relief.values[0]).toBeCloseTo(710, 3)
+    expect(relief.values[2]).toBe(1000)
+    // Un seul point grossier suffit à emporter le seuil du tracé entier.
+    expect(relief.threshold).toBe(8)
     expect(calls.filter((c) => c.service === 'valhalla')).toEqual([{ service: 'valhalla', points: 1 }])
   })
 
@@ -141,10 +146,12 @@ describe("l'altitude", () => {
   it('part en un seul envoi pour une recherche ordinaire', async () => {
     const ign = fakeIgn()
     const route = points(900, 1)
-    const [values] = await fetchMany([route], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
+    const [relief] = await fetchMany([route], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
     expect(ign.calls).toEqual([{ method: 'POST', points: 900 }])
-    expect(values[0]).toBeCloseTo(route[0][0] * 100, 3)
-    expect(values[899]).toBeCloseTo(route[899][0] * 100, 3)
+    expect(relief.values[0]).toBeCloseTo(route[0][0] * 100, 3)
+    expect(relief.values[899]).toBeCloseTo(route[899][0] * 100, 3)
+    // L'IGN est fin : le seuil d'hystérésis reste à deux mètres.
+    expect(relief.threshold).toBe(2)
   })
 
   it('découpe les très longues sorties en gros lots, jamais en même temps', async () => {
@@ -159,8 +166,8 @@ describe("l'altitude", () => {
   it('retombe sur les petits envois si le POST est refusé', async () => {
     const ign = fakeIgn({ postFails: true })
     const route = points(250, 3)
-    const [values] = await fetchMany([route], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
+    const [relief] = await fetchMany([route], { fetchImpl: ign.fetchImpl, providers: ['ign'] })
     expect(ign.calls.map((c) => `${c.method} ${c.points}`)).toEqual(['POST 250', 'GET 100', 'GET 100', 'GET 50'])
-    expect(values[249]).toBeCloseTo(route[249][0] * 100, 3)
+    expect(relief.values[249]).toBeCloseTo(route[249][0] * 100, 3)
   })
 })

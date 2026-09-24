@@ -7,6 +7,7 @@ import asyncio
 import pytest
 
 from app.elevation import (
+    COARSE_THRESHOLD_M,
     ElevationCache,
     _fetch_with_fallback,
     _ign_values,
@@ -156,10 +157,29 @@ class TestCouverture:
 
         self._fournisseurs(monkeypatch, ign, opentopo)
         coords = [(7.1, 47.5), (7.3, 47.5)]
-        values = asyncio.run(_fetch_with_fallback(coords))
+        values, coarse = asyncio.run(_fetch_with_fallback(coords))
         assert values == [710.0, 1000.0]
         # Le second n'a reçu que le point resté sans réponse.
         assert vus == [[(7.3, 47.5)]]
+        # Et la finesse suit le fournisseur : fin côté IGN, grossier côté monde.
+        assert coarse == [False, True]
+
+    def test_un_point_grossier_emporte_le_seuil(self, monkeypatch, tmp_path):
+        """Un modèle à trente mètres tremble : deux mètres de seuil compteraient
+        ce tremblement comme des côtes — 72 m de D+ inventés à Paris."""
+
+        def ign(coords):
+            return [c[0] * 100 if c[0] < 7.2 else None for c in coords]
+
+        def monde(coords):
+            return [1000.0] * len(coords)
+
+        self._fournisseurs(monkeypatch, ign, monde)
+        monkeypatch.setattr("app.elevation._cache", ElevationCache(tmp_path))
+        fin = asyncio.run(fetch_many([[(7.1, 47.5), (7.15, 47.5)]]))[0]
+        assert fin.threshold == 2.0
+        mêlé = asyncio.run(fetch_many([[(7.1, 47.6), (7.3, 47.6)]]))[0]
+        assert mêlé.threshold == COARSE_THRESHOLD_M
 
     def test_sans_profil_plutot_qu_un_faux(self, monkeypatch, tmp_path):
         def ign(coords):

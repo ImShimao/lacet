@@ -316,12 +316,14 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         ]
         # Tous les tracés en un seul jeu de requêtes : voir `elevation.fetch_many`.
         fetched = await fetch_many(sampled)
-        for i, (points, elevations) in enumerate(zip(sampled, fetched)):
-            if elevations:
-                elevations = smooth(elevations)
+        for i, (points, relief) in enumerate(zip(sampled, fetched)):
+            if relief and relief.values:
+                elevations = smooth(relief.values)
+                # Le seuil voyage avec le profil : c'est la source qui le fixe.
                 profiles[i] = (
                     elevations,
                     _profile_points(shortlist[i], elevations, sample_m),
+                    relief.threshold,
                 )
     lap("elevation")
 
@@ -330,7 +332,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     scored: list[tuple[float, Candidate, int]] = []
     for i, cand in enumerate(shortlist):
         elev = profiles.get(i)
-        gain = ascent_descent(elev[0])[0] if elev else None
+        gain = ascent_descent(elev[0], elev[2])[0] if elev else None
         scored.append((final_score(cand, target_m, req, gain, wind), cand, i))
 
     scored.sort(key=lambda t: -t[0])
@@ -712,7 +714,7 @@ def _to_model(
     ascent = descent = None
     profile_points = None
     if elev:
-        ascent, descent = ascent_descent(elev[0])
+        ascent, descent = ascent_descent(elev[0], elev[2])
         profile_points = elev[1]
 
     surfaces = SurfaceReport()
