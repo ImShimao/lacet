@@ -667,6 +667,31 @@ export default function App() {
     }
   }
 
+  // --- un parcours venu d'ailleurs ---------------------------------------------
+  // Le fichier entre comme favori : c'est là qu'on va chercher un parcours
+  // qu'on n'a pas calculé, et de là qu'on le lance. Rien n'y est noté ni guidé
+  // — voir `engine/gpxImport.js`.
+  const importGpx = async (file) => {
+    const { parseGpx, toRoute } = await import('./engine/gpxImport')
+    const lu = parseGpx(await file.text(), { name: file.name.replace(/\.gpx$/i, '') })
+    const route = toRoute(lu, {
+      sport: params.sport,
+      secondsPerKm:
+        params.sport === 'bike' || params.speedUnit === 'speed'
+          ? 3600 / params.speed_kmh
+          : params.pace_sec_per_km,
+    })
+    const next = [slim(route), ...saved.filter((r) => r.id !== route.id)]
+    setSaved(next)
+    save({ favorites: next })
+    // On l'ouvre tout de suite sur la carte : importer sans voir ce qui est
+    // entré laisserait douter que le bon fichier ait été choisi.
+    setSelected(route)
+    setResult({ routes: [route], rejected: [], meta: {} })
+    setTab('explore')
+    setSheet('peek')
+  }
+
   const toggleVoice = () => {
     voice.unlock()
     setSpeaking((v) => !v)
@@ -1058,6 +1083,7 @@ export default function App() {
             />
           ) : tab === 'routes' ? (
             <Library
+              onImport={importGpx}
               saved={saved}
               history={history}
               profile={params}

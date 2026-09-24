@@ -7,13 +7,13 @@
  * classement des itinéraires pour trouver le bouton qui télécharge une carte.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 
-export default function Library({ saved, history, onOpen, profile, mapStyle }) {
+export default function Library({ saved, history, onOpen, onImport, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
   const [view, setView] = useState(() =>
@@ -42,6 +42,8 @@ export default function Library({ saved, history, onOpen, profile, mapStyle }) {
           Favoris ({saved.length})
         </button>
       </div>
+
+      {view === 'saved' && onImport && <ImportRow onImport={onImport} />}
 
       {view === 'history' && history.length > 0 && (
         <div className="histfilter">
@@ -123,6 +125,59 @@ export default function Library({ saved, history, onOpen, profile, mapStyle }) {
             ))}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Faire entrer le parcours d'un autre.
+ *
+ * La trace d'un ami, une course balisée, un tracé dessiné ailleurs. Ce qui
+ * entre est **un tracé, rien de plus** : le fichier ne dit pas les rues, donc
+ * ni note de sécurité ni consignes de virage — et l'app le dit plutôt que de
+ * laisser croire qu'elle a regardé. Elle sait en revanche le suivre, dire où
+ * l'on en est, et prévenir quand on s'en écarte.
+ */
+function ImportRow({ onImport }) {
+  const [erreur, setErreur] = useState(null)
+  const champ = useRef(null)
+
+  const choisir = async (event) => {
+    const fichier = event.target.files?.[0]
+    // Le champ garde son fichier : sans ça, réimporter le même après une
+    // correction ne déclencherait rien.
+    event.target.value = ''
+    if (!fichier) return
+    setErreur(null)
+    try {
+      await onImport(fichier)
+    } catch (err) {
+      setErreur(err.message)
+    }
+  }
+
+  return (
+    <div className="import">
+      <input
+        ref={champ}
+        type="file"
+        accept=".gpx,application/gpx+xml,application/xml,text/xml"
+        onChange={choisir}
+        hidden
+      />
+      <button className="btn" onClick={() => champ.current?.click()}>
+        <Icon name="download" size={17} />
+        Importer un GPX
+      </button>
+      {erreur ? (
+        <p className="muted small import__error">{erreur}</p>
+      ) : (
+        <p className="muted small">
+          Le tracé d'un ami, une course balisée. Il sera suivi et mesuré, mais pas noté : un
+          fichier ne dit pas les rues qu'il emprunte, donc ni trottoirs, ni traversées, ni
+          consignes de virage.
+        </p>
       )}
     </div>
   )

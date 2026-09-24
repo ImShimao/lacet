@@ -390,6 +390,20 @@ input:focus-visible {
   overflow: hidden;
   box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.9);
 }
+/* L'entrée d'un parcours venu d'ailleurs : un bouton, et ce qu'il faut savoir
+   avant de s'y fier. */
+.import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+}
+.import__error {
+  color: var(--risk);
+}
+
 /* Ce que la liste annonce quand elle ne répond pas à une frappe. */
 .search__title {
   margin: 0;

@@ -123,6 +123,9 @@ export function slim(route) {
       road: s.road,
     })),
     geometry: route.geometry,
+    // Un parcours venu d'un fichier ne sera jamais noté : le rouvrir doit le
+    // dire, sinon l'absence de note passerait pour un calcul qui a échoué.
+    imported: route.imported || undefined,
     savedAt: new Date().toISOString(),
   }
 }

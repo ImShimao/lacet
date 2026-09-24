@@ -252,13 +252,14 @@ export default function Explore({
               sport={params.sport}
             />
           ) : (
-            // Un tracé de secours : le détail de la note n'existe pas, et un
-            // panneau vide laisserait croire à une évaluation réussie.
+            // Pas de note : le détail n'existe pas, et un panneau vide
+            // laisserait croire à une évaluation réussie. Deux raisons
+            // possibles, et elles n'appellent pas le même geste — réessayer
+            // plus tard, ou accepter que ce tracé-là ne sera jamais noté.
             <div className="notice">
-              Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de
-              ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni
-              traversées. Reste attentif, et relance la recherche plus tard pour une vraie
-              note.
+              {selected.imported
+                ? "Ce parcours vient d'un fichier : il donne une suite de points, pas les rues qu'ils empruntent. Lacet ne peut donc juger ni trottoirs, ni vitesses, ni traversées, et ne dicte pas les virages. Il le suit, le mesure et prévient si tu t'en écartes."
+                : "Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni traversées. Reste attentif, et relance la recherche plus tard pour une vraie note."}
             </div>
           )}
           {rejected?.length > 0 && <RejectedList rejected={rejected} />}
