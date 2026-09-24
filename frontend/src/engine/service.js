@@ -10,7 +10,7 @@
 // l'extrait figé que Python a lui aussi reçu.
 
 import { resample, haversineM } from './geo'
-import { Candidate, generateLoops, repeatLoop, similarity } from './loops'
+import { Candidate, generateLoops, repeatLoop, reverseCandidate, similarity } from './loops'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
@@ -188,6 +188,9 @@ export async function planLoops(input, deps) {
     now = () => new Date(),
     settings = SETTINGS,
     onProgress = () => {},
+    // Ce qu'il faut pour retourner une boucle plus tard : le worker le garde,
+    // les tests l'ignorent.
+    onReversible = () => {},
     // Points d'observation des tests de parité : le graphe construit, et chaque
     // lot de candidats bruts. Sans effet quand ils sont absents.
     trace = {},
@@ -308,7 +311,7 @@ export async function planLoops(input, deps) {
       if (relief?.values?.length) {
         const smoothed = smooth(relief.values)
         // Le seuil voyage avec le profil : c'est la source qui le fixe.
-        profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM), relief.threshold])
+        profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM), relief.threshold, sampleM])
       }
     })
   }
@@ -327,6 +330,23 @@ export async function planLoops(input, deps) {
   const routes = chosen.map(([score, cand, idx], rank) =>
     toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank]),
   )
+  // De quoi retourner une boucle sans tout recalculer : le graphe, le nœud de
+  // départ, et ce qui a servi à décrire chaque proposition. Passé par un rappel
+  // et non par la réponse : ces objets ne sont ni sérialisables ni publics, et
+  // la réponse doit rester exactement celle du moteur Python.
+  onReversible({
+    graph,
+    start,
+    req,
+    night,
+    routes: chosen.map(([score, cand, idx], rank) => ({
+      id: routes[rank].id,
+      cand,
+      elev: profiles.get(idx) ?? null,
+      score,
+      rank,
+    })),
+  })
 
   const rejectedBy = {}
   for (const r of rejected) rejectedBy[r.reason] = (rejectedBy[r.reason] ?? 0) + 1
@@ -648,6 +668,26 @@ function toModel(cand, score, req, elev, rank, steps, name) {
 }
 
 const directionOf = (bearing) => CARDINALS[Math.trunc(pyfloordiv(pymod(bearing + 22.5, 360), 45))]
+
+/**
+ * Le modèle d'une boucle retournée, prêt pour l'écran.
+ *
+ * Tout est recalculé comme à la recherche — consignes, nom, note — sauf le
+ * relief, qui n'a pas à être redemandé : ce sont les mêmes points dans l'ordre
+ * inverse. Seuls le D+ et le D− échangent leur rôle.
+ */
+export function reverseRoute(graph, start, cand, { req, elev, score, rank, night }) {
+  const flipped = reverseCandidate(graph, start, cand, { night })
+  const mirrored = elev
+    ? [[...elev[0]].reverse(), profilePoints(flipped, [...elev[0]].reverse(), elev[3]), elev[2], elev[3]]
+    : null
+  const [name] = nameRoutes([flipped])
+  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name)
+  // Le nom ne dit pas le sens — le cap moyen d'une boucle est le même dans les
+  // deux — et la carte le montre par ses chevrons. L'écran, lui, a besoin de le
+  // savoir : c'est ce drapeau qui fait du bouton une bascule.
+  return { route: { ...route, reversed: flipped.reversed }, cand: flipped }
+}
 
 export function nameRoutes(cands) {
   const perRoute = cands.map(roadLengths)

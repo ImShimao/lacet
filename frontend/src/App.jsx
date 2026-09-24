@@ -18,7 +18,7 @@ import { km, pace } from './format'
 import { load, recentPlaces, save, slim } from './storage'
 import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
-import { clearEngineData, prefetchOnDevice } from './engine/client'
+import { clearEngineData, prefetchOnDevice, reverseOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
 import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
@@ -647,6 +647,26 @@ export default function App() {
     setStarting(kind)
   }
 
+  // --- l'autre sens ------------------------------------------------------------
+  // La même boucle retournée : mêmes rues, même note, mais les côtes dans
+  // l'autre sens, le vent à la fin, et toutes les consignes refaites. Le moteur
+  // la recalcule à partir du candidat qu'il a gardé ; si le graphe a été
+  // remplacé entre-temps, il le dit, et on ne prétend pas savoir.
+  const [reversing, setReversing] = useState(false)
+  const reverseSelected = async () => {
+    if (!selected || reversing) return
+    setReversing(true)
+    try {
+      const { route } = await reverseOnDevice(selected.id)
+      setResult((r) => (r ? { ...r, routes: r.routes.map((x) => (x.id === selected.id ? route : x)) } : r))
+      setSelected(route)
+    } catch (err) {
+      setError({ message: err.message, offline: false })
+    } finally {
+      setReversing(false)
+    }
+  }
+
   const toggleVoice = () => {
     voice.unlock()
     setSpeaking((v) => !v)
@@ -1094,6 +1114,8 @@ export default function App() {
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
               onRegenerate={() => search(undefined, { regenerate: true })}
+              reversing={reversing}
+              onReverse={selected && !selected.remote ? reverseSelected : null}
               onOpenFilters={() => setFiltersOpen(true)}
               onFavorite={toggleFavorite}
               onStart={() => beginRun('route')}

@@ -72,5 +72,8 @@ export const prefetchOnDevice = (params) =>
  */
 export const detourOnDevice = (payload) => request('detour', payload)
 
+/** La même boucle dans l'autre sens, tant qu'elle est à l'écran. */
+export const reverseOnDevice = (id) => request('reverse', { id })
+
 /** Oublie les données OpenStreetMap gardées et les graphes en mémoire. */
 export const clearEngineData = () => request('clear', null)

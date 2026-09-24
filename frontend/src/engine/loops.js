@@ -511,6 +511,29 @@ function loopBearing(start, geometry) {
   return bearingDeg(start, centroid)
 }
 
+/**
+ * La même boucle, parcourue à l'envers.
+ *
+ * Le sens n'est pas décoratif : il décide des côtes qu'on prend en montant, du
+ * vent qu'on a dans le dos à la fin, et de chaque consigne de virage. Une
+ * boucle retournée est **le même chemin**, donc les mêmes rues, la même
+ * distance et la même note de sécurité — mais un autre tracé vécu.
+ *
+ * On retourne la suite d'arêtes et de nœuds, puis on laisse `measure` tout
+ * recalculer : géométrie, segments, traversées, cap, statistiques. Rien n'est
+ * recopié à la main, donc rien ne peut diverger de ce qu'aurait produit une
+ * recherche qui l'aurait trouvée dans ce sens-là.
+ */
+export function reverseCandidate(graph, start, cand, options) {
+  const flipped = new Candidate([...cand.edges].reverse(), [...cand.nodes].reverse())
+  flipped.laps = cand.laps
+  // Retourner deux fois ramène au sens d'origine : le drapeau suit, pour que
+  // le bouton soit une bascule et non un aller simple.
+  flipped.reversed = !cand.reversed
+  measure(graph, start, flipped, options)
+  return flipped
+}
+
 export function detectCrossings(graph, cand) {
   const used = cand.edgeSet
   const hits = []

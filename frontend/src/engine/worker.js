@@ -23,7 +23,7 @@ import { haversineM } from './geo'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
 import { currentWind } from './environment'
-import { graphRequest, normalizeRequest, planDetour, planLoops } from './service'
+import { graphRequest, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
 import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
@@ -138,6 +138,12 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
   }
 }
 
+// De quoi retourner la boucle qu'on vient de proposer : le graphe est déjà
+// gardé pour la recherche suivante, on lui adjoint les candidats et leur
+// relief. Remplacé à chaque recherche — on ne retourne que ce qui est à
+// l'écran, et une boucle d'hier n'a plus de graphe sous elle.
+let lastReversible = null
+
 self.onmessage = async ({ data }) => {
   const { id, type, payload } = data
   const progress = (stage, fraction) => self.postMessage({ id, type: 'progress', stage, fraction })
@@ -160,6 +166,9 @@ self.onmessage = async ({ data }) => {
       const result = await planLoops(payload, {
         loadGraph: (args) => loadGraph(args, progress),
         onProgress: progress,
+        onReversible: (r) => {
+          lastReversible = r
+        },
       })
       // `planLoops` a compté tout le chargement comme du téléchargement : on lui
       // rend le détail, arrondi comme le reste de ses mesures.
@@ -188,6 +197,35 @@ self.onmessage = async ({ data }) => {
         self.postMessage({ id, type: 'result', result: replacement })
         return
       }
+      self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
+    }
+    return
+  }
+
+  // La même boucle, dans l'autre sens. Pas une nouvelle recherche : le même
+  // chemin, les mêmes rues, la même note — d'autres côtes et d'autres virages.
+  if (type === 'reverse') {
+    const gardé = lastReversible?.routes?.find((r) => r.id === payload.id)
+    if (!gardé) {
+      // Le graphe a été remplacé depuis : il faudrait tout retélécharger pour
+      // retourner une boucle, ce qui n'en vaut pas la peine. L'écran le dira.
+      self.postMessage({ id, type: 'error', error: { name: 'StaleRoute', message: 'À refaire : cette boucle n’est plus en mémoire.' } })
+      return
+    }
+    try {
+      const { route, cand } = reverseRoute(lastReversible.graph, lastReversible.start, gardé.cand, {
+        req: lastReversible.req,
+        elev: gardé.elev,
+        score: gardé.score,
+        rank: gardé.rank,
+        night: lastReversible.night,
+      })
+      // Le sens retenu devient celui qu'on garde : presser une seconde fois
+      // ramène au sens d'origine, au lieu de refaire le même demi-tour.
+      gardé.cand = cand
+      if (gardé.elev) gardé.elev = [[...gardé.elev[0]].reverse(), gardé.elev[1], gardé.elev[2], gardé.elev[3]]
+      self.postMessage({ id, type: 'result', result: { route } })
+    } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
     }
     return

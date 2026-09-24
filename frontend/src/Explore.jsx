@@ -38,6 +38,8 @@ export default function Explore({
   onToggleDetail,
   onSearch,
   onRegenerate,
+  onReverse,
+  reversing = false,
   onOpenFilters,
   onFavorite,
   onStart,
@@ -293,6 +295,21 @@ export default function Explore({
         >
           <Icon name="download" size={19} />
         </button>
+        {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend en
+            montant, du vent qu'on a dans le dos à la fin, et de chaque consigne
+            de virage. La même boucle à l'envers est une autre sortie. */}
+        {onReverse && (
+          <button
+            className={`btn btn--icon ${selected.reversed ? 'btn--on' : ''}`}
+            onClick={onReverse}
+            disabled={reversing}
+            aria-pressed={Boolean(selected.reversed)}
+            title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+            aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+          >
+            <Icon name="uturn" size={19} />
+          </button>
+        )}
         <button
           className="btn btn--icon"
           onClick={onRegenerate ?? onSearch}

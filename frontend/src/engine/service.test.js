@@ -3,7 +3,7 @@ import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
-import { SETTINGS, extractRadiusM, planLoops } from './service'
+import { SETTINGS, extractRadiusM, planLoops, reverseRoute } from './service'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -98,4 +98,82 @@ describe('un village sans boucle', () => {
     // Et les motifs d'écart restent visibles.
     expect(Object.keys(result.meta.rejected_by).length).toBeGreaterThan(0)
   }, 30_000)
+})
+
+/**
+ * La même boucle, dans l'autre sens.
+ *
+ * Le sens n'est pas décoratif : il décide des côtes qu'on prend en montant, du
+ * vent qu'on a dans le dos à la fin, et de chaque consigne de virage. Ce qui ne
+ * doit pas changer, c'est le chemin lui-même — mêmes rues, même longueur, même
+ * note. Une inversion qui se contenterait de retourner la géométrie sans
+ * refaire les consignes enverrait à gauche là où il faut tourner à droite.
+ */
+describe('parcourir à l’envers', () => {
+  const dir = new URL('./__fixtures__/parity/', import.meta.url)
+  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL('extract-beaune.json.gz', dir))).toString('utf8')))
+  const graph = buildGraph(extract, { sport: 'run' })
+
+  async function boucle() {
+    let gardé = null
+    const result = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3 },
+      {
+        loadGraph: async () => graph,
+        fetchElevations: async (routes) =>
+          routes.map((coords) => ({ values: coords.map(([lon], i) => 100 + i + lon), threshold: 2 })),
+        wind: async () => null,
+        onReversible: (r) => {
+          gardé = r
+        },
+      },
+    )
+    return { route: result.routes[0], gardé }
+  }
+
+  it('garde le chemin et retourne le sens', async () => {
+    const { route, gardé } = await boucle()
+    const premier = gardé.routes[0]
+    const { route: envers } = reverseRoute(gardé.graph, gardé.start, premier.cand, {
+      req: gardé.req,
+      elev: premier.elev,
+      score: premier.score,
+      rank: premier.rank,
+      night: gardé.night,
+    })
+
+    // Le même chemin : même longueur au décimètre, même note, mêmes rues.
+    expect(envers.distance_m).toBeCloseTo(route.distance_m, 1)
+    expect(envers.grade).toBe(route.grade)
+    // Les mêmes revêtements, au millimètre : les longueurs sont additionnées
+    // dans l'ordre inverse, et le flottant s'en souvient à la dixième décimale.
+    for (const clef of Object.keys(route.surfaces)) {
+      expect(envers.surfaces[clef]).toBeCloseTo(route.surfaces[clef], 3)
+    }
+
+    // Mais parcouru à l'envers : la boucle part du même point et repasse par
+    // l'avant-dernier point d'abord.
+    expect(envers.geometry[0]).toEqual(route.geometry[0])
+    expect(envers.geometry[1]).toEqual(route.geometry[route.geometry.length - 2])
+
+    // Ce qui montait descend.
+    expect(envers.ascent_m).toBeCloseTo(route.descent_m, 1)
+    expect(envers.descent_m).toBeCloseTo(route.ascent_m, 1)
+
+    // Et les consignes sont refaites, pas recopiées.
+    expect(envers.instructions[0].turn).toBe('start')
+    expect(envers.instructions[envers.instructions.length - 1].turn).toBe('finish')
+    expect(envers.reversed).toBe(true)
+  }, 20_000)
+
+  it('revient au sens d’origine si on retourne deux fois', async () => {
+    const { route, gardé } = await boucle()
+    const premier = gardé.routes[0]
+    const args = { req: gardé.req, elev: premier.elev, score: premier.score, rank: premier.rank, night: gardé.night }
+    const { cand: envers } = reverseRoute(gardé.graph, gardé.start, premier.cand, args)
+    const { route: endroit } = reverseRoute(gardé.graph, gardé.start, envers, args)
+
+    expect(endroit.geometry).toEqual(route.geometry)
+    expect(endroit.reversed).toBe(false)
+  }, 20_000)
 })
