@@ -1,0 +1,82 @@
+/** @vitest-environment jsdom */
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
+import FiltersSheet, { DEFAULTS } from './FiltersSheet.jsx'
+
+/**
+ * Le panneau des filtres, tel qu'on s'en sert.
+ *
+ * Trois choses à tenir. **Ce qu'on règle se voit tout de suite** : c'est toute
+ * la raison du retour de l'allure ici — une heure de course ne veut rien dire
+ * tant qu'on ignore à quelle allure, et le nombre de kilomètres doit bouger
+ * sous les doigts. **Rien ne part avant « Rechercher »** : on ouvre souvent le
+ * panneau pour regarder, et une recherche déclenchée par un réglage effleuré
+ * coûterait dix secondes et des données. Et **« Annuler » annule vraiment** —
+ * les réglages touchés ne doivent pas rester.
+ */
+
+afterEach(cleanup)
+
+const ouvrir = (value = DEFAULTS) => {
+  const onApply = vi.fn()
+  const onClose = vi.fn()
+  render(<FiltersSheet value={value} onApply={onApply} onClose={onClose} />)
+  return { onApply, onClose }
+}
+
+/** Le texte de conversion « environ 9,2 km », sans se soucier des espaces. */
+const conversion = () => screen.getByText(/Converti en distance/).textContent.replace(/\s+/g, ' ')
+
+describe('le panneau des filtres', () => {
+  it('convertit la durée en distance, et suit l’allure qu’on règle', () => {
+    ouvrir({ ...DEFAULTS, mode: 'duration', duration_min: 60, pace_sec_per_km: 390 })
+    expect(conversion()).toContain('environ 9,2 km')
+
+    // Une allure plus lente, c'est moins de kilomètres dans la même heure.
+    const plus = screen.getAllByRole('button', { name: 'Augmenter' })
+    fireEvent.click(plus[plus.length - 1])
+    expect(screen.getByText(/6:35 \/km/)).toBeInTheDocument()
+    expect(conversion()).toContain('environ 9,1 km')
+  })
+
+  it('annonce la durée de la boucle quand on règle une distance', () => {
+    ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
+    expect(screen.getByText(/environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
+  })
+
+  it('ne lance rien tant qu’on n’a pas demandé', () => {
+    const { onApply } = ouvrir()
+    fireEvent.click(screen.getByRole('button', { name: /Sentier/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vélo' }))
+    // Le terrain change de nom avec l'activité — « Sentier » à pied, « VTT » à
+    // vélo —, et le panneau le suit sans rien lancer.
+    expect(screen.getByRole('button', { name: /VTT/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('applique tout d’un coup, et seulement à la demande', () => {
+    const { onApply } = ouvrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Vélo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply).toHaveBeenCalledTimes(1)
+    expect(onApply.mock.calls[0][0]).toMatchObject({ sport: 'bike' })
+  })
+
+  it('oublie ce qu’on a touché si l’on renonce', () => {
+    const { onApply, onClose } = ouvrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Vélo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('montre la vitesse et non l’allure à vélo', () => {
+    ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', speed_kmh: 20 })
+    expect(screen.getByText('Vitesse')).toBeInTheDocument()
+    expect(screen.getByText(/20 km\/h/)).toBeInTheDocument()
+    // Le choix d'unité n'a pas de sens à vélo : c'est la vitesse qui part au
+    // moteur, quoi qu'on affiche.
+    expect(screen.queryByRole('button', { name: 'min/km' })).not.toBeInTheDocument()
+  })
+})
