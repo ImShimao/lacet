@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   asCoordinates,
   expandNicknames,
   fromMapbox,
   fromPhoton,
   rankPlaces,
+  resetProviders,
   search,
   shorten,
   similarity,
@@ -19,6 +20,10 @@ import {
  */
 
 const GUEBWILLER = { lat: 47.9097, lon: 7.2106 }
+
+// Photon boude une minute après un refus, et le cache garde ce qu'il a trouvé :
+// deux états qui survivent à un test et fausseraient le suivant.
+beforeEach(resetProviders)
 
 /** Un résultat de Photon, tel qu'il arrive. */
 const feature = (name, [lon, lat], props = {}) => ({
@@ -299,6 +304,77 @@ describe('quand rien ne répond', () => {
   it('rend une liste vide quand les serveurs répondent, mais ne connaissent rien', async () => {
     const fetchImpl = async () => ({ ok: true, json: async () => ({ features: [] }) })
     expect(await search('zzzzqxwv', { near: GUEBWILLER, fetchImpl })).toEqual([])
+  })
+})
+
+/**
+ * Un service gratuit qui traîne est plus fréquent qu'un service en panne, et un
+ * service fâché plus fréquent encore : Photon ferme la porte quand on tape vite.
+ */
+describe('quand un fournisseur traîne ou se fâche', () => {
+  const nominatimRépond = (url) =>
+    String(url).includes('nominatim')
+      ? {
+          ok: true,
+          json: async () => [
+            { lat: '47.9097', lon: '7.2106', display_name: 'Guebwiller', name: 'Guebwiller', address: { city: 'Guebwiller' } },
+          ],
+        }
+      : null
+
+  it('ne laisse pas un fournisseur muet retenir le champ', async () => {
+    const appels = []
+    const fetchImpl = async (url, options = {}) => {
+      appels.push(String(url).includes('photon') ? 'photon' : 'nominatim')
+      const secours = nominatimRépond(url)
+      if (secours) return secours
+      // Photon ne répondra jamais : seul le délai peut en sortir.
+      return new Promise((_, rejette) => {
+        options.signal?.addEventListener('abort', () => rejette(new DOMException('coupé', 'AbortError')))
+      })
+    }
+    const results = await search('guebwiller', { near: GUEBWILLER, fetchImpl, timeoutMs: 20 })
+    expect(results[0].short).toBe('Guebwiller')
+    expect(appels).toContain('nominatim')
+  })
+
+  it('laisse tranquille un fournisseur qui vient de refuser', async () => {
+    const appels = []
+    const fetchImpl = async (url) => {
+      const quoi = String(url).includes('photon') ? 'photon' : 'nominatim'
+      appels.push(quoi)
+      if (quoi === 'photon') return { ok: false, status: 429, json: async () => ({}) }
+      return nominatimRépond(url)
+    }
+    await search('guebwiller', { near: GUEBWILLER, fetchImpl })
+    const première = appels.filter((a) => a === 'photon').length
+    expect(première).toBeGreaterThan(0)
+
+    // La frappe suivante ne retourne pas frapper à la porte fermée.
+    appels.length = 0
+    await search('colmar', { near: GUEBWILLER, fetchImpl })
+    expect(appels.filter((a) => a === 'photon')).toHaveLength(0)
+    expect(appels).toContain('nominatim')
+  })
+
+  it('retoque quand la bouderie est passée', async () => {
+    const fetchImpl = async (url) =>
+      String(url).includes('photon')
+        ? { ok: false, status: 429, json: async () => ({}) }
+        : nominatimRépond(url)
+    await search('guebwiller', { near: GUEBWILLER, fetchImpl })
+    resetProviders()
+
+    const appels = []
+    const ensuite = async (url) => {
+      appels.push(String(url).includes('photon') ? 'photon' : 'nominatim')
+      return String(url).includes('photon')
+        ? { ok: true, json: async () => ({ features: [feature('Guebwiller', [7.2106, 47.9097], { osm_key: 'place', osm_value: 'town' })] }) }
+        : nominatimRépond(url)
+    }
+    const results = await search('guebwiller', { near: GUEBWILLER, fetchImpl: ensuite })
+    expect(appels).toContain('photon')
+    expect(results[0].short).toBe('Guebwiller')
   })
 })
 

@@ -22,6 +22,16 @@
 // point au nom de sa rue), où il reste le meilleur. Sa charte demande une
 // requête par seconde au plus : la cadence est tenue ici.
 //
+// **Aucun fournisseur ne retient le champ.** Chaque appel a quatre secondes,
+// pas plus : au-delà, on se passe de lui. Un service gratuit qui traîne est
+// plus fréquent qu'un service en panne, et sans cette limite la recherche
+// attendait le temps que le navigateur voulait bien — trente secondes, parfois.
+//
+// **Et un fournisseur qui refuse est laissé tranquille une minute.** Photon
+// ferme la porte quand on tape trop vite ; sans cette pause, chaque frappe
+// suivante recommençait à toquer, perdait son délai, et retombait sur Nominatim
+// de toute façon. Une minute plus tard, on retoque.
+//
 // **Et les surnoms.** Personne ne tape « McDonald's » : on tape « macdo ». Aucun
 // géocodeur ne le devine ; une petite table les traduit avant d'interroger.
 //
@@ -58,9 +68,22 @@ const CACHE_MAX = 500
 // quai, le bâtiment et le commerce qu'il abrite.
 const SAME_PLACE_M = 150
 
+// Quatre secondes : c'est déjà très long quand on tape un nom de rue, et c'est
+// plus que ce que Photon met dans 99 % des cas (mesuré entre 120 et 900 ms).
+const CALL_TIMEOUT_MS = 4000
+// Le temps qu'on laisse à un fournisseur fâché pour se calmer.
+const SULK_MS = 60_000
+
 const cache = new Map()
 let lastCall = 0
 let chain = Promise.resolve()
+let sulkUntil = 0
+
+/** Pour les tests : le fournisseur n'est plus fâché, et le cache est vide. */
+export function resetProviders() {
+  sulkUntil = 0
+  cache.clear()
+}
 
 /**
  * Ce qu'on tape, et ce que les cartes écrivent. Clés en minuscules et sans
@@ -235,17 +258,26 @@ function separate(text) {
   return null
 }
 
-/** Une requête par seconde au plus vers Nominatim, tous appels confondus. */
-function throttled(url, params, signal, fetchImpl = fetch) {
+/**
+ * Une requête par seconde au plus vers Nominatim, tous appels confondus.
+ *
+ * Le délai maximum ne couvre que la requête, jamais l'attente : cette seconde
+ * est notre politesse envers un service gratuit, pas un serveur qui traîne. La
+ * compter dans le budget revenait à abandonner Nominatim avant de l'avoir
+ * appelé — et c'est justement le secours.
+ */
+function throttled(url, params, signal, fetchImpl = fetch, timeoutMs = CALL_TIMEOUT_MS) {
   const run = chain.then(async () => {
     const wait = 1050 - (Date.now() - lastCall)
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
     if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
     lastCall = Date.now()
-    const response = await fetchImpl(`${url}?${new URLSearchParams(params)}`, {
-      headers: { 'Accept-Language': 'fr' },
-      signal,
-    })
+    const response = await withDeadline(timeoutMs, signal, (inner) =>
+      fetchImpl(`${url}?${new URLSearchParams(params)}`, {
+        headers: { 'Accept-Language': 'fr' },
+        signal: inner,
+      }),
+    )
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     return response.json()
   })
@@ -257,7 +289,10 @@ function throttled(url, params, signal, fetchImpl = fetch) {
  * Cherche un lieu. `near` ({lat, lon}) : là où l'on est — les lieux proches
  * passent devant, et chaque résultat porte sa distance.
  */
-export async function search(query, { limit = 7, near = null, signal, fetchImpl = fetch, token = MAPBOX_TOKEN } = {}) {
+export async function search(
+  query,
+  { limit = 7, near = null, signal, fetchImpl = fetch, token = MAPBOX_TOKEN, timeoutMs = CALL_TIMEOUT_MS } = {},
+) {
   const text = query.trim()
   if (text.length < 2) return []
   const point = asCoordinates(text)
@@ -273,11 +308,36 @@ export async function search(query, { limit = 7, near = null, signal, fetchImpl 
   }
 
   const asked = expandNicknames(text)
+  // Un appel à Photon, sauf s'il boude — auquel cas on ne perd pas le délai à
+  // frapper une porte fermée, et Nominatim prend la relève plus bas.
+  const ask = (texte, autour) =>
+    Date.now() < sulkUntil
+      ? Promise.resolve(null)
+      : attempt(
+          () =>
+            withDeadline(timeoutMs, signal, (inner) =>
+              photon(texte, { limit, near: autour, signal: inner, fetchImpl }),
+            ),
+          signal,
+        ).then((list) => {
+          // Un refus ferme la porte pour une minute ; une réponse la rouvre.
+          sulkUntil = list === null ? Date.now() + SULK_MS : 0
+          return list
+        })
+
   // Les deux sources partent ensemble : l'attente est celle de la plus lente,
   // pas leur somme. Celle qui échoue ne fait pas échouer la recherche.
   const found = await Promise.all([
-    attempt(() => photon(asked, { limit, near, signal, fetchImpl })),
-    token ? attempt(() => mapbox(asked, { limit, near, signal, fetchImpl, token })) : Promise.resolve(null),
+    ask(asked, near),
+    token
+      ? attempt(
+          () =>
+            withDeadline(timeoutMs, signal, (inner) =>
+              mapbox(asked, { limit, near, signal: inner, fetchImpl, token }),
+            ),
+          signal,
+        )
+      : Promise.resolve(null),
   ])
   if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
 
@@ -286,8 +346,8 @@ export async function search(query, { limit = 7, near = null, signal, fetchImpl 
   if (!good(results, asked)) {
     const retry = shorten(asked)
     const second = await Promise.all([
-      near ? attempt(() => photon(asked, { limit, near: null, signal, fetchImpl })) : Promise.resolve(null),
-      retry ? attempt(() => photon(retry, { limit, near, signal, fetchImpl })) : Promise.resolve(null),
+      near ? ask(asked, null) : Promise.resolve(null),
+      retry ? ask(retry, near) : Promise.resolve(null),
     ])
     if (signal?.aborted) throw new DOMException('annulé', 'AbortError')
     lists.push(...second)
@@ -297,7 +357,7 @@ export async function search(query, { limit = 7, near = null, signal, fetchImpl 
     // Personne n'a répondu, ou personne n'a rien trouvé : Nominatim, sur les
     // mêmes données mais un autre index — il lui arrive de trouver seul.
     try {
-      results = await nominatim(asked, { limit, near, signal, fetchImpl })
+      results = await nominatim(asked, { limit, near, signal, fetchImpl, timeoutMs })
     } catch (error) {
       if (error.name === 'AbortError') throw error
       // Si personne n'a répondu, ce n'est pas « aucun lieu de ce nom » : c'est
@@ -334,14 +394,39 @@ function good(results, query) {
   return best.distance_m == null || best.distance_m <= FAR_M
 }
 
-/** Rend `null` plutôt que d'échouer — sauf si la frappe a continué. */
-async function attempt(task) {
+/**
+ * Rend `null` plutôt que d'échouer — sauf si la frappe a continué.
+ *
+ * La distinction se lit sur le signal extérieur, et non sur le nom de
+ * l'erreur : un appel abandonné pour dépassement de délai lève lui aussi un
+ * `AbortError`, et le prendre pour une frappe annulée ferait échouer toute la
+ * recherche au lieu de passer au fournisseur suivant.
+ */
+async function attempt(task, signal) {
   try {
     return await task()
   } catch (error) {
-    if (error.name === 'AbortError') throw error
+    if (error.name === 'AbortError' && signal?.aborted) throw error
     return null
   }
+}
+
+/**
+ * Le même appel, avec une limite de temps.
+ *
+ * Le signal intérieur suit celui de l'appelant — une frappe qui continue coupe
+ * tout — et s'y ajoute un réveil : passé `ms`, l'appel est abandonné et le
+ * fournisseur suivant prend la main.
+ */
+function withDeadline(ms, signal, task) {
+  const stop = new AbortController()
+  const relay = () => stop.abort()
+  signal?.addEventListener('abort', relay)
+  const timer = setTimeout(relay, ms)
+  return task(stop.signal).finally(() => {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', relay)
+  })
 }
 
 async function photon(text, { limit, near, signal, fetchImpl }) {
@@ -427,7 +512,7 @@ const MAPBOX_KINDS = {
   mountain: 'Sommet',
 }
 
-async function nominatim(text, { limit, near, signal, fetchImpl = fetch }) {
+async function nominatim(text, { limit, near, signal, fetchImpl = fetch, timeoutMs = CALL_TIMEOUT_MS }) {
   const params = { q: text.slice(0, 120), format: 'jsonv2', limit: String(limit), addressdetails: '1' }
   // Une préférence, pas une frontière : `bounded` à 0 laisse passer Paris
   // quand on cherche Paris depuis Colmar.
@@ -435,7 +520,7 @@ async function nominatim(text, { limit, near, signal, fetchImpl = fetch }) {
     params.viewbox = [near.lon - 0.5, near.lat + 0.3, near.lon + 0.5, near.lat - 0.3].map((v) => v.toFixed(4)).join(',')
     params.bounded = '0'
   }
-  const raw = await throttled(NOMINATIM_URL, params, signal, fetchImpl)
+  const raw = await throttled(NOMINATIM_URL, params, signal, fetchImpl, timeoutMs)
   const places = raw
     .filter((item) => item.lat && item.lon)
     .map((item) => ({
