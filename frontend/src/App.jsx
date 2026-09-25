@@ -18,7 +18,7 @@ import { km, pace } from './format'
 import { load, recentPlaces, save, slim } from './storage'
 import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
-import { clearEngineData, prefetchOnDevice, reverseOnDevice } from './engine/client'
+import { clearEngineData, matchOnDevice, prefetchOnDevice, reverseOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
 import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
@@ -674,13 +674,35 @@ export default function App() {
   const importGpx = async (file) => {
     const { parseGpx, toRoute } = await import('./engine/gpxImport')
     const lu = parseGpx(await file.text(), { name: file.name.replace(/\.gpx$/i, '') })
-    const route = toRoute(lu, {
+    const brut = toRoute(lu, {
       sport: params.sport,
       secondsPerKm:
         params.sport === 'bike' || params.speedUnit === 'speed'
           ? 3600 / params.speed_kmh
           : params.pace_sec_per_km,
     })
+
+    // **Reconnaître les rues.** Un fichier ne donne que des points ; accroché au
+    // réseau, il rend un parcours comme les autres — noms de rues, traversées,
+    // note, consignes. Le téléchargement des rues peut prendre quelques
+    // secondes, d'où la barre de progression ; si rien n'est reconnu, on garde
+    // le tracé tel quel plutôt que de prétendre.
+    let route = brut
+    setBusy(true)
+    setProgress({ stage: 'data', fraction: 0 })
+    try {
+      const out = await matchOnDevice(
+        { trace: lu.coords, sport: params.sport, name: brut.name },
+        (stage, fraction) => setProgress({ stage, fraction }),
+      )
+      if (out?.route) route = { ...out.route, id: brut.id, duration_s: brut.duration_s }
+    } catch {
+      /* pas de réseau, ou rues introuvables : le tracé brut fera l'affaire */
+    } finally {
+      setBusy(false)
+      setProgress(null)
+    }
+
     const next = [slim(route), ...saved.filter((r) => r.id !== route.id)]
     setSaved(next)
     save({ favorites: next })

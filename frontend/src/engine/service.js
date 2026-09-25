@@ -10,7 +10,7 @@
 // l'extrait figé que Python a lui aussi reçu.
 
 import { resample, haversineM } from './geo'
-import { Candidate, generateLoops, repeatLoop, reverseCandidate, similarity } from './loops'
+import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
@@ -668,6 +668,27 @@ function toModel(cand, score, req, elev, rank, steps, name) {
 }
 
 const directionOf = (bearing) => CARDINALS[Math.trunc(pyfloordiv(pymod(bearing + 22.5, 360), 45))]
+
+/**
+ * Le modèle d'un parcours importé **reconnu sur le réseau**.
+ *
+ * L'accrochage (`matcher.js`) a rendu la suite d'arêtes que la trace emprunte ;
+ * à partir de là, ce n'est plus un parcours étranger. On le décrit comme
+ * n'importe quelle boucle — mêmes segments, mêmes traversées, même note —, et
+ * les consignes sont construites par le même constructeur que les autres.
+ *
+ * Le nom, lui, reste celui du fichier : c'est celui que la personne reconnaît.
+ */
+export function matchedRoute(graph, start, matched, { req, name, elev = null, night = false }) {
+  const cand = new Candidate(matched.edges, matched.nodes)
+  measure(graph, start, cand, { night })
+  // Le profil se dessine sur le chemin reconnu, pas sur la trace : c'est
+  // seulement ici qu'on a la géométrie définitive. Sans ce calcul, le dénivelé
+  // s'affichait bien et la courbe restait vide.
+  const relief = elev && !elev[1] ? [elev[0], profilePoints(cand, elev[0], elev[3]), elev[2], elev[3]] : elev
+  const route = toModel(cand, 0, req, relief, 0, buildInstructions(graph, start, cand), name)
+  return { ...route, imported: true, matched: true }
+}
 
 /**
  * Le modèle d'une boucle retournée, prêt pour l'écran.

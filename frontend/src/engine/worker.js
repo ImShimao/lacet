@@ -19,11 +19,12 @@
 // ou le rejoint en cours de route au lieu de le recommencer.
 
 import { buildGraph } from './graph'
-import { haversineM } from './geo'
+import { haversineM, resample } from './geo'
+import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
-import { currentWind } from './environment'
-import { graphRequest, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
+import { currentWind, fetchMany, smooth } from './environment'
+import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
 import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
@@ -144,6 +145,17 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
 // l'écran, et une boucle d'hier n'a plus de graphe sous elle.
 let lastReversible = null
 
+const bbox = (trace) => ({
+  min: [Math.min(...trace.map((c) => c[0])), Math.min(...trace.map((c) => c[1]))],
+  max: [Math.max(...trace.map((c) => c[0])), Math.max(...trace.map((c) => c[1]))],
+})
+
+const traceLength = (trace) => {
+  let total = 0
+  for (let i = 1; i < trace.length; i += 1) total += haversineM(trace[i - 1], trace[i])
+  return total
+}
+
 self.onmessage = async ({ data }) => {
   const { id, type, payload } = data
   const progress = (stage, fraction) => self.postMessage({ id, type: 'progress', stage, fraction })
@@ -197,6 +209,66 @@ self.onmessage = async ({ data }) => {
         self.postMessage({ id, type: 'result', result: replacement })
         return
       }
+      self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
+    }
+    return
+  }
+
+  // Reconnaître les rues d'un parcours importé. Sans ça, un GPX n'est qu'une
+  // suite de points : ni nom de rue, ni traversée, ni note, ni consigne.
+  if (type === 'match') {
+    try {
+      const { trace, sport, name } = payload
+      const box = bbox(trace)
+      const rayon = Math.max(1200, haversineM(box.min, box.max) / 2 + 400)
+      const longueur = traceLength(trace)
+      const graph = await loadGraph(
+        {
+          lat: (box.min[1] + box.max[1]) / 2,
+          lon: (box.min[0] + box.max[0]) / 2,
+          radiusM: rayon,
+          targetM: longueur,
+          sport: sport ?? 'run',
+          allowTrail: true,
+        },
+        progress,
+      )
+      progress('routing', 0)
+      const matched = matchTrace(graph, trace)
+      if (!matched) {
+        self.postMessage({ id, type: 'result', result: { route: null } })
+        return
+      }
+      const start = matched.nodes[0]
+      // Le relief du chemin reconnu, pas celui du fichier : la géométrie a
+      // changé en rejoignant les rues, et mélanger les deux mentirait.
+      progress('elevation', 0)
+      const geometry = []
+      let cur = start
+      for (const e of matched.edges) {
+        const coords = graph.coordsFrom(e, cur)
+        for (const c of geometry.length ? coords.slice(1) : coords) geometry.push(c)
+        cur = graph.other(e, cur)
+      }
+      let elev = null
+      try {
+        const sampleM = 100
+        const points = resample(geometry, sampleM).map(([, c]) => c)
+        const [relief] = await fetchMany([points])
+        if (relief?.values?.length) {
+          const smoothed = smooth(relief.values)
+          elev = [smoothed, null, relief.threshold, sampleM]
+        }
+      } catch {
+        /* sans relief : le parcours reste juste */
+      }
+      const route = matchedRoute(graph, start, matched, {
+        req: normalizeRequest({ lat: geometry[0][1], lon: geometry[0][0], sport: sport ?? 'run', distance_km: longueur / 1000 }),
+        name,
+        elev,
+      })
+      self.postMessage({ id, type: 'result', result: { route, share: matched.share } })
+    } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
     }
     return

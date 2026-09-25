@@ -135,9 +135,10 @@ export default function Library({ saved, history, onOpen, onImport, profile, map
  *
  * La trace d'un ami, une course balisée, un tracé dessiné ailleurs. Ce qui
  * entre est **un tracé, rien de plus** : le fichier ne dit pas les rues, donc
- * ni note de sécurité ni consignes de virage — et l'app le dit plutôt que de
- * laisser croire qu'elle a regardé. Elle sait en revanche le suivre, dire où
- * l'on en est, et prévenir quand on s'en écarte.
+ * les rues qu'il emprunte. Lacet les reconnaît (voir `engine/matcher.js`) et le
+ * parcours devient alors comparable à une boucle calculée ici. Quand la
+ * reconnaissance échoue — un chemin absent du réseau, un fichier de bateau —,
+ * le tracé est gardé tel quel et l'app dit qu'elle n'a rien pu juger.
  */
 function ImportRow({ onImport }) {
   const [erreur, setErreur] = useState(null)
@@ -174,9 +175,11 @@ function ImportRow({ onImport }) {
         <p className="muted small import__error">{erreur}</p>
       ) : (
         <p className="muted small">
-          Le tracé d'un ami, une course balisée. Il sera suivi et mesuré, mais pas noté : un
-          fichier ne dit pas les rues qu'il emprunte, donc ni trottoirs, ni traversées, ni
-          consignes de virage.
+          Le tracé d'un ami, une course balisée. Lacet reconnaît les rues qu'il emprunte —
+          il faut télécharger celles du coin, quelques secondes — et le traite ensuite comme
+          une boucle calculée ici : noms de rues, traversées, note de sécurité et consignes
+          de virage. Quand la trace ne suit aucune rue connue, elle est gardée telle quelle,
+          sans note.
         </p>
       )}
     </div>

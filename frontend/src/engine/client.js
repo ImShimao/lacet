@@ -72,6 +72,12 @@ export const prefetchOnDevice = (params) =>
  */
 export const detourOnDevice = (payload) => request('detour', payload)
 
+/**
+ * Reconnaît les rues d'une trace importée. Rend `{route, share}`, ou
+ * `{route: null}` si la trace ne suit aucune rue connue.
+ */
+export const matchOnDevice = (payload, onProgress) => request('match', payload, onProgress)
+
 /** La même boucle dans l'autre sens, tant qu'elle est à l'écran. */
 export const reverseOnDevice = (id) => request('reverse', { id })
 
