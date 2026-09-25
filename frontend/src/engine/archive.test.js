@@ -52,6 +52,50 @@ beforeEach(async () => {
   setArchiveSources(['https://exemple.test/packs'])
 })
 
+/**
+ * Plusieurs dépôts d'archives.
+ *
+ * Un dépôt GitHub s'essouffle au-delà de quelques gigaoctets : la couverture
+ * grandira en ajoutant des dépôts, pas en gonflant celui-ci. Deux choses
+ * doivent alors tenir — qu'un bloc absent du premier soit cherché dans le
+ * suivant, et qu'on ne repaie pas cet aller-retour à chaque tuile.
+ */
+describe('plusieurs dépôts', () => {
+  it('cherche dans le dépôt suivant ce que le premier n’a pas', async () => {
+    const cdn = fakeCdn()
+    const visites = []
+    const fetchImpl = async (url, init) => {
+      visites.push(new URL(url).host)
+      if (url.startsWith('https://premier.test')) return { ok: false, status: 404, arrayBuffer: async () => new ArrayBuffer(0) }
+      return cdn.fetchImpl(url, init)
+    }
+    setArchiveSources(['https://premier.test/packs', 'https://exemple.test/packs'])
+    const got = await fetchArchived([[140, 940]], { fetchImpl })
+    expect(got.has('140:940')).toBe(true)
+    expect(visites[0]).toBe('premier.test')
+    expect(visites).toContain('exemple.test')
+  })
+
+  it('reparle d’abord à celui qui a répondu', async () => {
+    const cdn = fakeCdn()
+    const visites = []
+    const fetchImpl = async (url, init) => {
+      visites.push(new URL(url).host)
+      if (url.startsWith('https://premier.test')) return { ok: false, status: 404, arrayBuffer: async () => new ArrayBuffer(0) }
+      return cdn.fetchImpl(url, init)
+    }
+    setArchiveSources(['https://premier.test/packs', 'https://exemple.test/packs'])
+    await fetchArchived([[140, 940]], { fetchImpl })
+    const avant = visites.filter((h) => h === 'premier.test').length
+    visites.length = 0
+    // Les tuiles du même bloc, demandées ensuite : le dépôt muet n'est plus
+    // interrogé le premier.
+    await fetchArchived([[141, 941]], { fetchImpl })
+    expect(visites.filter((h) => h === 'premier.test')).toHaveLength(0)
+    expect(avant).toBeGreaterThan(0)
+  })
+})
+
 describe('les archives de rues', () => {
   it('range les tuiles par blocs d’un demi-degré', () => {
     expect(blockOf(140, 940)).toEqual([14, 94])

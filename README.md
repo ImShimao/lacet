@@ -110,6 +110,14 @@ mêmes candidats arête par arête et la même réponse, à 1e-9 près. Ce qui a
 demandé de reproduire l'arithmétique de CPython jusqu'au modulo flottant et à
 l'arrondi au pair.
 
+Les archives de rues couvrent la France, la Suisse, la Belgique et le
+Luxembourg, l'Allemagne du Sud-Ouest, l'Italie du Nord-Ouest, l'Espagne du
+Nord-Est, l'Autriche, les Pays-Bas et le Portugal. Ailleurs, les rues viennent
+d'Overpass, et un calculateur public prend le relais quand il ne répond pas.
+Ajouter un pays se fait dans `zones.json` du dépôt de données ; quand celui-ci
+approchera des cinq gigaoctets que GitHub tolère, la suite ira dans un second
+dépôt, dont l'adresse s'ajoute à `SOURCES` (voir `engine/archive.js`).
+
 Aucune clé d'API n'est nécessaire. Données © OpenStreetMap (Overpass et les
 archives de `lacet-data`), altitude IGN puis Valhalla — OpenTopoData côté
 serveur, qui n'envoie pas d'en-têtes CORS —, itinéraire de secours Valhalla,

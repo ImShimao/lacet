@@ -48,6 +48,11 @@ const PER_BLOCK = Math.round(BLOCK_DEG / TILE_DEG)
 // `raw.githubusercontent` rend, lui, exactement les octets demandés — vérifié au
 // milieu d'un fichier, pas seulement au début — et autorise l'app à les lire
 // (« Access-Control-Allow-Origin : * »). C'est donc lui, et c'est aussi un CDN.
+// **Plusieurs dépôts, dans l'ordre.** Un dépôt GitHub s'essouffle au-delà de
+// quelques gigaoctets ; la couverture grandira donc en ajoutant des dépôts, pas
+// en gonflant celui-ci. Il suffit d'en ajouter l'adresse ici : un bloc absent du
+// premier est cherché dans le suivant, et celui qui a répondu est interrogé en
+// premier la fois d'après.
 const SOURCES = [
   import.meta.env?.VITE_TILES_URL,
   'https://raw.githubusercontent.com/ImShimao/lacet-data/main/packs',
@@ -60,7 +65,16 @@ let sources = SOURCES
 /** Pour les tests, et pour une installation qui servirait ses propres archives. */
 export const setArchiveSources = (list) => {
   sources = list
+  served.clear()
 }
+
+// Quelle source a servi quel fichier. Les archives tiennent dans un dépôt
+// aujourd'hui, mais un dépôt GitHub s'essouffle au-delà de quelques gigaoctets :
+// la couverture grandira en ajoutant des dépôts, pas en gonflant celui-ci. Or
+// chercher un bloc d'Autriche dans le dépôt français coûte un aller-retour pour
+// rien, **à chaque tuile demandée**. On se souvient donc de qui a répondu, et
+// on lui reparle en premier.
+const served = new Map()
 
 const REQUEST_TIMEOUT_MS = 15_000
 // Deux tuiles séparées par moins que ça sont demandées ensemble : une requête de
@@ -78,7 +92,12 @@ export const blockOf = (ix, iy) => [Math.floor(ix / PER_BLOCK), Math.floor(iy / 
 const directories = new Map()
 
 async function get(path, range, fetchImpl) {
-  for (const source of sources) {
+  // Celle qui a déjà répondu pour ce fichier passe devant ; les autres suivent,
+  // dans leur ordre, au cas où elle aurait disparu.
+  const connue = served.get(path)
+  const ordre = connue ? [connue, ...sources.filter((s) => s !== connue)] : sources
+
+  for (const source of ordre) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     try {
@@ -91,6 +110,7 @@ async function get(path, range, fetchImpl) {
       const buffer = await response.arrayBuffer()
       // Un serveur qui ignore la plage demandée rend tout le fichier (« 200 ») :
       // c'est correct, seulement plus lourd, et on y découpe ce qu'on voulait.
+      served.set(path, source)
       if (range && response.status === 200 && buffer.byteLength > range[1] - range[0] + 1) {
         return buffer.slice(range[0], range[1] + 1)
       }
