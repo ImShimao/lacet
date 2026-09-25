@@ -8,9 +8,10 @@
  * présentation pour retrouver la gestion du point de départ.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon, { SolidIcon } from './Icon.jsx'
 import RouteStrip from './RouteStrip.jsx'
+import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
@@ -22,6 +23,7 @@ const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ou
 export default function Explore({
   progress = null,
   snapped = null,
+  history = [],
   start,
   startLabel,
   geo,
@@ -49,6 +51,17 @@ export default function Explore({
   onOpenDetail,
 }) {
   const [exporting, setExporting] = useState(false)
+  // Ce qu'on reconnaît de l'historique, calculé une fois par liste de
+  // propositions : le tri grossier écarte presque tout sans rien mesurer, mais
+  // le refaire à chaque rendu serait gratuit pour personne.
+  const known = useMemo(() => {
+    const out = new Map()
+    for (const r of result?.routes ?? []) {
+      const found = alreadyRun(r, history)
+      if (found) out.set(r.id, found)
+    }
+    return out
+  }, [result, history])
   // Sur ordinateur, on prépare : rien de ce qui sert pendant la course.
 
   if (busy) {
@@ -175,6 +188,7 @@ export default function Explore({
   return (
     <div className="panel panel--results">
       <RouteCards
+        known={known}
         routes={routes}
         selected={selected}
         onSelect={onSelect}
@@ -212,6 +226,7 @@ export default function Explore({
           c'est de là que la boucle part, et c'est là qu'elle revient.
         </div>
       )}
+      {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
       {meta.wind && <WindNote wind={meta.wind} />}
 
       {selected.laps > 1 && (
@@ -393,6 +408,27 @@ function SearchProgress({ progress }) {
 }
 
 /**
+ * « Tu l'as déjà courue. »
+ *
+ * L'app gardait les sorties passées sans jamais les rapprocher de ce qu'elle
+ * propose. Le rapprochement sert deux fois : éviter de refaire la même boucle
+ * trois dimanches de suite, et se comparer à soi-même quand c'est justement ce
+ * qu'on cherche.
+ */
+function AlreadyRun({ found }) {
+  const { run, share } = found
+  const quand = new Date(run.ranAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+  const temps = run.actual_duration_s ? minutes(run.actual_duration_s) : null
+  return (
+    <div className="notice">
+      Déjà couru le {quand}
+      {temps ? ` en ${temps}` : ''}
+      {share < 0.95 ? ` — à ${Math.round(share * 100)} % le même chemin.` : '.'}
+    </div>
+  )
+}
+
+/**
  * Les propositions, en cartes qu'on fait défiler du pouce.
  *
  * Elles remplacent une grille de pastilles qui passait sur deux rangées dès
@@ -405,7 +441,7 @@ function SearchProgress({ progress }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -495,6 +531,14 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail }) {
                 ) : (
                   <span className="grade grade--unknown" title="Sécurité non évaluée">
                     —
+                  </span>
+                )}
+                {/* Ce chemin-là, on l'a déjà fait : c'est parfois ce qu'on
+                    cherche — se comparer — et parfois ce qu'on fuit. Dans les
+                    deux cas, il vaut mieux le savoir avant de partir. */}
+                {known?.has(r.id) && !on && (
+                  <span className="rcard__seen" title="Déjà couru">
+                    <Icon name="refresh" size={13} />
                   </span>
                 )}
                 {on && (

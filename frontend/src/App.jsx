@@ -1123,6 +1123,7 @@ export default function App() {
           ) : (
             <Explore
               snapped={snapped}
+              history={history}
               progress={progress}
               start={start}
               startLabel={startLabel}
