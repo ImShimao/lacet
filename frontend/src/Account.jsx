@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { COUNTS, MOMENTS, SPORTS, Segmented } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
-import { exportAll, importAll, load, save } from './storage'
+import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
@@ -88,6 +88,14 @@ export default function Account({ params, geo, onClearData, onProfile }) {
           save({ emergencyContact: e.target.value.trim() })
         }}
       />
+
+      <h4 className="section">Sorties et favoris gardés</h4>
+      {/* Pas de `key` indexée sur `version` ici, contrairement aux compteurs
+          voisins : cette section garde son propre état — « tant de libérés » —
+          et le remontage le faisait disparaître à l'instant même où il devait
+          s'afficher. Ce qu'elle mesure ne dépend d'ailleurs pas de
+          l'effacement global, qui est ce que `version` sert à rafraîchir. */}
+      <StoredData />
 
       <h4 className="section">Mes signalements</h4>
       <MyReports />
@@ -229,6 +237,94 @@ function KeptStreets() {
  * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
  * finit par être vidé par le navigateur — au pire moment, sans prévenir.
  */
+/**
+ * Le poids de ce qui est gardé dans le navigateur, et ce qu'il en reste.
+ *
+ * Tout le reste de cet écran mesure des choses qu'on peut retélécharger : des
+ * tuiles, des rues. Celle-ci mesure la seule qu'on ne peut pas refaire — les
+ * sorties courues — et elle est gardée là où la place est la plus comptée :
+ * cinq mégaoctets pour toute l'app.
+ *
+ * Elle existe parce que le débordement était **silencieux**. Quand l'écriture
+ * échouait, l'app sacrifiait la moitié des sorties les plus anciennes pour
+ * faire de la place, et ne le disait que dans une console. On découvrait le
+ * trou des mois plus tard, sans pouvoir le relier à rien.
+ */
+function StoredData() {
+  const [info, setInfo] = useState(() => usage())
+  const [freed, setFreed] = useState(null)
+  if (!info) return <p className="muted small">Le stockage du navigateur n'est pas accessible ici.</p>
+
+  const part = Math.min(1, info.bytes / info.quota)
+  const serre = part > 0.75
+  return (
+    <>
+      {info.refusedAt && (
+        <div className="notice notice--warn">
+          <b>Le stockage est plein.</b> La dernière modification n'a pas pu être enregistrée — ni
+          favori, ni réglage, ni sortie terminée. Retire des traces ci-dessous, ou fais une
+          sauvegarde puis efface, avant de repartir courir.
+        </div>
+      )}
+      {info.trimmed && (
+        <div className="notice notice--warn">
+          <b>De la place a dû être faite le {dayOf(info.trimmed.at)}.</b> Le stockage était plein :{' '}
+          {info.trimmed.from - info.trimmed.to} sorties parmi les plus anciennes ont été supprimées pour
+          que la suite puisse s'enregistrer. Les plus récentes, elles, sont intactes.
+          <button
+            className="linkish"
+            onClick={() => {
+              forgetTrim()
+              setInfo(usage())
+            }}
+          >
+            J'ai lu
+          </button>
+        </div>
+      )}
+
+      <div className={`gauge ${serre ? 'gauge--tight' : ''}`}>
+        <i style={{ transform: `scaleX(${part})` }} />
+      </div>
+      <p className="muted small">
+        <b>{mo(info.bytes)}</b> sur environ {mo(info.quota)} — {info.counts.history} sortie
+        {info.counts.history > 1 ? 's' : ''} ({mo(info.parts.history)}), {info.counts.favorites} favori
+        {info.counts.favorites > 1 ? 's' : ''} ({mo(info.parts.favorites)}). La limite est celle du
+        navigateur, pas du téléphone : elle vaut pour toute l'app, et chaque caractère y compte double.
+      </p>
+
+      {info.counts.traces > 0 && (
+        <div className="row">
+          <button
+            className="btn"
+            onClick={() => {
+              const libere = dropTracks()
+              setFreed(libere)
+              setInfo(usage())
+            }}
+          >
+            Retirer les {info.counts.traces} traces gardées ({mo(info.parts.traces)})
+          </button>
+        </div>
+      )}
+      <p className="muted small">
+        {freed !== null
+          ? `${mo(freed)} libérés. Les chiffres des sorties n'ont pas bougé.`
+          : "Une trace est le dessin de ce qu'on a réellement couru. La retirer garde la distance, le temps, l'allure et les tours de kilomètre : seuls le tracé sur la carte et son export s'en vont."}
+      </p>
+    </>
+  )
+}
+
+/** « 1,4 Mo », « 320 ko ». */
+function mo(octets) {
+  if (octets >= 1048576) return `${(octets / 1048576).toFixed(1).replace('.', ',')} Mo`
+  return `${Math.round(octets / 1024)} ko`
+}
+
+/** « 28 septembre » */
+const dayOf = (at) => new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+
 /**
  * Ce qu'on a signalé en courant, et qu'on peut retirer.
  *

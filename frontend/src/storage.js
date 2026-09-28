@@ -63,6 +63,7 @@ export function load() {
  */
 export function save(patch) {
   let next = { ...load(), ...patch }
+  const avant = (next.history || []).length
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
@@ -71,12 +72,91 @@ export function save(patch) {
     } catch {
       const history = next.history || []
       if (history.length <= 5) break
-      next = { ...next, history: history.slice(0, Math.floor(history.length / 2)) }
+      // **Et on le note.** Sacrifier des sorties pour faire de la place est
+      // défendable ; le faire sans que personne l'apprenne ne l'est pas. Le
+      // seul signal était un message dans une console que personne n'ouvre sur
+      // un téléphone, et l'on découvrait le trou des semaines plus tard, sans
+      // pouvoir le relier à quoi que ce soit. La trace de l'élagage part avec
+      // l'écriture suivante — celle qui, elle, passera.
+      next = {
+        ...next,
+        history: history.slice(0, Math.floor(history.length / 2)),
+        trimmed: { at: Date.now(), from: avant, to: Math.floor(history.length / 2) },
+      }
     }
   }
 
+  // Même élagué, rien ne passe : la modification est perdue. Il n'y a alors
+  // plus de disque où noter l'échec — c'est justement le problème —, donc on le
+  // garde en mémoire, le temps de la session, pour que « Mon compte » puisse le
+  // dire au lieu de laisser croire que tout va bien.
+  refusedAt = Date.now()
   console.warn('Lacet — stockage local saturé, la dernière modification n’a pas été gardée.')
   return load()
+}
+
+let refusedAt = null
+
+// Ce que le navigateur accorde à une origine, en pratique : cinq mégaoctets,
+// chez Chrome comme chez Safari. Approximatif par nature — c'est un ordre de
+// grandeur affiché comme tel, pas une promesse.
+export const QUOTA_BYTES = 5 * 1024 * 1024
+
+/**
+ * Le poids de ce qui est gardé, et de quoi il est fait.
+ *
+ * **Chaque caractère compte double.** Les navigateurs gardent ces chaînes en
+ * UTF-16 et décomptent deux octets par caractère du quota : un magasin de trois
+ * millions de caractères en occupe six mégaoctets, et dépasse donc une limite
+ * qu'on croyait loin. C'est cette mesure-là qui est rendue, pas la longueur du
+ * texte, sans quoi la jauge annoncerait la moitié de la vérité.
+ */
+export function usage() {
+  let brut = ''
+  try {
+    brut = localStorage.getItem(KEY) || ''
+  } catch {
+    return null
+  }
+  const data = load()
+  const poids = (valeur) => (valeur === undefined ? 0 : JSON.stringify(valeur ?? null).length * 2)
+  const history = data.history || []
+  return {
+    bytes: brut.length * 2,
+    quota: QUOTA_BYTES,
+    parts: {
+      favorites: poids(data.favorites),
+      history: poids(history),
+      traces: history.reduce((somme, sortie) => somme + poids(sortie.track), 0),
+    },
+    counts: {
+      favorites: (data.favorites || []).length,
+      history: history.length,
+      traces: history.filter((sortie) => sortie.track?.length).length,
+    },
+    trimmed: data.trimmed ?? null,
+    // Une écriture refusée pendant cette session, élagage compris : ce qui
+    // vient d'être fait n'a pas été gardé.
+    refusedAt,
+  }
+}
+
+/** Efface la trace d'un élagage, une fois qu'on l'a lue. */
+export const forgetTrim = () => save({ trimmed: null })
+
+/**
+ * Retire les traces GPS gardées avec les sorties, et rend les octets libérés.
+ *
+ * C'est le seul allègement qui ne perd aucun chiffre : distance, temps, allure,
+ * tours de kilomètre et parcours prévu restent. Ce qui part, c'est le dessin de
+ * ce qu'on a réellement couru — qu'on ne reverra plus sur la carte, et qu'on ne
+ * pourra plus exporter.
+ */
+export function dropTracks() {
+  const data = load()
+  const avant = usage()?.bytes ?? 0
+  save({ history: (data.history || []).map((sortie) => (sortie.track ? { ...sortie, track: null } : sortie)) })
+  return Math.max(0, avant - (usage()?.bytes ?? 0))
 }
 
 /**

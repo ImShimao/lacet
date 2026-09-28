@@ -3441,6 +3441,27 @@ html[data-turn] .maplibregl-control-container {
 
 /* Pause au centre, en grand ; de part et d'autre, le dénivelé — ou
    « Terminer », qui n'apparaît qu'en pause — et le SOS. */
+/* La jauge du stockage : une barre, et rien d'autre. Elle ne se colore qu'au
+   moment où ça compte — quand la place vient à manquer. */
+.gauge {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.gauge i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: transform 0.25s ease;
+}
+.gauge--tight i {
+  background: linear-gradient(135deg, #ffd426 0%, #ff6a45 100%);
+}
+
 /* ══ une sortie relue ═════════════════════════════════════════════════════
    L'écran d'une sortie passée : ses chiffres d'abord, la carte derrière. La
    hiérarchie est celle de la lecture — la distance en grand, le reste en

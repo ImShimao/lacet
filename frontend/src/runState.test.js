@@ -45,4 +45,42 @@ describe('la sortie interrompue', () => {
     clearRun()
     expect(loadRun()).toBeNull()
   })
+
+  it('n’écrit pas dans le magasin des favoris et des sorties', () => {
+    // C'est le point de toute la séparation : écrire la sortie en cours ne doit
+    // plus relire ni réécrire l'historique, qui pèse mille fois plus lourd et
+    // que le navigateur peut refuser.
+    localStorage.setItem('lacet.v1', JSON.stringify({ favorites: [], history: [{ ranAt: 'hier' }] }))
+    const avant = localStorage.getItem('lacet.v1')
+    saveRun(sortie)
+    expect(localStorage.getItem('lacet.v1')).toBe(avant)
+    expect(loadRun()).toMatchObject({ covered: 3200 })
+  })
+
+  it('retrouve une sortie laissée dans l’ancien emplacement', () => {
+    // La mise à jour de l'app ne doit pas emporter la seule donnée qu'on ne
+    // peut pas refaire : une sortie interrompue juste avant.
+    localStorage.setItem(
+      'lacet.v1',
+      JSON.stringify({ run: { ...sortie, at: Date.now() }, favorites: [], history: [] }),
+    )
+    expect(loadRun()).toMatchObject({ covered: 3200 })
+    // Et une fois reprise ou abandonnée, elle ne revient pas hanter les
+    // lancements suivants.
+    clearRun()
+    expect(loadRun()).toBeNull()
+  })
+
+  it('ne casse rien quand le navigateur refuse d’écrire', () => {
+    const plein = {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException('QuotaExceededError')
+      },
+      removeItem: () => {},
+    }
+    vi.stubGlobal('localStorage', plein)
+    expect(saveRun(sortie)).toBe(false)
+    expect(loadRun()).toBeNull()
+  })
 })
