@@ -302,5 +302,3 @@ async function addElevation(routes, fetchImpl) {
   }
 }
 
-/** Pour les tests. */
-export const __internals = { waypoints, lengthOf, bearingOf }

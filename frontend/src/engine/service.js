@@ -93,12 +93,30 @@ export function normalizeRequest(input) {
     speed_kmh: input.speed_kmh ?? 20,
     limit: input.limit ?? 5,
     with_elevation: input.with_elevation ?? true,
-    // Propres à l'app : « Régénérer d'autres boucles ». Sans eux, la recherche est
-    // celle du moteur Python, à l'identique.
+    // === ce que ce moteur-ci sait faire en plus ==============================
+    //
+    // `backend/` est la référence : les tests de parité comparent, demande par
+    // demande, ce que rend ce fichier et ce que rend Python. Ces quatre clés-là
+    // n'existent que du côté JavaScript, et la parité ne les couvre donc pas —
+    // elle vérifie le sous-ensemble commun, ce qui est exactement ce qu'on veut
+    // tant que la liste reste courte et **écrite quelque part**. La voici.
+    //
+    // Laissées à leur valeur par défaut, la recherche est celle du moteur
+    // Python, à l'identique : c'est ce qui rend la parité possible.
+    //
+    //   variation, avoid_bearings  « Régénérer d'autres boucles » : tourner les
+    //                              polygones d'un cran et fuir les directions
+    //                              déjà montrées. Propre à l'écran.
+    //   avoid                      Les cases « Éviter » (escaliers, grands axes,
+    //                              rues non éclairées) — voir `weights.js`.
+    //   blocked                    Les signalements faits en courant. Ils ne
+    //                              quittent jamais l'appareil, et un serveur
+    //                              n'aurait rien à en faire.
+    //
+    // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
+    // propres, puisque la parité ne la verra pas.
     variation: input.variation ?? 0,
     avoid_bearings: input.avoid_bearings ?? [],
-    // Ce qu'on refuse de croiser (« escaliers »), et ce qu'on a signalé soi-même
-    // sur le terrain — des points, que `blocked.js` rapproche des rues.
     avoid: input.avoid ?? [],
     blocked: input.blocked ?? [],
   }

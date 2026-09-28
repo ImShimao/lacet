@@ -30,6 +30,9 @@ import { store } from './store'
 const MAGIC = 'LACETILE'
 const HEADER = 32
 const ENTRY = 20
+// Cent tuiles de côté dans un bloc de 0,5° au niveau le plus fin, soit dix
+// mille : c'est la borne d'un répertoire sain.
+const MAX_ENTRIES = 10_000
 export const BLOCK_DEG = 0.5
 const TILE_DEG = 0.05
 const PER_BLOCK = Math.round(BLOCK_DEG / TILE_DEG)
@@ -147,7 +150,11 @@ function directory(bx, by, fetchImpl) {
     // rues qu'elle ne contient pas — et l'app chercherait des boucles sur un
     // réseau troué sans le savoir.
     const level = view.getUint16(10, true)
+    // Un bloc de 0,5° ne contient pas plus de cent tuiles de côté. Au-delà,
+    // l'en-tête est abîmé : sans ce plafond, un nombre aberrant faisait demander
+    // une plage de vingt mégaoctets au CDN avant de constater l'évidence.
     const count = view.getUint32(20, true)
+    if (count > MAX_ENTRIES) return null
     // La date de fabrication de l'archive devient l'âge des tuiles qu'on en
     // tire : elles vieillissent comme les autres, et se rafraîchissent chez
     // Overpass passé trois mois.

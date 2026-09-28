@@ -106,8 +106,6 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
   }
 }
 
-export const openLocationSettings = () => BackgroundGeolocation.openSettings().catch(() => {})
-
 // --- voix ---------------------------------------------------------------------
 
 /**
