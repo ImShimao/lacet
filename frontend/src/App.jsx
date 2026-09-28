@@ -10,6 +10,7 @@ import PlaceSheet from './PlaceSheet.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
+import useLibrary from './useLibrary'
 import { blockedPoints } from './reports'
 import Account from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
@@ -232,14 +233,15 @@ export default function App() {
   const [overviewAt, setOverviewAt] = useState(0)
   const [northAt, setNorthAt] = useState(0)
   const [startMenu, setStartMenu] = useState(false)
-  // Les départs qu'on garde : chez soi, le bureau, le club.
-  const [places, setPlaces] = useState(stored.places || [])
   const [naming, setNaming] = useState(false)
   const stageRef = useRef(null)
   const compassRef = useRef(null)
 
-  const [saved, setSaved] = useState(stored.favorites)
-  const [history, setHistory] = useState(stored.history)
+  // Les favoris, les sorties et les départs nommés : trois listes qui partagent
+  // une contrainte de place, et les plafonds qui en découlent — voir
+  // `useLibrary.js`.
+  const library = useLibrary(stored)
+  const { saved, history, places } = library
 
   const geo = useGeolocation()
 
@@ -322,17 +324,11 @@ export default function App() {
 
   const keepPlace = (name) => {
     if (!start) return
-    const next = [{ id: `p${Date.now()}`, name, lat: start.lat, lon: start.lon }, ...places].slice(0, 8)
-    setPlaces(next)
-    save({ places: next })
+    library.keepPlace({ id: `p${Date.now()}`, name, lat: start.lat, lon: start.lon })
     setNaming(false)
   }
 
-  const dropPlace = (id) => {
-    const next = places.filter((p) => p.id !== id)
-    setPlaces(next)
-    save({ places: next })
-  }
+  const dropPlace = (id) => library.dropPlace(id)
 
   const startFromHere = () => {
     setStartMenu(false)
@@ -583,18 +579,7 @@ export default function App() {
   // que les deux restaient identiques — le jour où l'une aurait bougé,
   // l'app aurait affiché « carte disponible » sur un parcours dont la carte
   // serait devenue introuvable, sans rien signaler.
-  const keyOf = offline.keyOf
-  const isFavorite = selected && saved.some((r) => keyOf(r) === keyOf(selected))
-
-  function toggleFavorite() {
-    if (!selected) return
-    const key = keyOf(selected)
-    const next = saved.some((r) => keyOf(r) === key)
-      ? saved.filter((r) => keyOf(r) !== key)
-      : [slim(selected), ...saved].slice(0, 40)
-    setSaved(next)
-    save({ favorites: next })
-  }
+  const isFavorite = library.isFavorite(selected)
 
   /** Construit l'entrée d'historique d'une sortie terminée. */
   function runEntry(stats, { route, free, sport: ranWith }) {
@@ -624,13 +609,7 @@ export default function App() {
    * quelques dizaines de kilooctets, et le stockage du navigateur finirait par
    * refuser d'écrire — en emportant un favori plutôt qu'une vieille trace.
    */
-  function remember(entry) {
-    const next = [entry, ...history].map((run, i) => (i < 25 ? run : { ...run, track: null }))
-    const kept = next.slice(0, 200)
-    setHistory(kept)
-    save({ history: kept })
-    return entry
-  }
+  const remember = (entry) => library.remember(entry)
 
   /** Rouvre un parcours gardé — un favori, ou celui d'une sortie à refaire. */
   function openRoute(r) {
@@ -730,9 +709,7 @@ export default function App() {
       setProgress(null)
     }
 
-    const next = [slim(route), ...saved.filter((r) => r.id !== route.id)]
-    setSaved(next)
-    save({ favorites: next })
+    library.keepRoute(route)
     // On l'ouvre tout de suite sur la carte : importer sans voir ce qui est
     // entré laisserait douter que le bon fichier ait été choisi.
     setSelected(route)
@@ -1140,9 +1117,7 @@ export default function App() {
                 openRoute(r)
               }}
               onDelete={(r) => {
-                const next = history.filter((h) => h !== r)
-                setHistory(next)
-                save({ history: next })
+                library.forget(r)
                 setViewing(null)
               }}
             />
@@ -1192,9 +1167,7 @@ export default function App() {
                 await offline.clear()
                 // Les rues et altitudes gardées pour calculer hors ligne aussi.
                 await clearEngineData()
-                save({ favorites: [], history: [] })
-                setSaved([])
-                setHistory([])
+                library.clear()
               }}
             />
           ) : (
@@ -1221,7 +1194,7 @@ export default function App() {
               reversing={reversing}
               onReverse={selected && !selected.remote ? reverseSelected : null}
               onOpenFilters={() => setFiltersOpen(true)}
-              onFavorite={toggleFavorite}
+              onFavorite={() => library.toggleFavorite(selected)}
               onStart={() => beginRun('route')}
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
