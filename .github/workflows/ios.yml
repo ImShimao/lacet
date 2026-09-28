@@ -28,6 +28,22 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+# Les deux gros fichiers de cette compilation — les rues de la région, puis
+# l'IPA — voyagent par une **publication** (`release`) et non par des artefacts.
+#
+# Les artefacts ont un quota de cinq cents mégaoctets sur un dépôt privé. Une
+# IPA en pèse quarante, la région trente-huit : au bout de six compilations, la
+# suivante échoue à l'envoi, et les cinq précédentes doivent être effacées à la
+# main pour que la sixième passe. C'est arrivé, et c'est arrivé au mauvais
+# moment — une version prête, impossible à livrer.
+#
+# Une publication ne compte pas dans ce quota, garde un lien stable par version,
+# et se télécharge d'une ligne depuis le PC :
+#
+#     gh release download v1.0.58 --pattern Lacet.ipa
+permissions:
+  contents: write
+
 jobs:
   # La carte régionale livrée dans l'app : toutes les rues de la région, prêtes,
   # pour ne plus rien attendre d'Overpass quand on court chez soi. Voir
@@ -115,11 +131,19 @@ jobs:
           python frontend/scripts/region_tiles.py region.osm.pbf region.poly region             --name "$REGION_NAME" --margin "$MARGIN_M" --source-bbox "$BBOX"
           du -sh region
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: region
-          path: region
-          retention-days: 7
+      # La publication est créée ici, par le premier des deux travaux ; l'IPA
+      # viendra s'y ajouter. `--clobber` parce qu'une compilation relancée
+      # écrase la précédente plutôt que d'échouer.
+      - name: Publication des rues de la région
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v1.0.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          tar -czf region.tar.gz -C region .
+          ls -lh region.tar.gz
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA"               --title "Lacet 1.0.${{ github.run_number }}"               --notes "IPA à installer par AltStore, et les rues de la région qui l'accompagnent."
+          gh release upload "$TAG" region.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
 
   ipa:
     needs: region
@@ -153,10 +177,17 @@ jobs:
         run: npm ci
 
       # Rangée dans public/ : Vite la copie telle quelle dans l'app.
-      - uses: actions/download-artifact@v4
-        with:
-          name: region
-          path: frontend/public/region
+      - name: Rues de la région
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v1.0.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          mkdir -p public/region
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern region.tar.gz --output region.tar.gz --clobber
+          tar -xzf region.tar.gz -C public/region
+          rm region.tar.gz
+          du -sh public/region
 
       # Les tests d'abord : une IPA construite sur un moteur qui ne calcule plus
       # comme la référence serait pire qu'aucune IPA.
@@ -275,8 +306,13 @@ jobs:
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Lacet.ipa" Payload)
           ls -lh "$GITHUB_WORKSPACE/Lacet.ipa"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Lacet-ipa
-          path: Lacet.ipa
-          retention-days: 30
+      # L'IPA rejoint la publication de la région. C'est ce fichier-là que le PC
+      # télécharge, pose à la racine du dépôt et sert à AltStore.
+      - name: Publication de l'IPA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v1.0.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" "$GITHUB_WORKSPACE/Lacet.ipa" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
