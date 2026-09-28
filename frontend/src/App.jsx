@@ -12,16 +12,17 @@ import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
 import useLibrary from './useLibrary'
 import useRunSession from './useRunSession'
+import useSearch, { usePrefetch } from './useSearch'
 import { blockedPoints } from './reports'
 import Account from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import useGeolocation from './useGeolocation'
 import { DEFAULT_STYLE, styleByKey } from './mapStyles'
-import { describePlace, generateLoops } from './api'
+import { describePlace } from './api'
 import { km, pace } from './format'
 import { load, recentPlaces, save, slim } from './storage'
 import * as offline from './offlineMaps'
-import { clearEngineData, matchOnDevice, prefetchOnDevice, reverseOnDevice } from './engine/client'
+import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
 import { appDeltaY, currentTurn } from './orientation'
 import * as voice from './voice'
@@ -30,13 +31,6 @@ const PARIS = { lat: 48.8566, lon: 2.3522 }
 
 // « Distance exacte » : l'écart toléré entre la boucle et la distance visée.
 const PRECISE_TOLERANCE = 0.025
-
-// Le temps de laisser finir un repère qu'on fait glisser, ou une adresse qu'on
-// choisit, avant de préparer les rues : on ne prépare que là où l'on s'arrête.
-// Une demi-seconde suffit à ça, et c'est une demi-seconde de moins à rattraper
-// pour qui ouvre l'app et lance sa recherche dans la foulée — le cas d'un coin
-// jamais visité, justement celui où les rues sont longues à venir.
-const PREFETCH_DELAY_MS = 600
 
 /**
  * La poignée de la feuille, sur téléphone.
@@ -186,20 +180,14 @@ export default function App() {
   const [sheet, setSheet] = useState('peek')
   const shellRef = useRef(null)
 
-  const [result, setResult] = useState(null)
-  // De combien le repère a rejoint la rue, quand c'est assez pour se voir.
-  const [snapped, setSnapped] = useState(null)
-  const [selected, setSelected] = useState(null)
-  const [busy, setBusy] = useState(false)
-  // L'étape en cours et son avancement. Le calcul se fait sur l'appareil et
-  // commence par télécharger les rues : sans indication, une première recherche
-  // dans une grande ville ressemblerait à une app bloquée.
-  const [progress, setProgress] = useState(null)
-  const searchToken = useRef(0)
+  // La recherche et ce qu'elle produit : jeton, élargissement, repère qui
+  // rejoint la rue — voir `useSearch.js`.
+  const found = useSearch()
+  const { result, selected, busy, progress, error, snapped, scrub } = found
+  const setSelected = found.setSelected
+  const setScrub = found.setScrub
   // Numéro de « Régénérer » depuis la dernière recherche ordinaire.
   const variation = useRef(0)
-  const [error, setError] = useState(null)
-  const [scrub, setScrub] = useState(null)
   const [focus, setFocus] = useState(null)
 
   // Les favoris, les sorties et les départs nommés : trois listes qui partagent
@@ -255,10 +243,7 @@ export default function App() {
     // sans vraiment le déplacer.
     const previous = startRef.current
     if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
-      setResult(null)
-      setSelected(null)
-      setScrub(null)
-      setSnapped(null)
+      found.forget()
     }
     setStart(point)
     setStartLabel(label ?? null)
@@ -365,6 +350,9 @@ export default function App() {
   }, [startMenu])
 
   // --- génération -----------------------------------------------------------
+  // Ce qui reste ici : traduire les réglages en demande, et ce que l'écran doit
+  // faire autour — ranger les filtres, revenir à l'onglet, replier la feuille.
+  // Le calcul, son jeton et son élargissement sont dans `useSearch.js`.
   const search = useCallback(
     async (next, { regenerate = false } = {}) => {
       const active = next || params
@@ -379,110 +367,28 @@ export default function App() {
       setFiltersOpen(false)
       if (!start) return
 
-      setBusy(true)
-      setProgress(null)
-      setError(null)
-      setResult(null)
-      setSelected(null)
-      setSnapped(null)
-      setScrub(null)
       setTab('explore')
       setSheet('peek')
-
-      // Une recherche lancée pendant qu'une autre calcule la remplace : seule la
-      // dernière a le droit d'afficher son résultat. Sans ce jeton, la plus
-      // lente des deux gagnait, et l'écran montrait des boucles pour un
-      // réglage qu'on venait de changer.
-      const token = ++searchToken.current
-      try {
-        // Les signalements sont lus au moment du départ de la recherche, pas
-        // gardés en mémoire : celui qu'on vient de faire en courant doit
-        // compter dès la boucle suivante.
-        const request = {
+      // Les signalements sont lus au moment du départ de la recherche, pas
+      // gardés en mémoire : celui qu'on vient de faire en courant doit compter
+      // dès la boucle suivante.
+      await found.run(
+        {
           ...toRequest(active, start),
           variation: variation.current,
           avoid_bearings: avoid,
           blocked: blockedPoints(),
-        }
-        const onStage = (stage, fraction) => {
-          if (token === searchToken.current) setProgress({ stage, fraction })
-        }
-        let payload = await generateLoops(request, onStage)
-        // Rien à ±2,5 % ? Plutôt qu'un écran vide, on élargit et on le dit : le
-        // réseau de rues ne se plie pas toujours au mètre près, et une boucle
-        // de 20,4 km vaut mieux que pas de sortie.
-        if (!payload.routes.length && request.tolerance) {
-          const { tolerance, ...wider } = request
-          const relaxed = await generateLoops(wider, onStage)
-          if (relaxed.routes.length) {
-            payload = {
-              ...relaxed,
-              meta: {
-                ...relaxed.meta,
-                relaxed: true,
-                message: `Aucune boucle à ±2,5 % de ${formatKm(active.distance_km)} km depuis ce départ : voici les plus proches, à ±10 %.`,
-              },
-            }
-          }
-        }
-        if (token !== searchToken.current) return
-        // Le détail du temps passé, gardé pour « Mon compte ». Mesurer sur le
-        // téléphone est le seul moyen de savoir ce qui traîne vraiment : un PC
-        // de bureau construit un graphe trois fois plus vite qu'un iPhone, et
-        // une recherche lente en 4G n'a rien à voir avec une recherche lente
-        // dans un village sans réseau.
-        if (payload.meta?.timings_s) {
-          save({
-            lastSearch: {
-              at: Date.now(),
-              km: active.distance_km,
-              total: payload.meta.elapsed_s,
-              ...payload.meta.timings_s,
-              nodes: payload.meta.graph_nodes,
-              sources: payload.meta.sources ?? null,
-            },
-          })
-        }
-        // **Le repère se pose là où la boucle commence.** Une boucle part et
-        // revient au même point du réseau de rues — exactement, au centimètre —
-        // mais ce point n'est pas celui qu'on a touché sur la carte : il est sur
-        // la chaussée, à la distance qui sépare le repère de la rue la plus
-        // proche. Dix-huit mètres au bord d'un trottoir, cent vingt au milieu
-        // d'un village dont le centre géographique tombe dans un pré. Le repère
-        // restait où on l'avait posé, et la boucle semblait finir avant lui.
-        // Elle finit exactement là où elle commence ; c'est le repère qui
-        // rejoint le départ, et non l'inverse.
-        const commence = payload.routes[0]?.geometry?.[0]
-        if (commence) {
-          const point = { lat: commence[1], lon: commence[0] }
-          const posé = startRef.current
-          const écart = posé ? haversineM([posé.lon, posé.lat], [point.lon, point.lat]) : 0
-          if (écart > 1) {
+        },
+        {
+          from: start,
+          onStart: (point) => {
             startRef.current = point
             setStart(point)
-          }
-          // Sous cinquante mètres, le repère bouge de l'épaisseur d'un doigt et
-          // personne ne le remarque. Au-delà, il saute sous les yeux : mieux
-          // vaut dire pourquoi que laisser croire à un bug.
-          setSnapped(écart > 50 ? Math.round(écart) : null)
-        }
-
-        // La demande reste attachée au résultat : c'est avec elle qu'un chemin
-        // de retour se calcule, en course, si l'on s'écarte du parcours.
-        setResult({ ...payload, request })
-        setSelected(payload.routes[0] || null)
-      } catch (err) {
-        if (token !== searchToken.current) return
-        // On garde l'erreur entière : hors ligne, « réessayer » ne sert à rien
-        // et il vaut mieux renvoyer vers les parcours déjà enregistrés.
-        setError({ message: err.message, offline: Boolean(err.offline) })
-      } finally {
-        if (token === searchToken.current) {
-          setBusy(false)
-          setProgress(null)
-        }
-      }
+          },
+        },
+      )
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [params, start, result],
   )
 
@@ -496,30 +402,7 @@ export default function App() {
     if (!start || start === PARIS) return null
     return JSON.stringify(toRequest(params, start))
   }, [start, params])
-  const [prepared, setPrepared] = useState(null)
-  const [preparing, setPreparing] = useState(false)
-
-  useEffect(() => {
-    if (!prefetchKey || running) return undefined
-    const network = typeof navigator !== 'undefined' ? navigator : {}
-    if (network.onLine === false || network.connection?.saveData) return undefined
-    let cancelled = false
-    const timer = setTimeout(async () => {
-      // Le dire pendant que ça se fait : dans un coin jamais visité, la
-      // préparation dure quelques secondes, et une app qui s'active sans rien
-      // annoncer inquiète plus qu'elle ne rassure.
-      setPreparing(true)
-      const ready = await prefetchOnDevice(JSON.parse(prefetchKey))
-      if (cancelled) return
-      setPreparing(false)
-      if (ready) setPrepared(prefetchKey)
-    }, PREFETCH_DELAY_MS)
-    return () => {
-      cancelled = true
-      setPreparing(false)
-      clearTimeout(timer)
-    }
-  }, [prefetchKey, running])
+  const { prepared, preparing } = usePrefetch(prefetchKey, running)
 
   // --- raccourcis clavier ----------------------------------------------------
   useEffect(() => {
@@ -611,8 +494,7 @@ export default function App() {
 
   /** Rouvre un parcours gardé — un favori, ou celui d'une sortie à refaire. */
   function openRoute(r) {
-    setSelected(r)
-    setResult({ routes: [r], rejected: [], meta: {} })
+    found.show(r)
     setTab('explore')
     setSheet('peek')
     setDetail(true)
@@ -642,10 +524,9 @@ export default function App() {
     setReversing(true)
     try {
       const { route } = await reverseOnDevice(selected.id)
-      setResult((r) => (r ? { ...r, routes: r.routes.map((x) => (x.id === selected.id ? route : x)) } : r))
-      setSelected(route)
+      found.swap(selected.id, route)
     } catch (err) {
-      setError({ message: err.message, offline: false })
+      found.fail(err.message)
     } finally {
       setReversing(false)
     }
@@ -672,26 +553,19 @@ export default function App() {
     // secondes, d'où la barre de progression ; si rien n'est reconnu, on garde
     // le tracé tel quel plutôt que de prétendre.
     let route = brut
-    setBusy(true)
-    setProgress({ stage: 'data', fraction: 0 })
-    try {
-      const out = await matchOnDevice(
-        { trace: lu.coords, sport: params.sport, name: brut.name },
-        (stage, fraction) => setProgress({ stage, fraction }),
-      )
-      if (out?.route) route = { ...out.route, id: brut.id, duration_s: brut.duration_s }
-    } catch {
-      /* pas de réseau, ou rues introuvables : le tracé brut fera l'affaire */
-    } finally {
-      setBusy(false)
-      setProgress(null)
-    }
+    await found.working(async (etape) => {
+      try {
+        const out = await matchOnDevice({ trace: lu.coords, sport: params.sport, name: brut.name }, etape)
+        if (out?.route) route = { ...out.route, id: brut.id, duration_s: brut.duration_s }
+      } catch {
+        /* pas de réseau, ou rues introuvables : le tracé brut fera l'affaire */
+      }
+    })
 
     library.keepRoute(route)
     // On l'ouvre tout de suite sur la carte : importer sans voir ce qui est
     // entré laisserait douter que le bon fichier ait été choisi.
-    setSelected(route)
-    setResult({ routes: [route], rejected: [], meta: {} })
+    found.show(route)
     setTab('explore')
     setSheet('peek')
   }
@@ -1008,10 +882,7 @@ export default function App() {
               <button
                 className="banner__act"
                 onClick={() =>
-                  run.resumePending((route) => {
-                    setSelected(route)
-                    setResult({ routes: [route], rejected: [], meta: {} })
-                  })
+                  run.resumePending((route) => found.show(route))
                 }
               >
                 Reprendre
