@@ -87,6 +87,36 @@ def declared(plist: dict) -> list[dict]:
     return [{"type": kind, "usageDescription": found[kind]} for kind in sorted(found)]
 
 
+def changelog(build: str) -> str:
+    """Ce qui a changé, tel qu'AltStore l'affichera sous « Mettre à jour ».
+
+    « Compilation 58 » ne dit rien : on ne sait pas, le téléphone en main, si
+    l'on installe la fin de course automatique ou une correction de typo. Les
+    derniers messages de commit le disent — ce dépôt en fait des phrases, et
+    c'est exactement ce qu'on veut lire là.
+
+    Sans dépôt git sous la main, le numéro de compilation reste : il vaut mieux
+    une description pauvre qu'une mise à jour qui échoue.
+    """
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["git", "log", "-3", "--format=%s"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+        )
+        lignes = [l.strip() for l in out.stdout.splitlines() if l.strip()]
+        if lignes:
+            return "\n".join(f"• {l}" for l in lignes)
+    except Exception:
+        pass
+    return f"Compilation {build}."
+
+
 def main() -> None:
     host = sys.argv[1] if len(sys.argv) > 1 else lan_address()
     port = sys.argv[2] if len(sys.argv) > 2 else "8765"
@@ -110,6 +140,7 @@ def main() -> None:
     version = plist.get("CFBundleShortVersionString", "1.0")
     size = IPA.stat().st_size
     date = datetime.fromtimestamp(IPA.stat().st_mtime, timezone.utc).isoformat()
+    notes = changelog(build)
 
     # **Une adresse par version.** Servie toujours sous le même nom, une IPA
     # déjà téléchargée peut resservir — celle d'hier, alors que la source annonce
@@ -138,7 +169,7 @@ def main() -> None:
         "version": version,
         "buildVersion": build,
         "versionDate": date,
-        "versionDescription": f"Compilation {build}.",
+        "versionDescription": notes,
         "downloadURL": download,
         "size": size,
         # …AltStore 2 lit la liste, la plus récente d'abord.
@@ -147,7 +178,7 @@ def main() -> None:
                 "version": version,
                 "buildVersion": build,
                 "date": date,
-                "localizedDescription": f"Compilation {build}.",
+                "localizedDescription": notes,
                 "downloadURL": download,
                 "size": size,
                 "permissions": permissions,
