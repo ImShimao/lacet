@@ -13,7 +13,7 @@ import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 
-export default function Library({ saved, history, onOpen, onImport, profile, mapStyle }) {
+export default function Library({ saved, history, onOpen, onOpenRun, onImport, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
   const [view, setView] = useState(() =>
@@ -99,7 +99,11 @@ export default function Library({ saved, history, onOpen, onImport, profile, map
                 <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={rows.filter((x) => monthKey(x.ranAt) === monthKey(r.ranAt))} />
               )}
               <div className="list__item">
-                <button className="list__row" onClick={() => onOpen(r)}>
+                {/* Une sortie ouvre son bilan — ce qu'on a fait —, un favori
+                    ouvre le parcours sur la carte. Longtemps les deux menaient
+                    au même écran, qui montrait le plan : relire une sortie
+                    passée y était impossible. */}
+                <button className="list__row" onClick={() => (view === 'history' ? onOpenRun(r) : onOpen(r))}>
                   {view === 'history' && (
                     <span className="list__sport" aria-hidden="true">
                       <Icon name={r.sport === 'bike' ? 'bike' : 'run'} size={17} />

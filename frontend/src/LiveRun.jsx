@@ -6,6 +6,8 @@ import { haversine, km, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
 import { lockScreenState, shouldRefresh } from './lockScreen'
 import { motionTracker } from './autoPause'
+import { arrivalWatcher } from './arrival'
+import { REPORT_KINDS, addReport, blockedPoints } from './reports'
 import { load } from './storage'
 import * as voice from './voice'
 import SosButton from './SosButton.jsx'
@@ -72,6 +74,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
   const [paused, setPaused] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  // Le choix du signalement, ouvert par le bouton : « travaux », « passage
+  // fermé », « danger ».
+  const [reporting, setReporting] = useState(false)
 
   // Le tracé suivi : le parcours choisi, puis, après un recalcul, le raccord et
   // la fin de la boucle. Tenu aussi en référence : les relevés GPS arrivent
@@ -114,6 +119,19 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const resumedAt = useRef(Date.now())
   const motion = useRef(null)
   if (!motion.current) motion.current = motionTracker()
+  // L'approche de l'arrivée — voir `arrival.js`. Tenue en référence pour la
+  // même raison que le reste : elle est lue dans le rappel des positions.
+  const arrival = useRef(null)
+  if (!arrival.current) arrival.current = arrivalWatcher()
+  const finishing = useRef(false)
+  // Le temps de chaque kilomètre, relevé au passage. Sans lui, une sortie
+  // relue plus tard n'a qu'une allure moyenne — voir `RunDetail.jsx`.
+  const splits = useRef([])
+  // Le chrono au dernier passage de borne : c'est lui qui donne le temps du
+  // kilomètre suivant. Une somme des tours ne conviendrait pas — une sortie
+  // reprise après une coupure n'a plus les tours d'avant, et le premier
+  // kilomètre d'après aurait hérité de toute la durée écoulée.
+  const splitAt = useRef(0)
   // La distance des dernières secondes, relevé par relevé : l'arrêt n'est sûr
   // qu'au bout de huit secondes, et le tremblement du GPS pendant ce temps —
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
@@ -131,6 +149,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       pausedMs.current = 0
       startedAt.current = Date.now() - (resuming.elapsed ?? 0) * 1000
       lastSplit.current = Math.floor(covered.current / 1000)
+      splits.current = resuming.splits ?? []
+      splitAt.current = resuming.elapsed ?? 0
     }
   }
   // La sortie est écrite sur le disque de loin en loin : fermée par iOS ou par
@@ -325,6 +345,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       covered: covered.current,
       elapsed: movingSeconds(now),
       trail: trace.current.points,
+      splits: splits.current,
     })
   }
 
@@ -438,8 +459,18 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   function announceSplit(travelled) {
     const done = Math.floor(travelled / 1000)
     if (done <= lastSplit.current) return
+    const elapsed = movingSeconds()
+    // Le temps de ce kilomètre-là, pas celui du début : c'est ce qu'on cherche
+    // en relisant une sortie — où l'on a accéléré, où l'on a coulé.
+    // Un saut de GPS peut franchir deux bornes d'un coup : le temps écoulé est
+    // alors réparti entre elles, faute de mieux — inventer deux temps distincts
+    // serait pire que d'annoncer les deux kilomètres au même rythme.
+    const gap = done - lastSplit.current
+    const each = Math.round((elapsed - splitAt.current) / gap)
+    for (let n = lastSplit.current + 1; n <= done; n += 1) splits.current.push({ km: n, seconds: each })
+    splitAt.current = elapsed
     lastSplit.current = done
-    const perKm = movingSeconds() / (travelled / 1000)
+    const perKm = elapsed / (travelled / 1000)
     voice.speak(
       `${done} kilomètre${done > 1 ? 's' : ''}. Allure ${spoken(perKm)} au kilomètre.`,
       { priority: false },
@@ -479,6 +510,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       setRerouteDue(null)
     }
 
+    watchArrival(point, found)
+
     const upcoming = nextInstruction(instructions, found.along, announced.current)
     setCurrent(upcoming)
     upcomingStep.current = upcoming
@@ -497,11 +530,55 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   }
 
   /**
+   * L'arrivée : la boucle revient à son départ, et la sortie s'arrête d'elle-même.
+   *
+   * La décision est prise dans `arrival.js`, à part, parce qu'elle mérite
+   * d'être éprouvée relevé par relevé. Ici, on lui donne ce qu'elle demande et
+   * l'on obéit : un mot, une vibration, et le bilan.
+   */
+  function watchArrival(point, found) {
+    const guided = guideRef.current.route
+    const fin = guided?.geometry?.[guided.geometry.length - 1]
+    if (!fin || finishing.current) return
+    const verdict = arrival.current.push({
+      toFinish: haversine(point, fin),
+      remaining: Math.max(0, (guided.distance_m || 0) - found.along),
+      covered: covered.current,
+      planned: plannedM || null,
+      now: Date.now(),
+    })
+    if (verdict !== 'arrived') return
+    finishing.current = true
+    voice.speak('Arrivée. Sortie terminée.')
+    if (isNative()) import('./native').then((n) => n.warnHaptic())
+    else if (navigator.vibrate) navigator.vibrate([120, 80, 120, 80, 220])
+    finish()
+  }
+
+  /**
+   * Signaler ce que la carte ne dit pas : des travaux, un passage fermé.
+   *
+   * Le point est celui où l'on est — voir `reports.js`. Sur un parcours, le
+   * recalcul part dans la foulée : au moment où l'on signale, on est devant
+   * l'obstacle, et continuer tout droit n'a plus de sens.
+   */
+  function report(kind) {
+    const point = here.current
+    setReporting(false)
+    if (!point) return
+    addReport({ lon: point[0], lat: point[1], kind })
+    if (isNative()) import('./native').then((n) => n.pulseHaptic())
+    const said = REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.'
+    voice.speak(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
+    if (canDetour) detour(point, { forced: true })
+  }
+
+  /**
    * Un nouveau chemin, depuis là où l'on est, pour finir la boucle — voir
    * `engine/reroute.js`. Calculé sur l'appareil, avec les rues de la
    * recherche : hors réseau aussi.
    */
-  async function detour(point = here.current) {
+  async function detour(point = here.current, { forced = false } = {}) {
     if (!canDetour || detouring.current || !point) return
     detouring.current = true
     dueAt.current = null
@@ -509,7 +586,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const { route: guided, track } = guideRef.current
     try {
       const found = await detourOnDevice({
-        request,
+        // Les signalements sont relus ici, et non gardés avec la demande : le
+        // plus utile des trois est celui qu'on vient de faire, il y a une
+        // seconde, et c'est lui qui doit écarter la rue barrée.
+        request: { ...request, blocked: blockedPoints() },
         position: point,
         heading: heading.current,
         geometry: guided.geometry,
@@ -518,8 +598,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         plannedM,
       })
       if (!found) throw new Error('Aucun chemin')
-      // Revenu sur le tracé pendant le calcul : rien à changer.
-      if (strayCount.current < OFF_ROUTE_FIXES) return
+      // Revenu sur le tracé pendant le calcul : rien à changer. Sauf quand
+      // c'est nous qui avons demandé le détour — là, le tracé n'est pas en
+      // cause, c'est la rue devant qui est barrée.
+      if (!forced && strayCount.current < OFF_ROUTE_FIXES) return
       const next = spliceRoute(guided, found, track.cumulative[found.joinIndex] ?? 0)
       adopt(next)
       // La consigne s'affiche tout de suite, sans attendre le relevé suivant.
@@ -535,7 +617,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       if (isNative()) import('./native').then((n) => n.pulseHaptic())
       onReroute?.(next)
     } catch {
-      if (strayCount.current >= OFF_ROUTE_FIXES) {
+      if (forced) {
+        voice.speak("Je n'ai pas trouvé d'autre chemin d'ici. Le signalement est gardé pour les prochaines sorties.")
+      } else if (strayCount.current >= OFF_ROUTE_FIXES) {
         dueAt.current = Date.now() + REROUTE_RETRY_MS
         setRerouteDue(dueAt.current)
         voice.speak("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
@@ -551,6 +635,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const g = guideOf(next)
     guideRef.current = g
     setGuide(g)
+    // Le tracé a changé, et son arrivée avec : une approche en cours n'a plus
+    // de sens.
+    arrival.current = arrivalWatcher()
     fix.current = null
     strayCount.current = 0
     lastOnAlong.current = 0
@@ -580,16 +667,28 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setTimeout(() => setAlert(null), 8000)
   }
 
+  /**
+   * Le bilan de la sortie.
+   *
+   * Tout est lu dans les références, rien dans l'état affiché : l'arrivée
+   * automatique part du rappel des positions, créé une fois pour toutes, où
+   * `state` est resté celui du premier rendu — une sortie enregistrée à zéro
+   * kilomètre. Le bouton, lui, aurait lu la bonne valeur ; la différence entre
+   * les deux chemins est exactement le genre de piège que ce fichier évite
+   * partout ailleurs avec des références.
+   */
   const finish = () => {
     clearRun()
     onStop({
-      ...state,
+      distance: covered.current,
       elapsed: movingSeconds(),
       // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
       // reprendre, et un point tous les huit mètres y suffit.
       trail: simplify(trace.current.points),
       ascent: trace.current.points.length > 2 ? trace.current.ascent : null,
       rerouted: Boolean(guideRef.current.route?.rerouted),
+      splits: splits.current.slice(),
+      pausedS: Math.round(pausedMs.current / 1000),
     })
   }
 
@@ -699,6 +798,29 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       {error && <div className="live__error">{error}</div>}
       {!error && state.points === 0 && (
         <div className="live__wait">Acquisition du signal GPS…</div>
+      )}
+
+      {/* Ce que la carte ne sait pas, dit en passant devant.
+          Deux appuis, sans rien à viser : on est devant l'obstacle, c'est la
+          position qui fait le signalement. Le second appui relance aussitôt le
+          calcul d'un autre chemin — voir `report`. */}
+      {reporting ? (
+        <div className="signal signal--open" role="group" aria-label="Signaler un problème">
+          {REPORT_KINDS.map((k) => (
+            <button key={k.key} className="signal__kind" onClick={() => report(k.key)}>
+              <Icon name={k.icon} size={19} />
+              {k.label}
+            </button>
+          ))}
+          <button className="signal__cancel" onClick={() => setReporting(false)} aria-label="Annuler">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      ) : (
+        <button className="signal" onClick={() => setReporting(true)} disabled={!here.current}>
+          <Icon name="cone" size={17} />
+          Signaler un problème ici
+        </button>
       )}
 
       {/* Collés au bas du panneau, à portée de pouce. En course : le profil, la

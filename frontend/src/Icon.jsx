@@ -160,6 +160,25 @@ const PATHS = {
       <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
     </>
   ),
+  // Un escalier vu de profil : trois marches qui montent vers la droite. Le
+  // même dessin sert au filtre qui les évite et à l'explication.
+  stairs: (
+    <>
+      <path d="M3 20h5v-4h5v-4h5V8h3" />
+      <path d="M8 20v-4M13 16v-4M18 12V8" />
+    </>
+  ),
+  // Le cône de chantier. Ses deux bandes et son socle large sont ce qui le
+  // distingue du triangle de danger, à côté duquel il est affiché : sans elles,
+  // les deux se ressemblaient trop pour qu'on les distingue en courant.
+  cone: (
+    <>
+      <path d="M12 3.5 17 18.5H7z" />
+      <path d="M9.9 12h4.2" />
+      <path d="M8.8 15.2h6.4" />
+      <path d="M3.5 21h17" />
+    </>
+  ),
   warning: (
     <>
       <path d="M12 3.5 22 20.5H2z" />

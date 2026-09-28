@@ -11,10 +11,11 @@
 
 import { resample, haversineM } from './geo'
 import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
+import { blockedEdges } from './blocked'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
-import { buildProfile } from './weights'
+import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
 import { ascentDescent, currentWind, fetchMany, isNight, smooth, tailwindFinish } from './environment'
 
@@ -96,6 +97,10 @@ export function normalizeRequest(input) {
     // celle du moteur Python, à l'identique.
     variation: input.variation ?? 0,
     avoid_bearings: input.avoid_bearings ?? [],
+    // Ce qu'on refuse de croiser (« escaliers »), et ce qu'on a signalé soi-même
+    // sur le terrain — des points, que `blocked.js` rapproche des rues.
+    avoid: input.avoid ?? [],
+    blocked: input.blocked ?? [],
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -113,6 +118,16 @@ export function normalizeRequest(input) {
     throw new PlanningError('Paramètre avoid_bearings invalide.')
   }
   req.avoid_bearings = req.avoid_bearings.map((b) => bounded(b, 'avoid_bearings', { min: 0, max: 360 }))
+  if (!Array.isArray(req.avoid)) throw new PlanningError('Paramètre avoid invalide.')
+  // Un évitement inconnu est ignoré, pas refusé : une version plus récente de
+  // l'app peut en avoir ajouté un, et une sauvegarde rouverte ici ne doit pas
+  // faire échouer la recherche pour une case à cocher.
+  req.avoid = req.avoid.filter((key) => AVOID_KEYS.includes(key))
+  if (!Array.isArray(req.blocked) || req.blocked.length > 500) throw new PlanningError('Paramètre blocked invalide.')
+  req.blocked = req.blocked.map((p) => [
+    bounded(p?.[0], 'blocked', { min: -180, max: 180 }),
+    bounded(p?.[1], 'blocked', { min: -90, max: 90 }),
+  ])
 
   req.seconds_per_km = req.sport === 'bike' ? 3600 / req.speed_kmh : req.pace_sec_per_km
 
@@ -240,7 +255,10 @@ export async function planLoops(input, deps) {
   }
 
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
-  const profile = buildProfile(req.surface, req.safety, night, req.sport)
+  const profile = buildProfile(req.surface, req.safety, night, req.sport, {
+    avoid: req.avoid,
+    blocked: blockedEdges(graph, req.blocked),
+  })
 
   const windTask = windOf(req.lat, req.lon)
 
@@ -398,7 +416,13 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   const req = normalizeRequest(input.request)
   const graph = await loadGraph(graphArgs(req))
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
-  const profile = buildProfile(req.surface, req.safety, night, req.sport)
+  // Le retour sur la boucle suit les mêmes refus que la boucle elle-même — et
+  // surtout le signalement qu'on vient de faire : c'est souvent lui qui a
+  // déclenché ce recalcul.
+  const profile = buildProfile(req.surface, req.safety, night, req.sport, {
+    avoid: req.avoid,
+    blocked: blockedEdges(graph, req.blocked),
+  })
   return planRejoin(graph, profile.precompute(graph), input)
 }
 

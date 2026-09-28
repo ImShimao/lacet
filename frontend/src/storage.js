@@ -7,7 +7,7 @@ import { haversineM } from './engine/geo'
 
 const KEY = 'lacet.v1'
 
-const DEFAULTS = { favorites: [], history: [], params: null, recentPlaces: [] }
+const DEFAULTS = { favorites: [], history: [], params: null, recentPlaces: [], reports: [] }
 
 // Assez pour retrouver chez soi, le travail, le coin du dimanche et deux
 // endroits de vacances. Au-delà, la liste demanderait à être lue.
@@ -171,9 +171,10 @@ export function importAll(text) {
   }
   const favorites = merge(current.favorites, data.favorites, (r) => `${r.id}|${r.distance_m}`)
   const history = merge(current.history, data.history, (r) => r.ranAt || `${r.id}`)
+  const reports = merge(current.reports, data.reports, (r) => r.id)
   history.sort((a, b) => String(b.ranAt || '').localeCompare(String(a.ranAt || '')))
 
-  save({ ...data, favorites: favorites.slice(0, 40), history: history.slice(0, 200) })
+  save({ ...data, favorites: favorites.slice(0, 40), history: history.slice(0, 200), reports: reports.slice(0, 200) })
   return { favorites: favorites.length, history: history.length }
 }
 

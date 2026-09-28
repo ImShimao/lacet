@@ -102,6 +102,32 @@ const safety = (sport) => {
   }
 }
 
+// Les facteurs d'`AVOID_FACTOR`, dans `engine/weights.js` : vingt-cinq fois la
+// longueur. Un évitement n'interdit pas — il rend le détour presque toujours
+// préférable.
+const AVOID = {
+  title: 'Ce qu’on évite',
+  intro:
+    "Un évitement multiplie par vingt-cinq la longueur ressentie du tronçon : un escalier de trente mètres en coûte sept cent cinquante, et tout détour raisonnable le bat. Ce n'est pas une interdiction — quand c'est le seul accès, la boucle passe quand même, plutôt que de ne rien proposer du tout.",
+  items: [
+    {
+      icon: 'stairs',
+      label: 'Escaliers',
+      text: "Les volées de marches d'OpenStreetMap (`highway=steps`). Cent mètres de dénivelé pris dans un escalier, ce n'est pas la même sortie qu'une côte régulière — et à vélo, ils sont interdits de toute façon.",
+    },
+    {
+      icon: 'warning',
+      label: 'Grands axes',
+      text: "Les voies où l'on court au contact du trafic : une route rapide sans trottoir ni accotement. Le réglage « Sécurité » écarte la boucle entière au-delà d'un seuil ; cette case, elle, écarte chaque tronçon, un par un.",
+    },
+    {
+      icon: 'moon',
+      label: 'Rues non éclairées',
+      text: "Les voies explicitement données comme non éclairées (`lit=no`). Celles qui ne disent rien ne sont pas pénalisées : la moitié des rues d'un village n'ont simplement pas l'information, et les écarter viderait la carte.",
+    },
+  ],
+}
+
 const SPORT = {
   title: 'Activité',
   items: [
@@ -122,5 +148,5 @@ const SPORT = {
 export function explain(topic, sport = 'run') {
   if (topic === 'terrain') return sport === 'bike' ? TERRAIN_BIKE : TERRAIN_RUN
   if (topic === 'safety') return safety(sport)
-  return { relief: RELIEF, sport: SPORT }[topic] ?? null
+  return { relief: RELIEF, sport: SPORT, avoid: AVOID }[topic] ?? null
 }

@@ -9,6 +9,8 @@ import RunSummary from './RunSummary.jsx'
 import PlaceSheet from './PlaceSheet.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
+import RunDetail from './RunDetail.jsx'
+import { blockedPoints } from './reports'
 import Account from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import useGeolocation from './useGeolocation'
@@ -212,6 +214,10 @@ export default function App() {
   const [resume, setResume] = useState(null)
   // La sortie qui vient de se terminer : ses chiffres, et sa trace sur la carte.
   const [summary, setSummary] = useState(null)
+  // La sortie passée qu'on regarde, ouverte depuis l'historique. Distincte de
+  // `summary` — celle qu'on vient de terminer — parce qu'on n'y fait pas les
+  // mêmes gestes : l'une se referme, l'autre se rejoue ou se supprime.
+  const [viewing, setViewing] = useState(null)
   const [livePosition, setLivePosition] = useState(null)
   // La direction de course, pour la carte orientée comme un GPS de voiture.
   const [liveHeading, setLiveHeading] = useState(null)
@@ -395,7 +401,15 @@ export default function App() {
       // réglage qu'on venait de changer.
       const token = ++searchToken.current
       try {
-        const request = { ...toRequest(active, start), variation: variation.current, avoid_bearings: avoid }
+        // Les signalements sont lus au moment du départ de la recherche, pas
+        // gardés en mémoire : celui qu'on vient de faire en courant doit
+        // compter dès la boucle suivante.
+        const request = {
+          ...toRequest(active, start),
+          variation: variation.current,
+          avoid_bearings: avoid,
+          blocked: blockedPoints(),
+        }
         const onStage = (stage, fraction) => {
           if (token === searchToken.current) setProgress({ stage, fraction })
         }
@@ -593,6 +607,10 @@ export default function App() {
       actual_ascent_m: stats.ascent ?? null,
       // Ce qu'on a réellement couru, allégé — voir `trail.js`.
       track: stats.trail?.length > 1 ? stats.trail : null,
+      // Le temps de chaque kilomètre, et le temps passé à l'arrêt : relevés
+      // pendant la sortie, impossibles à retrouver après coup.
+      splits: stats.splits?.length ? stats.splits : null,
+      paused_s: stats.pausedS || 0,
       rerouted: Boolean(stats.rerouted),
       free: Boolean(free),
       sport: ranWith,
@@ -612,6 +630,15 @@ export default function App() {
     setHistory(kept)
     save({ history: kept })
     return entry
+  }
+
+  /** Rouvre un parcours gardé — un favori, ou celui d'une sortie à refaire. */
+  function openRoute(r) {
+    setSelected(r)
+    setResult({ routes: [r], rejected: [], meta: {} })
+    setTab('explore')
+    setSheet('peek')
+    setDetail(true)
   }
 
   function finishRun(stats) {
@@ -727,8 +754,24 @@ export default function App() {
   const sport = SPORTS.find((s) => s.key === params.sport)
   const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
-  const sheetMode = running ? 'live' : summary || tab !== 'explore' ? 'page' : sheet
-  const sheetGesture = useSheetDrag(sheetMode, setSheet, shellRef)
+  const sheetMode = running
+    ? 'live'
+    : viewing
+      ? 'full'
+      : summary || tab !== 'explore'
+        ? 'page'
+        : sheet
+  // Tirer la feuille vers le bas la referme — y compris celle d'une sortie
+  // relue, qui n'est pas un état de `sheet` mais une sortie ouverte : sans
+  // ça, le geste laissait la feuille en place, apparemment bloquée.
+  const sheetGesture = useSheetDrag(
+    sheetMode,
+    (next) => {
+      if (next === 'peek' && viewing) setViewing(null)
+      setSheet(next)
+    },
+    shellRef,
+  )
 
   const announcement = busy
     ? 'Recherche des itinéraires en cours.'
@@ -752,7 +795,9 @@ export default function App() {
           styleKey={mapStyle}
           start={start}
           route={
-            summary?.track
+            viewing
+              ? { ...viewing, geometry: viewing.track ?? viewing.geometry ?? [], segments: [], crossings: [] }
+              : summary?.track
               ? { ...summary, geometry: summary.track, segments: [], crossings: [] }
               : running && freeRun
                 ? null
@@ -967,7 +1012,7 @@ export default function App() {
           <div className="brand">
             Lacet<span>.</span>
           </div>
-          {!running && tab !== 'explore' && (
+          {!running && !viewing && tab !== 'explore' && (
             <h2 className="side__title">{tab === 'routes' ? 'Mes parcours' : 'Mon compte'}</h2>
           )}
           {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
@@ -1086,7 +1131,22 @@ export default function App() {
               </button>
             </div>
           )}
-          {summary ? (
+          {viewing ? (
+            <RunDetail
+              entry={viewing}
+              onClose={() => setViewing(null)}
+              onReplay={(r) => {
+                setViewing(null)
+                openRoute(r)
+              }}
+              onDelete={(r) => {
+                const next = history.filter((h) => h !== r)
+                setHistory(next)
+                save({ history: next })
+                setViewing(null)
+              }}
+            />
+          ) : summary ? (
             <RunSummary entry={summary} onClose={() => setSummary(null)} />
           ) : running ? (
             <LiveRun
@@ -1110,13 +1170,8 @@ export default function App() {
               history={history}
               profile={params}
               mapStyle={mapStyle}
-              onOpen={(r) => {
-                setSelected(r)
-                setResult({ routes: [r], rejected: [], meta: {} })
-                setTab('explore')
-                setSheet('peek')
-                setDetail(true)
-              }}
+              onOpen={openRoute}
+              onOpenRun={setViewing}
             />
           ) : tab === 'account' ? (
             <Account
@@ -1233,6 +1288,9 @@ function toRequest(p, start) {
     time_of_day: p.time_of_day,
     limit: p.count || 5,
   }
+  // Vide le plus souvent : n'envoyer la clé que lorsqu'elle sert garde la
+  // demande identique à celle du moteur Python tant qu'on ne coche rien.
+  if (p.avoid?.length) body.avoid = p.avoid
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
   // Viser un semi à ±10 %, c'est viser à deux kilomètres près.

@@ -81,6 +81,24 @@ export const raceOf = (km) => RACES.find((r) => Math.abs(r.km - km) < 0.01) ?? n
  */
 export const DURATIONS = [30, 45, 60, 90]
 
+/**
+ * Ce qu'on peut refuser de croiser.
+ *
+ * Trois cases, et pas dix : chacune doit répondre à une gêne qu'on a vraiment
+ * eue — les cent mètres de dénivelé avalés dans un escalier, la départementale
+ * sans trottoir, le chemin noir à dix-huit heures en décembre. Les clés sont
+ * celles de `AVOIDS`, dans `engine/weights.js`.
+ *
+ * Ce qui manque à cette liste, et qu'aucune donnée ne donne : le portail fermé
+ * et le chantier d'hier. Ceux-là ne s'évitent qu'une fois vus — c'est ce que
+ * fait le bouton « Signaler » pendant la sortie.
+ */
+export const AVOIDABLE = [
+  { key: 'steps', label: 'Escaliers', hint: 'Les volées de marches', sport: 'run' },
+  { key: 'busy', label: 'Grands axes', hint: 'Les voies au contact du trafic' },
+  { key: 'unlit', label: 'Rues non éclairées', hint: 'Seulement celles données comme telles' },
+]
+
 export const DEFAULTS = {
   sport: 'run',
   mode: 'distance',
@@ -94,6 +112,10 @@ export const DEFAULTS = {
   speed_kmh: 20,
   speedUnit: 'pace',
   count: 5,
+  // Ce qu'on refuse de croiser. Vide par défaut : chaque évitement rallonge
+  // les boucles, et l'imposer à qui ne l'a pas demandé serait décider à sa
+  // place — un escalier est parfois le raccourci qu'on cherche.
+  avoid: [],
   // Distance exacte : ±2,5 % au lieu de ±10 %. Réservé à qui vise une distance
   // précise — plus c'est serré, moins il y a de boucles qui conviennent.
   precise: false,
@@ -385,6 +407,37 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 ? "Écarte les itinéraires qui longent une route à 80 km/h ou plus sans trottoir ni accotement, ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
                 : 'Montre aussi les itinéraires exposés, avec le détail des portions concernées.'}
             </p>
+          </Field>
+
+          <Field label="Éviter" info="avoid" sport={draft.sport}>
+            <div className="checks">
+              {AVOIDABLE.filter((a) => !a.sport || a.sport === draft.sport).map((a) => {
+                const on = (draft.avoid || []).includes(a.key)
+                return (
+                  <button
+                    key={a.key}
+                    role="checkbox"
+                    aria-checked={on}
+                    className={`check ${on ? 'check--on' : ''}`}
+                    onClick={() =>
+                      set({
+                        avoid: on
+                          ? draft.avoid.filter((k) => k !== a.key)
+                          : [...(draft.avoid || []), a.key],
+                      })
+                    }
+                  >
+                    <span className="check__box">
+                      <Icon name="check" size={13} />
+                    </span>
+                    <span>
+                      {a.label}
+                      <em>{a.hint}</em>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </Field>
 
         </div>

@@ -10,6 +10,7 @@ import Icon from './Icon.jsx'
 import { COUNTS, MOMENTS, SPORTS, Segmented } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { exportAll, importAll, load, save } from './storage'
+import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 
@@ -87,6 +88,9 @@ export default function Account({ params, geo, onClearData, onProfile }) {
           save({ emergencyContact: e.target.value.trim() })
         }}
       />
+
+      <h4 className="section">Mes signalements</h4>
+      <MyReports />
 
       <h4 className="section">Cartes hors ligne</h4>
       <OfflineStorage key={`cartes-${version}`} />
@@ -225,6 +229,54 @@ function KeptStreets() {
  * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
  * finit par être vidé par le navigateur — au pire moment, sans prévenir.
  */
+/**
+ * Ce qu'on a signalé en courant, et qu'on peut retirer.
+ *
+ * Un signalement écarte des rues pour les six mois qui viennent : il faut
+ * pouvoir le relire et le défaire. Un chantier fini, un appui de trop dans la
+ * poche, et la boucle du dimanche se met à faire un crochet inexplicable —
+ * cette liste est la seule façon de comprendre pourquoi, et d'y remédier.
+ */
+function MyReports() {
+  const [items, setItems] = useState(() => activeReports())
+  if (!items.length) {
+    return (
+      <p className="muted small">
+        Rien de signalé. Pendant une sortie, le bouton « Signaler un problème ici » note des
+        travaux, un passage fermé ou un danger à l'endroit où tu te trouves : les boucles
+        suivantes passeront ailleurs, et la sortie en cours se recalcule aussitôt. Ces points
+        restent sur l'appareil — personne d'autre ne les voit — et s'effacent au bout de six mois.
+      </p>
+    )
+  }
+  return (
+    <>
+      <p className="muted small">
+        {items.length} point{items.length > 1 ? 's' : ''} écarté{items.length > 1 ? 's' : ''} du
+        routage, dans un rayon de vingt-cinq mètres chacun. Ils s'effacent d'eux-mêmes au bout de
+        six mois.
+      </p>
+      <div className="rows">
+        {items.map((r) => (
+          <div className="rows__row" key={r.id}>
+            <span>
+              {kindLabel(r.kind)}
+              <em className="muted small">
+                {' '}
+                · {new Date(r.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} ·{' '}
+                {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
+              </em>
+            </span>
+            <button className="linkish" onClick={() => setItems(removeReport(r.id))}>
+              Retirer
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function OfflineStorage() {
   const [total, setTotal] = useState(() => offline.totalBytes())
   const [count, setCount] = useState(() => offline.storedCount())

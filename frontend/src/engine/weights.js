@@ -3,7 +3,7 @@
 //     poids = longueur × (1 + λ · risque) × facteur_surface × facteur_nuit
 
 import { pyMin } from './py'
-import { nightFactor } from './safety'
+import { EXPOSED_RISK, nightFactor } from './safety'
 
 const LAMBDA = { safe: 4, standard: 1.5 }
 
@@ -22,18 +22,53 @@ const SURFACE_FACTOR_BIKE = {
   trail: table(1.5, 0.8, 0.85, 1.1),
 }
 
+// === évitements ==============================================================
+//
+// Ce que l'on ne veut pas croiser, coché dans les filtres, et ce qu'on a
+// signalé soi-même pendant une sortie. Les deux se règlent au même endroit,
+// parce qu'ils posent la même question au routage : « passe ailleurs ».
+//
+// **Un évitement n'est pas une interdiction.** Multiplier le poids plutôt que
+// retirer l'arête garde le réseau connexe : quand un escalier est le seul
+// accès à la rive, la boucle passe quand même, et l'on n'affiche pas « aucun
+// itinéraire » pour une marche de six marches. Vingt-cinq, c'est vingt-cinq
+// fois la longueur : un escalier de trente mètres coûte comme sept cent
+// cinquante — tout détour raisonnable le bat.
+const AVOID_FACTOR = 25
+
+// Un signalement, lui, pèse bien plus lourd : une route barrée n'est pas une
+// préférence, c'est un mur. Quatre cents fois la longueur, c'est un tronçon de
+// cinquante mètres qui en coûte vingt mille — il ne reste que le cas où il n'y
+// a vraiment pas d'autre chemin, et où prévenir vaut mieux qu'échouer.
+const BLOCKED_FACTOR = 400
+
+/** Ce qu'un évitement reconnaît, arête par arête. */
+const AVOIDS = {
+  steps: (s) => s.highway === 'steps',
+  // Le vrai critère du coureur : la voiture qui passe à cinquante centimètres.
+  // C'est celui que la note de sécurité appelle « exposé ».
+  busy: (s) => s.risk >= EXPOSED_RISK,
+  // `lit` est à `null` quand OpenStreetMap ne dit rien : dans le doute, on ne
+  // pénalise pas — la moitié des rues d'un village n'ont simplement pas le tag.
+  unlit: (s) => s.lit === false,
+}
+
+export const AVOID_KEYS = Object.keys(AVOIDS)
+
 const FOOT_ONLY_FACTOR = 4
 const FOOT_ONLY_HIGHWAY = new Set(['footway', 'pedestrian'])
 const STEPS_FACTOR = 3
 const NIGHT_MIN_FACTOR = 0.7 * 0.9
 
 export class Profile {
-  constructor({ lam, surface, night, sport = 'run' }) {
+  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null }) {
     this.lam = lam
     this.surface = surface
     this.night = night
     this.sport = sport
     this.factors = (sport === 'bike' ? SURFACE_FACTOR_BIKE : SURFACE_FACTOR)[surface]
+    this.avoid = avoid.filter((key) => key in AVOIDS).map((key) => AVOIDS[key])
+    this.blocked = blocked
   }
 
   weight(graph, e) {
@@ -46,6 +81,8 @@ export class Profile {
       w *= STEPS_FACTOR
     }
     if (this.night) w *= nightFactor(s)
+    for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
+    if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
     return w
   }
 
@@ -63,6 +100,6 @@ export class Profile {
   }
 }
 
-export function buildProfile(surface, safety, night, sport = 'run') {
-  return new Profile({ lam: LAMBDA[safety], surface, night, sport })
+export function buildProfile(surface, safety, night, sport = 'run', { avoid = [], blocked = null } = {}) {
+  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked })
 }

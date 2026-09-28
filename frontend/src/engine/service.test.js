@@ -3,6 +3,7 @@ import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
+import { haversineM } from './geo'
 import { SETTINGS, extractRadiusM, planLoops, reverseRoute } from './service'
 
 /**
@@ -32,6 +33,50 @@ describe("le rayon de l'extrait", () => {
   it("garde un minimum pour les très petites distances", () => {
     expect(extractRadiusM(1000, 0.1)).toBe(2000)
   })
+})
+
+describe('la boucle', () => {
+  const dir = new URL('./__fixtures__/parity/', import.meta.url)
+  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL('extract-beaune.json.gz', dir))).toString('utf8')))
+  const graph = buildGraph(extract, { sport: 'run' })
+  const deps = { loadGraph: async () => graph, fetchElevations: async () => [], wind: async () => null }
+
+  it('finit exactement là où elle commence', async () => {
+    // Pas « à quelques mètres près » : le même point, au chiffre près. C'est ce
+    // qui permet de dire qu'on est arrivé (voir `arrival.js`), et un écart de
+    // trente mètres entre le départ et l'arrivée se voit sur la carte.
+    const result = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 5 },
+      deps,
+    )
+    expect(result.routes.length).toBeGreaterThan(0)
+    for (const route of result.routes) {
+      const [depart] = route.geometry
+      const fin = route.geometry[route.geometry.length - 1]
+      expect(fin).toEqual(depart)
+    }
+  }, 30_000)
+
+  it('évite une rue signalée', async () => {
+    // Le cas vécu : un chemin qui finit sur un portail fermé. Une fois signalé,
+    // il ne doit plus être proposé — et la boucle doit rester une boucle.
+    const avant = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 1 },
+      deps,
+    )
+    const chemin = avant.routes[0].geometry
+    const barre = chemin[Math.floor(chemin.length / 2)]
+
+    const apres = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 1, blocked: [barre] },
+      deps,
+    )
+    expect(apres.routes.length).toBeGreaterThan(0)
+    const passe = apres.routes[0].geometry.some((c) => haversineM(c, barre) < 20)
+    expect(passe).toBe(false)
+    const fin = apres.routes[0].geometry[apres.routes[0].geometry.length - 1]
+    expect(fin).toEqual(apres.routes[0].geometry[0])
+  }, 30_000)
 })
 
 describe('le relief', () => {

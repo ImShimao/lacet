@@ -128,7 +128,7 @@ describe('les départs récents', () => {
 
 describe('load et save', () => {
   it('rend les valeurs par défaut sur un stockage vide', () => {
-    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [], reports: [] })
   })
 
   it('relit ce qui a été écrit', () => {
@@ -152,7 +152,7 @@ describe('load et save', () => {
         throw new Error('refusé')
       },
     })
-    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [], reports: [] })
     expect(() => save({ favorites: [] })).not.toThrow()
   })
 
@@ -160,7 +160,7 @@ describe('load et save', () => {
     const s = fauxStockage()
     s.setItem('lacet.v1', '{ceci n’est pas du JSON')
     vi.stubGlobal('localStorage', s)
-    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
+    expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [], reports: [] })
   })
 
   it('sacrifie l’historique quand le quota est atteint', () => {
@@ -180,7 +180,7 @@ describe('load et save', () => {
     const s = fauxStockage({ quota: 10 })
     vi.stubGlobal('localStorage', s)
     const apres = save({ favorites: [{ id: 'trop-gros', bourrage: 'x'.repeat(500) }] })
-    expect(apres).toEqual({ favorites: [], history: [], params: null, recentPlaces: [] })
+    expect(apres).toEqual({ favorites: [], history: [], params: null, recentPlaces: [], reports: [] })
   })
 })
 
