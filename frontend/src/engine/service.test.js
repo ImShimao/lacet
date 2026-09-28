@@ -57,6 +57,25 @@ describe('la boucle', () => {
     }
   }, 30_000)
 
+  it('trouve encore des boucles quand tout est coché', async () => {
+    // Le risque d'un évitement : rendre la recherche stérile. Trois cases
+    // cochées d'un coup — escaliers, grands axes, rues non éclairées — doivent
+    // rendre des boucles, pas un écran vide, parce qu'un évitement pénalise
+    // sans interdire.
+    const result = await planLoops(
+      {
+        lat: 47.0245,
+        lon: 4.8395,
+        distance_km: 5,
+        sport: 'run',
+        limit: 3,
+        avoid: ['steps', 'busy', 'unlit'],
+      },
+      deps,
+    )
+    expect(result.routes.length).toBeGreaterThan(0)
+  }, 30_000)
+
   it('évite une rue signalée', async () => {
     // Le cas vécu : un chemin qui finit sur un portail fermé. Une fois signalé,
     // il ne doit plus être proposé — et la boucle doit rester une boucle.
