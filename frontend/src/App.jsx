@@ -11,6 +11,7 @@ import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
 import useLibrary from './useLibrary'
+import useRunSession from './useRunSession'
 import { blockedPoints } from './reports'
 import Account from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
@@ -19,7 +20,6 @@ import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { describePlace, generateLoops } from './api'
 import { km, pace } from './format'
 import { load, recentPlaces, save, slim } from './storage'
-import { clearRun, loadRun } from './runState'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, prefetchOnDevice, reverseOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
@@ -202,28 +202,31 @@ export default function App() {
   const [scrub, setScrub] = useState(null)
   const [focus, setFocus] = useState(null)
 
-  const [running, setRunning] = useState(false)
-  // Le compte à rebours qui précède une sortie : `false`, ou `'route'` /
-  // `'free'` selon ce qui démarrera une fois qu'il sera fini.
-  const [starting, setStarting] = useState(false)
-  // Course libre : on enregistre sans itinéraire. C'est ce que fait la moitié
-  // des sorties — on part sans savoir où l'on va — et le refuser obligeait à
-  // choisir une boucle pour pouvoir simplement démarrer le chronomètre.
-  const [freeRun, setFreeRun] = useState(false)
-  // Une sortie interrompue retrouvée au lancement, et celle qu'on reprend.
-  const [pending, setPending] = useState(() => loadRun())
-  const [resume, setResume] = useState(null)
-  // La sortie qui vient de se terminer : ses chiffres, et sa trace sur la carte.
-  const [summary, setSummary] = useState(null)
+  // Les favoris, les sorties et les départs nommés : trois listes qui partagent
+  // une contrainte de place, et les plafonds qui en découlent — voir
+  // `useLibrary.js`.
+  const library = useLibrary(stored)
+  const { saved, history, places } = library
+
+  // La sortie, du premier appui au bilan : une machine, et non neuf états
+  // indépendants — voir `useRunSession.js`. Les noms locaux restent ceux que
+  // tout l'écran emploie.
+  const run = useRunSession({ toEntry: runEntry, remember: (e) => library.remember(e) })
+  const {
+    running,
+    starting,
+    freeRun,
+    pending,
+    resume,
+    summary,
+    position: livePosition,
+    heading: liveHeading,
+    route: liveRoute,
+  } = run
   // La sortie passée qu'on regarde, ouverte depuis l'historique. Distincte de
   // `summary` — celle qu'on vient de terminer — parce qu'on n'y fait pas les
   // mêmes gestes : l'une se referme, l'autre se rejoue ou se supprime.
   const [viewing, setViewing] = useState(null)
-  const [livePosition, setLivePosition] = useState(null)
-  // La direction de course, pour la carte orientée comme un GPS de voiture.
-  const [liveHeading, setLiveHeading] = useState(null)
-  // Le tracé suivi en course, quand un recalcul a remplacé celui du départ.
-  const [liveRoute, setLiveRoute] = useState(null)
   const [geoNoticeOpen, setGeoNoticeOpen] = useState(true)
 
   // Les commandes de la carte en course : la voix, l'orientation — dans le sens
@@ -237,11 +240,6 @@ export default function App() {
   const stageRef = useRef(null)
   const compassRef = useRef(null)
 
-  // Les favoris, les sorties et les départs nommés : trois listes qui partagent
-  // une contrainte de place, et les plafonds qui en découlent — voir
-  // `useLibrary.js`.
-  const library = useLibrary(stored)
-  const { saved, history, places } = library
 
   const geo = useGeolocation()
 
@@ -620,21 +618,6 @@ export default function App() {
     setDetail(true)
   }
 
-  function finishRun(stats) {
-    // Une sortie de moins de cent mètres est un démarrage par erreur, pas une
-    // sortie : l'enregistrer polluerait les statistiques et l'historique.
-    if (stats.distance >= 100) {
-      setSummary(remember(runEntry(stats, { route: selected, free: freeRun, sport: params.sport })))
-    }
-    clearRun()
-    setResume(null)
-    setRunning(false)
-    setFreeRun(false)
-    setLivePosition(null)
-    setLiveHeading(null)
-    setLiveRoute(null)
-  }
-
   // La demande d'où vient le parcours suivi. Celle de la recherche s'il en
   // sort ; pour un parcours rouvert depuis les favoris, on la reconstitue :
   // son départ, sa longueur, les réglages du moment.
@@ -646,12 +629,7 @@ export default function App() {
     return toRequest({ ...params, mode: 'distance', distance_km: distanceKm }, { lat, lon })
   }, [selected, result, params])
 
-  // Le doigt sur « Démarrer » est le seul geste que le navigateur accepte pour
-  // autoriser la voix : c'est ici qu'on la débloque, pas au premier virage.
-  const beginRun = (kind) => {
-    voice.unlock()
-    setStarting(kind)
-  }
+  const beginRun = (kind) => run.countdown(kind)
 
   // --- l'autre sens ------------------------------------------------------------
   // La même boucle retournée : mêmes rues, même note, mais les côtes dans
@@ -810,11 +788,9 @@ export default function App() {
             secondes, il n'y a rien d'autre à faire que partir. */}
         {starting && (
           <Countdown
-            onCancel={() => setStarting(false)}
+            onCancel={() => run.cancelCountdown()}
             onDone={() => {
-              setFreeRun(starting === 'free')
-              setStarting(false)
-              setRunning(true)
+              run.begin()
             }}
           />
         )}
@@ -1031,45 +1007,24 @@ export default function App() {
               </span>
               <button
                 className="banner__act"
-                onClick={() => {
-                  const route = pending.route
-                  if (route) {
+                onClick={() =>
+                  run.resumePending((route) => {
                     setSelected(route)
                     setResult({ routes: [route], rejected: [], meta: {} })
-                  }
-                  setFreeRun(!route)
-                  setResume(pending)
-                  setPending(null)
-                  setRunning(true)
-                }}
+                  })
+                }
               >
                 Reprendre
               </button>
               <button
                 className="banner__act"
-                onClick={() => {
-                  // Reprise impossible ou pas voulue : on garde au moins ce qui
-                  // a été couru, plutôt que de le jeter.
-                  setSummary(
-                    remember(
-                      runEntry(
-                        { distance: pending.covered, elapsed: pending.elapsed, trail: pending.trail },
-                        { route: pending.route, free: !pending.route, sport: pending.sport || params.sport },
-                      ),
-                    ),
-                  )
-                  clearRun()
-                  setPending(null)
-                }}
+                onClick={() => run.keepPending(params.sport)}
               >
                 Enregistrer
               </button>
               <button
                 className="banner__close"
-                onClick={() => {
-                  clearRun()
-                  setPending(null)
-                }}
+                onClick={() => run.dropPending()}
                 aria-label="Oublier"
               >
                 <Icon name="close" size={15} />
@@ -1122,7 +1077,7 @@ export default function App() {
               }}
             />
           ) : summary ? (
-            <RunSummary entry={summary} onClose={() => setSummary(null)} />
+            <RunSummary entry={summary} onClose={() => run.closeSummary()} />
           ) : running ? (
             <LiveRun
               route={freeRun ? null : selected}
@@ -1131,12 +1086,9 @@ export default function App() {
               resuming={resume}
               stage={stageRef.current}
               speaking={speaking}
-              onPosition={(point, heading) => {
-                setLivePosition(point)
-                setLiveHeading(heading ?? null)
-              }}
-              onReroute={setLiveRoute}
-              onStop={finishRun}
+              onPosition={(point, heading) => run.track(point, heading)}
+              onReroute={(next) => run.reroute(next)}
+              onStop={(stats) => run.finish(stats, { route: selected, sport: params.sport })}
             />
           ) : tab === 'routes' ? (
             <Library
