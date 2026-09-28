@@ -95,6 +95,10 @@ def changelog(build: str) -> str:
     derniers messages de commit le disent — ce dépôt en fait des phrases, et
     c'est exactement ce qu'on veut lire là.
 
+    Ce sont les commits **poussés** qui sont lus, pas ceux d'ici : l'IPA est
+    compilée à partir de ce qui est parti sur GitHub, et annoncer un travail
+    resté sur le PC ferait chercher dans l'app une chose qui n'y est pas.
+
     Sans dépôt git sous la main, le numéro de compilation reste : il vaut mieux
     une description pauvre qu'une mise à jour qui échoue.
     """
@@ -102,7 +106,7 @@ def changelog(build: str) -> str:
         import subprocess
 
         out = subprocess.run(
-            ["git", "log", "-3", "--format=%s"],
+            ["git", "log", "-3", "--format=%s", "origin/main"],
             cwd=ROOT,
             capture_output=True,
             text=True,
