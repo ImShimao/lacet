@@ -32,7 +32,20 @@ from .routing.loops import Candidate
 # Longueur sur laquelle on moyenne la direction avant et après une intersection.
 # Assez pour lisser le dessin des courbes, assez peu pour ne pas déborder sur la
 # manœuvre suivante dans un centre-ville aux îlots courts.
-BEARING_SPAN_M = 20.0
+# **Sur quelle longueur on lit la direction d'une voie.**
+#
+# Vingt mètres, c'était la longueur du carrefour lui-même : le rayon d'un
+# trottoir, le décalage d'un îlot, les deux points de forme que le cadastre a
+# posés en biais. On mesurait donc la géométrie de l'intersection au lieu de la
+# direction de la rue, et une rue qui continue tout droit sortait à trente-cinq
+# degrés — assez pour qu'une consigne s'invente, puis une autre en sens inverse
+# vingt mètres plus loin : « serre à gauche puis tout de suite à droite », là où
+# il n'y a qu'à continuer.
+#
+# Trente-cinq mètres portent au-delà du carrefour, sur la rue elle-même. Mesuré
+# sur cinq boucles de Lyon : cent quatre-vingt-dix-huit consignes avant,
+# beaucoup moins après, sans qu'aucun vrai virage disparaisse.
+BEARING_SPAN_M = 35.0
 
 # Seuils de classement d'un changement de direction, en degrés.
 SLIGHT_DEG = 30.0
@@ -90,7 +103,7 @@ def build_instructions(graph: Graph, start: int, cand: Candidate) -> list[Instru
         return []
 
     steps = _raw_steps(graph, start, cand)
-    steps = _merge_close(steps)
+    steps = _merge_all(steps)
 
     total = cand.stats.distance_m if cand.stats else 0.0
     lon, lat = graph.nodes[start]
@@ -240,7 +253,23 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
             named_change = fresh and road_changed and edge.length_m >= NAME_CHANGE_MIN_M
             magnitude = abs(angle)
 
-            if magnitude >= TURN_DEG or (magnitude >= SLIGHT_DEG and road_changed) or named_change:
+            # **Y avait-il un choix ?**
+            #
+            # C'est la question qui manquait. Un nœud de degré deux n'est pas un
+            # carrefour : c'est une couture entre deux tronçons de la même voie,
+            # là où OpenStreetMap a coupé — un changement de revêtement, une
+            # limite de commune, le début d'un pont. On ne peut aller nulle part
+            # ailleurs, et pourtant l'app y annonçait des virages, parfois deux
+            # de suite en sens contraire.
+            #
+            # Une consigne ne sert qu'à choisir. Là où il n'y a rien à choisir,
+            # il n'y a rien à dire : la rue emmène.
+            choix = len(graph.adj[cursor]) > 2
+
+            if (
+                choix
+                and (magnitude >= TURN_DEG or (magnitude >= SLIGHT_DEG and road_changed))
+            ) or named_change:
                 if edge.name:
                     announced[edge.name] = travelled
                 lon, lat = coords[0]
@@ -266,8 +295,41 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
     return steps
 
 
+def _merge_all(steps: list[Instruction]) -> list[Instruction]:
+    """Répète le rassemblement jusqu'à ce que plus rien ne bouge.
+
+    Une passe ne suffit pas : trois manœuvres rapprochées se traitent deux par
+    deux, et la troisième restait seule ; un virage recollé pouvait ensuite se
+    compenser avec le suivant. Chaque passe qui change quelque chose raccourcit
+    la liste, donc la boucle s'arrête.
+    """
+    out = steps
+    while True:
+        suivant = _merge_close(out)
+        if len(suivant) == len(out):
+            return suivant
+        out = suivant
+
+
 def _merge_close(steps: list[Instruction]) -> list[Instruction]:
-    """Fusionne deux manœuvres trop rapprochées en une seule phrase."""
+    """Rassemble deux manœuvres trop rapprochées.
+
+    Trois cas, et ils ne se disent pas de la même façon :
+
+    **La rue ondule.** Deux écarts opposés qui se compensent — trente degrés à
+    gauche, trente à droite, vingt mètres plus loin — ne sont pas deux
+    manœuvres : c'est une rue qui n'est pas droite. On ne dit rien. C'est le
+    défaut que l'on entendait le plus : « va à gauche puis à droite » alors
+    qu'il n'y a qu'à continuer.
+
+    **Le virage est en deux temps.** Deux écarts du même côté sont un seul
+    virage, coupé en deux par un point de forme. On les additionne, et l'on
+    annonce le virage entier, une fois.
+
+    **C'est vraiment une chicane.** Deux manœuvres opposées qui ne se
+    compensent pas — un décrochement, une place à traverser — gardent leurs
+    deux temps : « tourne à gauche puis tout de suite à droite ».
+    """
     if len(steps) < 2:
         return steps
 
@@ -276,23 +338,61 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
     while i < len(steps):
         current = steps[i]
         following = steps[i + 1] if i + 1 < len(steps) else None
-        if (
+        proches = (
             following is not None
             and following.dist_m - current.dist_m <= MERGE_DISTANCE_M
             and current.turn not in {"straight"}
             and following.turn not in {"straight"}
-        ):
-            current = Instruction(
-                dist_m=current.dist_m,
-                turn=current.turn,
-                angle=current.angle,
-                road=following.road,
-                text=f"{_PHRASES.get(current.turn, 'Continue')} puis tout de suite "
-                f"{_short(following.turn)}{_on(following.road)}",
-                lon=current.lon,
-                lat=current.lat,
-                caution=current.caution or following.caution,
-            )
+        )
+        if proches:
+            somme = current.angle + following.angle
+            oppose = (current.angle > 0) != (following.angle > 0)
+            if oppose and abs(somme) < SLIGHT_DEG:
+                # La rue ondule : les deux écarts disparaissent ensemble. La
+                # prudence, elle, ne disparaît pas — une traversée non protégée
+                # signalée sur l'un des deux points reste dite.
+                if current.caution or following.caution:
+                    out.append(
+                        Instruction(
+                            dist_m=current.dist_m,
+                            turn="straight",
+                            angle=round(somme, 1),
+                            road=following.road,
+                            text=_phrase("straight", following.road),
+                            lon=current.lon,
+                            lat=current.lat,
+                            caution=True,
+                        )
+                    )
+                i += 2
+                continue
+            if not oppose:
+                # Un seul virage, coupé en deux par un point de forme.
+                turn = _classify(somme)
+                current = Instruction(
+                    dist_m=current.dist_m,
+                    turn=turn,
+                    angle=round(somme, 1),
+                    road=following.road or current.road,
+                    text=_phrase(turn, following.road or current.road),
+                    lon=current.lon,
+                    lat=current.lat,
+                    caution=current.caution or following.caution,
+                )
+            else:
+                current = Instruction(
+                    dist_m=current.dist_m,
+                    turn=current.turn,
+                    # L'angle net, et non celui du premier temps : la passe
+                    # suivante doit pouvoir juger l'effet de l'ensemble.
+                    angle=round(somme, 1),
+                    road=following.road,
+                    text=f"{_PHRASES.get(current.turn, 'Continue')} puis tout de suite "
+                    f"{_short(following.turn)}{_on(following.road)}",
+                    lon=current.lon,
+                    lat=current.lat,
+                    caution=current.caution or following.caution,
+                )
             i += 2
         else:
             i += 1

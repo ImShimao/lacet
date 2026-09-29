@@ -3,7 +3,18 @@
 import { bearingDeg, haversineM } from './geo'
 import { pyfloordiv, pymod, pyRound, sortByKey } from './py'
 
-const BEARING_SPAN_M = 20
+// **Sur quelle longueur on lit la direction d'une voie.**
+//
+// Vingt mètres, c'était la longueur du carrefour lui-même : le rayon d'un
+// trottoir, le décalage d'un îlot, les deux points de forme que le cadastre a
+// posés en biais. On mesurait donc la géométrie de l'intersection au lieu de la
+// direction de la rue, et une rue qui continue tout droit sortait à trente-cinq
+// degrés — assez pour qu'une consigne s'invente, puis une autre en sens inverse
+// vingt mètres plus loin : « serre à gauche puis tout de suite à droite », là où
+// il n'y a qu'à continuer.
+//
+// Trente-cinq mètres portent au-delà du carrefour, sur la rue elle-même.
+const BEARING_SPAN_M = 35
 const SLIGHT_DEG = 30
 const TURN_DEG = 55
 const SHARP_DEG = 115
@@ -46,7 +57,7 @@ const instruction = (distM, turn, angle, road, text, lon, lat, caution) => ({
 export function buildInstructions(graph, start, cand) {
   if (!cand.edges.length) return []
 
-  let steps = mergeClose(rawSteps(graph, start, cand))
+  let steps = mergeAll(rawSteps(graph, start, cand))
 
   const total = cand.stats ? cand.stats.distanceM : 0
   const [lon, lat] = graph.node(start)
@@ -121,7 +132,20 @@ function rawSteps(graph, start, cand) {
       const namedChange = fresh && roadChanged && length >= NAME_CHANGE_MIN_M
       const magnitude = Math.abs(angle)
 
-      if (magnitude >= TURN_DEG || (magnitude >= SLIGHT_DEG && roadChanged) || namedChange) {
+      // **Y avait-il un choix ?**
+      //
+      // C'est la question qui manquait. Un nœud de degré deux n'est pas un
+      // carrefour : c'est une couture entre deux tronçons de la même voie, là
+      // où OpenStreetMap a coupé — un changement de revêtement, une limite de
+      // commune, le début d'un pont. On ne peut aller nulle part ailleurs, et
+      // pourtant l'app y annonçait des virages, parfois deux de suite en sens
+      // contraire.
+      //
+      // Une consigne ne sert qu'à choisir. Là où il n'y a rien à choisir, il
+      // n'y a rien à dire : la rue emmène.
+      const choix = graph.adjOffset[cursor + 1] - graph.adjOffset[cursor] > 2
+
+      if ((choix && (magnitude >= TURN_DEG || (magnitude >= SLIGHT_DEG && roadChanged))) || namedChange) {
         if (name) announced.set(name, travelled)
         const [lon, lat] = coords[0]
         const rlon = pyRound(lon, 6)
@@ -143,6 +167,41 @@ function rawSteps(graph, start, cand) {
   return steps
 }
 
+/**
+ * Répète le rassemblement jusqu'à ce que plus rien ne bouge.
+ *
+ * Une passe ne suffit pas : trois manœuvres rapprochées se traitent deux par
+ * deux, et la troisième restait seule ; un virage recollé pouvait ensuite se
+ * compenser avec le suivant. Chaque passe qui change quelque chose raccourcit
+ * la liste, donc la boucle s'arrête.
+ */
+function mergeAll(steps) {
+  let out = steps
+  for (;;) {
+    const suivant = mergeClose(out)
+    if (suivant.length === out.length) return suivant
+    out = suivant
+  }
+}
+
+/**
+ * Rassemble deux manœuvres trop rapprochées.
+ *
+ * Trois cas, et ils ne se disent pas de la même façon :
+ *
+ * **La rue ondule.** Deux écarts opposés qui se compensent — trente degrés à
+ * gauche, trente à droite, vingt mètres plus loin — ne sont pas deux
+ * manœuvres : c'est une rue qui n'est pas droite. On ne dit rien. C'est le
+ * défaut que l'on entendait le plus : « va à gauche puis à droite » alors qu'il
+ * n'y a qu'à continuer.
+ *
+ * **Le virage est en deux temps.** Deux écarts du même côté sont un seul
+ * virage, coupé en deux par un point de forme. On les additionne, et l'on
+ * annonce le virage entier, une fois.
+ *
+ * **C'est vraiment une chicane.** Deux manœuvres opposées qui ne se compensent
+ * pas — un décrochement, une place à traverser — gardent leurs deux temps.
+ */
 function mergeClose(steps) {
   if (steps.length < 2) return steps
   const out = []
@@ -150,17 +209,46 @@ function mergeClose(steps) {
   while (i < steps.length) {
     let current = steps[i]
     const following = i + 1 < steps.length ? steps[i + 1] : null
-    if (
+    const proches =
       following !== null &&
       following.dist_m - current.dist_m <= MERGE_DISTANCE_M &&
       current.turn !== 'straight' &&
       following.turn !== 'straight'
-    ) {
-      current = instruction(
-        current.dist_m, current.turn, current.angle, following.road,
-        `${PHRASES.get(current.turn) ?? 'Continue'} puis tout de suite ${SHORT.get(following.turn) ?? 'tout droit'}${on(following.road)}`,
-        current.lon, current.lat, current.caution || following.caution,
-      )
+    if (proches) {
+      const somme = current.angle + following.angle
+      const oppose = current.angle > 0 !== following.angle > 0
+      if (oppose && Math.abs(somme) < SLIGHT_DEG) {
+        // La rue ondule : les deux écarts disparaissent ensemble. La prudence,
+        // elle, ne disparaît pas — une traversée non protégée signalée sur l'un
+        // des deux points reste dite.
+        if (current.caution || following.caution) {
+          out.push(
+            instruction(
+              current.dist_m, 'straight', pyRound(somme, 1), following.road,
+              phrase('straight', following.road), current.lon, current.lat, true,
+            ),
+          )
+        }
+        i += 2
+        continue
+      }
+      if (!oppose) {
+        // Un seul virage, coupé en deux par un point de forme.
+        const turn = classify(somme)
+        const road = following.road || current.road
+        current = instruction(
+          current.dist_m, turn, pyRound(somme, 1), road, phrase(turn, road),
+          current.lon, current.lat, current.caution || following.caution,
+        )
+      } else {
+        // L'angle net, et non celui du premier temps : la passe suivante doit
+        // pouvoir juger l'effet de l'ensemble.
+        current = instruction(
+          current.dist_m, current.turn, pyRound(somme, 1), following.road,
+          `${PHRASES.get(current.turn) ?? 'Continue'} puis tout de suite ${SHORT.get(following.turn) ?? 'tout droit'}${on(following.road)}`,
+          current.lon, current.lat, current.caution || following.caution,
+        )
+      }
       i += 2
     } else {
       i += 1
@@ -211,7 +299,7 @@ function advance(coords, distanceM) {
 
 /** Les consignes le long d'une suite d'arêtes, distances comptées depuis `source`. */
 export function pathSteps(graph, source, edges) {
-  return mergeClose(rawSteps(graph, source, { edges, crossings: [] }))
+  return mergeAll(rawSteps(graph, source, { edges, crossings: [] }))
 }
 
 /** Le virage que fait un angle (degrés, positif à droite), et sa phrase. */

@@ -34,6 +34,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from app import service  # noqa: E402
 from app.models import LoopRequest  # noqa: E402
+from app.elevation import Relief  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.osm.extract import read as read_extract, to_cache  # noqa: E402
 from app.osm.overpass import fetch_area  # noqa: E402
 from app.solar import is_night  # noqa: E402
@@ -80,7 +82,16 @@ def fake_elevation(lon: float, lat: float) -> float:
 
 
 async def fake_fetch_many(routes):
-    return [[fake_elevation(lon, lat) for lon, lat in coords] if coords else None for coords in routes]
+    # `fetch_many` rend désormais un `Relief` — les altitudes **et** le seuil que
+    # leur source mérite. Ce script rendait encore une simple liste, et le dump
+    # échouait avant d'avoir écrit une ligne. Le seuil est celui de la source
+    # fine : la parité se juge à seuil égal des deux côtés.
+    return [
+        Relief([fake_elevation(lon, lat) for lon, lat in coords], settings.ascent_threshold_m)
+        if coords
+        else None
+        for coords in routes
+    ]
 
 
 def extract_path(name: str) -> Path:

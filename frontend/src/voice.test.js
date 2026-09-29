@@ -17,6 +17,14 @@ const gauche = { turn: 'left', text: 'Tourne à gauche sur Rue de Rivoli', cauti
 const traversee = { turn: 'right', text: 'Tourne à droite', caution: true }
 
 describe('phrase', () => {
+  it('dit « maintenant » au moment d’agir', () => {
+    // De loin et au carrefour, c'était la même phrase : on ne savait pas
+    // laquelle on venait d'entendre, ni s'il fallait tourner tout de suite.
+    expect(phrase(gauche, 100)).toBe('dans 100 mètres, tourne à gauche sur Rue de Rivoli.')
+    expect(phrase(gauche, 12)).toBe('Tourne à gauche sur Rue de Rivoli maintenant.')
+    expect(phrase(gauche, 0)).toBe('Tourne à gauche sur Rue de Rivoli maintenant.')
+  })
+
   it('annonce la distance au-delà de trente mètres', () => {
     expect(phrase(gauche, 100)).toMatch(/^dans 100 mètres, tourne à gauche/)
   })
@@ -35,7 +43,7 @@ describe('phrase', () => {
     // À vingt mètres, « dans vingt mètres » est du bruit : il faut tourner.
     const dit = phrase(gauche, 20)
     expect(dit).not.toMatch(/mètres/)
-    expect(dit).toBe('Tourne à gauche sur Rue de Rivoli.')
+    expect(dit).toBe('Tourne à gauche sur Rue de Rivoli maintenant.')
   })
 
   it('met la consigne en minuscule après la distance', () => {

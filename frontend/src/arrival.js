@@ -38,10 +38,21 @@ const AWAY_M = 6
 // Au bout de ce temps-là, le point le plus proche ne sera pas battu.
 const HOLD_MS = 5000
 
-// Il faut avoir fait la boucle : une part de la distance prévue, et la fin du
-// tracé. Les deux ensemble — une seule laisserait passer l'aller-retour qui
-// frôle le départ à mi-parcours.
-const DONE_SHARE = 0.8
+// Il faut avoir fait la boucle. Trois conditions, et chacune répond à un cas
+// précis :
+//
+// **Être au bout du tracé** écarte le passage près du départ à mi-parcours.
+//
+// **Être passé loin de l'arrivée au moins une fois** écarte le piège du
+// démarrage : sur une boucle, le premier relevé peut se projeter à la fin du
+// tracé — départ et arrivée sont le même point — et l'on « arriverait » avant
+// d'avoir couru un mètre.
+//
+// **Avoir couru une part de la distance prévue** reste un garde-fou, mais à
+// moitié seulement : la distance cumulée sous-compte dès que le GPS saute de
+// plus de cent mètres — un tunnel, un immeuble, une reprise de signal — et une
+// exigence trop haute empêchait alors l'arrivée de se déclencher du tout.
+const DONE_SHARE = 0.5
 const LEFT_M = 120
 
 /**
@@ -52,6 +63,7 @@ const LEFT_M = 120
  */
 export function arrivalWatcher({ armM = ARM_M, nearM = NEAR_M, awayM = AWAY_M, holdMs = HOLD_MS } = {}) {
   let armed = false
+  let everFar = false
   let closest = Infinity
   let closestAt = 0
   let done = false
@@ -71,7 +83,11 @@ export function arrivalWatcher({ armM = ARM_M, nearM = NEAR_M, awayM = AWAY_M, h
      */
     push({ toFinish, remaining, covered, planned, now = Date.now() }) {
       if (done || !Number.isFinite(toFinish)) return null
-      const finishing = remaining <= LEFT_M && (!planned || covered >= planned * DONE_SHARE)
+      // On s'éloigne avant de revenir : tant que ce n'est pas arrivé, il n'y a
+      // pas d'arrivée possible.
+      if (toFinish > armM) everFar = true
+      const finishing =
+        everFar && remaining <= LEFT_M && (!planned || covered >= planned * DONE_SHARE)
       if (!finishing) {
         // Reparti pour un tour, ou simple passage près du départ : on oublie
         // l'approche précédente plutôt que de garder un minimum d'il y a dix

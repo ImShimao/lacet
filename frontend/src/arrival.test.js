@@ -11,6 +11,9 @@ import { arrivalWatcher } from './arrival'
 
 /** Une approche : la distance à l'arrivée, relevé par relevé. */
 function approche(watcher, distances, { planned = 10_000, from = 0, step = 1000 } = {}) {
+  // Une approche commence de loin : c'est ce qui distingue une arrivée d'un
+  // démarrage, et le module l'exige.
+  watcher.push({ toFinish: 500, remaining: 500, covered: planned, planned, now: from - step })
   let out = null
   distances.forEach((toFinish, i) => {
     const r = watcher.push({
@@ -83,6 +86,32 @@ describe("l'arrivée", () => {
     expect(out.every((r) => r === null)).toBe(true)
   })
 
+  it('ne termine pas la sortie au moment même où on la lance', () => {
+    // Le piège de la boucle : départ et arrivée sont le même point, et le
+    // premier relevé peut se projeter à la fin du tracé. Sans garde, la sortie
+    // se terminerait avant d'avoir commencé.
+    const w = arrivalWatcher()
+    const debut = [2, 3, 2.5, 4].map((toFinish, i) =>
+      w.push({ toFinish, remaining: 20, covered: 9000, planned: 10_000, now: i * 1000 }),
+    )
+    expect(debut.every((r) => r === null)).toBe(true)
+    // Puis on s'éloigne pour de bon, on revient : là, c'est une arrivée.
+    w.push({ toFinish: 400, remaining: 9000, covered: 9000, planned: 10_000, now: 10_000 })
+    expect(approche(w, [60, 10, 25], { from: 20_000 })).not.toBeNull()
+  })
+
+  it('termine même quand le GPS a sous-compté la distance', () => {
+    // Un tunnel, un immeuble, une reprise de signal : les sauts de plus de cent
+    // mètres ne sont pas comptés, et la distance cumulée finit en dessous du
+    // parcours réel. Exiger quatre-vingts pour cent empêchait alors l'arrivée.
+    const w = arrivalWatcher()
+    w.push({ toFinish: 3000, remaining: 9000, covered: 100, planned: 10_000, now: 0 })
+    const out = [60, 8, 20].map((toFinish, i) =>
+      w.push({ toFinish, remaining: toFinish, covered: 6200, planned: 10_000, now: 10_000 + i * 1000 }),
+    )
+    expect(out).toContain('arrived')
+  })
+
   it('ne se déclenche qu’une fois', () => {
     const w = arrivalWatcher()
     approche(w, [40, 5, 20])
@@ -93,7 +122,7 @@ describe("l'arrivée", () => {
     // Un parcours importé, ou rouvert d'un favori sans longueur : le tracé
     // restant suffit alors à décider.
     const w = arrivalWatcher()
-    const out = [40, 6, 18].map((toFinish, i) =>
+    const out = [900, 40, 6, 18].map((toFinish, i) =>
       w.push({ toFinish, remaining: toFinish, covered: 3000, planned: null, now: i * 1000 }),
     )
     expect(out).toContain('arrived')

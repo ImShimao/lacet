@@ -166,7 +166,13 @@ export function phrase(step, remaining) {
         : `dans ${Math.round(remaining / 50) * 50} mètres`
 
   const warning = step.caution ? ' Traversée sans passage protégé.' : ''
-  return rounded ? `${rounded}, ${lower(step.text)}.${warning}` : `${step.text}.${warning}`
+  if (rounded) return `${rounded}, ${lower(step.text)}.${warning}`
+  // **« Maintenant. »** Sans ce mot, l'annonce de loin et celle du moment
+  // d'agir sont la même phrase, et l'on ne sait plus laquelle on vient
+  // d'entendre : « tourne à droite » à cent mètres, puis « tourne à droite »
+  // au carrefour. L'app dit deux fois la même chose et la seconde, la seule
+  // qui compte, ne se distingue pas de la première.
+  return `${step.text} maintenant.${warning}`
 }
 
 function lower(text) {
