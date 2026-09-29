@@ -158,6 +158,8 @@ const RACE_WIDTH = 2
 const EXCLUDED_HIGHWAYS = 'motorway|motorway_link|trunk|trunk_link|construction|proposed|raceway|bus_guideway|escape'
 const BUILTUP_LANDUSE = 'residential|retail|commercial|industrial|education'
 const EXCLUDED_SERVICE = 'parking_aisle|driveway|drive-through|slipway'
+// Les barrières qu'un vélo ne franchit pas — voir `closedBarrier` (`safety.js`).
+const NO_BIKE_BARRIERS = 'stile|turnstile|full-height_turnstile|kissing_gate'
 
 const DETAIL_LEVELS = [
   [25_000, ''],
@@ -201,6 +203,11 @@ out body geom;
 out geom;
 (
   node["highway"="crossing"](${bbox});
+  node["barrier"]["locked"="yes"](${bbox});
+  node["barrier"]["access"~"^(no|private)$"](${bbox});
+  node["barrier"]["foot"~"^(no|private)$"](${bbox});
+  node["barrier"]["bicycle"~"^(no|private)$"](${bbox});
+  node["barrier"~"^(${NO_BIKE_BARRIERS})$"](${bbox});
 );
 out body;`
 }
@@ -294,6 +301,9 @@ export function splitIntoTiles(extract, rect) {
   for (const area of extract.landuse) place(area.flat, (part) => part.landuse.push(area))
   for (const c of extract.crossings) {
     place(Float64Array.of(c.lon, c.lat), (part) => part.crossings.push(c))
+  }
+  for (const b of extract.barriers ?? []) {
+    place(Float64Array.of(b.lon, b.lat), (part) => part.barriers.push(b))
   }
   return parts
 }

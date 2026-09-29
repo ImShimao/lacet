@@ -74,8 +74,10 @@ async function runCase(entry) {
   const extract = fromCompact(readGz(`extract-${c.extract}.json.gz`))
   const seen = { graph: null, raw: [] }
 
+  // Le départ devant la porte est propre à l'app (voir `door.js`) : Python part
+  // du carrefour, et c'est ce départ-là qu'on compare.
   const response = await planLoops(
-    { with_elevation: false, time_of_day: 'day', ...c.req },
+    { with_elevation: false, time_of_day: 'day', doorstep: false, ...c.req },
     {
       loadGraph: async ({ sport, allowTrail }) => buildGraph(extract, { sport, allowTrail }),
       fetchElevations: fakeFetchMany,

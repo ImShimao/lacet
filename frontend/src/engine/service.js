@@ -12,6 +12,7 @@
 import { resample, haversineM } from './geo'
 import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
 import { blockedEdges } from './blocked'
+import { carryBlocked, openDoor, reachOf } from './door'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
@@ -96,13 +97,14 @@ export function normalizeRequest(input) {
     // === ce que ce moteur-ci sait faire en plus ==============================
     //
     // `backend/` est la référence : les tests de parité comparent, demande par
-    // demande, ce que rend ce fichier et ce que rend Python. Ces quatre clés-là
+    // demande, ce que rend ce fichier et ce que rend Python. Ces clés-là
     // n'existent que du côté JavaScript, et la parité ne les couvre donc pas —
     // elle vérifie le sous-ensemble commun, ce qui est exactement ce qu'on veut
     // tant que la liste reste courte et **écrite quelque part**. La voici.
     //
     // Laissées à leur valeur par défaut, la recherche est celle du moteur
-    // Python, à l'identique : c'est ce qui rend la parité possible.
+    // Python, à l'identique — **sauf `doorstep`**, actif par défaut parce que
+    // c'est ce que l'app veut toujours ; la parité le coupe explicitement.
     //
     //   variation, avoid_bearings  « Régénérer d'autres boucles » : tourner les
     //                              polygones d'un cran et fuir les directions
@@ -112,6 +114,10 @@ export function normalizeRequest(input) {
     //   blocked                    Les signalements faits en courant. Ils ne
     //                              quittent jamais l'appareil, et un serveur
     //                              n'aurait rien à en faire.
+    //   doorstep                   Partir du point choisi lui-même, et non du
+    //                              carrefour le plus proche : la rue est coupée
+    //                              devant la porte, et une allée y mène — voir
+    //                              `door.js`. Python part du carrefour.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -119,6 +125,7 @@ export function normalizeRequest(input) {
     avoid_bearings: input.avoid_bearings ?? [],
     avoid: input.avoid ?? [],
     blocked: input.blocked ?? [],
+    doorstep: input.doorstep ?? true,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -240,7 +247,8 @@ export async function planLoops(input, deps) {
   const args = graphArgs(req)
   const { targetM } = args
   onProgress('data', 0)
-  const graph = await loadGraph(args)
+  const area = await loadGraph(args)
+  let graph = area
   trace.graph?.(graph)
   lap('fetch')
   lap('graph')
@@ -259,10 +267,11 @@ export async function planLoops(input, deps) {
   }
 
   const probe = Math.max(2000, Math.trunc(graph.nodeCount / 20))
+  let component = null
+  const mainMask = () => (component ??= area.largestComponent())
   if (graph.localComponentSize(start, probe) < probe) {
-    const component = graph.largestComponent()
-    if (!component[start]) {
-      const relocated = graph.nearestNode(req.lon, req.lat, 2000, component)
+    if (!mainMask()[start]) {
+      const relocated = graph.nearestNode(req.lon, req.lat, 2000, mainMask())
       if (relocated === null) {
         throw new PlanningError(
           'Ce point de départ est sur une portion de réseau isolée, sans liaison praticable vers le reste. Décale-toi de quelques rues.',
@@ -272,10 +281,29 @@ export async function planLoops(input, deps) {
     }
   }
 
+  // Les signalements se rapprochent des rues du graphe partagé : le graphe
+  // dérivé ci-dessous partage ses géométries, pas ses tranches de coordonnées.
+  let blocked = blockedEdges(graph, req.blocked)
+
+  // Le départ devant la porte — voir `door.js`. Le graphe de la zone reste en
+  // cache tel quel ; la recherche travaille sur un dérivé qui connaît le seuil.
+  if (req.doorstep) {
+    const door = openDoor(area, req.lon, req.lat, {
+      inMain: (node) => area.localComponentSize(node, probe) >= probe || mainMask()[node] === 1,
+      mainMask,
+      sport: req.sport,
+    })
+    if (door) {
+      graph = door.graph
+      start = door.start
+      blocked = carryBlocked(graph, blocked)
+    }
+  }
+
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
     avoid: req.avoid,
-    blocked: blockedEdges(graph, req.blocked),
+    blocked,
   })
 
   const windTask = windOf(req.lat, req.lon)
@@ -364,7 +392,7 @@ export async function planLoops(input, deps) {
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
-    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank]),
+    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank], reachOf(graph, cand.edges)),
   )
   // De quoi retourner une boucle sans tout recalculer : le graphe, le nœud de
   // départ, et ce qui a servi à décrire chaque proposition. Passé par un rappel
@@ -441,7 +469,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
     avoid: req.avoid,
     blocked: blockedEdges(graph, req.blocked),
   })
-  return planRejoin(graph, profile.precompute(graph), input)
+  return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
 function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace) {
@@ -643,7 +671,8 @@ function profilePoints(cand, elevations, step) {
 
 const round6 = ([lon, lat]) => [pyRound(lon, 6), pyRound(lat, 6)]
 
-function toModel(cand, score, req, elev, rank, steps, name) {
+/** `reach` : l'allée du départ (voir `door.js`), courue une fois à l'aller et une au retour, hors des tours. */
+function toModel(cand, score, req, elev, rank, steps, name, reach = 0) {
   const s = cand.stats
   const [grade, notes] = gradeRoute(s)
   let ascent = null
@@ -704,7 +733,7 @@ function toModel(cand, score, req, elev, rank, steps, name) {
     direction: directionOf(cand.bearing),
     shape: cand.shape,
     laps: cand.laps,
-    lap_distance_m: pyRound(s.distanceM / cand.laps, 1),
+    lap_distance_m: pyRound(cand.laps > 1 ? (s.distanceM - 2 * reach) / cand.laps : s.distanceM, 1),
     score: pyRound(score, 4),
   }
 }
@@ -745,7 +774,7 @@ export function reverseRoute(graph, start, cand, { req, elev, score, rank, night
     ? [[...elev[0]].reverse(), profilePoints(flipped, [...elev[0]].reverse(), elev[3]), elev[2], elev[3]]
     : null
   const [name] = nameRoutes([flipped])
-  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name)
+  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name, reachOf(graph, flipped.edges))
   // Le nom ne dit pas le sens — le cap moyen d'une boucle est le même dans les
   // deux — et la carte le montre par ses chevrons. L'écran, lui, a besoin de le
   // savoir : c'est ce drapeau qui fait du bouton une bascule.

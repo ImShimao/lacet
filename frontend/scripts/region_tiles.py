@@ -57,6 +57,28 @@ EXCLUDED = set(EXCLUDED_HIGHWAYS.split("|"))
 BUILTUP = set(BUILTUP_LANDUSE.split("|"))
 SERVICE = set(EXCLUDED_SERVICE.split("|"))
 
+# Les barrières qui ferment le passage, gardées avec les passages piétons —
+# mêmes règles que `closedBarrier` dans `src/engine/safety.js`, qui décide
+# ensuite, sport par sport. Un portail sans restriction se franchit : on ne
+# garde que ce qui est fermé, sans quoi les parcs perdraient leurs allées.
+CLOSED_ACCESS = {"no", "private"}
+NO_BIKE_BARRIERS = {"stile", "turnstile", "full-height_turnstile", "kissing_gate"}
+
+
+def kept_node(tags: dict) -> bool:
+    """Un nœud à garder : un passage piéton, ou une barrière qui peut fermer."""
+    if tags.get("highway") == "crossing":
+        return True
+    if not tags.get("barrier"):
+        return False
+    return (
+        tags.get("locked") == "yes"
+        or tags.get("access") in CLOSED_ACCESS
+        or tags.get("foot") in CLOSED_ACCESS
+        or tags.get("bicycle") in CLOSED_ACCESS
+        or tags["barrier"] in NO_BIKE_BARRIERS
+    )
+
 
 # --- la limite du territoire -------------------------------------------------------
 
@@ -260,7 +282,8 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
 
     Les filtres reproduisent ceux de la requête Overpass : une voie `highway`
     hors de la liste exclue, sans `service` exclu ni `area=yes` ; un polygone
-    `landuse` bâti ; un nœud `highway=crossing`. Une voie qui porte à la fois
+    `landuse` bâti ; un nœud `highway=crossing`, ou une barrière qui ferme
+    (`kept_node`). Une voie qui porte à la fois
     `highway` et un `landuse` bâti est rangée comme voie — c'est ce que fait
     `fromOverpass` de la même voie revenue par la seconde requête.
     """
@@ -273,12 +296,12 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
     processor = (
         osmium.FileProcessor(str(pbf))
         .with_locations(locations)
-        .with_filter(osmium.filter.KeyFilter("highway", "landuse"))
+        .with_filter(osmium.filter.KeyFilter("highway", "landuse", "barrier"))
     )
     for obj in processor:
         tags = {t.k: t.v for t in obj.tags}
         if obj.is_node():
-            if tags.get("highway") == "crossing" and obj.location.valid():
+            if kept_node(tags) and obj.location.valid():
                 x, y = obj.location.x, obj.location.y
                 tile = (math.floor(x / 1e7 / TILE_DEG), math.floor(y / 1e7 / TILE_DEG))
                 if tile in keep:

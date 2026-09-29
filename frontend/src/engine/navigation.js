@@ -1,5 +1,6 @@
 // Consignes de navigation — portage fidèle de `backend/app/navigation.py`.
 
+import { reachOf } from './door'
 import { bearingDeg, haversineM } from './geo'
 import { pyfloordiv, pymod, pyRound, sortByKey } from './py'
 
@@ -57,15 +58,16 @@ const instruction = (distM, turn, angle, road, text, lon, lat, caution) => ({
 export function buildInstructions(graph, start, cand) {
   if (!cand.edges.length) return []
 
-  let steps = mergeAll(rawSteps(graph, start, cand))
+  const door = doorway(graph, start, cand)
+  let steps = mergeAll(rawSteps(graph, start, cand, door?.folded ? door.node : null))
 
   const total = cand.stats ? cand.stats.distanceM : 0
   const [lon, lat] = graph.node(start)
-  const firstRoad = graph.edgeName[cand.edges[0]]
-  const heading = bearingFromStart(graph.coordsFrom(cand.edges[0], start))
+  const firstRoad = door ? door.road : graph.edgeName[cand.edges[0]]
+  const heading = door ? door.onward : bearingFromStart(graph.coordsFrom(cand.edges[0], start))
 
-  const out = [instruction(0, 'start', 0, firstRoad, startText(heading, firstRoad), lon, lat, false)]
-  const markers = lapMarkers(cand, total, lon, lat, heading)
+  const out = [instruction(0, 'start', 0, firstRoad, door ? door.text : startText(heading, firstRoad), lon, lat, false)]
+  const markers = lapMarkers(cand, total, door ?? { lon, lat, reach: 0 }, heading)
   if (markers.length) {
     const bounds = markers.map((m) => m.dist_m)
     steps = steps.filter((step) => bounds.every((b) => Math.abs(step.dist_m - b) > LAP_ABSORB_M))
@@ -76,9 +78,14 @@ export function buildInstructions(graph, start, cand) {
   return sortByKey(out, (step) => step.dist_m)
 }
 
-function lapMarkers(cand, total, lon, lat, heading) {
+/**
+ * Les fins de tour. `at` dit où elles tombent : au départ, ou — quand on part
+ * de chez soi — au seuil de la rue, que les tours contournent sans repasser
+ * par l'allée (voir `repeatLoop`).
+ */
+function lapMarkers(cand, total, at, heading) {
   if (cand.laps < 2) return []
-  const lap = total / cand.laps
+  const lap = (total - 2 * at.reach) / cand.laps
   const out = []
   for (let k = 1; k < cand.laps; k += 1) {
     const restants = cand.laps - k
@@ -86,13 +93,49 @@ function lapMarkers(cand, total, lon, lat, heading) {
     const reste = restants === 1 ? 'Dernier tour.' : `Encore ${restants} tours.`
     out.push(
       instruction(
-        pyRound(lap * k, 1), 'lap', 0, null,
+        pyRound(at.reach + lap * k, 1), 'lap', 0, null,
         `Fin du ${fait} tour. ${reste} Repars vers ${headingWords(heading)}.`,
-        lon, lat, false,
+        at.lon, at.lat, false,
       ),
     )
   }
   return out
+}
+
+// === le seuil de la porte =======================================================
+//
+// Hors du portage Python : le départ devant la porte n'existe que dans l'app
+// (voir `door.js`). La boucle commence alors par quelques mètres d'allée
+// jusqu'à la rue — et « pars vers le nord », qui décrivait l'allée, ne disait
+// plus rien d'utile. Ce qu'on veut savoir sur le pas de sa porte, c'est de
+// quel côté partir une fois sur le trottoir.
+
+// Jusqu'à cette longueur, rejoindre la rue et y tourner ne font qu'une
+// consigne : deux phrases pour douze mètres, la seconde tomberait avant la fin
+// de la première. Au-delà — une longue allée, un parc —, le virage sur la rue
+// garde sa propre annonce.
+const FOLD_M = 30
+
+const PATH_LIKE = new Set(['footway', 'path', 'track', 'cycleway', 'bridleway', 'steps'])
+
+function doorway(graph, start, cand) {
+  const reach = reachOf(graph, cand.edges)
+  if (!reach || cand.edges.length < 3) return null
+  const node = graph.door.node
+  const street = cand.edges[1]
+  const road = graph.edgeName[street]
+  const onward = bearingFromStart(graph.coordsFrom(street, node))
+  const toStreet = bearingDeg(graph.node(start), graph.node(node))
+  // Face à la rue, en sortant : de quel côté l'on part.
+  const angle = pymod(onward - toStreet + 180, 360) - 180
+  const side = angle <= -SLIGHT_DEG ? 'à gauche' : angle >= SLIGHT_DEG ? 'à droite' : 'tout droit'
+  const way = road ?? (PATH_LIKE.has(graph.edgeSafety[street].highway) ? 'le chemin' : 'la rue')
+  const folded = reach <= FOLD_M
+  const text = folded
+    ? `Départ — rejoins ${way} et pars ${side}.`
+    : `Départ — rejoins ${way}, ${Math.round(reach / 10) * 10} mètres vers ${headingWords(toStreet)}.`
+  const [lon, lat] = graph.node(node)
+  return { node, reach, road, onward, folded, text, lon, lat }
 }
 
 const headingWords = (heading) => CARDINALS[Math.trunc(pyfloordiv(pymod(heading + 22.5, 360), 45))]
@@ -105,7 +148,8 @@ const finishText = (laps) =>
 /** Clé d'égalité d'un point arrondi au millionième, comme le tuple Python. */
 const pointKey = (lon, lat) => `${pyRound(lon, 6)},${pyRound(lat, 6)}`
 
-function rawSteps(graph, start, cand) {
+/** `quiet` : un nœud où ne rien annoncer — le seuil, quand le départ le dit déjà. */
+function rawSteps(graph, start, cand, quiet = null) {
   const unprotected = new Set()
   for (const c of cand.crossings) if (!c.protected) unprotected.add(pointKey(c.lon, c.lat))
 
@@ -121,7 +165,7 @@ function rawSteps(graph, start, cand) {
     const name = graph.edgeName[e]
     const length = graph.edgeLen[e]
 
-    if (outBearing !== null) {
+    if (outBearing !== null && cursor !== quiet) {
       const inBearing = bearingFromStart(coords)
       const angle = pymod(inBearing - outBearing + 180, 360) - 180
       const turn = classify(angle)
@@ -297,9 +341,13 @@ function advance(coords, distanceM) {
 // dans l'app. Il réemploie les mêmes règles — mêmes angles, mêmes phrases — pour
 // que les consignes d'un détour sonnent comme celles du parcours.
 
-/** Les consignes le long d'une suite d'arêtes, distances comptées depuis `source`. */
-export function pathSteps(graph, source, edges) {
-  return mergeAll(rawSteps(graph, source, { edges, crossings: [] }))
+/**
+ * Les consignes le long d'une suite d'arêtes, distances comptées depuis `source`.
+ * `quiet` : un nœud où ne rien annoncer — le seuil de la rue, quand la
+ * première consigne dit déjà de quel côté la prendre.
+ */
+export function pathSteps(graph, source, edges, quiet = null) {
+  return mergeAll(rawSteps(graph, source, { edges, crossings: [] }, quiet))
 }
 
 /** Le virage que fait un angle (degrés, positif à droite), et sa phrase. */

@@ -40,7 +40,7 @@ const AVOID_FACTOR = 25
 // préférence, c'est un mur. Quatre cents fois la longueur, c'est un tronçon de
 // cinquante mètres qui en coûte vingt mille — il ne reste que le cas où il n'y
 // a vraiment pas d'autre chemin, et où prévenir vaut mieux qu'échouer.
-const BLOCKED_FACTOR = 400
+export const BLOCKED_FACTOR = 400
 
 /** Ce qu'un évitement reconnaît, arête par arête. */
 const AVOIDS = {
@@ -83,6 +83,9 @@ export class Profile {
     if (this.night) w *= nightFactor(s)
     for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
     if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
+    // Un portail fermé connu d'OpenStreetMap pèse comme un signalement : c'est
+    // un mur, sauf s'il n'y a vraiment pas d'autre chemin.
+    if (graph.gatedEdges?.has(e)) w *= BLOCKED_FACTOR
     return w
   }
 

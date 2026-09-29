@@ -22,9 +22,10 @@ import { save } from './storage'
  * demande sans la tolérance et on le dit : le réseau de rues ne se plie pas
  * toujours au mètre près, et une boucle de 20,4 km vaut mieux que pas de sortie.
  *
- * **Le repère qui rejoint la rue.** Une boucle part et revient au même point du
- * réseau — au centimètre —, mais ce point n'est pas celui qu'on a touché sur la
- * carte : il est sur la chaussée. Le repère rejoint donc le départ, et non
+ * **Le repère qui rejoint la rue.** La boucle part du point posé lui-même : une
+ * allée le relie à la rue la plus proche (voir `engine/door.js`). Sauf quand ce
+ * point est trop loin de toute rue — au milieu d'un champ, à plus de deux cents
+ * mètres : elle part alors de la rue, et le repère la rejoint, et non
  * l'inverse ; au-delà de cinquante mètres, l'écart est annoncé plutôt que subi.
  */
 

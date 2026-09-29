@@ -220,9 +220,13 @@ describe('parcourir à l’envers', () => {
     expect(envers.geometry[0]).toEqual(route.geometry[0])
     expect(envers.geometry[1]).toEqual(route.geometry[route.geometry.length - 2])
 
-    // Ce qui montait descend.
-    expect(envers.ascent_m).toBeCloseTo(route.descent_m, 1)
-    expect(envers.descent_m).toBeCloseTo(route.ascent_m, 1)
+    // Ce qui montait descend — à un palier près. Le cumul ne compte une montée
+    // qu'une fois le seuil franchi (deux mètres ici), en partant du début du
+    // profil : le dernier bout de pente, sous le seuil, n'est jamais compté, et
+    // à l'envers ce bout-là est à l'autre extrémité. L'écart est donc borné par
+    // le seuil, pas nul.
+    expect(Math.abs(envers.ascent_m - route.descent_m)).toBeLessThan(2)
+    expect(Math.abs(envers.descent_m - route.ascent_m)).toBeLessThan(2)
 
     // Et les consignes sont refaites, pas recopiées.
     expect(envers.instructions[0].turn).toBe('start')

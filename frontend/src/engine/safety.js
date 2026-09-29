@@ -78,6 +78,36 @@ export function isExcluded(tags, { allowTrail = false, sport = 'run' } = {}) {
   return null
 }
 
+// === barrières ================================================================
+//
+// Propre au moteur de l'app. Un portail fermé au bout de sept cents mètres de
+// boucle, c'est un demi-tour et un détour improvisé : signalé au retour d'une
+// sortie. OpenStreetMap le sait souvent — `barrier=gate` avec `access=private`,
+// ou `locked=yes` — mais le moteur ne lisait des nœuds que les passages piétons.
+//
+// On ne retient que ce qui **ferme** : une barrière sans restriction (la
+// plupart des portails de parc, les chicanes, les bornes) se franchit à pied, et
+// l'écarter viderait les parcs de leurs allées. Le fichier des tuiles
+// (`scripts/region_tiles.py`) garde ces nœuds-là avec les mêmes règles.
+
+const CLOSED_ACCESS = new Set(['no', 'private'])
+const OPEN_ACCESS = new Set(['yes', 'designated', 'permissive', 'official'])
+// Ce qu'on ne franchit pas avec un vélo, même quand le passage est ouvert.
+const NO_BIKE_BARRIERS = new Set(['stile', 'turnstile', 'full-height_turnstile', 'kissing_gate'])
+
+/** Une barrière qui ferme le passage — à pied, ou à vélo selon `sport`. */
+export function closedBarrier(tags, sport = 'run') {
+  if (!tags?.barrier) return false
+  const mode = sport === 'bike' ? tags.bicycle : tags.foot
+  if (OPEN_ACCESS.has(mode)) return false
+  if (CLOSED_ACCESS.has(mode)) return true
+  if (sport === 'bike' && NO_BIKE_BARRIERS.has(tags.barrier)) return true
+  return tags.locked === 'yes' || CLOSED_ACCESS.has(tags.access)
+}
+
+/** Une barrière à garder dans l'extrait : fermée pour l'un des deux sports. */
+export const keptBarrier = (tags) => closedBarrier(tags, 'run') || closedBarrier(tags, 'bike')
+
 export function tunnelIsUnprotected(tags) {
   if (tags.tunnel !== 'yes' && tags.tunnel !== 'building_passage') return false
   if (has(PEDESTRIAN_HIGHWAY, tags.highway)) return false

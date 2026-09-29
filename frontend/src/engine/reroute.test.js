@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { blockedEdges } from './blocked'
 import { buildGraph } from './graph'
 import { buildProfile } from './weights'
 import { planRejoin } from './reroute'
@@ -82,6 +83,45 @@ describe('le recalcul en course', () => {
     const alongJoin = joined * 100
     // Ce qui reste depuis la jonction, plus le raccord : le plus court possible.
     expect(detour.connectM + (2400 - alongJoin)).toBeLessThanOrEqual(600 + 1)
+  })
+
+  it('part d’où l’on est, au milieu de la rue, sans revenir au carrefour d’avant', () => {
+    // Sur Rue 2, quarante mètres après le carrefour (3, 2), en allant vers
+    // l'est. Le carrefour le plus proche est derrière : le chemin en partait,
+    // et la première consigne disait de faire demi-tour.
+    const detour = planRejoin(graph, weights, {
+      position: at(3.4, 2), heading: 90, geometry: loop, fromAlong: 300, travelledM: 500, plannedM: 2400,
+    })
+    expect(near(detour.coords.at(-1), at(6, 2))).toBe(true)
+    expect(detour.connectM).toBeCloseTo(260, -1)
+    // Tout le raccord est devant : aucun point en deçà de la position.
+    expect(detour.coords.every(([lon]) => lon >= at(3.4, 2)[0] - 1e-9)).toBe(true)
+    expect(detour.steps[0].turn).toBe('straight')
+  })
+
+  it('fait demi-tour quand la boucle est vraiment derrière', () => {
+    // Même rue, mais en allant vers l'ouest : la boucle la plus juste est à
+    // l'est. On le dit franchement.
+    const detour = planRejoin(graph, weights, {
+      position: at(3.4, 2), heading: 270, geometry: loop, fromAlong: 300, travelledM: 500, plannedM: 2400,
+    })
+    expect(near(detour.coords.at(-1), at(6, 2))).toBe(true)
+    expect(detour.steps[0].turn).toBe('uturn')
+  })
+
+  it('rejoint la boucle après le passage fermé, jamais avant', () => {
+    // Le portail en (4, 0), sur la boucle : on l'a trouvé fermé, on a fait
+    // demi-tour et remonté jusqu'en (2,5 ; 0). Rejoindre la boucle en (3, 0),
+    // à cinquante mètres, c'était y retourner.
+    const portail = at(4, 0)
+    const bloque = buildProfile('road', 'standard', false, 'run', { blocked: blockedEdges(graph, [portail]) }).precompute(graph)
+    const detour = planRejoin(graph, bloque, {
+      position: at(2.5, 0), heading: 270, geometry: loop, fromAlong: 250, travelledM: 350, plannedM: 2400, blocked: [portail],
+    })
+    const joinAlong = buildTrack(loop).cumulative[detour.joinIndex]
+    expect(joinAlong).toBeGreaterThan(400)
+    // Et le raccord ne passe pas par le portail.
+    expect(detour.coords.some((p) => near(p, portail))).toBe(false)
   })
 
   it('recoud un parcours complet, consignes décalées au nouveau départ', () => {

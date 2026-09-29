@@ -61,3 +61,30 @@ class TestTuilesLivrees:
     def test_une_marge_sans_source_reste_possible(self):
         """Le cas du script lancé à la main, sur un extrait qu'on sait large."""
         assert region_tiles.shipped_tiles(CARRE, [], 6000.0, None)
+
+
+class TestLesNoeudsGardes:
+    """Ce qu'une tuile garde des nœuds : passages piétons et barrières fermées.
+
+    Un portail fermé au bout de sept cents mètres de boucle a fait faire demi-tour
+    en pleine sortie. OpenStreetMap le savait ; la tuile ne le gardait pas.
+    """
+
+    def test_les_passages_pietons(self):
+        assert region_tiles.kept_node({"highway": "crossing", "crossing": "zebra"})
+
+    def test_un_portail_prive_ou_verrouille(self):
+        assert region_tiles.kept_node({"barrier": "gate", "access": "private"})
+        assert region_tiles.kept_node({"barrier": "gate", "locked": "yes"})
+        assert region_tiles.kept_node({"barrier": "lift_gate", "foot": "no"})
+
+    def test_ce_qui_ne_ferme_qu_aux_velos(self):
+        assert region_tiles.kept_node({"barrier": "stile"})
+        assert region_tiles.kept_node({"barrier": "gate", "bicycle": "no"})
+
+    def test_pas_les_portails_ouverts(self):
+        # La plupart des portails de parc, les bornes, les chicanes : on passe.
+        assert not region_tiles.kept_node({"barrier": "gate"})
+        assert not region_tiles.kept_node({"barrier": "bollard"})
+        assert not region_tiles.kept_node({"barrier": "kerb"})
+        assert not region_tiles.kept_node({"amenity": "bench"})

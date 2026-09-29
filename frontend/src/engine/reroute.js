@@ -22,7 +22,9 @@
 // Le chemin suit les mêmes préférences que la boucle — trottoirs, pistes,
 // rues calmes — puisqu'il est calculé avec le même profil.
 
+import { BLOCK_RADIUS_M } from './blocked'
 import { INF, dijkstra, nodeSequence, reconstruct } from './dijkstra'
+import { carryWeights, openDoor } from './door'
 import { bearingDeg, haversineM } from './geo'
 import { headings, pathSteps, turnOf } from './navigation'
 import { pymod } from './py'
@@ -54,22 +56,42 @@ const CARDINALS = ['le nord', 'le nord-est', "l'est", 'le sud-est', 'le sud', 'l
  * @param fromAlong où l'on a quitté ce tracé, en mètres depuis son début
  * @param travelledM la distance déjà courue
  * @param plannedM la distance prévue pour toute la sortie
+ * @param blocked  les signalements `[lon, lat]` à contourner — dont celui qu'on
+ *   vient de faire, qui a souvent déclenché ce recalcul
+ * @param sport    pour qualifier le raccord jusqu'à la rue
  * @returns `{ coords, connectM, joinIndex, steps }` ou `null` s'il n'y a pas de chemin.
  *   `coords` va de la position au point de jonction, `geometry[joinIndex]` ;
  *   `steps` sont les consignes du raccord, distances comptées depuis la position.
  */
-export function planRejoin(graph, weights, { position, heading = null, geometry, fromAlong = 0, travelledM = 0, plannedM = null }) {
+export function planRejoin(
+  area,
+  areaWeights,
+  { position, heading = null, geometry, fromAlong = 0, travelledM = 0, plannedM = null, blocked = [], sport = 'run' },
+) {
   if (!geometry || geometry.length < 2 || !position) return null
-  const source = graph.nearestNode(position[0], position[1], 400)
-  if (source === null) return null
+
+  // **D'où l'on est, pas du carrefour le plus proche.** Partir du carrefour,
+  // c'était souvent partir de celui qu'on venait de passer : la première
+  // consigne disait « fais demi-tour » alors que la rue continuait devant.
+  // La rue est coupée à la position, comme au départ de la boucle (`door.js`),
+  // et le chemin peut la prendre dans un sens ou dans l'autre.
+  const door = openDoor(area, position[0], position[1], { sport })
+  if (!door) return null
+  const graph = door.graph
+  const weights = carryWeights(graph, areaWeights)
+  const source = door.start
   const lead = haversineM(position, graph.node(source))
+  if (lead > MAX_LEAD_M) return null
+  const threshold = graph.door?.node ?? source
 
   const cumulative = new Float64Array(geometry.length)
   for (let i = 1; i < geometry.length; i += 1) cumulative[i] = cumulative[i - 1] + haversineM(geometry[i - 1], geometry[i])
   const total = cumulative[geometry.length - 1]
   const planned = plannedM ?? total
+  const beyond = obstacleAlong(geometry, cumulative, fromAlong, blocked)
 
   const tree = dijkstra(graph, source, weights, { maxDist: MAX_CONNECT_M, slack: 1 })
+  const backwards = behind(graph, threshold, heading)
 
   const candidates = []
   // Les passages de la boucle par chaque carrefour — une boucle peut repasser
@@ -81,15 +103,26 @@ export function planRejoin(graph, weights, { position, heading = null, geometry,
     if (along < fromAlong) continue
     const finish = i === geometry.length - 1
     if (!finish && along - lastAlong < SAMPLE_M) continue
-    const node = graph.nearestNode(geometry[i][0], geometry[i][1], SNAP_M)
+    // Les carrefours du réseau de la zone : le seuil posé à l'instant n'en est
+    // pas un, et les numéros sont les mêmes dans les deux graphes.
+    const node = area.nearestNode(geometry[i][0], geometry[i][1], SNAP_M)
     if (node === null) continue
     lastAlong = along
     if (!visits.has(node)) visits.set(node, [])
     visits.get(node).push(along)
+    // Rejoindre la boucle avant l'obstacle, ce serait y retourner.
+    if (along <= beyond) continue
     const d = tree.dist[node]
     if (d === INF) continue
     const estimate = travelledM + lead + d + (total - along)
-    candidates.push({ index: i, node, along, connectM: d, score: Math.abs(estimate - planned) + CONNECT_WEIGHT * d })
+    const turnBack = backwards.size && backwards.has(firstEdgeFrom(tree, node, threshold)) ? TURN_BACK_COST_M : 0
+    candidates.push({
+      index: i,
+      node,
+      along,
+      connectM: d,
+      score: Math.abs(estimate - planned) + CONNECT_WEIGHT * d + turnBack,
+    })
   }
   candidates.sort((a, b) => a.score - b.score || a.along - b.along)
 
@@ -106,6 +139,70 @@ export function planRejoin(graph, weights, { position, heading = null, geometry,
   return null
 }
 
+// Au-delà, on n'est plus sur un chemin qu'on a quitté : on est ailleurs.
+const MAX_LEAD_M = 400
+
+// Ce que coûte un demi-tour dans le choix de la jonction, en mètres : à
+// distance à peu près égale, on continue devant soi plutôt que de faire volte-
+// face — mais on fait demi-tour quand c'est vraiment plus juste.
+const TURN_BACK_COST_M = 120
+const BEHIND_DEG = 110
+
+/**
+ * Les moitiés de rue qui partent derrière soi, depuis le seuil.
+ *
+ * Rien sans cap connu : on ne sait pas alors ce qui est devant.
+ */
+function behind(graph, node, heading) {
+  const out = new Set()
+  if (heading == null) return out
+  for (let k = graph.adjOffset[node]; k < graph.adjOffset[node + 1]; k += 1) {
+    const e = graph.adjEdges[k]
+    if (e === graph.door?.connector) continue
+    const [bearing] = headings(graph.coordsFrom(e, node))
+    if (Math.abs(pymod(bearing - heading + 180, 360) - 180) > BEHIND_DEG) out.add(e)
+  }
+  return out
+}
+
+/** L'arête par laquelle le chemin vers `node` quitte le seuil. */
+function firstEdgeFrom(tree, node, threshold) {
+  let cur = node
+  let guard = 0
+  while (tree.prevNode[cur] >= 0 && tree.prevNode[cur] !== threshold && guard < 100_000) {
+    cur = tree.prevNode[cur]
+    guard += 1
+  }
+  return tree.prevNode[cur] === threshold ? tree.prevEdge[cur] : -1
+}
+
+/**
+ * Le point de la boucle au-delà duquel il faut la rejoindre.
+ *
+ * Un signalement qui tombe sur la suite du parcours — le portail qu'on vient de
+ * trouver fermé — n'est contourné qu'à condition de rejoindre la boucle
+ * **après** lui : la rejoindre avant, c'était y être renvoyé. On ne regarde que
+ * les six cents mètres qui suivent : un vieux signalement à l'autre bout de la
+ * boucle ne doit pas en faire sauter la moitié.
+ */
+function obstacleAlong(geometry, cumulative, fromAlong, blocked) {
+  let beyond = -Infinity
+  if (!blocked?.length) return beyond
+  for (let i = 0; i < geometry.length; i += 1) {
+    const along = cumulative[i]
+    if (along < fromAlong - OBSTACLE_BEHIND_M) continue
+    if (along > fromAlong + OBSTACLE_AHEAD_M) break
+    if (blocked.some((p) => haversineM(p, geometry[i]) <= BLOCK_RADIUS_M)) beyond = Math.max(beyond, along)
+  }
+  return beyond
+}
+
+const OBSTACLE_AHEAD_M = 600
+// Un peu en arrière aussi : on signale souvent l'obstacle après avoir
+// rebroussé chemin, et « l'endroit où l'on a quitté le tracé » est alors en
+// deçà de lui.
+const OBSTACLE_BEHIND_M = 150
+
 /** Le raccord : sa géométrie, sa longueur et ses consignes. */
 function connection(graph, source, edges, best, { position, heading, geometry, lead }) {
   const coords = [position]
@@ -118,11 +215,16 @@ function connection(graph, source, edges, best, { position, heading, geometry, l
     cursor = graph.other(e, cursor)
   }
   const connectM = lead + best.connectM
-  const firstRoad = edges.length ? graph.edgeName[edges[0]] : null
+  // L'allée jusqu'à la rue n'a pas de nom : c'est la rue qu'on nomme.
+  const connector = graph.door?.connector
+  const street = edges.find((e) => e !== connector)
+  const firstRoad = street !== undefined ? graph.edgeName[street] : null
+  // La direction se lit sur la rue, pas sur les quelques mètres pour l'atteindre.
+  const onStreet = connector != null && edges[0] === connector ? coords.slice(1) : coords
 
   const steps = []
   if (coords.length >= 2 && connectM >= 10) {
-    const [departure] = headings(coords)
+    const [departure] = headings(onStreet.length >= 2 ? onStreet : coords)
     if (heading != null) {
       const angle = pymod(departure - heading + 180, 360) - 180
       const { turn, text } = turnOf(angle, firstRoad)
@@ -131,7 +233,10 @@ function connection(graph, source, edges, best, { position, heading, geometry, l
       const words = CARDINALS[Math.trunc(pymod(departure + 22.5, 360) / 45)]
       steps.push(step(0, 'start', `Pars vers ${words}${firstRoad ? ` sur ${firstRoad}` : ''} pour rejoindre le parcours.`, coords[0], firstRoad))
     }
-    for (const s of pathSteps(graph, source, edges)) steps.push({ ...s, dist_m: Math.round((s.dist_m + lead) * 10) / 10 })
+    // Le virage sur la rue, au bout de l'allée, est celui que la première
+    // consigne vient de dire : pas de seconde annonce trois mètres plus loin.
+    const quiet = onStreet !== coords ? graph.door.node : null
+    for (const s of pathSteps(graph, source, edges, quiet)) steps.push({ ...s, dist_m: Math.round((s.dist_m + lead) * 10) / 10 })
   }
 
   // La jonction elle-même : dans quel sens repartir sur la boucle.

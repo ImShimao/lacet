@@ -13,6 +13,8 @@
 
 // Relatif à l'app, qui sert ces fichiers elle-même : `capacitor://localhost/…`
 // sur l'iPhone, le serveur de développement ailleurs, où ils sont absents.
+import { keptBarrier } from './safety'
+
 const BASE = '/region/'
 
 // La lecture de l'index, gardée comme promesse : les tuiles d'une zone le
@@ -68,10 +70,15 @@ export async function regionTile(ix, iy, fetchImpl = fetch) {
  * décimales : les deux sont l'arrondi correct du même décimal.
  */
 export function fromRegionTile(data) {
+  // Les nœuds d'une tuile : les passages piétons, et depuis septembre 2026 les
+  // barrières qui ferment le passage. Une tuile plus ancienne n'a que les
+  // premiers ; elle se relit pareil.
+  const nodes = data.c.map(([id, x, y, tags]) => ({ id, lon: x / 1e7, lat: y / 1e7, tags }))
   return {
     ways: data.w.map(([id, tags, nodes, coords]) => ({ id, tags, nodes: undelta(nodes), flat: unpair(coords) })),
     landuse: data.l.map(([id, coords]) => ({ id, flat: unpair(coords) })),
-    crossings: data.c.map(([id, x, y, tags]) => ({ id, lon: x / 1e7, lat: y / 1e7, tags })),
+    crossings: nodes.filter((n) => n.tags?.highway === 'crossing'),
+    barriers: nodes.filter((n) => keptBarrier(n.tags)),
   }
 }
 
@@ -89,8 +96,20 @@ export function toRegionTile(extract) {
   return {
     w: extract.ways.map((way) => [way.id, way.tags, delta(way.nodes), pair(way.flat)]),
     l: extract.landuse.map((area) => [area.id, pair(area.flat)]),
-    c: extract.crossings.map((c) => [c.id, Math.round(c.lon * 1e7), Math.round(c.lat * 1e7), c.tags]),
+    c: nodesOf(extract).map((c) => [c.id, Math.round(c.lon * 1e7), Math.round(c.lat * 1e7), c.tags]),
   }
+}
+
+/** Passages et barrières, sans doublon : un même nœud peut être les deux. */
+function nodesOf(extract) {
+  const seen = new Set()
+  const out = []
+  for (const n of [...extract.crossings, ...(extract.barriers ?? [])]) {
+    if (seen.has(n.id)) continue
+    seen.add(n.id)
+    out.push(n)
+  }
+  return out
 }
 
 function delta(values) {

@@ -6,7 +6,9 @@
 // couples feraient autant de petits tableaux : plusieurs centaines de
 // mégaoctets sur un téléphone, pour exactement les mêmes nombres.
 
-/** Range une réponse Overpass brute : `{ways, landuse, crossings}`. */
+import { keptBarrier } from './safety'
+
+/** Range une réponse Overpass brute : `{ways, landuse, crossings, barriers}`. */
 export function fromOverpass(payload, into = emptyExtract()) {
   for (const el of payload.elements ?? []) {
     const tags = el.tags ?? {}
@@ -15,6 +17,7 @@ export function fromOverpass(payload, into = emptyExtract()) {
       if (tags.highway === 'crossing') {
         into.crossings.push({ id: el.id, lon: el.lon, lat: el.lat, tags })
       }
+      if (keptBarrier(tags)) into.barriers.push({ id: el.id, lon: el.lon, lat: el.lat, tags })
       continue
     }
 
@@ -36,7 +39,9 @@ export function fromOverpass(payload, into = emptyExtract()) {
   return into
 }
 
-export const emptyExtract = () => ({ ways: [], landuse: [], crossings: [] })
+// `barriers` : les portails fermés et ce qui ferme le passage — propres au
+// moteur de l'app (voir `closedBarrier` dans `safety.js`) ; Python n'en a pas.
+export const emptyExtract = () => ({ ways: [], landuse: [], crossings: [], barriers: [] })
 
 /**
  * Relit la forme compacte écrite par le moteur Python (`to_cache`, version 2).
@@ -51,6 +56,7 @@ export function fromCompact(data) {
     ways: data.ways.map(([id, tags, nodes, flat]) => ({ id, tags, nodes, flat: Float64Array.from(flat) })),
     landuse: data.landuse.map((flat, i) => ({ id: -(i + 1), flat: Float64Array.from(flat) })),
     crossings: data.crossings.map(([id, lon, lat, tags]) => ({ id, lon, lat, tags })),
+    barriers: [],
   }
 }
 
@@ -88,14 +94,16 @@ export function clipToDisk(extract, lon, lat, radiusM) {
     const dy = (Math.min(Math.max(lat, south), north) - lat) * ky
     return dx * dx + dy * dy <= radiusM * radiusM
   }
+  const inside = (c) => {
+    const dx = (c.lon - lon) * kx
+    const dy = (c.lat - lat) * ky
+    return dx * dx + dy * dy <= radiusM * radiusM
+  }
   return {
     ways: extract.ways.filter((way) => reaches(way.flat)),
     landuse: extract.landuse.filter((area) => reaches(area.flat)),
-    crossings: extract.crossings.filter((c) => {
-      const dx = (c.lon - lon) * kx
-      const dy = (c.lat - lat) * ky
-      return dx * dx + dy * dy <= radiusM * radiusM
-    }),
+    crossings: extract.crossings.filter(inside),
+    barriers: (extract.barriers ?? []).filter(inside),
   }
 }
 
@@ -122,6 +130,7 @@ export function mergeExtracts(parts) {
   const out = emptyExtract()
   const ways = new Set()
   const crossings = new Set()
+  const barriers = new Set()
   const landuse = new Set()
   for (const part of parts) {
     for (const way of part.ways) {
@@ -138,6 +147,11 @@ export function mergeExtracts(parts) {
       if (crossings.has(c.id)) continue
       crossings.add(c.id)
       out.crossings.push(c)
+    }
+    for (const b of part.barriers ?? []) {
+      if (barriers.has(b.id)) continue
+      barriers.add(b.id)
+      out.barriers.push(b)
     }
   }
   return out

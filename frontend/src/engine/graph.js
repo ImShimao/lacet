@@ -15,7 +15,7 @@
 import { haversineM, planarDistance, pointInRing, ringBbox } from './geo'
 import { pairs, pointAt } from './extract'
 import { pyfloordiv, pyRound, pySum, radians } from './py'
-import { evaluateEdge, isExcluded, tunnelIsUnprotected } from './safety'
+import { closedBarrier, evaluateEdge, isExcluded, tunnelIsUnprotected } from './safety'
 
 const BUILTUP_DENSITY_M = 15_000
 const DENSITY_CELL_M = 400
@@ -64,6 +64,11 @@ export class Graph {
     this.adjOffset = null
     this.adjEdges = null
     this.crossings = new Map()
+    // Les barrières fermées (voir `closedBarrier`) : leurs nœuds, et les arêtes
+    // qu'elles ferment. Vides sur tout extrait sans barrière — celui des tests
+    // de parité compris.
+    this.gates = new Set()
+    this.gatedEdges = new Set()
 
     this.grid = new Map()
     this.origin = null
@@ -232,7 +237,11 @@ export class Graph {
     this.edgeCoordCount = Int32Array.from(this.edgeCoordCount)
     this.edgeWayId = Float64Array.from(this.edgeWayId)
     this.edgeTunnel = Uint8Array.from(this.edgeTunnel)
+    this.link()
+  }
 
+  /** L'adjacence compacte, arêtes rangées dans leur ordre de création. */
+  link() {
     const n = this.nodeCount
     const degree = new Int32Array(n + 1)
     for (let e = 0; e < this.edgeCount; e += 1) {
@@ -345,6 +354,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
   }
 
   const crossingIds = new Set(extract.crossings.map((c) => c.id))
+  const gateIds = new Set((extract.barriers ?? []).filter((b) => closedBarrier(b.tags, sport)).map((b) => b.id))
   const origin = pointAt(extract.ways[0].flat, 0)
   const builtup = new BuiltUpIndex(extract.landuse, origin)
   const distance = planarDistance(origin[1])
@@ -383,6 +393,9 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
   const junctions = new Set()
   for (const [id, count] of occurrences) if (count >= 2) junctions.add(id)
   for (const id of crossingIds) if (occurrences.has(id)) junctions.add(id)
+  // Une barrière coupe la voie : elle doit être un nœud du graphe, sans quoi
+  // elle disparaîtrait au milieu d'une arête.
+  for (const id of gateIds) if (occurrences.has(id)) junctions.add(id)
   for (const [, nodeIds] of kept) {
     junctions.add(nodeIds[0])
     junctions.add(nodeIds[nodeIds.length - 1])
@@ -391,6 +404,9 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
   // --- passe 3 : contraction + sécurité ------------------------------------
   const rank = new Map()
   const coords = new GrowableFloat64(1 << 16)
+  // Pour chaque barrière : les arêtes qui y touchent, et si elle est au bout
+  // de leur voie ou en son milieu — voir plus bas.
+  const gateSides = new Map()
   const nodeRank = (osmId, lon, lat) => {
     let idx = rank.get(osmId)
     if (idx === undefined) {
@@ -443,7 +459,26 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
       graph.edgeName.push(name)
       graph.edgeWayId.push(way.id)
       graph.edgeTunnel.push(tunnel)
+      if (gateIds.size) {
+        const e = graph.edgeA.length - 1
+        for (const [id, end] of [[a, i === 0], [b, j === n - 1]]) {
+          if (!gateIds.has(id)) continue
+          if (!gateSides.has(id)) gateSides.set(id, [])
+          gateSides.get(id).push([e, end])
+        }
+      }
     }
+  }
+
+  // **Ce qu'une barrière ferme.** Au milieu d'un chemin, elle le coupe : les
+  // deux côtés sont fermés. Posée là où une allée privée quitte la rue — le
+  // nœud est au bout de l'allée, au milieu de la rue —, elle ferme l'allée et
+  // pas la rue : ce sont les voies qui **commencent** au portail qu'on ferme.
+  for (const [id, sides] of gateSides) {
+    graph.gates.add(rank.get(id))
+    const through = sides.some(([, end]) => !end)
+    const branch = sides.some(([, end]) => end)
+    for (const [e, end] of sides) if (!(through && branch) || end) graph.gatedEdges.add(e)
   }
 
   // --- traversées ----------------------------------------------------------

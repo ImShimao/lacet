@@ -175,6 +175,10 @@ self.onmessage = async ({ data }) => {
 
     try {
       lastLoad = { fetch: 0, graph: 0 }
+      // Ce qu'on gardait pour retourner les boucles d'avant tient un graphe
+      // dérivé — celui du départ devant la porte (`door.js`). Lâché dès
+      // maintenant, il ne coexiste pas avec celui de la recherche qui commence.
+      lastReversible = null
       const result = await planLoops(payload, {
         loadGraph: (args) => loadGraph(args, progress),
         onProgress: progress,
