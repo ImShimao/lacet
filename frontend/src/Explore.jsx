@@ -222,7 +222,7 @@ export default function Explore({
           pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas. */}
       {snapped && (
         <div className="notice">
-          Le départ s'est posé sur la rue la plus proche, à {snapped} m du point demandé :
+          Le départ s'est posé sur la rue, à {snapped} m du point demandé :
           c'est de là que la boucle part, et c'est là qu'elle revient.
         </div>
       )}

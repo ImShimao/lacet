@@ -63,7 +63,7 @@ en pleine sortie, historique avec totaux mensuels.
 [AltStore](https://altstore.io) — pas besoin de Mac.
 
 ```bash
-gh run download --name Lacet-ipa   # récupère Lacet.ipa
+gh release download v1.0.<numéro de compilation> --pattern Lacet.ipa
 ```
 
 Puis AltStore → **Mes apps → +** → `Lacet.ipa`. Le détail, et pourquoi AltStore
@@ -281,11 +281,14 @@ GitHub : à chaque modification du front poussée sur `main`, le workflow
 **App iPhone (IPA)** lance les tests, construit l'app, génère le projet Xcode,
 y applique `frontend/ios-overlay/customize.py` et compile. Compter deux minutes.
 
-L'IPA se télécharge depuis l'onglet **Actions** du dépôt → dernière exécution
-réussie → **Artifacts** → `Lacet-ipa`, ou en ligne de commande :
+L'IPA est jointe à une **publication** du dépôt (`v1.0.<numéro de
+compilation>`), et non aux artefacts de l'exécution : ceux-ci ont un quota de
+cinq cents mégaoctets sur un dépôt privé, que six compilations suffisaient à
+remplir. Elle se télécharge depuis l'onglet **Releases**, ou en ligne de
+commande :
 
 ```bash
-gh run download --name Lacet-ipa
+gh release download v1.0.58 --pattern Lacet.ipa
 ```
 
 Elle n'est **pas signée** : c'est l'installateur qui la signe, avec ton

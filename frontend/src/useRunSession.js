@@ -105,7 +105,9 @@ export default function useRunSession({ toEntry, remember }) {
       setSummary(
         remember(
           toEntry(
-            { distance: pending.covered, elapsed: pending.elapsed, trail: pending.trail },
+            // Les temps de chaque kilomètre sont gardés avec le reste : ils ne se
+            // retrouvent pas après coup.
+            { distance: pending.covered, elapsed: pending.elapsed, trail: pending.trail, splits: pending.splits },
             { route: pending.route, free: !pending.route, sport: pending.sport || sport },
           ),
         ),

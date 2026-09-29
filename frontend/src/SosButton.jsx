@@ -77,7 +77,9 @@ export default function SosButton({ position, distance, elapsed, className = '' 
     // `sms:` ouvre l'application de messagerie avec le texte prérempli. Le
     // séparateur diffère : « ?body= » sur Android, « &body= » sur iOS. Mettre
     // les deux marche partout — l'un est ignoré comme paramètre inconnu.
-    const href = `sms:${contact.replace(/\s/g, '')}?&body=${encodeURIComponent(text)}`
+    // Le numéro réduit à ses chiffres (et au « + » international) : « 06.12.34 »
+    // ou « 06-12-34 », tels qu'on les tape, ne sont pas des numéros pour Messages.
+    const href = `sms:${contact.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(text)}`
     // Dans l'app native, le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre
     // de la façon dont WebKit traite un lien d'un autre schéma.
     if (isNative()) import('./native').then((n) => n.openExternal(href))

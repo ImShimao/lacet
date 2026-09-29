@@ -95,10 +95,18 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
         timestamp: location.time ?? Date.now(),
       })
     },
-  ).then((watcherId) => {
-    id = watcherId
-    if (stopped) BackgroundGeolocation.removeWatcher({ id }).catch(() => {})
-  })
+  ).then(
+    (watcherId) => {
+      id = watcherId
+      if (stopped) BackgroundGeolocation.removeWatcher({ id }).catch(() => {})
+    },
+    // Le module lui-même refuse — pas une position manquante, un suivi qui ne
+    // démarrera jamais. Sans ce retour, l'écran de course restait sur
+    // « Acquisition du signal GPS… » pour toujours, sans une explication.
+    () => {
+      if (!stopped) onError?.({ denied: false, message: 'Le suivi de position ne démarre pas. Ferme et rouvre l’app.' })
+    },
+  )
 
   return () => {
     stopped = true

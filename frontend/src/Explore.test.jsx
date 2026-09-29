@@ -77,14 +77,14 @@ function afficher(props = {}) {
 describe('les avertissements de l’écran', () => {
   it('se taisent quand tout s’est bien passé', () => {
     afficher()
-    expect(screen.queryByText(/posé sur la rue la plus proche/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/posé sur la rue/)).not.toBeInTheDocument()
     expect(screen.queryByText(/relief n'a pas répondu/)).not.toBeInTheDocument()
     expect(screen.queryByText(/bord de la zone/)).not.toBeInTheDocument()
   })
 
   it('disent de combien le départ a rejoint la rue', () => {
     afficher({ snapped: 118 })
-    expect(screen.getByText(/posé sur la rue la plus proche, à 118 m/)).toBeInTheDocument()
+    expect(screen.getByText(/posé sur la rue, à 118 m/)).toBeInTheDocument()
   })
 
   it('disent que le relief manque — et pourquoi le classement s’en est passé', () => {
