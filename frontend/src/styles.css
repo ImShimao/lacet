@@ -10,7 +10,10 @@
   --line-soft: #221e2c;
   --text: #f2f0f7;
   --text-2: #a39eb4;
-  --text-3: #767089;
+  /* Mesuré : 4,5:1 au moins sur les trois fonds de l'app, le minimum de la
+     norme pour du petit texte. L'ancien gris (#767089) tombait à 3,4:1 sur les
+     panneaux — la moitié des explications de l'app étaient sous le seuil. */
+  --text-3: #8a849d;
 
   /* Deux violets, pas un : le soutenu pour les aplats (le blanc dessus reste
      lisible), le clair pour le texte et les icônes posés sur le noir — le

@@ -49,10 +49,10 @@ export default function Account({ params, geo, onClearData, onProfile }) {
         />
       </div>
 
-      <h4 className="section">Recherche</h4>
+      <h3 className="section">Recherche</h3>
       <SearchSettings params={params} onProfile={onProfile} />
 
-      <h4 className="section">Poids</h4>
+      <h3 className="section">Poids</h3>
       <p className="muted small">
         Sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
       </p>
@@ -67,11 +67,11 @@ export default function Account({ params, geo, onClearData, onProfile }) {
         />
       </div>
 
-      <h4 className="section">Pendant la sortie</h4>
+      <h3 className="section">Pendant la sortie</h3>
       <AutoPauseSetting />
       <LockScreenSetting />
 
-      <h4 className="section">Contact d'urgence</h4>
+      <h3 className="section">Contact d'urgence</h3>
       <p className="muted small">
         Le bouton SOS prépare un SMS vers ce numéro avec ta position.{' '}
         <b>L'app ne l'envoie pas</b> : c'est toi qui appuies sur envoyer.
@@ -89,7 +89,7 @@ export default function Account({ params, geo, onClearData, onProfile }) {
         }}
       />
 
-      <h4 className="section">Sorties et favoris gardés</h4>
+      <h3 className="section">Sorties et favoris gardés</h3>
       {/* Pas de `key` indexée sur `version` ici, contrairement aux compteurs
           voisins : cette section garde son propre état — « tant de libérés » —
           et le remontage le faisait disparaître à l'instant même où il devait
@@ -97,19 +97,19 @@ export default function Account({ params, geo, onClearData, onProfile }) {
           l'effacement global, qui est ce que `version` sert à rafraîchir. */}
       <StoredData />
 
-      <h4 className="section">Mes signalements</h4>
+      <h3 className="section">Mes signalements</h3>
       <MyReports />
 
-      <h4 className="section">Cartes hors ligne</h4>
+      <h3 className="section">Cartes hors ligne</h3>
       <OfflineStorage key={`cartes-${version}`} />
 
-      <h4 className="section">Rues gardées</h4>
+      <h3 className="section">Rues gardées</h3>
       <KeptStreets key={`rues-${version}`} />
 
-      <h4 className="section">Sauvegarde</h4>
+      <h3 className="section">Sauvegarde</h3>
       <BackupRows />
 
-      <h4 className="section">L'app</h4>
+      <h3 className="section">L'app</h3>
       <BuildStamp />
       <LastSearch />
       <p className="muted small">
@@ -443,7 +443,6 @@ function AutoPauseSetting() {
             key={String(value)}
             role="radio"
             aria-checked={on === value}
-            aria-pressed={on === value}
             onClick={() => {
               setOn(value)
               save({ autoPause: value })

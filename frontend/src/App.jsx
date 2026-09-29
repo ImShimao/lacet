@@ -619,7 +619,17 @@ export default function App() {
 
   return (
     <div className="shell" data-map={theme} data-sheet={sheetMode} ref={shellRef}>
-      <div className="stage" ref={stageRef}>
+      {/* `main` plutôt que `div` : la carte, la recherche de lieu et les
+          commandes qui flottent dessus sont le contenu principal de l'app. Sans
+          ce repère, un lecteur d'écran ne propose aucun moyen d'y sauter, et le
+          champ de recherche se retrouvait hors de toute région annoncée. */}
+      <main className="stage" ref={stageRef}>
+        {/* Le titre de la page. Le logo visible ferait l'affaire, mais il vit
+            dans un en-tête que la feuille repliée réduit à rien : il
+            disparaîtrait de la structure au moment même où l'on ouvre l'app.
+            Celui-ci ne se voit pas et ne bouge jamais — c'est le premier repère
+            annoncé en arrivant, et il est dans la région principale. */}
+        <h1 className="visually-hidden">Lacet — boucles de course et de vélo</h1>
         <MapView
           styleKey={mapStyle}
           start={start}
@@ -828,7 +838,7 @@ export default function App() {
             Clique sur la carte pour poser le départ — ou fais glisser le repère.
           </div>
         )}
-      </div>
+      </main>
 
       <aside className="side">
         {/* En course, pas d'en-tête : l'activité et ses réglages ne se changent
