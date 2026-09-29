@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { downloadGpx } from './api'
 import { duration, km, pace } from './format'
+import { standing } from './knownRoutes'
 
 /**
  * Une sortie déjà faite, rouverte.
@@ -19,8 +20,12 @@ import { duration, km, pace } from './format'
  * `LiveRun.jsx`). Les sorties d'avant ne les ont pas : on ne les invente pas à
  * partir de la trace, dont les points n'ont pas d'heure.
  */
-export default function RunDetail({ entry, onReplay, onDelete, onClose }) {
+export default function RunDetail({ entry, history = [], onReplay, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
+  // Où cette sortie se situe parmi celles qui ont emprunté le même chemin.
+  // Calculé à l'ouverture d'une sortie, pas à chaque rendu : c'est une
+  // comparaison de tracés point à point sur tout l'historique.
+  const rang = useMemo(() => standing(entry, history), [entry, history])
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
@@ -78,6 +83,8 @@ export default function RunDetail({ entry, onReplay, onDelete, onClose }) {
           est le temps en mouvement, et c'est lui qui donne l'allure.
         </p>
       )}
+
+      {rang && <Standing rang={rang} bike={bike} />}
 
       {splits && <Splits splits={splits} bike={bike} />}
 
@@ -167,6 +174,50 @@ export default function RunDetail({ entry, onReplay, onDelete, onClose }) {
     </div>
   )
 }
+
+/**
+ * Se comparer à soi-même, sur le même chemin.
+ *
+ * C'est la seule comparaison qui veut dire quelque chose : ni un classement
+ * contre des inconnus, ni un temps sur une distance ronde, mais **cette
+ * boucle-là**, celle qu'on refait le dimanche, avec ses côtes et ses feux.
+ *
+ * L'allure est comparée plutôt que le temps brut : deux passages sur le même
+ * chemin diffèrent de quelques centaines de mètres, et un temps brut ferait
+ * passer un détour par la boulangerie pour un jour sans.
+ */
+function Standing({ rang, bike }) {
+  const ecart = (s) => `${s <= 0 ? '−' : '+'}${pace(Math.abs(s))}`
+  return (
+    <div className={`standing ${rang.record ? 'standing--record' : ''}`}>
+      <div className="standing__head">
+        <b>
+          {rang.record ? 'Ton meilleur passage' : `${rang.count}ᵉ fois sur ce chemin`}
+        </b>
+        <em>
+          {rang.record
+            ? `Le plus rapide de tes ${rang.count} passages ici.`
+            : `au mieux ${pace(paceOf(rang.best))}${bike ? '' : '/km'}, le ${jour(rang.best.ranAt)}`}
+        </em>
+      </div>
+      {!rang.record && (
+        <div className="standing__gaps">
+          <div>
+            <span>contre la dernière</span>
+            <b className={rang.vsPrevious <= 0 ? 'standing__up' : ''}>{ecart(rang.vsPrevious)}</b>
+          </div>
+          <div>
+            <span>contre la meilleure</span>
+            <b className={rang.vsBest <= 0 ? 'standing__up' : ''}>{ecart(rang.vsBest)}</b>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const paceOf = (r) => (r.actual_duration_s || 0) / ((r.actual_distance_m || 1) / 1000)
+const jour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
 
 /**
  * Les tours de kilomètre, en barres.

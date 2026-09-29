@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alreadyRun } from './knownRoutes'
+import { alreadyRun, sameRoute, standing } from './knownRoutes'
 
 /**
  * Reconnaître un chemin déjà parcouru.
@@ -30,6 +30,53 @@ const sortie = (geometry, extra = {}) => ({
   actual_duration_s: 3600,
   track: geometry,
   ...extra,
+})
+
+describe('se comparer à soi-même', () => {
+  const trace = anneau(7.2, 47.9, 800)
+  const passage = (jour, secondes, extra = {}) => ({
+    ranAt: `2026-09-${String(jour).padStart(2, '0')}T09:00:00.000Z`,
+    actual_distance_m: Math.round(longueur(800)),
+    actual_duration_s: secondes,
+    track: trace,
+    ...extra,
+  })
+
+  it('retrouve les autres passages sur le même chemin, le plus récent d’abord', () => {
+    const aujourdhui = passage(20, 1500)
+    const trouvés = sameRoute(aujourdhui, [passage(14, 1600), passage(7, 1450), aujourdhui])
+    expect(trouvés).toHaveLength(2)
+    expect(trouvés[0].ranAt).toContain('-14')
+    // La sortie qu'on regarde ne se compare pas à elle-même.
+    expect(trouvés.some((r) => r.ranAt === aujourdhui.ranAt)).toBe(false)
+  })
+
+  it('écarte les boucles d’ailleurs, même de même longueur', () => {
+    const ailleurs = { ...passage(14, 1600), track: anneau(7.25, 47.95, 800) }
+    expect(sameRoute(passage(20, 1500), [ailleurs])).toHaveLength(0)
+  })
+
+  it('dit qu’un record est un record, et de combien', () => {
+    // 1450 s pour 5,03 km, contre 1600 la fois d'avant : plus rapide.
+    const rang = standing(passage(20, 1450), [passage(14, 1600), passage(7, 1550)])
+    expect(rang.record).toBe(true)
+    expect(rang.count).toBe(3)
+    expect(rang.vsPrevious).toBeLessThan(0)
+  })
+
+  it('situe une sortie moins bonne sans la juger', () => {
+    const rang = standing(passage(20, 1700), [passage(14, 1600), passage(7, 1450)])
+    expect(rang.record).toBe(false)
+    expect(rang.best.actual_duration_s).toBe(1450)
+    expect(rang.previous.ranAt).toContain('-14')
+    expect(rang.vsBest).toBeGreaterThan(0)
+  })
+
+  it('ne dit rien la première fois', () => {
+    expect(standing(passage(20, 1500), [])).toBeNull()
+    // Ni quand les autres passages n'ont pas de temps à comparer.
+    expect(standing(passage(20, 1500), [passage(14, 0)])).toBeNull()
+  })
 })
 
 describe('déjà couru', () => {

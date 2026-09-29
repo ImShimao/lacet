@@ -3550,6 +3550,53 @@ html[data-turn] .maplibregl-control-container {
   margin-top: 4px;
 }
 
+/* Se comparer à soi-même. Discret quand on n'a pas battu son record — c'est
+   une information, pas un jugement — et franchement vert quand si. */
+.standing {
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.standing--record {
+  border-color: rgba(50, 215, 75, 0.45);
+  background: rgba(50, 215, 75, 0.1);
+}
+.standing__head b {
+  display: block;
+  font-size: 14.5px;
+}
+.standing--record .standing__head b {
+  color: var(--safe);
+}
+.standing__head em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+.standing__gaps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 11px;
+}
+.standing__gaps span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.standing__gaps b {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.standing__up {
+  color: var(--safe);
+}
+
 /* Les tours de kilomètre. La barre dit le temps : la plus longue est le
    kilomètre le plus lent, et le plus rapide se repère à sa couleur. */
 .splits {

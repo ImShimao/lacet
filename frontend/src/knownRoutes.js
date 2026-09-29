@@ -60,6 +60,68 @@ export function alreadyRun(route, history, { near = NEAR_M, share = SAME_SHARE }
   return null
 }
 
+/**
+ * Toutes les fois où l'on a couru ce chemin-là, la plus récente d'abord.
+ *
+ * `alreadyRun` répond « oui, dimanche dernier » — assez pour une pastille sur
+ * une proposition. Relire une sortie demande autre chose : **où elle se situe
+ * parmi les autres**. C'est la question qu'on se pose en rouvrant une sortie,
+ * et la seule à laquelle une app de course peut répondre mieux qu'une montre
+ * qu'on ne consulte plus : est-ce que je progresse sur cette boucle ?
+ *
+ * La sortie passée en argument est exclue du résultat : on ne se compare pas
+ * à soi-même deux fois.
+ */
+export function sameRoute(entry, history, { near = NEAR_M, share = SAME_SHARE } = {}) {
+  const points = sample(entry?.track?.length > 1 ? entry.track : entry?.geometry)
+  if (points.length < 3) return []
+
+  const out = []
+  for (const past of history ?? []) {
+    if (past === entry || (entry.ranAt && past.ranAt === entry.ranAt)) continue
+    const trace = past.track?.length > 1 ? past.track : past.geometry
+    if (!trace || trace.length < 2) continue
+    if (!plausible({ distance_m: entry.actual_distance_m || entry.distance_m }, past, points[0], trace)) continue
+    if (coverage(points, sample(trace), near) >= share) out.push(past)
+  }
+  // Une sortie de moins de cent mètres ne vaut pas d'être comparée ; une sortie
+  // sans temps non plus — il n'y aurait rien à mettre en regard.
+  return out
+    .filter((r) => (r.actual_distance_m || 0) >= 100 && (r.actual_duration_s || 0) > 0)
+    .sort((a, b) => String(b.ranAt || '').localeCompare(String(a.ranAt || '')))
+}
+
+/**
+ * Où se situe une sortie parmi celles qui ont emprunté le même chemin.
+ *
+ * Rend `null` quand c'est la première fois : il n'y a alors rien à dire, et
+ * inventer une comparaison serait pire que de se taire.
+ *
+ * L'allure est comparée plutôt que le temps : deux passages sur « le même
+ * chemin » peuvent différer de trois cents mètres, et un temps brut ferait
+ * alors passer un détour pour un jour sans.
+ */
+export function standing(entry, history, options) {
+  const autres = sameRoute(entry, history, options)
+  if (!autres.length) return null
+  const allure = (r) => (r.actual_duration_s || 0) / ((r.actual_distance_m || 1) / 1000)
+  const mienne = allure(entry)
+  const meilleure = autres.reduce((best, r) => (allure(r) < allure(best) ? r : best), autres[0])
+  const precedente = autres[0]
+  return {
+    count: autres.length + 1,
+    others: autres,
+    previous: precedente,
+    best: meilleure,
+    // Le record est à moi quand personne n'a fait mieux — l'égalité comprise,
+    // parce qu'une seconde d'écart sur dix kilomètres ne veut rien dire.
+    record: mienne <= allure(meilleure),
+    // En secondes par kilomètre, négatif quand on a été plus rapide.
+    vsPrevious: Math.round(mienne - allure(precedente)),
+    vsBest: Math.round(mienne - allure(meilleure)),
+  }
+}
+
 /** Le tri grossier : même longueur, même départ. */
 function plausible(route, past, start, trace) {
   const mine = route.distance_m || 0

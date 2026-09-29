@@ -947,6 +947,7 @@ export default function App() {
           {viewing ? (
             <RunDetail
               entry={viewing}
+              history={history}
               onClose={() => setViewing(null)}
               onReplay={(r) => {
                 setViewing(null)
