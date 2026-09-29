@@ -1053,6 +1053,12 @@ export default function App() {
                 key={key}
                 className={`tab ${tab === key ? 'tab--on' : ''}`}
                 onClick={() => {
+                  // La sortie qu'on relit et le bilan qu'on vient de terminer
+                  // prennent le panneau entier : sans les refermer, les onglets
+                  // changeaient bien d'onglet derrière, mais rien ne bougeait à
+                  // l'écran. On croyait trois boutons morts.
+                  setViewing(null)
+                  run.closeSummary()
                   setTab(key)
                   if (key === 'explore') setSheet('peek')
                 }}
