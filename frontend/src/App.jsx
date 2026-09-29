@@ -1052,7 +1052,14 @@ export default function App() {
               onSearch={() => search()}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}
-              onReverse={selected && !selected.remote ? reverseSelected : null}
+              // Le moteur ne retourne que ce qu'il vient de calculer : un favori
+              // rouvert, un fichier importé ou un tracé du calculateur public
+              // aboutissaient à « cette boucle n'est plus en mémoire ».
+              onReverse={
+                selected && !selected.remote && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id)
+                  ? reverseSelected
+                  : null
+              }
               onOpenFilters={() => setFiltersOpen(true)}
               onFavorite={() => library.toggleFavorite(selected)}
               onStart={() => beginRun('route')}

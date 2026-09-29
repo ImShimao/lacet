@@ -197,7 +197,10 @@ export default function Explore({
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
           proposition, ils ne doivent pas la pousser sous le pli. */}
-      {meta.relaxed && <div className="notice notice--warn">{meta.message}</div>}
+      {/* Et un tracé venu du calculateur public le dit d'emblée : son absence
+          de note ne se lisait que dans le détail replié, et l'on pouvait partir
+          sans savoir que rien n'avait été jugé. */}
+      {(meta.relaxed || meta.remote) && <div className="notice notice--warn">{meta.message}</div>}
       {/* Une bordure de la zone n'est pas arrivée à temps — la carte livrée
           s'arrête à la limite de la région, et Overpass tardait. Plutôt que de
           faire attendre devant une barre figée, on a cherché avec le reste ; le

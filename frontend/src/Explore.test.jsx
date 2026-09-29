@@ -106,4 +106,12 @@ describe('les avertissements de l’écran', () => {
     expect(pastille.className).toContain('grade--unknown')
     expect(screen.queryByText('D+ 0 m')).not.toBeInTheDocument()
   })
+
+  it('disent d’emblée qu’un tracé vient du calculateur public', () => {
+    // Le message ne se lisait que dans le détail replié : on pouvait partir
+    // sans savoir que rien n'avait été jugé.
+    const message = "Les rues de ce coin ne sont pas encore arrivées : ces boucles viennent d'un calculateur public."
+    afficher({ routes: [boucle({ grade: null, safety: null, remote: true })], meta: { remote: 'valhalla', message }, detail: false })
+    expect(screen.getByText(message)).toBeInTheDocument()
+  })
 })

@@ -264,6 +264,9 @@ function toModel(trip, geometry, instructions, req, rank) {
     bearing: pyRound(bearingOf(geometry), 1),
     laps: 1,
     graded: false,
+    // Calculé ailleurs : le moteur de l'appareil n'en garde rien, et ne saurait
+    // ni le retourner ni le recalculer.
+    remote: true,
   }
 }
 
