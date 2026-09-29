@@ -254,9 +254,18 @@ export function importAll(text) {
   const favorites = merge(current.favorites, data.favorites, (r) => `${r.id}|${r.distance_m}`)
   const history = merge(current.history, data.history, (r) => r.ranAt || `${r.id}`)
   const reports = merge(current.reports, data.reports, (r) => r.id)
+  // Les départs nommés aussi : « Chez moi » enregistré depuis la sauvegarde
+  // ne doit pas disparaître parce qu'elle ne le connaissait pas.
+  const places = merge(current.places, data.places, (p) => p.id ?? `${p.name}|${p.lat}|${p.lon}`)
   history.sort((a, b) => String(b.ranAt || '').localeCompare(String(a.ranAt || '')))
 
-  save({ ...data, favorites: favorites.slice(0, 40), history: history.slice(0, 200), reports: reports.slice(0, 200) })
+  save({
+    ...data,
+    favorites: favorites.slice(0, 40),
+    history: history.slice(0, 200),
+    reports: reports.slice(0, 200),
+    places: places.slice(0, 8),
+  })
   return { favorites: favorites.length, history: history.length }
 }
 

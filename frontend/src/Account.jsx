@@ -14,7 +14,7 @@ import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 
-export default function Account({ params, geo, onClearData, onProfile }) {
+export default function Account({ params, geo, onClearData, onProfile, onRestored }) {
   const [confirm, setConfirm] = useState(false)
   const [contact, setContact] = useState(() => load().emergencyContact || '')
   // L'effacement vide aussi les cartes ; le compteur, lui, a lu le journal en
@@ -107,7 +107,7 @@ export default function Account({ params, geo, onClearData, onProfile }) {
       <KeptStreets key={`rues-${version}`} />
 
       <h3 className="section">Sauvegarde</h3>
-      <BackupRows />
+      <BackupRows onRestored={onRestored} />
 
       <h3 className="section">L'app</h3>
       <BuildStamp />
@@ -602,7 +602,7 @@ function LastSearch() {
  * réinstallation les emporte. Un fichier suffit à les retrouver — et il se
  * range où l'on veut, sans compte.
  */
-function BackupRows() {
+function BackupRows({ onRestored }) {
   const [message, setMessage] = useState(null)
 
   const backup = async () => {
@@ -615,7 +615,10 @@ function BackupRows() {
     if (!file) return
     try {
       const { favorites, history } = importAll(await file.text())
-      setMessage(`Restauré : ${favorites} parcours en favori, ${history} sorties. Rouvre l’app pour les voir.`)
+      // L'écran relit tout de suite ce qui vient d'être écrit : laissé à ses
+      // listes d'avant, il les aurait réécrites par-dessus à la première occasion.
+      onRestored?.()
+      setMessage(`Restauré : ${favorites} parcours en favori, ${history} sorties.`)
     } catch (error) {
       setMessage(error.message)
     }

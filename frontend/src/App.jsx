@@ -492,15 +492,6 @@ export default function App() {
     }
   }
 
-  /**
-   * Range une sortie dans l'historique.
-   *
-   * Les traces ne sont gardées que pour les sorties récentes : une trace pèse
-   * quelques dizaines de kilooctets, et le stockage du navigateur finirait par
-   * refuser d'écrire — en emportant un favori plutôt qu'une vieille trace.
-   */
-  const remember = (entry) => library.remember(entry)
-
   /** Rouvre un parcours gardé — un favori, ou celui d'une sortie à refaire. */
   function openRoute(r) {
     found.show(r)
@@ -1015,6 +1006,11 @@ export default function App() {
                 // Les rues et altitudes gardées pour calculer hors ligne aussi.
                 await clearEngineData()
                 library.clear()
+              }}
+              onRestored={() => {
+                library.reload()
+                const restored = load().params
+                if (restored) setParams({ ...DEFAULTS, ...restored })
               }}
             />
           ) : (

@@ -121,5 +121,20 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       setSaved([])
       setHistory([])
     },
+
+    /**
+     * Relit les trois listes sur le disque — après la restauration d'une
+     * sauvegarde, qui les y a écrites sans passer par ici.
+     *
+     * Sans cette relecture, l'écran gardait les listes d'avant, et la première
+     * écriture suivante — un favori, une sortie terminée — les réécrivait
+     * par-dessus celles qu'on venait de restaurer.
+     */
+    reload() {
+      const disk = load()
+      setSaved(disk.favorites || [])
+      setHistory(disk.history || [])
+      setPlaces(disk.places || [])
+    },
   }
 }

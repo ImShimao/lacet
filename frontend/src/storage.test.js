@@ -212,6 +212,14 @@ describe('la sauvegarde', () => {
     expect(load().history[0].ranAt).toBe('2026-09-20T10:00:00.000Z')
   })
 
+  it('garde les départs nommés enregistrés depuis la sauvegarde', () => {
+    save({ places: [{ id: 'p1', name: 'Le club', lat: 47.9, lon: 7.2 }] })
+    const copie = exportAll()
+    save({ places: [{ id: 'p2', name: 'Chez moi', lat: 47.91, lon: 7.21, street: 'Rue des Tonneliers' }] })
+    importAll(copie)
+    expect(load().places.map((p) => p.name).sort()).toEqual(['Chez moi', 'Le club'])
+  })
+
   it('refuse un fichier qui n’en est pas une', () => {
     expect(() => importAll('{"app":"autre"}')).toThrow(/sauvegarde Lacet/)
     expect(() => importAll('pas du json')).toThrow(/sauvegarde Lacet/)

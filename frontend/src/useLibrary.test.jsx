@@ -2,7 +2,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import useLibrary from './useLibrary'
-import { load } from './storage'
+import { exportAll, importAll, load, save } from './storage'
 
 /**
  * Les listes qu'on garde, et les plafonds qui les bornent.
@@ -106,5 +106,19 @@ describe('ce que l’app garde', () => {
     act(() => api.clear())
     expect(load().history).toHaveLength(0)
     expect(load().favorites).toHaveLength(0)
+  })
+
+  it('ne réécrit pas ses vieilles listes par-dessus une sauvegarde restaurée', () => {
+    // Une sauvegarde qui contient un favori, restaurée pendant que l'écran
+    // tient une liste vide : sans relecture, le favori suivant effaçait le
+    // restauré en réécrivant la liste d'avant.
+    save({ favorites: [parcours(1)], history: [], places: [] })
+    const copie = exportAll()
+    save({ favorites: [] })
+    monter()
+    importAll(copie)
+    act(() => api.reload())
+    act(() => api.toggleFavorite(parcours(2)))
+    expect(load().favorites.map((r) => r.id).sort()).toEqual(['r1', 'r2'])
   })
 })
