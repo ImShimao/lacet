@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeShape, planRemote } from './remote'
+import { decodeShape, planRemote, readTrip } from './remote'
 
 /**
  * Le filet de secours : une boucle calculée par un service public quand on n'a
@@ -113,7 +113,8 @@ describe('le secours', () => {
     const route = result.routes[0]
     expect(route.geometry.length).toBeGreaterThan(10)
     expect(route.distance_m).toBeGreaterThan(1000)
-    expect(route.instructions[0].text).toMatch(/Marchez/)
+    expect(route.instructions[0]).toMatchObject({ turn: 'start', dist_m: 0, road: 'Rue du Test' })
+    expect(route.instructions[0].text).toMatch(/^Départ — pars vers .+ sur Rue du Test\.$/)
 
     // **Aucune note inventée.** C'est la propriété qui compte le plus ici.
     expect(route.safety).toBeNull()
@@ -141,6 +142,70 @@ describe('le secours', () => {
     const service = fakeValhalla(5)
     await planRemote(demande(5, 6), { fetchImpl: service.fetchImpl })
     expect(service.calls.length).toBeLessThanOrEqual(8)
+  })
+
+  it('donne des consignes que le guidage sait suivre', () => {
+    // Trois tronçons : les deux points de passage du polygone sont, pour le
+    // calculateur, deux arrivées et deux départs. Le guidage comparait la
+    // distance courue à un `dist_m` absent — « dans NaN mètres » — et aurait
+    // annoncé l'arrivée à chaque point de passage.
+    const ligne = (x0, n) => Array.from({ length: n }, (_, k) => [3.87 + (x0 + k) * 0.0005, 43.61])
+    const points = ligne(0, 61)
+    const trip = {
+      legs: [
+        { shape: encode(points.slice(0, 21)), maneuvers: [
+          { type: 1, instruction: "Marchez vers l'est.", street_names: ['Rue du Test'], begin_shape_index: 0 },
+          { type: 10, instruction: 'Tournez à droite.', street_names: ['Rue Pasteur'], begin_shape_index: 8 },
+          { type: 4, instruction: 'Vous êtes arrivé à votre destination.', begin_shape_index: 20 },
+        ] },
+        { shape: encode(points.slice(20, 41)), maneuvers: [
+          { type: 1, instruction: 'Marchez vers le sud.', begin_shape_index: 0 },
+          { type: 8, instruction: 'Continuez.', begin_shape_index: 3 },
+          { type: 15, instruction: 'Tournez à gauche.', street_names: ['Rue Haute'], begin_shape_index: 6 },
+          { type: 5, instruction: 'Vous êtes arrivé à votre destination.', begin_shape_index: 20 },
+        ] },
+        { shape: encode(points.slice(40, 61)), maneuvers: [
+          { type: 2, instruction: 'Marchez vers le nord.', begin_shape_index: 0 },
+          { type: 4, instruction: 'Vous êtes arrivé à votre destination.', begin_shape_index: 20 },
+        ] },
+      ],
+    }
+    const { geometry, instructions } = readTrip(trip)
+    expect(geometry.length).toBe(61)
+    expect(instructions.map((s) => s.turn)).toEqual(['start', 'right', 'left', 'finish'])
+    expect(instructions.map((s) => s.text)).toEqual([
+      expect.stringMatching(/^Départ — pars vers l'est sur Rue du Test\.$/),
+      'Tourne à droite sur Rue Pasteur',
+      'Tourne à gauche sur Rue Haute',
+      'Tu es revenu au point de départ. Boucle terminée.',
+    ])
+    // Chaque consigne tombe là où le calculateur la place, en mètres depuis le départ.
+    const pas = 0.0005 * 111_320 * Math.cos((43.61 * Math.PI) / 180)
+    expect(instructions[1].dist_m).toBeCloseTo(8 * pas, -1)
+    expect(instructions[2].dist_m).toBeCloseTo(26 * pas, -1)
+    expect(instructions[3].dist_m).toBeCloseTo(60 * pas, -1)
+    for (const s of instructions) {
+      expect(Number.isFinite(s.lon) && Number.isFinite(s.lat)).toBe(true)
+    }
+  })
+
+  it('mesure le relief des boucles de secours', async () => {
+    // Les altitudes reviennent en `{values, threshold}` : lues comme une liste,
+    // elles ne donnaient jamais de dénivelé.
+    const trajets = fakeValhalla(5)
+    const fetchImpl = async (url, init = {}) => {
+      if (String(url).includes('altimetrie')) {
+        const { lon } = JSON.parse(init.body)
+        const n = lon.split('|').length
+        return { ok: true, status: 200, json: async () => ({ elevations: Array.from({ length: n }, (_, k) => 200 + (k % 20) * 3) }) }
+      }
+      return trajets.fetchImpl(url, init)
+    }
+    const result = await planRemote(demande(), { fetchImpl })
+    const route = result.routes[0]
+    expect(route.ascent_m).toBeGreaterThan(0)
+    expect(route.elevation_profile.length).toBeGreaterThan(5)
+    expect(route.elevation_profile.at(-1).dist_m).toBeLessThanOrEqual(route.distance_m)
   })
 
   it('rend null plutôt qu’un tracé faux quand le service ne répond pas', async () => {

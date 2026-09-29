@@ -22,7 +22,8 @@
 
 import { ascentDescent, fetchMany, smooth } from './environment'
 import { haversineM, resample } from './geo'
-import { pyRound } from './py'
+import { headings, turnOf, turnPhrase } from './navigation'
+import { pymod, pyRound } from './py'
 
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route'
 const AGENT = 'Lacet/1.0 (application de course à pied ; itinéraires de secours)'
@@ -114,25 +115,92 @@ async function ask(locations, sport, fetchImpl) {
   }
 }
 
-/** Le tracé complet d'un trajet, et ses consignes, mis à notre forme. */
-function readTrip(trip) {
+// Les manœuvres Valhalla (`type`) qui sont des virages, dans nos mots.
+const VALHALLA_TURNS = {
+  9: 'slight_right',
+  10: 'right',
+  11: 'sharp_right',
+  12: 'uturn',
+  13: 'uturn',
+  14: 'sharp_left',
+  15: 'left',
+  16: 'slight_left',
+  18: 'slight_right',
+  19: 'slight_left',
+  20: 'right',
+  21: 'left',
+  23: 'slight_right',
+  24: 'slight_left',
+}
+// Tout droit, la rue qui change de nom, une bretelle droite : rien à dire.
+const VALHALLA_QUIET = new Set([7, 8, 17, 22, 25])
+const CARDINALS = ['le nord', 'le nord-est', "l'est", 'le sud-est', 'le sud', 'le sud-ouest', "l'ouest", 'le nord-ouest']
+
+const instruction = (distM, turn, road, text, [lon, lat]) => ({
+  dist_m: distM, turn, angle: 0, road, text, lon, lat, caution: false,
+})
+
+/**
+ * Le tracé complet d'un trajet, et ses consignes, mis à notre forme.
+ *
+ * **Les consignes du calculateur ne se lisent pas telles quelles.** Elles ne
+ * disent pas où elles tombent — le guidage, qui compare la distance courue à
+ * celle de chaque consigne, annonçait « dans NaN mètres » —, elles vouvoient,
+ * et chaque point de passage demandé pour dessiner la boucle y est une
+ * arrivée : « Vous êtes arrivé à destination », trois fois par sortie. On
+ * garde donc ce qu'elles savent — où tourner, et de quel côté — et on le dit
+ * comme le reste de l'app : départ, virages, arrivée.
+ */
+export function readTrip(trip) {
   const geometry = []
-  const instructions = []
-  let along = 0
-  for (const leg of trip.legs) {
+  const marks = []
+  trip.legs.forEach((leg, l) => {
     const points = decodeShape(leg.shape)
     // Le dernier point d'un tronçon est le premier du suivant.
+    const offset = geometry.length ? geometry.length - 1 : 0
     for (const point of geometry.length ? points.slice(1) : points) geometry.push(point)
-    for (const step of leg.maneuvers ?? []) {
-      instructions.push({
-        along_m: pyRound(along + step.begin_shape_index * 0, 1),
-        text: step.instruction,
-        // Le calculateur ne dit pas le nom de la rue séparément : la consigne
-        // le contient déjà.
-        street: (step.street_names ?? [])[0] ?? null,
-      })
+    const maneuvers = leg.maneuvers ?? []
+    maneuvers.forEach((m, k) => {
+      // Le départ et l'arrivée d'un tronçon intermédiaire ne sont que des
+      // points de passage : on n'y part ni n'y arrive.
+      const opens = k === 0
+      const closes = k === maneuvers.length - 1 && k > 0
+      if ((opens && l > 0) || (closes && l < trip.legs.length - 1)) return
+      marks.push({ m, index: offset + (m.begin_shape_index ?? 0), start: opens && l === 0, finish: closes && l === trip.legs.length - 1 })
+    })
+  })
+  if (geometry.length < 2) return { geometry, instructions: [] }
+
+  const cumulative = [0]
+  for (let i = 1; i < geometry.length; i += 1) cumulative.push(cumulative[i - 1] + haversineM(geometry[i - 1], geometry[i]))
+  const total = cumulative[cumulative.length - 1]
+  const last = geometry.length - 1
+
+  const instructions = []
+  for (const { m, index, start, finish } of marks) {
+    const i = Math.max(0, Math.min(last, index))
+    const road = m.street_names?.[0] ?? null
+    if (start) {
+      const [heading] = headings(geometry)
+      const words = CARDINALS[Math.trunc(pymod(heading + 22.5, 360) / 45)]
+      instructions.push(instruction(0, 'start', road, `Départ — pars vers ${words}${road ? ` sur ${road}` : ''}.`, geometry[0]))
+      continue
     }
-    along += (leg.summary?.length ?? 0) * 1000
+    if (finish) {
+      instructions.push(instruction(pyRound(total, 1), 'finish', null, 'Tu es revenu au point de départ. Boucle terminée.', geometry[0]))
+      continue
+    }
+    if (VALHALLA_QUIET.has(m.type) || i === 0 || i === last) continue
+    let turn = VALHALLA_TURNS[m.type]
+    if (!turn) {
+      // Une manœuvre qu'on ne sait pas nommer — un rond-point, un type
+      // inconnu : l'angle du tracé à cet endroit dit de quel côté tourner.
+      const [, arrival] = headings(geometry.slice(Math.max(0, i - 8), i + 1))
+      const [departure] = headings(geometry.slice(i, i + 9))
+      turn = turnOf(pymod(departure - arrival + 180, 360) - 180).turn
+    }
+    if (turn === 'straight') continue
+    instructions.push(instruction(pyRound(cumulative[i], 1), turn, road, turnPhrase(turn, road), geometry[i]))
   }
   return { geometry, instructions }
 }
@@ -285,14 +353,19 @@ async function addElevation(routes, fetchImpl) {
   try {
     const sampled = routes.map((route) => resample(route.geometry, ELEVATION_STEP_M).map(([, c]) => c))
     const fetched = await fetchMany(sampled, { fetchImpl })
-    fetched.forEach((elevations, i) => {
-      if (!elevations?.length) return
-      const lissees = smooth(elevations)
-      const [ascent, descent] = ascentDescent(lissees)
+    // Chaque tracé revient avec ses altitudes **et le seuil de sa source**
+    // (`{values, threshold}`), comme pour les boucles calculées ici. Lu comme
+    // une simple liste, il ne donnait jamais rien : les boucles de secours
+    // restaient sans dénivelé.
+    fetched.forEach((relief, i) => {
+      if (!relief?.values?.length) return
+      const lissees = smooth(relief.values)
+      const [ascent, descent] = ascentDescent(lissees, relief.threshold)
       routes[i].ascent_m = pyRound(ascent, 1)
       routes[i].descent_m = pyRound(descent, 1)
       routes[i].elevation_profile = lissees.map((ele, k) => ({
-        dist_m: pyRound(k * ELEVATION_STEP_M, 1),
+        // Le dernier point est la fin du tracé, pas un pas de plus.
+        dist_m: pyRound(Math.min(k * ELEVATION_STEP_M, routes[i].distance_m), 1),
         ele_m: pyRound(ele, 1),
         surface: 'unknown',
       }))
