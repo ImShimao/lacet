@@ -55,6 +55,20 @@ const REROUTE_RETRY_MS = 30_000
 // long pour dépasser l'imprécision du GPS, sinon la carte tourne sur du bruit.
 const MOVE_FOR_HEADING_M = 8
 
+// Un saut de plus de cent mètres entre deux relevés est un artefact du GPS, pas
+// un déplacement — **sauf si le temps écoulé l'explique**. Au sortir d'un
+// tunnel, d'un passage sous voie, d'une minute sans signal dans une rue
+// étroite, le relevé suivant tombe deux ou trois cents mètres plus loin : ces
+// mètres-là ont été courus, et les jeter faussait toute la distance. La vitesse
+// retenue est celle qu'on ne dépasse pas — un sprint à pied, une descente à
+// vélo : au-delà, c'est bien un artefact.
+const JUMP_M = 100
+const TOP_SPEED_MS = { run: 7, bike: 22 }
+
+// Les bornes annoncées : chaque kilomètre à pied ; à vélo, où il en passe un
+// toutes les deux minutes, tous les cinq.
+const SPLIT_EVERY_KM = { run: 1, bike: 5 }
+
 const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
 
 /**
@@ -105,6 +119,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const lastOnAlong = useRef(0)
 
   const last = useRef(null)
+  // L'heure du relevé `last` : c'est elle qui dit si un saut est plausible.
+  const lastAt = useRef(null)
   const here = useRef(null)
   const startedAt = useRef(Date.now())
   // La distance est tenue dans une référence en plus de l'état : `setState`
@@ -286,11 +302,12 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           return
         }
 
+        const at = position.timestamp ?? Date.now()
         if (last.current) {
           const step = haversine(last.current, point)
-          // Un saut de plus de 100 m entre deux relevés est un artefact GPS,
-          // pas un déplacement : le compter fausserait toute la distance.
-          if (step < 100) {
+          // Voir `JUMP_M` : un saut n'est compté que si le temps l'explique.
+          const seconds = lastAt.current ? Math.max(0, (at - lastAt.current) / 1000) : 0
+          if (step < Math.max(JUMP_M, seconds * (TOP_SPEED_MS[sport] ?? TOP_SPEED_MS.run))) {
             covered.current += step
             setState((s) => ({ ...s, distance: covered.current, points: s.points + 1 }))
             announceSplit(covered.current)
@@ -300,6 +317,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           while (trail.current.length && now - trail.current[0].t > 20_000) trail.current.shift()
         }
         last.current = point
+        lastAt.current = at
         trace.current.push(point, position.coords.altitude ?? null)
         if (route) {
           followRoute(point)
@@ -486,7 +504,16 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     return bearing(from, point)
   }
 
-  /** Chaque kilomètre franchi, dit à voix haute — sans couper une consigne. */
+  /**
+   * Chaque kilomètre franchi, relevé pour le bilan et dit à voix haute — sans
+   * couper une consigne.
+   *
+   * La voix dit d'abord le temps **de ce kilomètre-là** : c'est ce qu'on veut
+   * savoir en courant — suis-je en train de ralentir ? L'allure moyenne depuis
+   * le départ, seule annoncée jusqu'ici, bouge à peine passé le cinquième
+   * kilomètre et ne répond pas à la question. À vélo, un kilomètre passe toutes
+   * les deux minutes : la voix ne parle que tous les cinq, et en kilomètres-heure.
+   */
   function announceSplit(travelled) {
     const done = Math.floor(travelled / 1000)
     if (done <= lastSplit.current) return
@@ -498,12 +525,25 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // serait pire que d'annoncer les deux kilomètres au même rythme.
     const gap = done - lastSplit.current
     const each = Math.round((elapsed - splitAt.current) / gap)
+    const previous = lastSplit.current
     for (let n = lastSplit.current + 1; n <= done; n += 1) splits.current.push({ km: n, seconds: each })
     splitAt.current = elapsed
     lastSplit.current = done
-    const perKm = elapsed / (travelled / 1000)
+
+    const every = SPLIT_EVERY_KM[sport] ?? 1
+    if (Math.floor(done / every) <= Math.floor(previous / every)) return
+    const said = `${done} kilomètre${done > 1 ? 's' : ''}.`
+    if (sport === 'bike') {
+      const kmh = travelled / 1000 / (elapsed / 3600)
+      voice.speak(`${said} Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
+      return
+    }
+    const average = `allure moyenne ${spoken(elapsed / (travelled / 1000))}`
+    // Deux bornes franchies d'un coup n'ont pas de temps propre à dire.
     voice.speak(
-      `${done} kilomètre${done > 1 ? 's' : ''}. Allure ${spoken(perKm)} au kilomètre.`,
+      gap === 1 && each > 0
+        ? `${said} Ce kilomètre en ${spoken(each)}, ${average}.`
+        : `${said} ${capitalize(average)}.`,
       { priority: false },
     )
   }
@@ -1135,5 +1175,15 @@ function spoken(secondsPerKm) {
   const total = Math.round(secondsPerKm)
   const m = Math.floor(total / 60)
   const s = total % 60
-  return s ? `${m} minutes ${s}` : `${m} minutes`
+  if (!m) return `${s} secondes`
+  const minutes = m > 1 ? `${m} minutes` : '1 minute'
+  return s ? `${minutes} ${s}` : minutes
 }
+
+/** « 24,5 kilomètres-heure ». */
+function spokenSpeed(kmh) {
+  if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'
+  return `${String(Math.round(kmh * 10) / 10).replace('.', ',')} kilomètres-heure`
+}
+
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1)

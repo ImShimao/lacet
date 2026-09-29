@@ -270,3 +270,70 @@ describe('la sortie guidée', () => {
     expect(gardes[0].lon).toBeCloseTo(geometry[2][0], 5)
   })
 })
+
+describe('la distance et les kilomètres', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    fixes = null
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  const [lon, lat] = [7.2, 47.9]
+  const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
+  const est = (m) => [lon + m / kx, lat]
+  let now = null
+  beforeEach(() => {
+    now = vi.spyOn(Date, 'now')
+  })
+  afterEach(() => {
+    now.mockRestore()
+  })
+
+  /** Une course libre qu'on termine en pause, pour lire le bilan. */
+  async function courir(relevés) {
+    const onStop = vi.fn()
+    now.mockReturnValue(relevés[0][1])
+    render(<LiveRun route={null} request={null} sport="run" stage={null} onPosition={() => {}} onStop={onStop} />)
+    for (const [m, t] of relevés) {
+      // Le chrono suit l'horloge du téléphone : on la fait avancer avec les relevés.
+      now.mockReturnValue(t)
+      await act(async () => {
+        fixes({ coords: { longitude: est(m)[0], latitude: lat, accuracy: 5, altitude: null, speed: 3 }, timestamp: t })
+        await Promise.resolve()
+      })
+    }
+    await act(async () => {
+      screen.getByLabelText('Mettre en pause').click()
+    })
+    await act(async () => {
+      screen.getByText('Terminer').click()
+    })
+    return onStop.mock.calls[0][0]
+  }
+
+  it('compte les mètres courus sous un tunnel, pas un saut du GPS', async () => {
+    const t0 = 1_700_000_000_000
+    // Trois cents mètres sans signal, en une minute et demie : c'est courable.
+    const tunnel = await courir([[0, t0], [10, t0 + 3000], [310, t0 + 93_000], [320, t0 + 96_000]])
+    expect(tunnel.distance).toBeGreaterThan(310)
+    // Le même saut en une seconde, c'est le GPS qui s'égare.
+    cleanup()
+    const saut = await courir([[0, t0], [10, t0 + 3000], [310, t0 + 4000], [320, t0 + 7000]])
+    expect(saut.distance).toBeLessThan(30)
+  })
+
+  it('dit le temps du kilomètre qui vient de passer', async () => {
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const t0 = 1_700_000_000_000
+    // Quatre mètres par seconde : 250 secondes au kilomètre.
+    const relevés = []
+    for (let m = 0; m <= 1040; m += 20) relevés.push([m, t0 + m * 250])
+    await courir(relevés)
+    const dit = voice.speak.mock.calls.map(([d]) => d)
+    // La borne tombe au relevé qui la franchit, un pas de vingt mètres plus loin.
+    expect(dit).toEqual([expect.stringMatching(/^1 kilomètre\. Ce kilomètre en 4 minutes 1\d, allure moyenne 4 minutes 1\d\.$/)])
+  })
+})
