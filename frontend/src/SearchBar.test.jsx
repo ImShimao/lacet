@@ -105,4 +105,22 @@ describe('la recherche d’un départ', () => {
     // Rien n'est reparti sur le réseau : c'est tout l'intérêt de cette liste.
     expect(cherche).not.toHaveBeenCalled()
   })
+
+  it('garde la rue d’une adresse, jusque dans les départs récents', async () => {
+    // C'est sur la rue de l'adresse que la boucle partira, même si une autre
+    // voie passe plus près des murs.
+    const adresse = lieu('12 Rue des Tonneliers', { kind: 'Adresse', street: 'Rue des Tonneliers' })
+    cherche.mockResolvedValue([adresse])
+    const onPick = vi.fn()
+    render(<SearchBar onPick={onPick} />)
+
+    taper('12 rue des tonneliers')
+    fireEvent.click(await screen.findByRole('option', { name: /Tonneliers/ }))
+    expect(onPick).toHaveBeenLastCalledWith({ lat: 47.9, lon: 7.2, label: '12 Rue des Tonneliers', street: 'Rue des Tonneliers' })
+
+    fireEvent.click(screen.getByRole('combobox'))
+    await waitFor(() => expect(screen.getByText('Départs récents')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('option', { name: /Tonneliers/ }))
+    expect(onPick).toHaveBeenLastCalledWith({ lat: 47.9, lon: 7.2, label: '12 Rue des Tonneliers', street: 'Rue des Tonneliers' })
+  })
 })

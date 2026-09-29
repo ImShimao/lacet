@@ -90,6 +90,8 @@ describe('les résultats de Photon', () => {
     }))
     expect(place.short).toBe('12 Rue de la République')
     expect(place.label).toBe('68500 Guebwiller')
+    // La rue voyage avec le lieu : c'est sur elle que la boucle partira.
+    expect(place.street).toBe('Rue de la République')
   })
 
   it('dit le genre du lieu en mots de tous les jours', () => {

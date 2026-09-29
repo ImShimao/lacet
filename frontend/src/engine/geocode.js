@@ -481,6 +481,7 @@ export function fromMapbox(feature) {
     kind: MAPBOX_KINDS[p.poi_category?.[0]] ?? (p.feature_type === 'address' ? 'Adresse' : place ? 'Ville' : null),
     lat,
     lon,
+    street: p.context?.street?.name || null,
     group: `${fold(short)}|${place ? 'lieu' : 'poi'}`,
   }
 }
@@ -529,6 +530,7 @@ async function nominatim(text, { limit, near, signal, fetchImpl = fetch, timeout
       kind: null,
       lat: Number(item.lat),
       lon: Number(item.lon),
+      street: item.address?.road || item.address?.pedestrian || null,
     }))
   return rankPlaces(places, near)
 }
@@ -573,6 +575,9 @@ export function fromPhoton(feature) {
     kind: kindOf(p),
     lat,
     lon,
+    // La rue de l'adresse : c'est sur elle que la boucle part, même quand une
+    // autre voie passe plus près des murs (voir `engine/door.js`).
+    street: p.street || null,
     // Le genre, en deux familles seulement — une ville ou le reste. Plus fin,
     // le même lieu vu par deux sources ne se reconnaîtrait pas : « salle de
     // sport » d'un côté, « bâtiment » de l'autre.

@@ -241,7 +241,7 @@ export default function App() {
     // le Valais sous une carte intitulée « Boucle sud-ouest · avenue des
     // Gobelins ». Dix mètres de tolérance pour le doigt qui replace le repère
     // sans vraiment le déplacer.
-    const previous = startRef.current
+    const previous = startRef.current && askedOf(startRef.current)
     if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
       found.forget()
     }
@@ -270,7 +270,7 @@ export default function App() {
       // le seul repère dont on dispose. Paris ne reste que pour une première
       // ouverture, quand il n'y a encore rien à se rappeler.
       const dernier = recentPlaces()[0]
-      if (dernier) applyStart({ lat: dernier.lat, lon: dernier.lon }, dernier.label, true)
+      if (dernier) applyStart(placeOf(dernier), dernier.label, true)
       else applyStart(PARIS, 'Paris', true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,7 +307,10 @@ export default function App() {
 
   const keepPlace = (name) => {
     if (!start) return
-    library.keepPlace({ id: `p${Date.now()}`, name, lat: start.lat, lon: start.lon })
+    // Le point choisi, et non le seuil de la rue où le repère s'est posé : c'est
+    // de lui que se déduit, à chaque recherche, le côté par où sortir.
+    const { lat, lon, street } = askedOf(start)
+    library.keepPlace({ id: `p${Date.now()}`, name, lat, lon, ...(street ? { street } : {}) })
     setNaming(false)
   }
 
@@ -372,6 +375,11 @@ export default function App() {
       // Les signalements sont lus au moment du départ de la recherche, pas
       // gardés en mémoire : celui qu'on vient de faire en courant doit compter
       // dès la boucle suivante.
+      //
+      // Le repère se pose ensuite sur la rue, là où la boucle commence ; la
+      // demande, elle, repart toujours du point choisi — la maison, pas le
+      // trottoir —, pour que chaque recherche sorte du même côté.
+      const asked = askedOf(start)
       await found.run(
         {
           ...toRequest(active, start),
@@ -380,10 +388,11 @@ export default function App() {
           blocked: blockedPoints(),
         },
         {
-          from: start,
+          from: asked,
           onStart: (point) => {
-            startRef.current = point
-            setStart(point)
+            const next = { ...point, asked }
+            startRef.current = next
+            setStart(next)
           },
         },
       )
@@ -689,7 +698,7 @@ export default function App() {
                     ? start
                     : null
               }
-              onPick={(p) => applyStart({ lat: p.lat, lon: p.lon }, p.label, true)}
+              onPick={(p) => applyStart(placeOf(p), p.label, true)}
             />
           </div>
         )}
@@ -774,7 +783,7 @@ export default function App() {
                         role="menuitem"
                         onClick={() => {
                           setStartMenu(false)
-                          applyStart({ lat: place.lat, lon: place.lon }, place.name, true)
+                          applyStart(placeOf(place), place.name, true)
                         }}
                       >
                         <Icon name="heart" size={17} />
@@ -1094,10 +1103,21 @@ export default function App() {
 
 // --- traduction des réglages vers l'API ---------------------------------------
 
+/**
+ * Le point demandé. Après une recherche, le repère rejoint la rue, là où la
+ * boucle commence (voir `engine/door.js`) ; `asked` garde le point choisi —
+ * la maison, et la rue de son adresse — d'où les recherches suivantes partent.
+ */
+const askedOf = (start) => start.asked ?? start
+
+/** Un lieu choisi (recherche, départ enregistré) comme départ : sa position, et sa rue. */
+const placeOf = (place) => ({ lat: place.lat, lon: place.lon, ...(place.street ? { street: place.street } : {}) })
+
 function toRequest(p, start) {
+  const point = askedOf(start)
   const body = {
-    lat: start.lat,
-    lon: start.lon,
+    lat: point.lat,
+    lon: point.lon,
     sport: p.sport,
     surface: p.surface,
     elevation: p.elevation,
@@ -1108,6 +1128,7 @@ function toRequest(p, start) {
   // Vide le plus souvent : n'envoyer la clé que lorsqu'elle sert garde la
   // demande identique à celle du moteur Python tant qu'on ne coche rien.
   if (p.avoid?.length) body.avoid = p.avoid
+  if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
   // Viser un semi à ±10 %, c'est viser à deux kilomètres près.

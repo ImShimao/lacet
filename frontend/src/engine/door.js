@@ -1,4 +1,4 @@
-// Partir de chez soi — pas du carrefour d'à côté.
+// Partir de devant chez soi — pas du carrefour d'à côté, ni de son salon.
 //
 // Le graphe ne connaît que des carrefours : une rue n'y est qu'un trait entre
 // deux intersections. Le départ se posait donc sur le **carrefour** le plus
@@ -6,19 +6,30 @@
 // quatre-vingts mètres plus loin — jamais devant la porte. Signalé d'une
 // capture d'écran : « le point de départ n'est même pas devant chez moi ».
 //
-// On fait maintenant ce que ferait quelqu'un qui sort de chez lui :
+// Une première réponse faisait partir la boucle du point choisi lui-même, par
+// une allée tracée en ligne droite jusqu'à la rue. Mais le point d'une adresse
+// est posé sur le toit : la boucle sortait du salon et traversait le jardin.
+// Ce qu'on veut, c'est le trottoir devant la maison — « à partir de la rue
+// même, genre devant chez moi ».
 //
-// 1. **Il rejoint la rue.** On cherche le point de voie le plus proche du
-//    départ — sur n'importe quelle rue, pas seulement à ses extrémités — et
-//    l'on coupe la rue en deux à cet endroit. C'est le seuil.
-// 2. **Il y va à pied.** Du départ au seuil, un raccord en ligne droite :
-//    l'allée, le trottoir, les quelques mètres qu'aucune carte ne trace. La
-//    boucle part **exactement** du point choisi, et y revient.
+// On fait donc ce que ferait quelqu'un qui sort de chez lui :
+//
+// 1. **Il sort sur sa rue.** Celle de son adresse quand on la connaît — une
+//    maison d'angle, ou dont le jardin donne sur un chemin, a une autre voie
+//    plus près de ses murs que celle où donne sa porte. Sinon, la voie la plus
+//    proche, sur toute sa longueur et pas seulement à ses extrémités.
+// 2. **La boucle part de là.** On coupe la rue en deux au droit du point
+//    choisi : c'est le seuil, et c'est de lui que la boucle part et à lui
+//    qu'elle revient. Le repère s'y pose sur la carte.
+//
+// Le recalcul en course (`reroute.js`) emploie le même découpage depuis la
+// position, avec en plus un raccord en ligne droite jusqu'à la rue : on y est
+// vraiment, sur ce bout de trottoir que la carte ne trace pas.
 //
 // Le graphe partagé n'est pas touché : il sert à d'autres recherches, et le
 // seuil ne vaut que pour celle-ci. On en dérive un autre, qui partage les
-// géométries et ne recopie que les colonnes des arêtes — deux nœuds et deux
-// arêtes de plus.
+// géométries et ne recopie que les colonnes des arêtes — un nœud et une arête
+// de plus, au plus deux avec le raccord.
 //
 // Propre au moteur de l'app : le moteur Python part du carrefour. Voir la
 // liste des divergences dans `service.js`.
@@ -29,10 +40,8 @@ import { evaluateEdge } from './safety'
 import { BLOCKED_FACTOR } from './weights'
 
 // Au-delà, le point posé n'est plus une porte : c'est un champ, un toit, le
-// milieu d'un étang. Une ligne droite jusqu'à la rue traverserait n'importe
-// quoi ; le départ se pose alors sur la rue la plus proche, et l'écran le dit
-// (voir `useSearch.js`). Deux cents mètres couvrent les plus longues allées de
-// campagne.
+// milieu d'un étang. Le raccord en ligne droite du recalcul en course
+// traverserait n'importe quoi ; on n'en trace pas.
 export const MAX_REACH_M = 200
 
 // En deçà, le point est déjà sur la rue : un raccord de cette longueur ne
@@ -48,6 +57,11 @@ const AT_NODE_M = 3
 // rue où donne la porte ; partir par l'escalier du talus n'a pas de sens.
 const TRAIL_HANDICAP_M = 8
 const TRAIL_LIKE = new Set(['path', 'track', 'bridleway', 'steps'])
+
+// La rue de l'adresse n'est retenue qu'à cette distance au plus. Plus loin,
+// c'est que le nom ne désigne pas la voie qu'on croit — une homonyme à l'autre
+// bout de la commune —, ou que le point n'est pas celui de l'adresse.
+export const STREET_REACH_M = 150
 
 /**
  * Un graphe dérivé : celui de la zone, plus le seuil et le raccord.
@@ -69,6 +83,44 @@ class DoorGraph extends Graph {
 }
 
 /**
+ * Un nom de rue tel qu'on le compare : sans accents, sans casse, sans les
+ * variations d'apostrophe et de trait d'union qui séparent souvent le nom de
+ * l'adresse de celui de la voie (« Jean-Jaurès », « Jean Jaurès »).
+ */
+export const streetKey = (name) =>
+  String(name ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[’'`´-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/** Les arêtes qui portent ce nom de rue, en masque — ou `null` s'il n'y en a aucune. */
+function namedEdges(graph, street) {
+  const wanted = streetKey(street)
+  if (!wanted) return null
+  const mask = new Uint8Array(graph.edgeCount)
+  // Les noms se répètent d'une arête à l'autre : on ne replie chacun qu'une fois.
+  const seen = new Map()
+  let any = false
+  for (let e = 0; e < graph.edgeCount; e += 1) {
+    const name = graph.edgeName[e]
+    if (!name) continue
+    let same = seen.get(name)
+    if (same === undefined) {
+      same = streetKey(name) === wanted
+      seen.set(name, same)
+    }
+    if (same) {
+      mask[e] = 1
+      any = true
+    }
+  }
+  return any ? mask : null
+}
+
+/**
  * Le point de voie le plus proche de `[lon, lat]`, arête par arête.
  *
  * Toutes les arêtes sont balayées : une rue longue peut passer devant la porte
@@ -76,7 +128,7 @@ class DoorGraph extends Graph {
  * qu'on veut trouver. En mètres locaux, sans racine carrée inutile — quelques
  * millisecondes pour une ville entière.
  *
- * `accept` restreint les arêtes candidates (masque de composante).
+ * `accept` restreint les arêtes candidates (masque de composante, nom de rue).
  */
 export function nearestSpot(graph, lon, lat, accept = null) {
   const kx = Math.cos((lat * Math.PI) / 180) * 111_320
@@ -130,26 +182,49 @@ export function nearestSpot(graph, lon, lat, accept = null) {
 }
 
 /**
- * Le départ, devant la porte.
- *
- * @param graph  le graphe de la zone — jamais modifié
- * @param lon, lat  le point choisi
- * @param options.inMain  (nœud) → vrai s'il est relié au gros du réseau
- * @param options.mainMask  () → masque de la plus grande composante
- * @param options.sport  pour qualifier le raccord comme le reste du réseau
- * @returns `{ graph, start, reachM }` — le graphe à employer, le nœud d'où
- *   part la boucle, la longueur du raccord (0 sans raccord) — ou `null` si le
- *   réseau est vide.
+ * La voie où l'on sort : celle de l'adresse si elle est à portée, sinon la
+ * plus proche — et, dans les deux cas, une voie reliée au reste du réseau.
  */
-export function openDoor(graph, lon, lat, { inMain = () => true, mainMask = null, sport = 'run' } = {}) {
-  let spot = nearestSpot(graph, lon, lat)
-  // La rue la plus proche est un îlot — une cour, un parking fermé que les
-  // données ne relient à rien : on prend la plus proche de celles qui mènent
-  // quelque part.
+function chooseSpot(graph, lon, lat, { street, inMain, mainMask }) {
+  let spot = null
+  const named = street ? namedEdges(graph, street) : null
+  if (named) {
+    const onStreet = nearestSpot(graph, lon, lat, (e) => named[e] === 1)
+    if (onStreet && haversineM([lon, lat], onStreet.point) <= STREET_REACH_M) spot = onStreet
+  }
+  spot ??= nearestSpot(graph, lon, lat)
+  // La rue retenue est un îlot — une cour, un parking fermé que les données ne
+  // relient à rien : on prend la plus proche de celles qui mènent quelque part.
   if (spot && !inMain(graph.edgeA[spot.edge]) && mainMask) {
     const mask = mainMask()
     spot = nearestSpot(graph, lon, lat, (e) => mask[graph.edgeA[e]] === 1)
   }
+  return spot
+}
+
+/**
+ * Le départ, devant la porte.
+ *
+ * @param graph  le graphe de la zone — jamais modifié
+ * @param lon, lat  le point choisi
+ * @param options.street  la rue de l'adresse, quand on la connaît
+ * @param options.connect  tracer un raccord en ligne droite du point choisi
+ *   jusqu'à la rue — pour le recalcul en course, où l'on est vraiment à ce
+ *   point-là. Sans lui, c'est du seuil que l'on part.
+ * @param options.inMain  (nœud) → vrai s'il est relié au gros du réseau
+ * @param options.mainMask  () → masque de la plus grande composante
+ * @param options.sport  pour qualifier le raccord comme le reste du réseau
+ * @returns `{ graph, start, reachM }` — le graphe à employer, le nœud d'où
+ *   part le chemin, la longueur du raccord (0 sans raccord) — ou `null` si le
+ *   réseau est vide.
+ */
+export function openDoor(
+  graph,
+  lon,
+  lat,
+  { inMain = () => true, mainMask = null, sport = 'run', street = null, connect = true } = {},
+) {
+  const spot = chooseSpot(graph, lon, lat, { street, inMain, mainMask })
   if (!spot) return null
 
   const here = [lon, lat]
@@ -162,9 +237,10 @@ export function openDoor(graph, lon, lat, { inMain = () => true, mainMask = null
   else if (graph.edgeLen[e] - along <= AT_NODE_M) doorNode = graph.edgeB[e]
   const doorPoint = doorNode !== null ? graph.node(doorNode) : spot.point
   const reach = haversineM(here, doorPoint)
-  const connect = reach > ON_STREET_M && reach <= MAX_REACH_M
+  const link = connect && reach > ON_STREET_M && reach <= MAX_REACH_M
 
-  if (doorNode !== null && !connect) return { graph, start: doorNode, reachM: 0 }
+  // Rien à ajouter, et rien à retenir : le carrefour du réseau fait l'affaire.
+  if (doorNode !== null && connect && !link) return { graph, start: doorNode, reachM: 0 }
 
   const n0 = graph.nodeCount
   const m0 = graph.edgeCount
@@ -204,7 +280,7 @@ export function openDoor(graph, lon, lat, { inMain = () => true, mainMask = null
 
   let start = doorNode
   let connector = null
-  if (connect) {
+  if (link) {
     start = n0 + nodes.length
     nodes.push(here)
     connector = m0 + edges.length
@@ -214,9 +290,9 @@ export function openDoor(graph, lon, lat, { inMain = () => true, mainMask = null
       b: doorNode,
       length: reach,
       like: e,
-      // L'allée, le bout de trottoir : ni trafic ni nom. Une voie piétonne en
-      // ville, pour la note comme pour les poids — et, de toute façon, le seul
-      // chemin possible pour sortir.
+      // Le bout de trottoir : ni trafic ni nom. Une voie piétonne en ville,
+      // pour la note comme pour les poids — et, de toute façon, le seul chemin
+      // possible pour rejoindre la rue.
       safety: evaluateEdge({ highway: 'footway' }, { inBuiltup: true, sport }),
       name: null,
       tunnel: 0,
@@ -263,12 +339,16 @@ export function openDoor(graph, lon, lat, { inMain = () => true, mainMask = null
     node: doorNode,
     start,
     connector,
-    reachM: connect ? reach : 0,
+    reachM: link ? reach : 0,
     split: shapes.has(e) ? [e, m0] : null,
     splitGated,
+    // Le point choisi, et sa distance au seuil : de quoi dire, au départ, de
+    // quel côté partir en sortant de chez soi (voir `navigation.js`).
+    from: here,
+    away: reach,
   }
   g.link()
-  return { graph: g, start, reachM: connect ? reach : 0 }
+  return { graph: g, start, reachM: link ? reach : 0 }
 }
 
 /**
@@ -286,12 +366,12 @@ export function carryBlocked(graph, blocked) {
  * Les poids d'un profil, reportés sur le graphe dérivé.
  *
  * Un poids est une longueur multipliée par des facteurs propres à la voie : la
- * rue coupée en deux se partage le sien au prorata, et l'allée — seul chemin
- * pour sortir — pèse sa longueur.
+ * rue coupée en deux se partage le sien au prorata, et le raccord — seul
+ * chemin pour rejoindre la rue — pèse sa longueur.
  */
 export function carryWeights(graph, weights) {
   const door = graph.door
-  if (!door) return weights
+  if (!door || (!door.split && door.connector == null)) return weights
   const out = new Float64Array(graph.edgeCount)
   out.set(weights)
   if (door.split) {
@@ -309,11 +389,4 @@ export function carryWeights(graph, weights) {
   }
   if (door.connector != null) out[door.connector] = graph.edgeLen[door.connector]
   return out
-}
-
-/** La longueur du raccord emprunté par ce tracé, ou 0. */
-export function reachOf(graph, edges) {
-  const connector = graph.door?.connector
-  if (connector == null || edges[0] !== connector) return 0
-  return graph.edgeLen[connector]
 }

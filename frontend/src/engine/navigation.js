@@ -1,6 +1,5 @@
 // Consignes de navigation — portage fidèle de `backend/app/navigation.py`.
 
-import { reachOf } from './door'
 import { bearingDeg, haversineM } from './geo'
 import { pyfloordiv, pymod, pyRound, sortByKey } from './py'
 
@@ -58,16 +57,16 @@ const instruction = (distM, turn, angle, road, text, lon, lat, caution) => ({
 export function buildInstructions(graph, start, cand) {
   if (!cand.edges.length) return []
 
-  const door = doorway(graph, start, cand)
-  let steps = mergeAll(rawSteps(graph, start, cand, door?.folded ? door.node : null))
+  let steps = mergeAll(rawSteps(graph, start, cand))
 
   const total = cand.stats ? cand.stats.distanceM : 0
   const [lon, lat] = graph.node(start)
-  const firstRoad = door ? door.road : graph.edgeName[cand.edges[0]]
-  const heading = door ? door.onward : bearingFromStart(graph.coordsFrom(cand.edges[0], start))
+  const firstRoad = graph.edgeName[cand.edges[0]]
+  const heading = bearingFromStart(graph.coordsFrom(cand.edges[0], start))
+  const door = doorway(graph, start, heading, firstRoad)
 
-  const out = [instruction(0, 'start', 0, firstRoad, door ? door.text : startText(heading, firstRoad), lon, lat, false)]
-  const markers = lapMarkers(cand, total, door ?? { lon, lat, reach: 0 }, heading)
+  const out = [instruction(0, 'start', 0, firstRoad, door ?? startText(heading, firstRoad), lon, lat, false)]
+  const markers = lapMarkers(cand, total, { lon, lat }, heading)
   if (markers.length) {
     const bounds = markers.map((m) => m.dist_m)
     steps = steps.filter((step) => bounds.every((b) => Math.abs(step.dist_m - b) > LAP_ABSORB_M))
@@ -78,14 +77,10 @@ export function buildInstructions(graph, start, cand) {
   return sortByKey(out, (step) => step.dist_m)
 }
 
-/**
- * Les fins de tour. `at` dit où elles tombent : au départ, ou — quand on part
- * de chez soi — au seuil de la rue, que les tours contournent sans repasser
- * par l'allée (voir `repeatLoop`).
- */
+/** Les fins de tour, au départ : c'est là que chaque tour se referme. */
 function lapMarkers(cand, total, at, heading) {
   if (cand.laps < 2) return []
-  const lap = (total - 2 * at.reach) / cand.laps
+  const lap = total / cand.laps
   const out = []
   for (let k = 1; k < cand.laps; k += 1) {
     const restants = cand.laps - k
@@ -93,7 +88,7 @@ function lapMarkers(cand, total, at, heading) {
     const reste = restants === 1 ? 'Dernier tour.' : `Encore ${restants} tours.`
     out.push(
       instruction(
-        pyRound(at.reach + lap * k, 1), 'lap', 0, null,
+        pyRound(lap * k, 1), 'lap', 0, null,
         `Fin du ${fait} tour. ${reste} Repars vers ${headingWords(heading)}.`,
         at.lon, at.lat, false,
       ),
@@ -105,37 +100,27 @@ function lapMarkers(cand, total, at, heading) {
 // === le seuil de la porte =======================================================
 //
 // Hors du portage Python : le départ devant la porte n'existe que dans l'app
-// (voir `door.js`). La boucle commence alors par quelques mètres d'allée
-// jusqu'à la rue — et « pars vers le nord », qui décrivait l'allée, ne disait
-// plus rien d'utile. Ce qu'on veut savoir sur le pas de sa porte, c'est de
-// quel côté partir une fois sur le trottoir.
+// (voir `door.js`). La boucle part de la rue, au droit du point choisi — et
+// « pars vers le nord », sur le pas de sa porte, ne dit pas grand-chose. Ce
+// qu'on veut savoir en sortant de chez soi, c'est de quel côté partir.
 
-// Jusqu'à cette longueur, rejoindre la rue et y tourner ne font qu'une
-// consigne : deux phrases pour douze mètres, la seconde tomberait avant la fin
-// de la première. Au-delà — une longue allée, un parc —, le virage sur la rue
-// garde sa propre annonce.
-const FOLD_M = 30
+// Au-delà, le point choisi n'est plus une porte donnant sur la rue — le milieu
+// d'un parc, une ferme au bout d'un chemin : « en sortant » ne voudrait rien
+// dire, et le cap reprend sa place.
+const FACING_M = 60
+// En deçà, le point est posé sur la rue même : il n'y a pas de « sortie ».
+const ON_STREET_M = 1.5
 
-const PATH_LIKE = new Set(['footway', 'path', 'track', 'cycleway', 'bridleway', 'steps'])
-
-function doorway(graph, start, cand) {
-  const reach = reachOf(graph, cand.edges)
-  if (!reach || cand.edges.length < 3) return null
-  const node = graph.door.node
-  const street = cand.edges[1]
-  const road = graph.edgeName[street]
-  const onward = bearingFromStart(graph.coordsFrom(street, node))
-  const toStreet = bearingDeg(graph.node(start), graph.node(node))
+/** « Départ — en sortant, pars à droite sur rue des Tonneliers. », ou `null`. */
+function doorway(graph, start, onward, road) {
+  const door = graph.door
+  if (!door?.from || door.node !== start || door.connector != null) return null
+  if (!(door.away > ON_STREET_M && door.away <= FACING_M)) return null
   // Face à la rue, en sortant : de quel côté l'on part.
+  const toStreet = bearingDeg(door.from, graph.node(start))
   const angle = pymod(onward - toStreet + 180, 360) - 180
   const side = angle <= -SLIGHT_DEG ? 'à gauche' : angle >= SLIGHT_DEG ? 'à droite' : 'tout droit'
-  const way = road ?? (PATH_LIKE.has(graph.edgeSafety[street].highway) ? 'le chemin' : 'la rue')
-  const folded = reach <= FOLD_M
-  const text = folded
-    ? `Départ — rejoins ${way} et pars ${side}.`
-    : `Départ — rejoins ${way}, ${Math.round(reach / 10) * 10} mètres vers ${headingWords(toStreet)}.`
-  const [lon, lat] = graph.node(node)
-  return { node, reach, road, onward, folded, text, lon, lat }
+  return `Départ — en sortant, pars ${side}${on(road)}.`
 }
 
 const headingWords = (heading) => CARDINALS[Math.trunc(pyfloordiv(pymod(heading + 22.5, 360), 45))]
@@ -355,6 +340,9 @@ export function turnOf(angle, road = null) {
   const turn = classify(angle)
   return { turn, text: phrase(turn, road) }
 }
+
+/** La phrase d'un virage déjà nommé : « Tourne à droite sur rue Pasteur ». */
+export const turnPhrase = (turn, road = null) => phrase(turn, road)
 
 /** Cap de départ et cap d'arrivée d'une géométrie, lissés sur vingt mètres. */
 export const headings = (coords) => [bearingFromStart(coords), bearingToEnd(coords)]

@@ -92,8 +92,10 @@ export default function SearchBar({ onPick, near = null }) {
   }
 
   const choose = (place) => {
-    onPick({ lat: place.lat, lon: place.lon, label: place.short })
-    rememberPlace({ label: place.short, sub: place.kind || place.label || '', lat: place.lat, lon: place.lon })
+    // La rue de l'adresse suit le lieu : c'est sur elle que la boucle partira.
+    const street = place.street ? { street: place.street } : {}
+    onPick({ lat: place.lat, lon: place.lon, label: place.short, ...street })
+    rememberPlace({ label: place.short, sub: place.kind || place.label || '', lat: place.lat, lon: place.lon, ...street })
     setRecents(recentPlaces())
     setQuery('')
     setResults([])

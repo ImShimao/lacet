@@ -12,7 +12,7 @@
 import { resample, haversineM } from './geo'
 import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
 import { blockedEdges } from './blocked'
-import { carryBlocked, openDoor, reachOf } from './door'
+import { carryBlocked, openDoor } from './door'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
@@ -114,10 +114,15 @@ export function normalizeRequest(input) {
     //   blocked                    Les signalements faits en courant. Ils ne
     //                              quittent jamais l'appareil, et un serveur
     //                              n'aurait rien à en faire.
-    //   doorstep                   Partir du point choisi lui-même, et non du
-    //                              carrefour le plus proche : la rue est coupée
-    //                              devant la porte, et une allée y mène — voir
-    //                              `door.js`. Python part du carrefour.
+    //   doorstep                   Partir de la rue devant le point choisi, et
+    //                              non du carrefour le plus proche : la rue est
+    //                              coupée au droit de la porte, et la boucle
+    //                              part de là — voir `door.js`. Python part du
+    //                              carrefour.
+    //   street                     La rue de l'adresse choisie, quand la
+    //                              recherche de lieux la donne : c'est elle
+    //                              qu'on rejoint en sortant, même si une autre
+    //                              voie passe plus près des murs.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -126,6 +131,7 @@ export function normalizeRequest(input) {
     avoid: input.avoid ?? [],
     blocked: input.blocked ?? [],
     doorstep: input.doorstep ?? true,
+    street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -285,13 +291,16 @@ export async function planLoops(input, deps) {
   // dérivé ci-dessous partage ses géométries, pas ses tranches de coordonnées.
   let blocked = blockedEdges(graph, req.blocked)
 
-  // Le départ devant la porte — voir `door.js`. Le graphe de la zone reste en
-  // cache tel quel ; la recherche travaille sur un dérivé qui connaît le seuil.
+  // Le départ devant la porte, sur la rue — voir `door.js`. Le graphe de la
+  // zone reste en cache tel quel ; la recherche travaille sur un dérivé qui
+  // connaît le seuil.
   if (req.doorstep) {
     const door = openDoor(area, req.lon, req.lat, {
       inMain: (node) => area.localComponentSize(node, probe) >= probe || mainMask()[node] === 1,
       mainMask,
       sport: req.sport,
+      street: req.street,
+      connect: false,
     })
     if (door) {
       graph = door.graph
@@ -392,7 +401,7 @@ export async function planLoops(input, deps) {
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
-    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank], reachOf(graph, cand.edges)),
+    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank]),
   )
   // De quoi retourner une boucle sans tout recalculer : le graphe, le nœud de
   // départ, et ce qui a servi à décrire chaque proposition. Passé par un rappel
@@ -671,8 +680,7 @@ function profilePoints(cand, elevations, step) {
 
 const round6 = ([lon, lat]) => [pyRound(lon, 6), pyRound(lat, 6)]
 
-/** `reach` : l'allée du départ (voir `door.js`), courue une fois à l'aller et une au retour, hors des tours. */
-function toModel(cand, score, req, elev, rank, steps, name, reach = 0) {
+function toModel(cand, score, req, elev, rank, steps, name) {
   const s = cand.stats
   const [grade, notes] = gradeRoute(s)
   let ascent = null
@@ -733,7 +741,7 @@ function toModel(cand, score, req, elev, rank, steps, name, reach = 0) {
     direction: directionOf(cand.bearing),
     shape: cand.shape,
     laps: cand.laps,
-    lap_distance_m: pyRound(cand.laps > 1 ? (s.distanceM - 2 * reach) / cand.laps : s.distanceM, 1),
+    lap_distance_m: pyRound(s.distanceM / cand.laps, 1),
     score: pyRound(score, 4),
   }
 }
@@ -774,7 +782,7 @@ export function reverseRoute(graph, start, cand, { req, elev, score, rank, night
     ? [[...elev[0]].reverse(), profilePoints(flipped, [...elev[0]].reverse(), elev[3]), elev[2], elev[3]]
     : null
   const [name] = nameRoutes([flipped])
-  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name, reachOf(graph, flipped.edges))
+  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name)
   // Le nom ne dit pas le sens — le cap moyen d'une boucle est le même dans les
   // deux — et la carte le montre par ses chevrons. L'écran, lui, a besoin de le
   // savoir : c'est ce drapeau qui fait du bouton une bascule.

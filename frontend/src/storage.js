@@ -32,6 +32,8 @@ export function rememberPlace(place) {
     lon: place.lon,
     at: Date.now(),
   }
+  // La rue de l'adresse, quand on l'a : c'est sur elle qu'on sortira.
+  if (place.street) kept.street = place.street
   if (!kept.label) return
   const others = (load().recentPlaces || []).filter(
     (other) => haversineM([other.lon, other.lat], [kept.lon, kept.lat]) > SAME_START_M,

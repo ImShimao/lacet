@@ -958,6 +958,15 @@ avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent
 recherche d'adresse, ou directement sur la carte — le repère se fait glisser, et
 le mode placement permet de le poser d'un clic.
 
+**La boucle part de la rue, devant ce point** — pas du carrefour d'à côté, ni de
+la maison elle-même. Le point d'une adresse est posé sur le toit : on coupe la
+rue au droit de la porte, et c'est de là que la boucle part et là qu'elle
+revient ; le repère s'y pose après la recherche. Quand la recherche d'adresse
+donne le nom de la rue, c'est elle qu'on rejoint, même si une autre voie passe
+plus près des murs — une maison d'angle, un jardin qui donne sur un chemin. La
+première consigne dit de quel côté partir : « Départ — en sortant, pars à
+droite sur rue des Tonneliers. » (`engine/door.js`)
+
 **Le sens de parcours** est marqué par des chevrons le long du tracé. Ce n'est
 pas décoratif : les consignes de navigation, le profil altimétrique et
 l'orientation par rapport au vent décrivent tous la boucle **dans un sens

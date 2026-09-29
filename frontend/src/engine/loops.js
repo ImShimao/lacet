@@ -6,7 +6,6 @@
 // expliqué dans le module Python, qui fait foi.
 
 import { astar, dijkstra, INF, nodeSequence, reconstruct } from './dijkstra'
-import { reachOf } from './door'
 import { bearingDeg, haversineM, roundness } from './geo'
 import { degrees, pyfloordiv, pymod, pyMax, pyMin, pyRoundInt, pySum, radians } from './py'
 import { EXPOSED_RISK, RouteStats, unlitLength } from './safety'
@@ -567,13 +566,8 @@ export function detectCrossings(graph, cand) {
 
 /** Une boucle parcourue plusieurs fois — voir `repeat_loop`. */
 export function repeatLoop(graph, start, cand, laps) {
-  // Partie de chez soi, la boucle commence et finit par l'allée : les tours se
-  // font sur la rue, et l'on ne repasse par sa porte qu'à la fin.
-  const door = reachOf(graph, cand.edges) > 0 && cand.edges.at(-1) === cand.edges[0]
-  const lap = door ? cand.edges.slice(1, -1) : cand.edges
-  const edges = door ? [cand.edges[0]] : []
-  for (let i = 0; i < laps; i += 1) edges.push(...lap)
-  if (door) edges.push(cand.edges[0])
+  const edges = []
+  for (let i = 0; i < laps; i += 1) edges.push(...cand.edges)
   const repeated = new Candidate(edges, [])
   repeated.nodes = nodeSequence(graph, start, edges)
   measure(graph, start, repeated, { night: cand.stats.unlitM !== null })
