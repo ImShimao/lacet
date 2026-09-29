@@ -137,6 +137,119 @@ describe('la sortie guidée', () => {
     expect(onStop).not.toHaveBeenCalled()
   })
 
+  it('dit chaque virage une fois, en entier, sans que le suivant le coupe', async () => {
+    // Trois virages à cent mètres d'intervalle : l'annonce de chacun tombait
+    // juste après le « maintenant » du précédent, et le coupait.
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const coin = (k) => ({ lon: geometry[5 * k][0], lat: geometry[5 * k][1] })
+    const guidee = {
+      ...boucle,
+      instructions: [
+        { dist_m: 0, turn: 'start', text: 'Départ — rejoins Rue du Moulin et pars à droite.', road: 'Rue du Moulin', caution: false, ...coin(0) },
+        { dist_m: 100, turn: 'left', text: 'Tourne à gauche sur Rue Haute', road: 'Rue Haute', caution: false, ...coin(1) },
+        { dist_m: 200, turn: 'left', text: 'Tourne à gauche sur Rue Basse', road: 'Rue Basse', caution: false, ...coin(2) },
+        { dist_m: 300, turn: 'left', text: 'Tourne à gauche', road: null, caution: false, ...coin(3) },
+        { dist_m: 400, turn: 'finish', text: 'Tu es revenu au point de départ. Boucle terminée.', road: null, caution: false, ...coin(0) },
+      ],
+    }
+    render(<LiveRun route={guidee} request={null} sport="run" stage={null} onPosition={() => {}} onStop={vi.fn()} />)
+
+    // À pied : vingt mètres toutes les six secondes.
+    let t = Date.now()
+    for (const point of geometry) {
+      t += 6000
+      await relever(point, t)
+    }
+    t += 6000
+    await relever(geometry[1], t)
+
+    const dit = voice.speak.mock.calls.map(([texte]) => texte)
+    expect(dit.filter((d) => d.startsWith('Départ'))).toEqual([
+      'Départ — rejoins Rue du Moulin et pars à droite, puis dans 100 mètres, à gauche sur Rue Haute.',
+    ])
+    expect(dit.filter((d) => d.startsWith('Maintenant'))).toEqual([
+      'Maintenant, tourne à gauche sur Rue Haute, puis dans 100 mètres, à gauche sur Rue Basse.',
+      'Maintenant, tourne à gauche sur Rue Basse, puis dans 100 mètres, à gauche.',
+      'Maintenant, tourne à gauche, puis arrivée dans 100 mètres.',
+    ])
+    // Aucune annonce isolée : chacune a été dite avec le virage d'avant.
+    expect(dit.filter((d) => d.startsWith('Dans'))).toEqual([])
+    // Et l'arrivée n'est dite qu'une fois, en y arrivant.
+    expect(dit.filter((d) => /arrivée|revenu/i.test(d) && !d.startsWith('Maintenant'))).toEqual(['Arrivée. Sortie terminée.'])
+  })
+
+  it('continue de guider pendant une pause automatique', async () => {
+    // Arrêté à un feu vingt mètres avant le virage, puis reparti en marchant :
+    // la pause tient encore — moins de quinze mètres, au pas —, et c'est là
+    // qu'arrive le carrefour. Le guidage restait figé jusqu'à la reprise.
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const [lon, lat] = geometry[0]
+    const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
+    const est = (m) => [lon + m / kx, lat]
+    const guidee = {
+      ...boucle,
+      instructions: [
+        { dist_m: 0, turn: 'start', text: 'Départ.', road: null, caution: false, lon, lat },
+        { dist_m: 100, turn: 'left', text: 'Tourne à gauche sur Rue Haute', road: 'Rue Haute', caution: false, lon: est(100)[0], lat },
+      ],
+    }
+    render(<LiveRun route={guidee} request={null} sport="run" stage={null} onPosition={() => {}} onStop={vi.fn()} />)
+
+    let t = Date.now()
+    const fix = async (m, speed) => {
+      t += 1000
+      await act(async () => {
+        fixes({ coords: { longitude: est(m)[0], latitude: lat, accuracy: 5, altitude: null, speed }, timestamp: t })
+        await Promise.resolve()
+      })
+    }
+    for (let m = 0; m <= 80; m += 4) await fix(m, 4)
+    for (let s = 0; s < 10; s += 1) await fix(80, 0)
+    expect(voice.speak.mock.calls.map(([d]) => d)).toContain('Pause automatique.')
+    voice.speak.mockClear()
+    // Au pas, sous le seuil de reprise : toujours en pause.
+    for (const m of [82, 84, 86, 88, 90]) await fix(m, 0.8)
+    const dit = voice.speak.mock.calls.map(([d]) => d)
+    expect(dit).not.toContain('Reprise.')
+    expect(dit.some((d) => d.startsWith('Maintenant, tourne à gauche sur Rue Haute'))).toBe(true)
+  })
+
+  it('propose de signaler un passage fermé quand on rebrousse chemin', async () => {
+    // Le portail fermé au bout de soixante mètres : on fait demi-tour sur le
+    // tracé lui-même. Ce n'était pas « hors parcours », et l'app ne disait rien.
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const stage = document.createElement('div')
+    document.body.appendChild(stage)
+    render(<LiveRun route={boucle} request={null} sport="run" stage={stage} onPosition={() => {}} onStop={vi.fn()} />)
+
+    let t = Date.now()
+    const aller = geometry.slice(0, 4) // jusqu'à soixante mètres
+    for (const point of aller) {
+      t += 6000
+      await relever(point, t)
+    }
+    for (const point of [...aller].reverse()) {
+      t += 6000
+      await relever(point, t)
+    }
+    expect(voice.speak.mock.calls.some(([d]) => d.startsWith('Tu reviens sur tes pas'))).toBe(true)
+
+    await act(async () => {
+      screen.getByText('Passage fermé').click()
+    })
+    // Le portail est signalé là où l'on a fait demi-tour, pas là où l'on est
+    // soixante mètres plus loin.
+    const [signale] = activeReports()
+    expect(signale.kind).toBe('closed')
+    expect(signale.lon).toBeCloseTo(aller.at(-1)[0], 5)
+    expect(signale.lat).toBeCloseTo(aller.at(-1)[1], 5)
+    expect(screen.getByText('Passage fermé signalé : il sera évité.')).toBeTruthy()
+    stage.remove()
+  })
+
   it('garde le signalement fait en courant', async () => {
     render(
       <LiveRun route={boucle} request={null} sport="run" stage={null} onPosition={() => {}} onStop={vi.fn()} />,

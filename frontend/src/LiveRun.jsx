@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import ElevationSheet from './ElevationSheet.jsx'
 import { haversine, km, pace } from './format'
-import { bearing, buildTrack, headingAt, locate, nextInstruction } from './routeTracker'
+import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt } from './routeTracker'
 import { lockScreenState, shouldRefresh } from './lockScreen'
+import { actAt, announcement, chains, followingStep, previewAt, speedOr, thenLabel } from './guidance'
 import { motionTracker } from './autoPause'
 import { arrivalWatcher } from './arrival'
 import { REPORT_KINDS, addReport, blockedPoints } from './reports'
@@ -24,11 +25,20 @@ const CROSSING_ALERT_M = 120
 // En dessous de cette précision GPS, le point est trop douteux pour compter.
 const ACCURACY_LIMIT_M = 35
 
-// Les deux temps du guidage : l'annonce, puis le rappel au moment d'agir.
-// Un seul message ne suffit pas — trop tôt on l'a oublié, trop tard on a déjà
-// dépassé la rue.
-const PREVIEW_M = 110
-const ACT_M = 25
+// Les deux temps du guidage — l'annonce, puis « maintenant » — se règlent sur
+// la vitesse du moment : voir `guidance.js`.
+
+// La vitesse se lit sur les dernières secondes de course : assez pour lisser le
+// tremblement du GPS, assez peu pour suivre une accélération en descente.
+const SPEED_WINDOW_MS = 15_000
+const SPEED_MIN_MS = 4_000
+// En pause, l'allure d'une marche.
+const WALKING_SPEED = 1.3
+
+// Le recul sur le tracé à partir duquel on parle de demi-tour : bien au-delà
+// du tremblement d'un GPS à l'arrêt, bien en deçà de ce qu'on remonte avant de
+// chercher un autre chemin.
+const TURN_BACK_M = 50
 
 // Nombre de relevés consécutifs hors du tracé avant d'alerter. Un seul point
 // aberrant est banal en ville, entre deux immeubles ; trois de suite, non.
@@ -86,6 +96,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const [rerouting, setRerouting] = useState(false)
   const [rerouteDue, setRerouteDue] = useState(null)
   const detouring = useRef(false)
+  // Le plus loin atteint sur le tracé, et le demi-tour quand on revient sur ses
+  // pas : voir `watchTurnBack`.
+  const farthest = useRef(0)
+  const turnedBack = useRef(null)
+  const [turnBack, setTurnBack] = useState(null)
   const dueAt = useRef(null)
   const lastOnAlong = useRef(0)
 
@@ -252,8 +267,21 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           }
         }
 
-        // En pause, le repère suit, mais rien ne compte.
+        // En pause, rien ne compte — ni la distance ni le chrono. Mais le
+        // guidage continue : on repart souvent en marchant, sous le seuil de la
+        // pause automatique, et c'est là qu'arrive le carrefour. Figé, le
+        // bandeau restait sur « 40 m » et la voix se taisait jusqu'à ce qu'on
+        // se remette à courir.
         if (pausedKind.current) {
+          setState((s) => (s.points ? s : { ...s, points: 1 }))
+          if (route) {
+            // Arrêté à la main, on a le droit d'aller remplir sa gourde en face :
+            // l'écran suit, mais rien ne se dit ni ne se recalcule.
+            const quiet = pausedKind.current === 'manual'
+            followRoute(point, { quiet })
+            if (!quiet) warnCrossing(point)
+          }
+          heading.current = runHeading(point) ?? heading.current
           onPosition(point, heading.current)
           return
         }
@@ -426,7 +454,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       share: outingShare(along),
     })
     const now = Date.now()
-    if (!shouldRefresh(shown.current, next, now - shownAt.current)) return
+    // Près d'un virage, la distance affichée doit suivre le pas : cinq secondes
+    // de retard, c'est quinze mètres à pied, et le virage déjà passé à vélo.
+    const minMs = upcoming && upcoming.remaining < 250 ? 1000 : 5000
+    if (!shouldRefresh(shown.current, next, now - shownAt.current, minMs)) return
     shown.current = next
     shownAt.current = now
     import('./native').then((n) => n.updateLiveActivity(next))
@@ -477,16 +508,25 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     )
   }
 
-  /** Position sur le tracé, consigne à venir, et détection du hors-parcours. */
-  function followRoute(point) {
+  /**
+   * Position sur le tracé, consigne à venir, et détection du hors-parcours.
+   *
+   * `quiet` : en pause mise à la main. Le bandeau et l'écran de verrouillage
+   * suivent, mais rien ne se dit et rien ne se recalcule.
+   */
+  function followRoute(point, { quiet = false } = {}) {
     const { track, route: guided } = guideRef.current
     const instructions = guided?.instructions || []
     const found = locate(track, point, fix.current)
     if (!found) return
+    // À la fontaine d'en face, pendant une pause : rien à guider.
+    if (quiet && found.offRoute) return
     fix.current = found
     setProgress(found)
 
-    if (found.offRoute) {
+    if (quiet) {
+      // Rien : ni alerte de sortie du tracé, ni arrivée, ni demi-tour.
+    } else if (found.offRoute) {
       strayCount.current += 1
       if (strayCount.current === OFF_ROUTE_FIXES) {
         setOffRoute(true)
@@ -510,23 +550,93 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       setRerouteDue(null)
     }
 
-    watchArrival(point, found)
+    if (!quiet) {
+      watchArrival(point, found)
+      watchTurnBack(found)
+    }
 
-    const upcoming = nextInstruction(instructions, found.along, announced.current)
+    const speed = runSpeed()
+    const next = nextInstruction(instructions, found.along, announced.current)
+    const following = next ? followingStep(instructions, next.index) : null
+    // Ce que lisent le bandeau et l'écran de verrouillage : « Maintenant » au
+    // même moment que la voix, et la manœuvre d'après quand elle suit de près.
+    const upcoming = next
+      ? { ...next, imminent: next.remaining <= actAt(speed), then: thenLabel(following, speed) }
+      : null
     setCurrent(upcoming)
     upcomingStep.current = upcoming
     refreshLockScreen(upcoming, found.along)
-    if (!upcoming || found.offRoute) return
+    // Revenu sur ses pas, la prochaine consigne est derrière soi : la dire
+    // n'aurait aucun sens — voir `watchTurnBack`.
+    if (!upcoming || found.offRoute || quiet || turnedBack.current) return
 
     const { index, step, remaining } = upcoming
-    if (remaining <= ACT_M && !acted.current.has(index)) {
+    if (upcoming.imminent && !acted.current.has(index)) {
       acted.current.add(index)
       announced.current.add(index)
-      voice.speak(voice.phrase(step, remaining))
-    } else if (remaining <= PREVIEW_M && !previewed.current.has(index)) {
+      // La suivante est dite dans la même phrase : son annonce, un relevé plus
+      // tard, aurait coupé celle-ci au milieu.
+      if (chains(following, speed)) previewed.current.add(following.index)
+      say(announcement(step, remaining, { stage: 'act', following, speed }))
+    } else if (remaining <= previewAt(speed) && !previewed.current.has(index)) {
       previewed.current.add(index)
-      voice.speak(voice.phrase(step, remaining))
+      say(announcement(step, remaining, { stage: 'preview', following, speed }))
     }
+  }
+
+  const say = (text) => {
+    if (text) voice.speak(text)
+  }
+
+  /**
+   * Revenir sur ses pas le long du tracé.
+   *
+   * Ce n'est pas « hors parcours » — on est dessus —, et pourtant quelque chose
+   * bloque devant, le plus souvent : un portail fermé, une rue en travaux, dont
+   * on s'aperçoit sur place. L'app continuait d'annoncer le virage d'après,
+   * derrière soi, de plus en plus loin, et ne proposait rien : il fallait
+   * trouver un autre chemin tout seul.
+   *
+   * Passé cinquante mètres de recul — bien au-delà du tremblement du GPS à
+   * l'arrêt —, on le dit, on propose de signaler le passage fermé là où l'on a
+   * fait demi-tour, et tout nouveau chemin calculé l'évitera.
+   */
+  function watchTurnBack(found) {
+    if (found.offRoute) return
+    if (found.along > farthest.current) {
+      farthest.current = found.along
+      if (turnedBack.current) {
+        // Reparti dans le bon sens, au-delà du point de demi-tour.
+        turnedBack.current = null
+        setTurnBack(null)
+      }
+      return
+    }
+    if (turnedBack.current || farthest.current - found.along < TURN_BACK_M) return
+    turnedBack.current = { along: farthest.current, point: pointAt(guideRef.current.track, farthest.current) }
+    setTurnBack(turnedBack.current)
+    voice.speak(
+      canDetour
+        ? 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » : je t’en trouve un autre.'
+        : 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » pour qu’il soit évité la prochaine fois.',
+    )
+  }
+
+  /**
+   * La vitesse du moment, en m/s : la distance des quinze dernières secondes.
+   * Avant d'en avoir quatre, l'allure prévue — ou celle du sport.
+   */
+  function runSpeed() {
+    // En pause, on marche — ou l'on ne bouge pas : les distances d'annonce les
+    // plus courtes.
+    if (pausedKind.current) return WALKING_SPEED
+    const points = trail.current
+    const last = points[points.length - 1]
+    const first = last && points.find((p) => last.t - p.t <= SPEED_WINDOW_MS)
+    const measured =
+      first && last.t - first.t >= SPEED_MIN_MS ? (last.covered - first.covered) / ((last.t - first.t) / 1000) : null
+    const planned = plannedPerKm(request, sport === 'bike')
+    return speedOr(measured ?? (planned > 0 ? 1000 / planned : null), sport)
   }
 
   /**
@@ -558,19 +668,21 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   /**
    * Signaler ce que la carte ne dit pas : des travaux, un passage fermé.
    *
-   * Le point est celui où l'on est — voir `reports.js`. Sur un parcours, le
-   * recalcul part dans la foulée : au moment où l'on signale, on est devant
-   * l'obstacle, et continuer tout droit n'a plus de sens.
+   * Le point est celui où l'on est — voir `reports.js` —, ou, après un
+   * demi-tour, celui où l'on a rebroussé chemin : on a déjà remonté cinquante
+   * mètres, et c'est l'obstacle qu'on signale, pas l'endroit où l'on se trouve.
+   * Sur un parcours, le recalcul part dans la foulée, depuis là où l'on est.
    */
-  function report(kind) {
-    const point = here.current
+  function report(kind, at = null) {
+    const point = at ?? here.current
     setReporting(false)
     if (!point) return
     addReport({ lon: point[0], lat: point[1], kind })
+    if (at && turnedBack.current) setTurnBack({ ...turnedBack.current, reported: true })
     if (isNative()) import('./native').then((n) => n.pulseHaptic())
     const said = REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.'
     voice.speak(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
-    if (canDetour) detour(point, { forced: true })
+    if (canDetour) detour(here.current ?? point, { forced: true })
   }
 
   /**
@@ -589,7 +701,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // Les signalements sont relus ici, et non gardés avec la demande : le
         // plus utile des trois est celui qu'on vient de faire, il y a une
         // seconde, et c'est lui qui doit écarter la rue barrée.
-        request: { ...request, blocked: blockedPoints() },
+        // Et le point où l'on a fait demi-tour, le temps de cette sortie : ce
+        // qui nous a fait rebrousser chemin est encore là.
+        request: { ...request, blocked: [...blockedPoints(), ...(turnedBack.current ? [turnedBack.current.point] : [])] },
         position: point,
         heading: heading.current,
         geometry: guided.geometry,
@@ -638,6 +752,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // Le tracé a changé, et son arrivée avec : une approche en cours n'a plus
     // de sens.
     arrival.current = arrivalWatcher()
+    farthest.current = 0
+    turnedBack.current = null
+    setTurnBack(null)
     fix.current = null
     strayCount.current = 0
     lastOnAlong.current = 0
@@ -716,6 +833,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           <RunBanner
             step={current}
             offRoute={offRoute}
+            turnBack={turnBack}
+            onBlocked={turnBack ? () => report('closed', turnBack.point) : null}
             rerouting={rerouting}
             rerouteIn={canDetour ? rerouteIn : null}
             onReroute={canDetour ? () => detour() : null}
@@ -866,7 +985,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
  * courant. Le virage en pictogramme, sa distance en très grand, la rue en
  * toutes lettres.
  */
-function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidance, waiting }) {
+function RunBanner({ step, offRoute, turnBack, onBlocked, rerouting, rerouteIn, onReroute, hasGuidance, waiting }) {
   if (rerouting) {
     return (
       <div className="runbar runbar--stray" role="status">
@@ -902,6 +1021,28 @@ function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidanc
       </div>
     )
   }
+  if (turnBack) {
+    return (
+      <div className="runbar runbar--stray" role="status">
+        <span className="runbar__turn">
+          <Icon name="uturn" size={30} strokeWidth={2.2} />
+        </span>
+        <div className="runbar__text">
+          <b>Demi-tour</b>
+          <em>
+            {turnBack.reported
+              ? 'Passage fermé signalé : il sera évité.'
+              : 'Passage fermé devant ? Signale-le, et le parcours le contournera.'}
+          </em>
+        </div>
+        {onBlocked && !turnBack.reported && (
+          <button className="runbar__act" onClick={onBlocked}>
+            Passage fermé
+          </button>
+        )}
+      </div>
+    )
+  }
   if (!hasGuidance) {
     return (
       <div className="runbar runbar--idle" role="status">
@@ -920,7 +1061,7 @@ function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidanc
       </div>
     )
   }
-  const distance = step.remaining > 20 ? roundedDistance(step.remaining) : 'Maintenant'
+  const distance = step.imminent ? 'Maintenant' : roundedDistance(step.remaining)
   return (
     <div className="runbar" role="status">
       <span className="runbar__turn">
@@ -930,6 +1071,9 @@ function RunBanner({ step, offRoute, rerouting, rerouteIn, onReroute, hasGuidanc
         <b>{distance}</b>
         <em>{step.step.text}</em>
         {step.step.caution && <small>Traversée non protégée</small>}
+        {/* La manœuvre d'après, quand elle suit de si près qu'on ne la verrait
+            qu'une fois celle-ci passée — trop tard pour se placer. */}
+        {step.then && <span className="runbar__then">{step.then}</span>}
       </div>
     </div>
   )

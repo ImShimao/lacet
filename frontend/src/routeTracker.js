@@ -67,20 +67,30 @@ export function locate(track, position, previous) {
   let best = null
   for (let i = from; i < to; i += 1) {
     const hit = projectOnSegment(position, points[i], points[i + 1])
-    if (!best || hit.offset < best.offset) {
-      best = { ...hit, index: i }
+    const along = cumulative[i] + (cumulative[i + 1] - cumulative[i]) * hit.t
+    // **À écart égal, le passage le plus proche de l'avancée d'avant.** Une
+    // rue prise à l'aller et au retour — une impasse, l'allée du départ — est
+    // deux fois sous le GPS, exactement au même écart ; le premier trouvé
+    // l'emportait, c'est-à-dire l'aller, et l'avancée repartait en arrière
+    // pendant tout le retour. Dix mètres d'avancée ne pèsent qu'un mètre
+    // d'écart : rien qui retienne un vrai saut en avant.
+    const score = previous ? hit.offset + CONTINUITY * Math.abs(along - previous.along) : hit.offset
+    if (!best || score < best.score) {
+      best = { ...hit, index: i, along, score }
     }
   }
   if (!best) return previous || null
 
-  const segment = haversine(points[best.index], points[best.index + 1])
   return {
     index: best.index,
-    along: cumulative[best.index] + segment * best.t,
+    along: best.along,
     offset: best.offset,
     offRoute: best.offset > OFF_ROUTE_M,
   }
 }
+
+// Le poids de la continuité face à l'écart au tracé — voir `locate`.
+const CONTINUITY = 0.1
 
 /** Premier indice dont la distance cumulée atteint `distance`. */
 function indexAt(cumulative, distance) {

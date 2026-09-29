@@ -3366,6 +3366,21 @@ html[data-turn] .maplibregl-control-container {
   font-weight: 700;
   color: #ffe38a;
 }
+/* La manœuvre d'après, quand elle suit de près : une ligne, en retrait, sur
+   un filet — lisible d'un coup d'œil sans concurrencer la consigne. */
+.runbar__then {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .runbar--stray {
   background: linear-gradient(135deg, #ff7a52 0%, #e2452a 100%);
   box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.9);
@@ -3883,6 +3898,43 @@ html[data-turn] .maplibregl-control-container {
   }
   .shell[data-sheet='live'] .side__body {
     padding-top: 2px;
+  }
+
+  /* Le panneau de course, resserré : il prenait plus de la moitié de l'écran,
+     et la carte n'en gardait que le haut — le prochain virage tombait sous
+     lui. Rien n'en disparaît : des marges plus courtes, un chrono et des
+     boutons un cran plus petits, toujours lisibles à bout de bras. */
+  .live {
+    padding-top: 12px;
+    gap: 9px;
+  }
+  .live__clock {
+    font-size: 46px;
+  }
+  .stats--live > div {
+    padding-block: 7px;
+  }
+  .live__paused {
+    padding: 7px 12px;
+  }
+  .live__paused span {
+    font-size: 11.5px;
+  }
+  .signal {
+    padding: 7px;
+    margin-bottom: 2px;
+  }
+  .live__controls {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .runctl__main {
+    width: 68px;
+    height: 68px;
+  }
+  .runctl__side,
+  .runctl .runctl__sos {
+    height: 52px;
   }
 }
 

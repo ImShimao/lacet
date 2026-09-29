@@ -23,7 +23,42 @@ describe('les distances affichées', () => {
   it('arrondissent à ce qu’on lit en courant', () => {
     expect(shortDistance(124)).toBe('120 m')
     expect(shortDistance(1260)).toBe('1,3 km')
-    expect(shortDistance(12)).toBe('maintenant')
+    expect(shortDistance(4)).toBe('maintenant')
+  })
+
+  it('disent « maintenant » en même temps que la voix', () => {
+    // À vélo, la voix dit « maintenant » à trente-cinq mètres : l'écran ne doit
+    // pas afficher « 30 m » pendant ce temps.
+    const velo = lockScreenState({
+      route: ROUTE,
+      step: { step: { text: 'Tourne à gauche', turn: 'left' }, remaining: 32, imminent: true },
+      along: 1000,
+      travelled: 1000,
+      elapsedS: 300,
+      now: NOW,
+    })
+    expect(velo.distance).toBe('maintenant')
+    const loin = lockScreenState({
+      route: ROUTE,
+      step: { step: { text: 'Tourne à gauche', turn: 'left' }, remaining: 32, imminent: false },
+      along: 1000,
+      travelled: 1000,
+      elapsedS: 300,
+      now: NOW,
+    })
+    expect(loin.distance).toBe('30 m')
+  })
+
+  it('montrent le virage suivant quand il suit de près', () => {
+    const state = lockScreenState({
+      route: ROUTE,
+      step: { step: { text: 'Tourne à droite sur Rue de Lorraine', turn: 'right' }, remaining: 80, then: 'puis à gauche à 60 m · Rue Pasteur' },
+      along: 1000,
+      travelled: 1000,
+      elapsedS: 300,
+      now: NOW,
+    })
+    expect(state.instruction).toBe('Tourne à droite sur Rue de Lorraine — puis à gauche à 60 m · Rue Pasteur')
   })
 })
 
@@ -84,6 +119,17 @@ describe('la fréquence des mises à jour', () => {
   it('ne réveille pas l’écran à chaque mètre', () => {
     expect(shouldRefresh(base, { ...base, distance: '110 m' }, 1200)).toBe(false)
     expect(shouldRefresh(base, { ...base, distance: '110 m' }, 6000)).toBe(true)
+  })
+
+  it('suit le pas à l’approche d’un virage', () => {
+    // L'écran de course raccourcit le délai près d'un virage : cinq secondes de
+    // retard, c'est quinze mètres à pied.
+    expect(shouldRefresh(base, { ...base, distance: '110 m' }, 1200, 1000)).toBe(true)
+  })
+
+  it('dit tout de suite qu’il faut tourner', () => {
+    const pres = { ...base, distance: '20 m' }
+    expect(shouldRefresh(pres, { ...pres, distance: 'maintenant' }, 200)).toBe(true)
   })
 
   it('ne renvoie rien qui n’ait changé', () => {

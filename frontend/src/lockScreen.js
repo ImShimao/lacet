@@ -20,7 +20,7 @@ const DEFAULT_PACE = 0.39
 /** « 120 m », « 1,2 km » — arrondi à ce qu'on peut lire en courant. */
 export function shortDistance(meters) {
   const m = Math.max(0, meters)
-  if (m < 20) return 'maintenant'
+  if (m < 10) return 'maintenant'
   if (m < 1000) return `${Math.round(m / 10) * 10} m`
   return `${(m / 1000).toFixed(1).replace('.', ',')} km`
 }
@@ -49,18 +49,25 @@ export function paceEstimate({ route, travelled, elapsedS }) {
  * L'état complet à envoyer à l'écran de verrouillage.
  *
  * `step` est la consigne à venir telle que la rend `nextInstruction` —
- * `{ step, remaining }` — ou `null` quand il n'y en a plus.
+ * `{ step, remaining }` —, complétée par l'écran de course de `imminent` (le
+ * moment où la voix dit « maintenant ») et de `then` (la manœuvre d'après,
+ * quand elle suit de près) ; ou `null` quand il n'y a plus de consigne.
  */
 export function lockScreenState({ route, step, along, offRoute, paused = false, travelled, elapsedS, share = null, now = Date.now() }) {
   const total = route?.distance_m || 0
   const left = Math.max(0, total - (along ?? travelled))
   const pace = paceEstimate({ route, travelled, elapsedS })
-  const instruction = step?.step?.text || (left < 30 ? 'Arrivée' : 'Continue sur le parcours')
+  const text = step?.step?.text
+  // Deux virages rapprochés se lisent ensemble : le second serait sinon affiché
+  // une fois le premier pris, quand il n'est déjà plus temps de se placer.
+  const instruction = text ? (step.then ? `${text} — ${step.then}` : text) : left < 30 ? 'Arrivée' : 'Continue sur le parcours'
+  // « Maintenant » en même temps que la voix, quand l'écran de course le sait.
+  const imminent = step ? step.imminent ?? step.remaining < 20 : false
 
   return {
     name: route?.name || 'Sortie',
     instruction,
-    distance: step ? shortDistance(step.remaining) : shortDistance(left),
+    distance: imminent ? 'maintenant' : shortDistance(step ? step.remaining : left),
     turn: step?.step?.turn || (left < 30 ? 'finish' : 'straight'),
     remaining: remainingDistance(left),
     arrival: Math.round(now + left * pace * 1000),
@@ -77,18 +84,20 @@ export function lockScreenState({ route, step, along, offRoute, paused = false, 
 /**
  * Faut-il mettre l'écran à jour ?
  *
- * Tout de suite quand la consigne change ou qu'on sort du tracé — c'est ce
- * qu'on vient y lire. Sinon au plus toutes les `minMs` : la distance au virage
- * bouge à chaque relevé, et réveiller l'affichage à chaque seconde coûterait de
- * la batterie pour un chiffre que personne ne regarde. Le temps restant, lui,
- * défile tout seul à l'écran.
+ * Tout de suite quand la consigne change, quand il faut tourner maintenant ou
+ * qu'on sort du tracé — c'est ce qu'on vient y lire. Sinon au plus toutes les
+ * `minMs` : la distance au virage bouge à chaque relevé, et réveiller
+ * l'affichage à chaque seconde coûterait de la batterie pour un chiffre que
+ * personne ne regarde. L'écran de course raccourcit ce délai à l'approche d'un
+ * virage, là où le chiffre compte.
  */
 export function shouldRefresh(previous, next, elapsedMs, minMs = 5000) {
   if (!previous) return true
   if (
     previous.instruction !== next.instruction ||
     previous.offRoute !== next.offRoute ||
-    previous.paused !== next.paused
+    previous.paused !== next.paused ||
+    (next.distance === 'maintenant') !== (previous.distance === 'maintenant')
   ) {
     return true
   }

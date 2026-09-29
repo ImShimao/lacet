@@ -144,37 +144,5 @@ export function stop() {
   }
 }
 
-/**
- * Formule la consigne à dire à `remaining` mètres d'une manœuvre.
- *
- * On ne dit pas « dans 87 mètres » : personne n'estime 87 mètres en courant.
- * Les distances sont arrondies à des repères que l'oreille retient, et
- * disparaissent quand la manœuvre est imminente.
- */
-export function phrase(step, remaining) {
-  // Départ, fin de tour, arrivée : ce sont déjà des phrases complètes. Les
-  // préfixer d'une distance donnerait « dans 200 mètres, fin du premier tour »,
-  // qui annonce un événement au lieu de le constater.
-  if (step.turn === 'finish' || step.turn === 'start' || step.turn === 'lap') {
-    return step.text
-  }
-  const rounded =
-    remaining < 30
-      ? null
-      : remaining < 120
-        ? `dans ${Math.round(remaining / 10) * 10} mètres`
-        : `dans ${Math.round(remaining / 50) * 50} mètres`
-
-  const warning = step.caution ? ' Traversée sans passage protégé.' : ''
-  if (rounded) return `${rounded}, ${lower(step.text)}.${warning}`
-  // **« Maintenant. »** Sans ce mot, l'annonce de loin et celle du moment
-  // d'agir sont la même phrase, et l'on ne sait plus laquelle on vient
-  // d'entendre : « tourne à droite » à cent mètres, puis « tourne à droite »
-  // au carrefour. L'app dit deux fois la même chose et la seconde, la seule
-  // qui compte, ne se distingue pas de la première.
-  return `${step.text} maintenant.${warning}`
-}
-
-function lower(text) {
-  return text.charAt(0).toLowerCase() + text.slice(1)
-}
+// Ce qu'on dit, et à quel moment, est décidé dans `guidance.js` : ce module-ci
+// ne fait que parler.
