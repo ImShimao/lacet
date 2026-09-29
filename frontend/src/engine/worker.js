@@ -145,10 +145,20 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
 // l'écran, et une boucle d'hier n'a plus de graphe sous elle.
 let lastReversible = null
 
-const bbox = (trace) => ({
-  min: [Math.min(...trace.map((c) => c[0])), Math.min(...trace.map((c) => c[1]))],
-  max: [Math.max(...trace.map((c) => c[0])), Math.max(...trace.map((c) => c[1]))],
-})
+// Une boucle, pas `Math.min(...trace)` : une trace importée compte jusqu'à
+// soixante mille points, et WebKit refuse un appel à plus de 65 536 arguments —
+// bien avant, parfois, faute de pile dans un worker.
+function bbox(trace) {
+  const min = [Infinity, Infinity]
+  const max = [-Infinity, -Infinity]
+  for (const [lon, lat] of trace) {
+    if (lon < min[0]) min[0] = lon
+    if (lat < min[1]) min[1] = lat
+    if (lon > max[0]) max[0] = lon
+    if (lat > max[1]) max[1] = lat
+  }
+  return { min, max }
+}
 
 const traceLength = (trace) => {
   let total = 0

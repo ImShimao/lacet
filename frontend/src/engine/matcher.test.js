@@ -162,6 +162,46 @@ describe('l’accrochage d’une trace au réseau', () => {
     }
   })
 
+  // Deux rues droites de mille mètres, sans aucun point de forme entre leurs
+  // bouts — le cas ordinaire d'une rue droite dans OpenStreetMap —, que rien
+  // ne relie.
+  const LAT = 47.9
+  const DX = 1 / (111_320 * Math.cos((LAT * Math.PI) / 180))
+  const DY = 1 / 110_540
+  const at = (x, y) => [7.2 + x * DX, LAT + y * DY]
+  const rue = (id, nom, x0, x1) => ({
+    id,
+    tags: { highway: 'residential', name: nom },
+    nodes: [id * 10, id * 10 + 1],
+    flat: Float64Array.from([...at(x0, 0), ...at(x1, 0)]),
+  })
+  const isolées = buildGraph({
+    ways: [rue(1, 'Rue du Bac', 0, 1000), rue(2, 'Quai d’en face', 1100, 2100)],
+    landuse: [],
+    crossings: [],
+    barriers: [],
+  })
+
+  it('reconnaît une longue rue droite, même loin de ses deux bouts', () => {
+    // Les rues n'étaient rangées qu'à leurs points de forme : au milieu d'une
+    // rue droite, aucun point ne trouvait de candidat, et la trace entière
+    // était refusée.
+    const trace = []
+    for (let x = 0; x <= 1000; x += 10) trace.push(at(x, 3))
+    const trouve = matchTrace(isolées, trace)
+    expect(trouve).not.toBeNull()
+    expect(trouve.edges.map((e) => isolées.edgeName[e])).toEqual(['Rue du Bac'])
+  })
+
+  it('ne perd pas en silence ce qui précède un saut sans rue', () => {
+    // La trace passe de l'une à l'autre. Le treillis repartait de zéro après
+    // le saut, et le parcours reconnu ne gardait que la seconde rue — la
+    // première disparaissait sans un mot.
+    const trace = []
+    for (let x = 0; x <= 2100; x += 10) if (x < 1000 || x > 1100) trace.push(at(x, 3))
+    expect(matchTrace(isolées, trace)).toBeNull()
+  })
+
   it('ne dit rien d’une trace trop courte ou vide', () => {
     expect(matchTrace(graph, [])).toBeNull()
     expect(matchTrace(graph, [[4.8395, 47.0245]])).toBeNull()

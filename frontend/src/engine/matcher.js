@@ -72,6 +72,9 @@ const UTURN_PENALTY = 2.5
 // sans nom ni note, que de la remplacer par un chemin inventé.
 const MIN_MATCHED_SHARE = 0.7
 
+// La part de la trace qu'une rupture peut faire perdre avant qu'on renonce.
+const MAX_LOST_SHARE = 0.05
+
 /**
  * Les rues qu'une trace emprunte, ou `null` si on ne les reconnaît pas.
  *
@@ -97,6 +100,14 @@ export function matchTrace(
 
   const chosen = viterbi(graph, points, lattice, sigmaM, betaM)
   if (!chosen) return null
+  // **Une rupture ne se franchit pas en silence.** Quand la trace saute par où
+  // aucune rue ne passe — un bac, un tunnel absent des données, deux bouts de
+  // réseau que rien ne relie —, le treillis repart de zéro, et la chaîne
+  // retenue ne commence qu'après : tout ce qui précédait disparaissait du
+  // parcours reconnu, sans rien dire. Deux ou trois points au tout début, passe
+  // encore ; au-delà, la trace reste telle qu'elle est venue.
+  const lost = colonnes.length - chosen.length
+  if (lost > Math.max(2, colonnes.length * MAX_LOST_SHARE)) return null
 
   const edges = stitch(graph, chosen)
   if (!edges || !edges.length) return null
@@ -107,34 +118,50 @@ export function matchTrace(
     cur = graph.other(e, cur)
     nodes.push(cur)
   }
-  return { edges, nodes, share: colonnes.length / points.length }
+  return { edges, nodes, share: chosen.length / points.length }
 }
 
 // --- les candidats -----------------------------------------------------------
 
 /**
- * Les arêtes rangées par case, d'après **tous** leurs points de forme.
+ * Les arêtes rangées par case, **sur toute leur longueur**.
  *
  * Passer par les nœuds ne suffirait pas : une rue droite de trois cents mètres
- * n'a que deux nœuds, et un point posé en son milieu n'en verrait aucun.
+ * n'a que deux nœuds, et un point posé en son milieu n'en verrait aucun. Ses
+ * points de forme non plus — une rue droite n'en a souvent que deux, ses deux
+ * bouts : chaque segment est donc suivi pas à pas, une demi-case à la fois,
+ * et toutes les cases qu'il traverse le connaissent.
  */
 function edgeIndex(graph, radiusM) {
   const cell = radiusM
   const kx = 111_320 * Math.cos((graph.nodeLat[0] * Math.PI) / 180)
   const grid = new Map()
   const key = (lon, lat) => `${Math.floor((lon * kx) / cell)}:${Math.floor((lat * 110_540) / cell)}`
+  const file = (e, lon, lat, last) => {
+    const k = key(lon, lat)
+    if (k === last) return k
+    let bucket = grid.get(k)
+    if (!bucket) grid.set(k, (bucket = new Set()))
+    bucket.add(e)
+    return k
+  }
 
+  const coords = graph.coords
   for (let e = 0; e < graph.edgeCount; e += 1) {
     const start = graph.edgeCoordStart[e]
     const count = graph.edgeCoordCount[e]
-    let last = null
-    for (let i = 0; i < count; i += 1) {
-      const k = key(graph.coords[2 * (start + i)], graph.coords[2 * (start + i) + 1])
-      if (k === last) continue
-      last = k
-      let bucket = grid.get(k)
-      if (!bucket) grid.set(k, (bucket = new Set()))
-      bucket.add(e)
+    let last = file(e, coords[2 * start], coords[2 * start + 1], null)
+    for (let i = 1; i < count; i += 1) {
+      const lon0 = coords[2 * (start + i - 1)]
+      const lat0 = coords[2 * (start + i - 1) + 1]
+      const lon1 = coords[2 * (start + i)]
+      const lat1 = coords[2 * (start + i) + 1]
+      const metres = Math.hypot((lon1 - lon0) * kx, (lat1 - lat0) * 110_540)
+      const steps = Math.max(1, Math.ceil(metres / (cell / 2)))
+      for (let s = 1; s <= steps; s += 1) {
+        const t = s / steps
+        last = file(e, lon0 + (lon1 - lon0) * t, lat0 + (lat1 - lat0) * t, last)
+      }
     }
   }
   return { grid, key }
