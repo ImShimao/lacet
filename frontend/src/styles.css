@@ -3476,11 +3476,33 @@ html[data-turn] .maplibregl-control-container {
   align-items: center;
   gap: 12px;
 }
-.rundet__head b {
+.rundet__head b,
+.rundet__name input {
   display: block;
+  width: 100%;
   font-family: var(--display);
   font-size: 17px;
+  font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--text);
+}
+/* Le nom se corrige là où on le lit : au repos, un titre ; au toucher, un
+   champ. Sans bordure ni fond tant qu'on n'y est pas — une boîte de saisie
+   permanente ferait croire qu'il faut remplir quelque chose. */
+.rundet__name input {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 3px 7px;
+  margin-left: -7px;
+}
+.rundet__name input:hover {
+  border-color: var(--line);
+}
+.rundet__name input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  background: var(--surface-2);
 }
 .rundet__head em {
   display: block;
@@ -3548,6 +3570,63 @@ html[data-turn] .maplibregl-control-container {
 .rundet__remove {
   display: grid;
   margin-top: 4px;
+}
+
+/* Douze semaines de volume. Barres fines, extrémités arrondies posées sur la
+   ligne de base, deux pixels entre elles — et une seule teinte : une barre
+   d'une autre couleur se lirait comme une autre catégorie. */
+.weeks {
+  margin: 0;
+}
+.weeks__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.weeks__head em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.weeks__plot {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  align-items: end;
+  height: 76px;
+}
+.weeks__col {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  /* Le fond de la colonne : la semaine sans sortie se voit alors comme un
+     creux, et non comme un trou dans le dessin. */
+  background: linear-gradient(var(--surface-2), var(--surface-2)) bottom / 100% 100% no-repeat;
+  border-radius: 4px 4px 0 0;
+}
+.weeks__col i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-bottom: none;
+}
+/* La semaine en cours : plus dense, parce qu'elle est en train de se remplir.
+   Son libellé la nomme — la teinte seule ne dirait pas laquelle. */
+.weeks__col i[data-now] {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+.weeks__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--text-3);
 }
 
 /* Se comparer à soi-même. Discret quand on n'a pas battu son record — c'est

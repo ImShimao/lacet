@@ -76,6 +76,28 @@ describe('ce que l’app garde', () => {
     expect(load().favorites[0].name).toBe('Boucle 1 (corrigée)')
   })
 
+  it('renomme une sortie, et la reconnaît encore après', () => {
+    // Le piège : renommer crée une copie, et l'écran qui l'affiche garde la
+    // copie. Supprimer juste après ne trouvait plus rien à supprimer.
+    const une = sortie(1)
+    monter({ favorites: [], history: [une, sortie(2)], places: [] })
+    act(() => api.rename(une, '  Course du club  '))
+    expect(load().history[0].name).toBe('Course du club')
+    const copie = { ...une, name: 'Course du club' }
+    act(() => api.forget(copie))
+    expect(load().history).toHaveLength(1)
+    expect(load().history[0].id).toBe('h2')
+  })
+
+  it('refuse un nom vide et borne sa longueur', () => {
+    const une = sortie(1)
+    monter({ favorites: [], history: [une], places: [] })
+    act(() => api.rename(une, '   '))
+    expect(load().history).toHaveLength(0) // rien n'a été écrit
+    act(() => api.rename(une, 'x'.repeat(200)))
+    expect(load().history[0].name).toHaveLength(60)
+  })
+
   it('oublie une sortie, et sait tout effacer', () => {
     const une = sortie(1)
     monter({ favorites: [parcours(1)], history: [une, sortie(2)], places: [] })

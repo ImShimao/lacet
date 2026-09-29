@@ -32,7 +32,16 @@ export default function useLibrary(stored = load()) {
   const [history, setHistory] = useState(stored.history || [])
   const [places, setPlaces] = useState(stored.places || [])
 
-  /** Pose une liste **et** l'écrit : les deux ne doivent jamais se séparer. */
+/**
+ * Reconnaître une sortie dans la liste.
+ *
+ * L'identité de l'objet ne suffit pas : renommer une sortie en crée une copie,
+ * et l'écran qui la montre garde alors la copie. Supprimer juste après ne
+ * trouvait plus rien à supprimer. L'instant de départ, lui, ne change jamais.
+ */
+const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
+
+/** Pose une liste **et** l'écrit : les deux ne doivent jamais se séparer. */
   const put = (cle, valeur, poser) => {
     poser(valeur)
     save({ [cle]: valeur })
@@ -78,9 +87,23 @@ export default function useLibrary(stored = load()) {
       return entry
     },
 
+    /**
+     * Renomme une sortie.
+     *
+     * Vingt lignes « Sortie libre » ne se distinguent que par leur date. Le nom
+     * est ce qu'on lit d'abord dans la liste, et c'est le seul champ qu'on
+     * puisse vouloir corriger après coup — « Course du club », « Le tour du
+     * lac », « Reconnaissance du parcours ».
+     */
+    rename(entry, nom) {
+      const propre = String(nom ?? '').trim().slice(0, 60)
+      if (!propre || propre === entry.name) return history
+      return put('history', history.map((s) => (meme(s, entry) ? { ...s, name: propre } : s)), setHistory)
+    },
+
     /** Retire une sortie — un test, un départ déclenché dans la poche. */
     forget(entry) {
-      return put('history', history.filter((sortie) => sortie !== entry), setHistory)
+      return put('history', history.filter((sortie) => !meme(sortie, entry)), setHistory)
     },
 
     /** Garde un départ sous un nom : « chez moi », « le club ». */

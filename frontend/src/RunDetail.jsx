@@ -20,8 +20,10 @@ import { standing } from './knownRoutes'
  * `LiveRun.jsx`). Les sorties d'avant ne les ont pas : on ne les invente pas à
  * partir de la trace, dont les points n'ont pas d'heure.
  */
-export default function RunDetail({ entry, history = [], onReplay, onDelete, onClose }) {
+export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
+  // Le nom en cours d'édition, ou `null` quand on ne le modifie pas.
+  const [nom, setNom] = useState(null)
   // Où cette sortie se situe parmi celles qui ont emprunté le même chemin.
   // Calculé à l'ouverture d'une sortie, pas à chaque rendu : c'est une
   // comparaison de tracés point à point sur tout l'historique.
@@ -41,8 +43,31 @@ export default function RunDetail({ entry, history = [], onReplay, onDelete, onC
         <button className="rundet__back" onClick={onClose} aria-label="Retour aux sorties">
           <Icon name="chevronDown" size={18} />
         </button>
-        <div>
-          <b>{entry.name}</b>
+        <div className="rundet__name">
+          {/* Un champ, pas un bouton « renommer » : le nom se corrige là où on
+              le lit. Il reprend sa forme de titre dès qu'on le quitte. */}
+          {onRename ? (
+            <input
+              value={nom ?? entry.name}
+              aria-label="Nom de la sortie"
+              maxLength={60}
+              onChange={(e) => setNom(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onBlur={() => {
+                if (nom !== null) onRename(entry, nom)
+                setNom(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') {
+                  setNom(null)
+                  e.currentTarget.blur()
+                }
+              }}
+            />
+          ) : (
+            <b>{entry.name}</b>
+          )}
           <em>{whenLabel(entry.ranAt)}</em>
         </div>
         <span className="rundet__sport" aria-hidden="true">

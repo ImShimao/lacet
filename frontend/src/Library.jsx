@@ -32,7 +32,10 @@ export default function Library({ saved, history, onOpen, onOpenRun, onImport, p
   return (
     <div className="panel">
       {view === 'history' && shown.length > 0 && (
-        <Totals history={shown} profile={profile} />
+        <>
+          <Totals history={shown} profile={profile} />
+          <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} />
+        </>
       )}
       <div className="seg">
         <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
@@ -300,6 +303,112 @@ function OfflineControl({ route, mapStyle }) {
       <Icon name={failed ? 'warning' : 'download'} size={14} />
     </button>
   )
+}
+
+// Douze semaines : trois mois de préparation, ce qui tient à l'écran d'un
+// téléphone sans que les barres deviennent des traits.
+const WEEKS = 12
+
+/**
+ * Le volume des douze dernières semaines.
+ *
+ * Les totaux disaient « 22 km au total » et « 3 sorties » : des nombres justes
+ * dont on ne peut rien faire. La question qu'on se pose en ouvrant cet écran
+ * est autre — **est-ce que je tiens le rythme ?** —, et elle demande une forme,
+ * pas un chiffre : douze barres se lisent d'un coup d'œil, et le creux de la
+ * semaine où l'on était malade se voit sans être écrit.
+ *
+ * Une seule teinte, celle de l'app. La semaine en cours est distinguée par son
+ * libellé et sa valeur affichée, jamais par une couleur à elle : une barre
+ * d'une autre couleur se lirait comme une autre catégorie, et personne ne
+ * devinerait laquelle.
+ */
+function WeeklyVolume({ history }) {
+  const semaines = useMemo(() => lastWeeks(history, WEEKS), [history])
+  const haut = Math.max(...semaines.map((s) => s.metres), 1)
+  if (!semaines.some((s) => s.metres > 0)) return null
+
+  const total = semaines.reduce((m, s) => m + s.metres, 0)
+  const moyenne = total / WEEKS
+
+  return (
+    <figure className="weeks">
+      <figcaption className="weeks__head">
+        {/* Court des deux côtés : à 390 px, « Douze dernières semaines » et
+            « par semaine en moyenne » se repliaient chacun sur deux lignes. La
+            période est déjà dite par l'axe, juste en dessous. */}
+        <span className="label">Volume par semaine</span>
+        <em>{km(moyenne, 0)} km en moyenne</em>
+      </figcaption>
+
+      {/* Douze dates sous douze barres ne tiennent pas dans la largeur d'un
+          téléphone : elles se chevauchaient. Les deux bornes suffisent à situer
+          la période, et chaque barre garde sa valeur au survol et dans le
+          tableau ci-dessous. */}
+      <div className="weeks__plot" aria-hidden="true">
+        {semaines.map((s, i) => (
+          <div className="weeks__col" key={s.key} title={`${s.label} : ${km(s.metres, 1).replace('.', ',')} km`}>
+            <i
+              style={{ height: `${s.metres ? Math.max(3, (s.metres / haut) * 100) : 0}%` }}
+              data-now={i === semaines.length - 1 || undefined}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="weeks__axis" aria-hidden="true">
+        <span>{semaines[0].short}</span>
+        <span>cette semaine</span>
+      </div>
+
+      {/* Ce que le dessin montre, écrit : c'est la seule version lisible par
+          une synthèse vocale, et la seule consultable sans souris. */}
+      <table className="visually-hidden">
+        <caption>Distance par semaine, les douze dernières</caption>
+        <tbody>
+          {semaines.map((s) => (
+            <tr key={s.key}>
+              <th scope="row">{s.label}</th>
+              <td>{km(s.metres, 1)} km</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
+  )
+}
+
+/** Le lundi de la semaine d'une date, à minuit. */
+function monday(d) {
+  const out = new Date(d)
+  out.setHours(0, 0, 0, 0)
+  // `getDay()` rend 0 le dimanche : en France la semaine commence le lundi.
+  out.setDate(out.getDate() - ((out.getDay() + 6) % 7))
+  return out
+}
+
+/** Les `n` dernières semaines, la plus ancienne d'abord, avec leur distance. */
+function lastWeeks(history, n, now = new Date()) {
+  const debut = monday(now)
+  const seaux = []
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const lundi = new Date(debut)
+    lundi.setDate(lundi.getDate() - i * 7)
+    seaux.push({
+      key: lundi.toISOString().slice(0, 10),
+      from: lundi.getTime(),
+      to: lundi.getTime() + 7 * 864e5,
+      label: `Semaine du ${lundi.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`,
+      short: lundi.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', ''),
+      metres: 0,
+    })
+  }
+  for (const sortie of history || []) {
+    const t = new Date(sortie.ranAt).getTime()
+    if (Number.isNaN(t)) continue
+    const seau = seaux.find((s) => t >= s.from && t < s.to)
+    if (seau) seau.metres += sortie.actual_distance_m || 0
+  }
+  return seaux
 }
 
 /**

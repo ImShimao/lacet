@@ -948,6 +948,10 @@ export default function App() {
             <RunDetail
               entry={viewing}
               history={history}
+              onRename={(r, nom) => {
+                library.rename(r, nom)
+                setViewing({ ...r, name: nom.trim().slice(0, 60) })
+              }}
               onClose={() => setViewing(null)}
               onReplay={(r) => {
                 setViewing(null)
