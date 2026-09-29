@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   asCoordinates,
   expandNicknames,
@@ -6,6 +6,7 @@ import {
   fromPhoton,
   rankPlaces,
   resetProviders,
+  reverse,
   search,
   shorten,
   similarity,
@@ -420,5 +421,33 @@ describe('le second tour', () => {
     const results = await search('tour eifel', { near: GUEBWILLER, fetchImpl })
     expect(asked).toHaveLength(3)
     expect(results[0].short).toBe('Tour Eiffel')
+  })
+})
+
+describe('le nom d’un point posé à la main', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('rend la rue de l’adresse du bâtiment, pas seulement un nom', async () => {
+    // Le départ posé sur une maison d'angle : c'est l'adresse qui dit sur
+    // quelle rue donne la porte, et la boucle y sortira.
+    const urls = []
+    vi.stubGlobal('fetch', async (url) => {
+      urls.push(String(url))
+      return {
+        ok: true,
+        json: async () => ({
+          name: '',
+          address: { house_number: '12', road: 'Rue des Tonneliers', town: 'Guebwiller' },
+          display_name: '12, Rue des Tonneliers, Guebwiller',
+        }),
+      }
+    })
+    expect(await reverse(47.9097, 7.2106)).toEqual({ label: 'Rue des Tonneliers, Guebwiller', street: 'Rue des Tonneliers' })
+    expect(urls[0]).toMatch(/zoom=18/)
+  })
+
+  it('ne rend rien quand le service ne répond pas', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 503, json: async () => ({}) }))
+    expect(await reverse(47.9097, 7.2106)).toBeNull()
   })
 })

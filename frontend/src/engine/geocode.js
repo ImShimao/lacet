@@ -716,10 +716,21 @@ function metres(a, b) {
   return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
+/**
+ * Le nom d'un point, et la rue de son adresse : `{ label, street }`, ou `null`.
+ *
+ * Au niveau du **bâtiment** (zoom 18), et non de la rue la plus proche : posé
+ * sur une maison — le GPS de quelqu'un qui part de chez lui, un repère placé à
+ * la main —, le point rend l'adresse de la maison, donc la rue où donne sa
+ * porte. C'est elle que la boucle rejoint (voir `door.js`), même quand une
+ * autre voie passe plus près des murs. Le nom affiché, lui, reste celui de la
+ * rue et de la commune.
+ */
 export async function reverse(lat, lon) {
   try {
-    const raw = await throttled(REVERSE_URL, { lat: String(lat), lon: String(lon), format: 'jsonv2', zoom: '16' })
-    return raw ? shortLabel(raw) : null
+    const raw = await throttled(REVERSE_URL, { lat: String(lat), lon: String(lon), format: 'jsonv2', zoom: '18' })
+    if (!raw) return null
+    return { label: shortLabel(raw), street: raw.address?.road || raw.address?.pedestrian || null }
   } catch {
     return null
   }

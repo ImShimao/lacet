@@ -139,8 +139,9 @@ export default function Account({ params, geo, onClearData, onProfile, onRestore
       )}
 
       <p className="disclaimer">
-        Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © Esri,
-        © OpenTopoMap · Altitudes IGN RGE ALTI et OpenTopoData.
+        Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © OpenFreeMap,
+        © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI et Valhalla (FOSSGIS) · Recherche de
+        lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
       </p>
     </div>
   )

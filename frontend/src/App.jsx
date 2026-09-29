@@ -245,11 +245,28 @@ export default function App() {
     if (previous && haversineM([previous.lon, previous.lat], [point.lon, point.lat]) > 10) {
       found.forget()
     }
+    startRef.current = point
     setStart(point)
     setStartLabel(label ?? null)
     setPlacing(false)
     if (recenter) setFocus({ ...point, at: Date.now() })
-    if (label === undefined) setStartLabel(await describePlace(point.lat, point.lon))
+    if (label !== undefined) return
+    // Un point sans nom — la position, un repère posé à la main : on demande
+    // lequel, et la rue de l'adresse avec, pour sortir devant la bonne porte.
+    // Seulement si le départ n'a pas bougé entre-temps : la réponse d'un point
+    // quitté ne doit ni renommer ni déplacer le suivant.
+    // (Une recherche lancée dans l'intervalle a pu poser le repère sur la rue :
+    // le point choisi est alors gardé dans `asked`, et c'est lui qu'on nomme.)
+    const place = await describePlace(point.lat, point.lon)
+    const current = startRef.current
+    if (current !== point && current?.asked !== point) return
+    setStartLabel(place?.label ?? null)
+    if (place?.street && !point.street) {
+      const named = { ...point, street: place.street }
+      const next = current === point ? named : { ...current, asked: named }
+      startRef.current = next
+      setStart(next)
+    }
   }, [])
 
   // Au premier chargement on tente la position ; le refus n'est pas un échec,
