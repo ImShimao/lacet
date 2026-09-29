@@ -239,8 +239,10 @@ export function openDoor(
   const reach = haversineM(here, doorPoint)
   const link = connect && reach > ON_STREET_M && reach <= MAX_REACH_M
 
-  // Rien à ajouter, et rien à retenir : le carrefour du réseau fait l'affaire.
-  if (doorNode !== null && connect && !link) return { graph, start: doorNode, reachM: 0 }
+  // Rien à ajouter, et rien à retenir : le carrefour du réseau fait l'affaire —
+  // sans raccord à tracer, ou, pour un départ, quand le point est déjà sur lui
+  // et qu'il n'y a pas de « sortie » à décrire.
+  if (doorNode !== null && (connect ? !link : reach <= ON_STREET_M)) return { graph, start: doorNode, reachM: 0 }
 
   const n0 = graph.nodeCount
   const m0 = graph.edgeCount
