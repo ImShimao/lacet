@@ -1,0 +1,488 @@
+/* Le contenu du panneau : le départ, la bande de parcours, le détail de sécurité, les listes et les messages. */
+
+/* ══ contenu du panneau ════════════════════════════════════════════════ */
+
+.panel {
+  padding: 16px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.origin {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.origin__pin {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  flex: none;
+}
+.origin b {
+  display: block;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.origin em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.grade {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 7px;
+  flex: none;
+  border: 1px solid transparent;
+}
+.grade--A {
+  background: rgba(50, 215, 75, 0.13);
+  color: var(--safe);
+  border-color: rgba(50, 215, 75, 0.28);
+}
+.grade--B {
+  background: rgba(255, 212, 38, 0.13);
+  color: var(--caution);
+  border-color: rgba(255, 212, 38, 0.28);
+}
+.grade--free {
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+.grade--C {
+  background: rgba(255, 106, 69, 0.13);
+  color: var(--risk);
+  border-color: rgba(255, 106, 69, 0.28);
+}
+
+/* Pas de note du tout : un tracé de secours, que Lacet n'a pas pu juger. En
+   violet, la couleur de l'app — ni encouragement ni avertissement. */
+.grade--unknown {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.stats--four {
+  grid-template-columns: repeat(4, 1fr);
+}
+.stats > div {
+  padding: 10px 4px;
+  text-align: center;
+  border-right: 1px solid var(--line);
+}
+.stats > div:last-child {
+  border-right: none;
+}
+.stats b {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.stats span {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* ══ bande de parcours ═════════════════════════════════════════════════ */
+
+.strip {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  padding: 11px 12px 9px;
+}
+.strip__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.strip__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.strip__read {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.strip__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+.strip__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.strip__tick {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  fill: var(--text-3);
+  text-anchor: end;
+}
+.strip__line {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.6;
+}
+.strip__cursor {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.strip__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.strip__key {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.strip__key i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.disclose {
+  width: 100%;
+  padding: 9px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+/* ══ détail sécurité ═══════════════════════════════════════════════════ */
+
+.safety {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.safety__rows,
+.rows {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.safety__row,
+.rows__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.safety__row:last-child,
+.rows__row:last-child {
+  border-bottom: none;
+}
+.safety__row em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+.rows__row span:last-child {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Une ligne à boutons se centre sur eux ; la ligne de base, elle, posait le
+   libellé plus bas que les « − » et « + » qu'il nomme. */
+.rows__row:has(.rows__num) {
+  align-items: center;
+}
+/* Le nombre se touche pour le taper : il en a l'air, sans devenir un formulaire. */
+.rows__field {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: var(--surface-3);
+  cursor: text;
+}
+.rows__field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.rows__field input {
+  width: 2.4em;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rows__field input:focus {
+  outline: none;
+}
+.rows__field b {
+  color: var(--text-3);
+  font-weight: 600;
+}
+.safety__value {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.safety__value--good {
+  color: var(--safe);
+}
+.safety__value--warn {
+  color: var(--caution);
+}
+.safety__value--bad {
+  color: var(--risk);
+}
+.safety__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.bar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.bar__key {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.bar__key i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.s--paved {
+  background: var(--info);
+}
+.s--gravel {
+  background: var(--caution);
+}
+.s--trail {
+  background: #c58b4a;
+}
+.s--unknown {
+  background: var(--text-3);
+}
+
+/* ══ écarts, listes, messages ══════════════════════════════════════════ */
+
+.rejected {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.rejected__title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.rejected__row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 9px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rejected__row .mono {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.list__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  width: 100%;
+  text-align: left;
+  font-size: 13.5px;
+}
+.list__row > span:not(.list__sport):not(.grade) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list__row em {
+  display: block;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.list__row .grade {
+  margin-left: auto;
+}
+/* Un parcours et son contrôle hors ligne, côte à côte. La ligne reste un
+   bouton d'ouverture ; le second geste vit à côté, pas dedans — un bouton dans
+   un bouton n'est pas du HTML valide et se comporte mal au clavier. */
+.list__item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.list__item .list__row {
+  flex: 1;
+  min-width: 0;
+}
+.offline {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 48px;
+  padding: 0 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+.offline--on {
+  color: var(--safe);
+  border-color: rgba(50, 215, 75, 0.34);
+}
+/* Carte gardée sous un autre fond que celui affiché : disponible, mais pas
+   pour ce que l'on regarde. Ni vert rassurant, ni rouge alarmant. */
+.offline--other {
+  color: var(--text-2);
+  border-color: var(--surface-3);
+}
+.offline--warn {
+  color: var(--caution);
+  border-color: rgba(255, 212, 38, 0.34);
+}
+.offline--busy {
+  position: relative;
+  overflow: hidden;
+  color: var(--text-2);
+}
+.offline--busy i {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform 0.2s linear;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 26px 12px 18px;
+  line-height: 1.5;
+}
+.empty p {
+  margin: 0;
+  max-width: 30ch;
+}
+.empty__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.notice {
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: rgba(255, 106, 69, 0.1);
+  border: 1px solid rgba(255, 106, 69, 0.28);
+}
+.disclaimer {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-3);
+}

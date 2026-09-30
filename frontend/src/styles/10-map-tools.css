@@ -1,0 +1,108 @@
+/* Les commandes de la carte : la boussole, le menu du départ. */
+
+/* ══ commandes de la carte ═══════════════════════════════════════════════
+   Hors course : le fond de carte, puis — un cran plus bas — ma position, le
+   départ, et la boussole quand la carte a tourné. En course : le fond, la
+   voix, l'orientation, la vue d'ensemble. */
+
+.tools__gap {
+  height: 4px;
+}
+.tool--muted {
+  color: var(--text-3);
+}
+.tool:disabled {
+  opacity: 0.4;
+}
+
+/* La boussole : une aiguille dont la pointe rouge montre le nord. */
+.tool--compass {
+  position: relative;
+}
+.needle {
+  position: relative;
+  width: 8px;
+  height: 24px;
+  transform: rotate(var(--north, 0deg));
+}
+.needle::before,
+.needle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+.needle::before {
+  top: 0;
+  border-bottom: 12px solid var(--risk);
+}
+.needle::after {
+  bottom: 0;
+  border-top: 12px solid var(--text-2);
+}
+.tool--compass small {
+  position: absolute;
+  bottom: 2px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.stage__tools--run .needle {
+  height: 20px;
+  margin-top: -6px;
+}
+/* Carte droite, nord en haut : rien à remettre, la boussole s'efface. */
+.stage__tools:not(.stage__tools--run) .tool--compass:not([data-rotated='true']) {
+  display: none;
+}
+
+/* Le départ : un petit menu, deux façons de le poser. */
+.toolmenu {
+  position: relative;
+}
+.startmenu {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  min-width: 222px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: rgba(19, 17, 26, 0.97);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.95);
+}
+.startmenu b {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.startmenu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+}
+.startmenu button .icon {
+  color: var(--accent-text);
+}
+.startmenu button:hover,
+.startmenu button:focus-visible {
+  background: var(--surface-2);
+}
+
+/* En course, sous le bandeau de consigne. */
+.stage__tools--run {
+  top: calc(env(safe-area-inset-top) + 112px);
+}

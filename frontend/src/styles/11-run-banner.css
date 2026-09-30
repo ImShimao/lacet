@@ -1,0 +1,175 @@
+/* La sortie : le bandeau de consigne en haut de la carte, et le panneau du bas. */
+
+/* ══ la sortie : le bandeau de consigne ══════════════════════════════════
+   Ce qu'on cherche des yeux en courant : où tourner, et dans combien. Le
+   virage en pictogramme, la distance en très grand, la rue en toutes
+   lettres — lisible à bout de bras, écran qui bouge. */
+
+.runbar {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  max-width: 560px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 88px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.9), 0 10px 30px -18px var(--accent-glow);
+}
+.runbar__turn {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.18);
+}
+.runbar__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.runbar__text b {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.runbar__text em {
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.runbar__text small {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffe38a;
+}
+/* La manœuvre d'après, quand elle suit de près : une ligne, en retrait, sur
+   un filet — lisible d'un coup d'œil sans concurrencer la consigne. */
+.runbar__then {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.runbar--stray {
+  background: linear-gradient(135deg, #ff7a52 0%, #e2452a 100%);
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.9);
+}
+.runbar--stray .runbar__text b {
+  font-size: 21px;
+  white-space: nowrap;
+}
+.runbar--stray .runbar__text em {
+  font-size: 13px;
+  font-weight: 500;
+}
+.runbar__act {
+  flex: none;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: #fff;
+  color: #c8391f;
+  font-weight: 800;
+  font-size: 13.5px;
+}
+.runbar--idle {
+  min-height: 0;
+  background: rgba(19, 17, 26, 0.94);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  backdrop-filter: blur(10px);
+}
+.runbar--idle .runbar__text em {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.runbar__spin {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: 0 14px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: runbar-spin 0.9s linear infinite;
+}
+@keyframes runbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .runbar__spin {
+    animation-duration: 3s;
+  }
+}
+
+/* « Recentrer » descend au bas de la carte : le haut est au bandeau. */
+.recenter {
+  top: auto;
+  bottom: 22px;
+}
+
+/* ══ la sortie : le panneau ═══════════════════════════════════════════════ */
+
+.live__clock {
+  text-align: center;
+  font-size: 54px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.live__clock--paused {
+  opacity: 0.45;
+}
+.stats--live {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Pause au centre, en grand ; de part et d'autre, le dénivelé — ou
+   « Terminer », qui n'apparaît qu'en pause — et le SOS. */
+/* La jauge du stockage : une barre, et rien d'autre. Elle ne se colore qu'au
+   moment où ça compte — quand la place vient à manquer. */
+.gauge {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.gauge i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: transform 0.25s ease;
+}
+.gauge--tight i {
+  background: linear-gradient(135deg, #ffd426 0%, #ff6a45 100%);
+}

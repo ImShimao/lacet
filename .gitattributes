@@ -1,4 +1,4 @@
 # Fins de ligne normalisées en LF dans le dépôt et à la sortie.
-# Le dépôt est construit sur Linux (image Docker, Hugging Face) : un Dockerfile
-# ou un script arrivé en CRLF depuis Windows y casse sans message clair.
+# Le dépôt est construit sur Linux et macOS (GitHub Actions) : un script arrivé
+# en CRLF depuis Windows y casse sans message clair.
 * text=auto eol=lf

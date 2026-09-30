@@ -5,11 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mobile": "vite --mode mobile",
     "icons": "python scripts/make-icons.py",
     "build": "vite build",
-    "preview": "vite preview",
-    "preview:mobile": "vite preview --mode mobile",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -37,7 +34,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
-    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "vite": "^6.0.7",

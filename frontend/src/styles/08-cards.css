@@ -1,0 +1,236 @@
+/* Les cartes de parcours, qu'on fait défiler du pouce, et la barre d'action. */
+
+/* ══ cartes de parcours ════════════════════════════════════════════════
+   Une carte par proposition, qui défile du pouce. Le chiffre qui décide —
+   la distance — en grand ; ce qui départage — durée, dénivelé, part protégée —
+   en ligne dessous. Les voisines dépassent sur les bords, atténuées : elles
+   disent qu'il y a d'autres choix sans rivaliser avec celui qu'on regarde.
+   ────────────────────────────────────────────────────────────────────── */
+
+.cards {
+  --card-w: min(300px, calc(100cqw - 88px));
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  /* Les cartes vont jusqu'aux bords du panneau : une voisine coupée par la
+     marge intérieure se lirait comme un défaut, pas comme une invitation. */
+  margin-inline: -18px;
+}
+.cards__track {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-block: 2px 6px;
+}
+.cards__track::-webkit-scrollbar {
+  display: none;
+}
+.cards__pad {
+  flex: 0 0 max(0px, calc((100% - var(--card-w)) / 2 - 10px));
+}
+.rcard {
+  flex: 0 0 var(--card-w);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 12px 14px 12px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--line);
+  opacity: 0.6;
+  transition:
+    opacity 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.rcard--on {
+  opacity: 1;
+  border-color: #8b5cf6;
+  background:
+    linear-gradient(155deg, rgba(139, 92, 246, 0.24), rgba(139, 92, 246, 0.03) 62%),
+    var(--surface-2);
+  box-shadow: 0 16px 34px -18px var(--accent-glow);
+}
+.rcard__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rcard__n {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  flex: none;
+}
+.rcard--on .rcard__n {
+  background: var(--accent);
+  color: #fff;
+}
+.rcard__dir {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcard--on .rcard__dir {
+  color: var(--accent-text);
+}
+.rcard__km {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+  line-height: 1;
+}
+.rcard__km b {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  margin-right: 1px;
+}
+.rcard__name {
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcard__stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.rcard__stats b {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cards__dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+.cards__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  transition:
+    width 0.2s ease,
+    background 0.2s ease;
+}
+.cards__dots i.on {
+  width: 18px;
+  background: var(--accent);
+}
+
+.route-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/* ── barre d'action collée au bas du panneau ──────────────────────────── */
+
+.actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  /* Déborde du rembourrage du panneau pour se poser à ras de son bord. */
+  margin: 0 -18px -22px;
+  padding: 18px 18px 14px;
+  /* Le contenu qui défile dessous s'efface au lieu d'être coupé net. */
+  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+}
+.actionbar .btn--primary {
+  font-size: 15.5px;
+}
+/* La barre fait déjà office de fin de zone : le fondu du bas la voilerait. */
+.side__body:has(.actionbar) {
+  mask-image: none;
+}
+
+/* ── retouches d'ensemble ─────────────────────────────────────────────── */
+
+.origin {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.banner > span {
+  flex: 1;
+  min-width: 0;
+}
+.banner > .icon {
+  color: var(--risk);
+}
+.banner .banner__act {
+  margin-left: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.skeleton--card {
+  height: 128px;
+  border-radius: 18px;
+}
+
+/* Les intitulés de réglage en phrase, pas en petites capitales : ils se lisent
+   comme les questions qu'ils posent (« Terrain ? ») plutôt que comme les
+   étiquettes d'un formulaire administratif. */
+.label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--text);
+}
+
+/* « Détails », sur la carte de parcours choisie — seulement quand le détail
+   est replié. */
+.rcard__more {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-text);
+  white-space: nowrap;
+}

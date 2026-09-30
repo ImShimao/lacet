@@ -215,8 +215,20 @@ export const appVersion = () => App.getInfo().catch(() => null)
 
 // --- fichiers, liens ----------------------------------------------------------
 
-/** Ouvre un lien d'une autre app — la messagerie pour le SOS. */
+/**
+ * Ouvre un lien d'une autre app — la messagerie pour le SOS, Strava pour s'y
+ * connecter. Rend `{ completed }` : faux quand aucune app ne sait l'ouvrir.
+ */
 export const openExternal = (url) => AppLauncher.openUrl({ url })
+
+/** Les adresses `lacet://` ouvertes pendant que l'app tourne. */
+export const onAppUrl = (handler) => App.addListener('appUrlOpen', ({ url }) => handler(url))
+
+/** L'adresse qui a lancé l'app, s'il y en a une. */
+export const launchUrl = () =>
+  App.getLaunchUrl()
+    .then((r) => r?.url ?? null)
+    .catch(() => null)
 
 /** Écrit un fichier et ouvre la feuille de partage d'iOS pour l'emporter. */
 export async function shareTextFile(filename, text, mime) {

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { duration, km } from './format'
 import { load, save } from './storage'
 import useModal from './useModal'
-import { isNative } from './platform'
 
 // Appui long, en millisecondes, avant que le SOS ne s'arme. Un bouton d'alerte
 // posé à côté de « Terminer », sur un écran qu'on touche en courant, part tout
@@ -16,9 +15,9 @@ const HOLD_MS = 900
  *
  * **L'app n'envoie rien elle-même.** Elle prépare le message et ouvre l'appli
  * de messagerie du téléphone ; c'est la personne qui appuie sur « envoyer ».
- * C'est délibéré : un message parti tout seul depuis une page web serait à la
- * fois techniquement fragile — aucun navigateur ne le permet sans serveur
- * d'envoi — et fâcheux le jour où le bouton est touché par erreur.
+ * C'est délibéré : un message parti tout seul serait à la fois techniquement
+ * fragile — iOS ne le permet pas sans serveur d'envoi — et fâcheux le jour où
+ * le bouton est touché par erreur.
  *
  * Le contact est gardé sur l'appareil, jamais transmis.
  */
@@ -80,30 +79,20 @@ export default function SosButton({ position, distance, elapsed, className = '' 
     // Le numéro réduit à ses chiffres (et au « + » international) : « 06.12.34 »
     // ou « 06-12-34 », tels qu'on les tape, ne sont pas des numéros pour Messages.
     const href = `sms:${contact.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(text)}`
-    // Dans l'app native, le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre
-    // de la façon dont WebKit traite un lien d'un autre schéma.
-    if (isNative()) import('./native').then((n) => n.openExternal(href))
-    else window.location.href = href
+    // Le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre de la façon
+    // dont WebKit traite un lien d'un autre schéma.
+    import('./native').then((n) => n.openExternal(href))
   }
 
   async function shareInstead() {
     const text = message()
     try {
-      if (isNative()) {
-        const native = await import('./native')
-        await native.shareText('Lacet — besoin d’aide', text)
-        setAsking(false)
-        return
-      }
-      if (navigator.share) {
-        await navigator.share({ title: 'Lacet — besoin d’aide', text })
-        setAsking(false)
-        return
-      }
-      await navigator.clipboard.writeText(text)
-      window.alert('Message copié. Colle-le dans ton application de messagerie.')
-    } catch {
-      window.prompt('Copie ce message et envoie-le :', text)
+      const native = await import('./native')
+      await native.shareText('Lacet — besoin d’aide', text)
+    } catch (error) {
+      // Refermer la feuille de partage n'est pas une panne : iOS le signale
+      // comme une erreur, et le message à copier surgissait alors pour rien.
+      if (!/cancel/i.test(error?.message || '')) window.prompt('Copie ce message et envoie-le :', text)
     }
     setAsking(false)
   }

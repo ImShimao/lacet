@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
 import { haversine, km, surfaceLabel } from './format'
-import { currentTurn, localRatio } from './orientation'
 
 /**
  * La bande de parcours : le profil altimétrique et le niveau de sécurité sur un
@@ -39,10 +38,9 @@ export default function RouteStrip({ route, onScrub }) {
 
   if (!model) return null
 
-  const locate = (clientX, clientY) => {
+  const locate = (clientX) => {
     const rect = svgRef.current.getBoundingClientRect()
-    const { x } = localRatio(rect, currentTurn(), clientX, clientY)
-    const ratio = Math.max(0, Math.min(1, x))
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
     const dist = ratio * model.total
     setCursor(dist)
     onScrub?.(coordAt(model, dist))
@@ -76,10 +74,8 @@ export default function RouteStrip({ route, onScrub }) {
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="strip__svg"
-        onMouseMove={(e) => locate(e.clientX, e.clientY)}
-        onMouseLeave={clear}
-        onTouchStart={(e) => locate(e.touches[0].clientX, e.touches[0].clientY)}
-        onTouchMove={(e) => locate(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchStart={(e) => locate(e.touches[0].clientX)}
+        onTouchMove={(e) => locate(e.touches[0].clientX)}
         onTouchEnd={clear}
         role="img"
         aria-label={`Profil du parcours sur ${km(model.total, 1)} kilomètres`}

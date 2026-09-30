@@ -1,0 +1,19 @@
+/* Strava : son orange, et rien d'autre de sa marque — un bouton qu'on
+   reconnaît sans qu'il imite l'app. */
+
+.strava-btn {
+  flex: none;
+  width: 100%;
+  border-color: rgba(252, 76, 2, 0.45);
+  color: #ff8a57;
+}
+.strava-btn--sent {
+  border-color: var(--line);
+  color: var(--text-2);
+}
+.strava-btn:disabled {
+  opacity: 0.6;
+}
+.strava-error {
+  margin-top: -4px;
+}

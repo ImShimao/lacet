@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
-import { downloadGpx } from './api'
+import { downloadRun } from './api'
+import { StravaButton } from './Strava.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
 
@@ -20,7 +21,7 @@ import { standing } from './knownRoutes'
  * `LiveRun.jsx`). Les sorties d'avant ne les ont pas : on ne les invente pas à
  * partir de la trace, dont les points n'ont pas d'heure.
  */
-export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose }) {
+export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose, onStrava }) {
   const [confirm, setConfirm] = useState(false)
   // Le nom en cours d'édition, ou `null` quand on ne le modifie pas.
   const [nom, setNom] = useState(null)
@@ -160,12 +161,11 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
         </p>
       )}
 
+      <StravaButton key={entry.ranAt} entry={entry} onSent={(id) => onStrava?.(entry, id)} />
+
       <div className="row">
         {entry.track?.length > 1 && (
-          <button
-            className="btn"
-            onClick={() => downloadGpx(`${entry.name} — trace`, entry.track, null, entry.sport)}
-          >
+          <button className="btn" onClick={() => downloadRun(entry)}>
             <Icon name="download" size={16} />
             Exporter la trace
           </button>

@@ -13,6 +13,7 @@ import Icon, { SolidIcon } from './Icon.jsx'
 import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
+import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { km } from './format'
@@ -49,6 +50,8 @@ export default function Explore({
   onOpenSaved,
   onScrub,
   onOpenDetail,
+  stops = { stops: [], loading: false, complete: true },
+  poiPrefs = null,
 }) {
   const [exporting, setExporting] = useState(false)
   // Ce qu'on reconnaît de l'historique, calculé une fois par liste de
@@ -144,9 +147,6 @@ export default function Explore({
           Fais glisser le repère, touche la carte en mode placement, ou cherche une
           adresse pour changer de départ.
         </p>
-        <p className="shortcuts mono">
-          Entrée rechercher · F filtres · L ma position · P placer
-        </p>
       </div>
     )
   }
@@ -222,9 +222,11 @@ export default function Explore({
         </div>
       )}
       {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher
-          pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas. */}
+          pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas.
+          Dans le détail seulement : sur la carte repliée, ces trois lignes
+          prenaient la place du tracé, à chaque recherche depuis une adresse. */}
       {snapped && (
-        <div className="notice">
+        <div className="notice notice--detail">
           Le départ s'est posé sur la rue, à {snapped} m du point demandé :
           c'est de là que la boucle part, et c'est là qu'elle revient.
         </div>
@@ -254,6 +256,8 @@ export default function Explore({
       </div>
 
       <RouteStrip route={selected} onScrub={onScrub} />
+
+      <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 
       <button className="disclose" onClick={onToggleDetail} aria-expanded={detail}>
         {detail ? 'Masquer le détail' : 'Voir le détail de la note'}

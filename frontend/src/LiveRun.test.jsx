@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen } from '@testing-library/react'
-import { act } from 'react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -335,5 +334,33 @@ describe('la distance et les kilomètres', () => {
     const dit = voice.speak.mock.calls.map(([d]) => d)
     // La borne tombe au relevé qui la franchit, un pas de vingt mètres plus loin.
     expect(dit).toEqual([expect.stringMatching(/^1 kilomètre\. Ce kilomètre en 4 minutes 1\d, allure moyenne 4 minutes 1\d\.$/)])
+  })
+})
+
+describe('les arrêts en chemin', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    fixes = null
+  })
+  afterEach(() => cleanup())
+
+  it("annonce le point d'eau à l'approche, une seule fois", async () => {
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    // Un point d'eau sur le deuxième côté du carré, à 150 m du départ.
+    const arrets = [{ kind: 'water', lat: geometry[7][1], lon: geometry[7][0], along: 150, off: 0 }]
+    render(
+      <LiveRun route={boucle} request={null} sport="run" stage={null} stops={arrets} onPosition={() => {}} onStop={() => {}} />,
+    )
+    let t = Date.now()
+    for (const point of geometry.slice(0, 7)) {
+      t += 2000
+      await relever(point, t)
+    }
+    const dit = voice.speak.mock.calls.map(([d]) => d).filter((d) => d.startsWith("Point d'eau"))
+    expect(dit).toHaveLength(1)
+    expect(dit[0]).toMatch(/^Point d'eau dans \d+ mètres\.$/)
+    // Et l'écran le montre, avec sa distance.
+    expect(document.querySelector('.nextstops')?.textContent).toMatch(/Point d'eau dans/)
   })
 })

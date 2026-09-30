@@ -9,6 +9,7 @@
 import { planOnDevice } from './engine/client'
 import { reverse, search } from './engine/geocode'
 import { buildGpx, gpxFilename } from './engine/gpx'
+import { buildRunGpx } from './runGpx'
 import { saveTextFile } from './platform'
 
 /**
@@ -66,4 +67,13 @@ export async function searchPlaces(query, signal, near = null) {
 
 export async function describePlace(lat, lon) {
   return reverse(lat, lon)
+}
+
+/**
+ * La trace d'une sortie terminée, avec l'heure de chaque point — ce qu'un
+ * autre service (Garmin Connect, le site de Strava) demande pour y voir une
+ * activité, et pas seulement un dessin. Voir `runGpx.js`.
+ */
+export async function downloadRun(entry) {
+  await saveTextFile(gpxFilename(`${entry.name} — trace`), buildRunGpx(entry), 'application/gpx+xml')
 }

@@ -12,17 +12,6 @@
       "port": 5173
     },
     {
-      "name": "lacet-preview",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "preview"
-      ],
-      "cwd": "frontend",
-      "port": 4173,
-      "url": "http://localhost:4173"
-    },
-    {
       "name": "lacet-api",
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": [

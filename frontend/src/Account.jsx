@@ -2,7 +2,7 @@
  * Mon compte : le profil local, le contact d'urgence, les cartes gardées.
  *
  * Tout y est local à l'appareil — c'est le propos de l'écran, et la raison
- * pour laquelle il ne dépend de rien d'autre que du stockage du navigateur.
+ * pour laquelle il ne dépend de rien d'autre que du stockage de l'app.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -13,8 +13,10 @@ import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from 
 import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
+import { StravaSetting } from './Strava.jsx'
+import { StopsSetting } from './Stops.jsx'
 
-export default function Account({ params, geo, onClearData, onProfile, onRestored }) {
+export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored }) {
   const [confirm, setConfirm] = useState(false)
   const [contact, setContact] = useState(() => load().emergencyContact || '')
   // L'effacement vide aussi les cartes ; le compteur, lui, a lu le journal en
@@ -52,6 +54,9 @@ export default function Account({ params, geo, onClearData, onProfile, onRestore
       <h3 className="section">Recherche</h3>
       <SearchSettings params={params} onProfile={onProfile} />
 
+      <h3 className="section">Sur le parcours</h3>
+      <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
+
       <h3 className="section">Poids</h3>
       <p className="muted small">
         Sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
@@ -70,6 +75,9 @@ export default function Account({ params, geo, onClearData, onProfile, onRestore
       <h3 className="section">Pendant la sortie</h3>
       <AutoPauseSetting />
       <LockScreenSetting />
+
+      <h3 className="section">Strava</h3>
+      <StravaSetting />
 
       <h3 className="section">Contact d'urgence</h3>
       <p className="muted small">
@@ -236,10 +244,10 @@ function KeptStreets() {
  *
  * Un chiffre plutôt qu'une promesse : ces fichiers sont les seuls de l'app à se
  * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
- * finit par être vidé par le navigateur — au pire moment, sans prévenir.
+ * finit par être vidé par iOS — au pire moment, sans prévenir.
  */
 /**
- * Le poids de ce qui est gardé dans le navigateur, et ce qu'il en reste.
+ * Le poids de ce qui est gardé dans le petit stockage de l'app, et ce qu'il en reste.
  *
  * Tout le reste de cet écran mesure des choses qu'on peut retélécharger : des
  * tuiles, des rues. Celle-ci mesure la seule qu'on ne peut pas refaire — les
@@ -254,7 +262,7 @@ function KeptStreets() {
 function StoredData() {
   const [info, setInfo] = useState(() => usage())
   const [freed, setFreed] = useState(null)
-  if (!info) return <p className="muted small">Le stockage du navigateur n'est pas accessible ici.</p>
+  if (!info) return <p className="muted small">Le stockage de l'app ne répond pas.</p>
 
   const part = Math.min(1, info.bytes / info.quota)
   const serre = part > 0.75
@@ -291,7 +299,7 @@ function StoredData() {
         <b>{mo(info.bytes)}</b> sur environ {mo(info.quota)} — {info.counts.history} sortie
         {info.counts.history > 1 ? 's' : ''} ({mo(info.parts.history)}), {info.counts.favorites} favori
         {info.counts.favorites > 1 ? 's' : ''} ({mo(info.parts.favorites)}). La limite est celle du
-        navigateur, pas du téléphone : elle vaut pour toute l'app, et chaque caractère y compte double.
+        moteur web de l'app, pas du téléphone : elle vaut pour toute l'app, et chaque caractère y compte double.
       </p>
 
       {info.counts.traces > 0 && (
@@ -382,8 +390,8 @@ function OfflineStorage() {
   if (!offline.isAvailable()) {
     return (
       <p className="muted small">
-        Ce navigateur ne sait pas garder de carte hors ligne. Les parcours, eux,
-        restent accessibles : ils sont déjà sur l'appareil.
+        Le stockage de l'appareil ne répond pas : les cartes ne peuvent pas être
+        gardées. Les parcours, eux, restent accessibles.
       </p>
     )
   }

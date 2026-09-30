@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { isNative } from './platform'
 import { locateOnce, watchPosition } from './position'
 
 /**
- * Géolocalisation du navigateur, avec ses états réels.
+ * La position de l'iPhone, avec ses états réels.
  *
- * Un `getCurrentPosition` isolé ne suffit pas : il ne dit pas si l'autorisation
- * a été refusée une fois pour toutes, il ne donne pas la précision, et il ne
- * met rien à jour ensuite. Or ces trois informations changent tout ce que
- * l'interface doit afficher — un point net à 400 m près est un mensonge, et
- * « réessayer » n'a aucun sens si l'utilisateur a bloqué l'accès.
+ * Une position isolée ne suffit pas : il faut savoir si l'autorisation a été
+ * refusée une fois pour toutes, avec quelle précision on est placé, et suivre
+ * ensuite. Ces trois informations changent tout ce que l'interface doit
+ * afficher — un point net à 400 m près est un mensonge, et « réessayer » n'a
+ * aucun sens si l'accès est refusé dans les Réglages.
  */
 export default function useGeolocation() {
   const [state, setState] = useState({
@@ -21,31 +20,6 @@ export default function useGeolocation() {
   })
   const [following, setFollowing] = useState(false)
 
-  // L'API Permissions dit si c'est refusé *avant* de déclencher une demande —
-  // ça évite de proposer un bouton qui ne peut pas fonctionner.
-  useEffect(() => {
-    // Dans l'app native, l'autorisation se demande au premier suivi, par iOS.
-    if (isNative() || !navigator.permissions?.query) return
-    let cancelled = false
-    navigator.permissions
-      .query({ name: 'geolocation' })
-      .then((status) => {
-        if (cancelled) return
-        if (status.state === 'denied') {
-          setState((s) => ({ ...s, status: 'denied', message: DENIED }))
-        }
-        status.onchange = () => {
-          if (status.state === 'denied') {
-            setState((s) => ({ ...s, status: 'denied', message: DENIED }))
-          }
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   const apply = useCallback((geo) => {
     setState({
       position: [geo.coords.longitude, geo.coords.latitude],
@@ -56,8 +30,7 @@ export default function useGeolocation() {
     })
   }, [])
 
-  // Les erreurs arrivent déjà ramenées à une forme commune par `position.js`,
-  // qu'elles viennent du navigateur ou de l'iPhone.
+  // Les erreurs arrivent déjà ramenées à une forme commune par `position.js`.
   const fail = useCallback((error) => {
     setState((s) => ({
       ...s,
@@ -80,6 +53,3 @@ export default function useGeolocation() {
 
   return { ...state, locate, following, setFollowing }
 }
-
-const DENIED =
-  "L'accès à ta position est bloqué pour ce site. Rouvre-le dans les réglages du navigateur (l'icône à gauche de l'adresse), ou place le départ à la main sur la carte."

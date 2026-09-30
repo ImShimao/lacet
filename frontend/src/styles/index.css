@@ -1,0 +1,25 @@
+/* Les styles de l'app, un fichier par partie de l'écran.
+
+   L'ordre compte : c'est celui de la cascade. La feuille du bas (`09-sheet`)
+   retouche les composants qui la précèdent selon son état, et les mouvements
+   (`15-motion`) passent après tout le reste. Un fichier ajouté va à la place
+   de ce qu'il retouche. */
+
+@import './01-base.css';
+@import './02-map-controls.css';
+@import './03-panel.css';
+@import './04-buttons.css';
+@import './05-run.css';
+@import './06-filters.css';
+@import './07-map-overlays.css';
+@import './08-cards.css';
+@import './09-sheet.css';
+@import './10-map-tools.css';
+@import './11-run-banner.css';
+@import './12-history.css';
+@import './13-elevation.css';
+@import './14-library.css';
+@import './15-motion.css';
+@import './16-summary.css';
+@import './17-strava.css';
+@import './18-stops.css';

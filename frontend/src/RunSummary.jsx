@@ -1,6 +1,7 @@
 import Icon from './Icon.jsx'
-import { downloadGpx } from './api'
+import { downloadRun } from './api'
 import { duration, km, pace } from './format'
+import { StravaButton } from './Strava.jsx'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -11,9 +12,10 @@ import { duration, km, pace } from './format'
  *
  * La trace affichée est **celle qu'on a réellement suivie**, pas le plan : la
  * carte la dessine derrière ce panneau, et l'export GPX la donne telle quelle,
- * pour une montre ou Strava.
+ * horodatée, pour une montre ou un autre service. Strava, lui, la reçoit
+ * directement — d'elle-même si l'envoi automatique est choisi.
  */
-export default function RunSummary({ entry, onClose }) {
+export default function RunSummary({ entry, onClose, onStrava }) {
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
@@ -72,12 +74,11 @@ export default function RunSummary({ entry, onClose }) {
         </p>
       )}
 
+      <StravaButton entry={entry} auto onSent={onStrava} />
+
       <div className="row">
         {entry.track?.length > 1 && (
-          <button
-            className="btn"
-            onClick={() => downloadGpx(`${entry.name} — trace`, entry.track, null, entry.sport)}
-          >
+          <button className="btn" onClick={() => downloadRun(entry)}>
             <Icon name="download" size={16} />
             Exporter ma trace
           </button>

@@ -10,11 +10,10 @@ import {
 } from './offlineMaps'
 
 /**
- * Les cartes hors ligne dans l'app iPhone.
+ * Les cartes hors ligne, rangées sur l'appareil et relues par la carte.
  *
- * Dans le navigateur, c'est le service worker qui ressert les fichiers gardés.
- * L'app iPhone n'en a pas : sans ce chemin, une carte se téléchargeait, s'
- * annonçait « hors ligne ✓ », et restait noire une fois dehors. Rien ne le
+ * L'app n'a pas de service worker : sans ce chemin, une carte se téléchargeait,
+ * s'annonçait « hors ligne ✓ », et restait noire une fois dehors. Rien ne le
  * montre tant qu'on a du réseau — c'est-à-dire pendant tous les essais faits à
  * la maison.
  */
@@ -98,10 +97,9 @@ beforeEach(async () => {
     setItem: (k, v) => donnees.set(k, v),
     removeItem: (k) => donnees.delete(k),
   })
-  vi.stubGlobal('window', { Capacitor: { isNativePlatform: () => true } })
-  // Présent, mais inutilisable : le magasin retombe en mémoire, comme prévu hors navigateur.
+  // Présent, mais inutilisable : le magasin retombe en mémoire.
   vi.stubGlobal('indexedDB', {})
-  // L'app iPhone n'a pas l'API de cache : y toucher serait une erreur.
+  // L'API de cache ne sert pas : y toucher serait une erreur.
   vi.stubGlobal('caches', {
     open: () => {
       throw new Error('API de cache utilisée dans l’app iPhone')
@@ -129,12 +127,6 @@ describe('le rangement sur l’appareil', () => {
   it('laisse partir normalement ce qui n’est pas gardé', async () => {
     await download(PARCOURS, STYLE)
     expect(offlineRequest('https://tiles-a.example/14/1/1.mvt', 'Tile')).toBeUndefined()
-  })
-
-  it('ne détourne rien dans le navigateur, où le service worker s’en charge', async () => {
-    await download(PARCOURS, STYLE)
-    vi.stubGlobal('window', {})
-    expect(offlineRequest(tuileDemandee(), 'Tile')).toBeUndefined()
   })
 })
 

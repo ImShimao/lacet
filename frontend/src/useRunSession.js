@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { clearRun, loadRun } from './runState'
-import * as voice from './voice'
 
 /**
  * La sortie, du premier appui au bilan.
@@ -66,15 +65,8 @@ export default function useRunSession({ toEntry, remember }) {
     heading,
     route,
 
-    /**
-     * Le compte à rebours avant le départ.
-     *
-     * Le doigt sur « Démarrer » est le seul geste que le navigateur accepte
-     * pour autoriser la voix : c'est ici qu'on la débloque, pas au premier
-     * virage — où il serait trop tard, et où rien ne serait dit.
-     */
+    /** Le compte à rebours avant le départ. */
     countdown(kind) {
-      voice.unlock()
       setStarting(kind)
     },
     cancelCountdown() {

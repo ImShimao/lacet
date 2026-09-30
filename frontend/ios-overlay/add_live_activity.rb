@@ -71,7 +71,7 @@ ext.build_configurations.each do |config|
   s['GENERATE_INFOPLIST_FILE'] = 'NO'
   s['SWIFT_VERSION'] = '5.0'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
-  s['TARGETED_DEVICE_FAMILY'] = '1,2'
+  s['TARGETED_DEVICE_FAMILY'] = '1'
   s['SKIP_INSTALL'] = 'YES'
   s['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
   # Même version que l'app : iOS refuse une extension qui ne la porte pas.
@@ -79,6 +79,12 @@ ext.build_configurations.each do |config|
   s['CURRENT_PROJECT_VERSION'] = build
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
 end
+
+# --- iPhone seulement ------------------------------------------------------------
+# Lacet n'a qu'une mise en page, celle du téléphone. Sur iPad, iOS l'ouvre donc
+# en mode iPhone, à sa taille, plutôt que d'étirer sur dix pouces un écran
+# pensé pour une main.
+app.build_configurations.each { |config| config.build_settings['TARGETED_DEVICE_FAMILY'] = '1' }
 
 # --- l'app embarque l'extension ------------------------------------------------
 app.add_dependency(ext)

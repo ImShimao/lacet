@@ -1,0 +1,128 @@
+import Icon from './Icon.jsx'
+import { KINDS, NEAR_M } from './pois'
+
+const kmText = (m) => (m / 1000).toFixed(1).replace('.', ',')
+
+/**
+ * Le réglage de « Mon compte » : quels arrêts montrer le long des boucles.
+ * `onChange` reçoit ce qui change, pas l'ensemble : deux cases touchées coup
+ * sur coup ne doivent pas s'écraser l'une l'autre.
+ * Rien n'est coché d'office — c'est une requête de plus, et une carte plus
+ * chargée, pour qui n'en a pas besoin.
+ */
+export function StopsSetting({ prefs, onChange }) {
+  return (
+    <>
+      <div className="checks" role="group" aria-label="Arrêts à montrer le long du parcours">
+        {Object.entries(KINDS).map(([kind, k]) => {
+          const on = Boolean(prefs?.[kind])
+          return (
+            <button
+              key={kind}
+              role="checkbox"
+              aria-checked={on}
+              className={`check ${on ? 'check--on' : ''}`}
+              onClick={() => onChange({ [kind]: !on })}
+            >
+              <span className="check__box">
+                <Icon name="check" size={13} />
+              </span>
+              <span className="check__label">
+                <Icon name={k.icon} size={17} />
+                {k.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="muted small">
+        Ceux qui sont à moins de {NEAR_M} m du tracé apparaissent sur la carte, dans le détail
+        du parcours, et pendant la sortie — « point d'eau dans 800 m ». D'après OpenStreetMap :
+        une fontaine peut être coupée l'hiver.
+      </p>
+    </>
+  )
+}
+
+/** Au-delà, la liste des kilomètres ne se lit plus : on dit l'écart. */
+const LIST_MAX = 6
+
+/**
+ * Le plus long tronçon sans arrêt, départ et arrivée compris : c'est lui qui
+ * dit s'il faut emporter sa gourde. `distance` : la longueur de la boucle.
+ */
+export function longestGap(stops, distance) {
+  const marks = [0, ...stops.map((s) => s.along), Math.max(distance, stops.at(-1)?.along ?? 0)]
+  let best = { from: 0, to: 0 }
+  for (let i = 1; i < marks.length; i += 1) {
+    if (marks[i] - marks[i - 1] > best.to - best.from) best = { from: marks[i - 1], to: marks[i] }
+  }
+  return best
+}
+
+/** Dans le détail d'un parcours : ce qu'on croise, et à quel kilomètre. */
+export function StopsList({ stops, loading, complete, prefs, distance = 0 }) {
+  const kinds = Object.keys(KINDS).filter((k) => prefs?.[k])
+  if (!kinds.length) return null
+  if (loading) return <p className="muted small stops">Recherche des points d'eau et toilettes…</p>
+
+  return (
+    <div className="stops">
+      {kinds.map((kind) => {
+        const here = stops.filter((s) => s.kind === kind)
+        const name = here.length > 1 ? KINDS[kind].plural : KINDS[kind].label.toLowerCase()
+        const gap = longestGap(here, distance)
+        return (
+          <div key={kind} className="stops__row">
+            <Icon name={KINDS[kind].icon} size={17} />
+            {here.length === 0 ? (
+              <span className="muted">
+                {complete
+                  ? kind === 'water'
+                    ? "Aucun point d'eau connu le long du tracé."
+                    : 'Pas de toilettes connues le long du tracé.'
+                  : 'Pas de réseau : rien à montrer pour l’instant.'}
+              </span>
+            ) : here.length <= LIST_MAX ? (
+              <span>
+                <b>
+                  {here.length} {name}
+                </b>{' '}
+                — km {here.map((s) => kmText(s.along) + (s.fee ? ' (payantes)' : '')).join(' · ')}
+              </span>
+            ) : (
+              <span>
+                <b>
+                  {here.length} {name}
+                </b>
+                , le plus long tronçon sans : <b>{kmText(gap.to - gap.from)} km</b> (km {kmText(gap.from)} → {kmText(gap.to)})
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * En course, le prochain de chaque genre devant soi. `along` : où l'on en est
+ * sur le tracé suivi.
+ */
+export function NextStops({ stops, along }) {
+  const next = Object.keys(KINDS)
+    .map((kind) => stops.find((s) => s.kind === kind && s.along > along))
+    .filter(Boolean)
+  if (!next.length) return null
+  return (
+    <div className="nextstops" role="status">
+      {next.map((s) => (
+        <span key={s.kind}>
+          <Icon name={KINDS[s.kind].icon} size={15} />
+          {KINDS[s.kind].label} dans{' '}
+          <b>{s.along - along >= 1000 ? `${kmText(s.along - along)} km` : `${Math.max(10, Math.round((s.along - along) / 10) * 10)} m`}</b>
+        </span>
+      ))}
+    </div>
+  )
+}

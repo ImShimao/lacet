@@ -2,22 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import ElevationSheet from './ElevationSheet.jsx'
-import { haversine, km, pace } from './format'
+import RunBanner from './RunBanner.jsx'
+import { ReportButton, RunControls, RunStats } from './RunPanel.jsx'
+import { NextStops } from './Stops.jsx'
+import useLiveActivity from './useLiveActivity'
+import { haversine } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt } from './routeTracker'
-import { lockScreenState, shouldRefresh } from './lockScreen'
+import { lockScreenState } from './lockScreen'
 import { actAt, announcement, chains, followingStep, previewAt, speedOr, thenLabel } from './guidance'
 import { motionTracker } from './autoPause'
 import { arrivalWatcher } from './arrival'
 import { REPORT_KINDS, addReport, blockedPoints } from './reports'
 import { load } from './storage'
 import * as voice from './voice'
-import SosButton from './SosButton.jsx'
 import { isNative } from './platform'
 import { watchPosition } from './position'
 import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
+import { capitalize, plannedPerKm, spoken, spokenSpeed } from './runFormat'
+
+/** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
+const haptic = (kind) => {
+  if (isNative()) import('./native').then((n) => n[kind]())
+}
 
 // Distance à laquelle on prévient d'une traversée à venir.
 const CROSSING_ALERT_M = 120
@@ -65,6 +74,11 @@ const MOVE_FOR_HEADING_M = 8
 const JUMP_M = 100
 const TOP_SPEED_MS = { run: 7, bike: 22 }
 
+// Un point d'eau ou des toilettes s'annoncent à cette distance : assez tôt pour
+// ralentir et regarder, assez tard pour qu'on s'en souvienne en y arrivant.
+const STOP_ALERT_M = 120
+const STOP_EVERY_M = 1000
+
 // Les bornes annoncées : chaque kilomètre à pied ; à vélo, où il en passe un
 // toutes les deux minutes, tous les cinq.
 const SPLIT_EVERY_KM = { run: 1, bike: 5 }
@@ -88,7 +102,7 @@ const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
 // `resuming` et non `resume` : une fonction interne porte déjà ce nom, et en
 // JavaScript une déclaration de fonction écrase le paramètre de même nom — la
 // sortie reprise repartait alors de zéro, sans une erreur.
-export default function LiveRun({ route, request, sport, resuming, stage, speaking, onPosition, onReroute, onStop }) {
+export default function LiveRun({ route, request, sport, resuming, stage, speaking, stops = [], onPosition, onReroute, onStop }) {
   const [state, setState] = useState({ distance: 0, elapsed: 0, points: 0 })
   const [error, setError] = useState(null)
   const [alert, setAlert] = useState(null)
@@ -98,9 +112,6 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
   const [paused, setPaused] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
-  // Le choix du signalement, ouvert par le bouton : « travaux », « passage
-  // fermé », « danger ».
-  const [reporting, setReporting] = useState(false)
 
   // Le tracé suivi : le parcours choisi, puis, après un recalcul, le raccord et
   // la fin de la boucle. Tenu aussi en référence : les relevés GPS arrivent
@@ -136,11 +147,15 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const lastSplit = useRef(0)
   const heading = useRef(null)
   const moved = useRef(null)
-  // L'écran de verrouillage : prêt ou non, et ce qu'on lui a envoyé en dernier.
-  const lockReady = useRef(false)
-  const shown = useRef(null)
-  const shownAt = useRef(0)
+  // L'écran de verrouillage — voir `useLiveActivity.js` — et la consigne qu'il montre.
+  const refreshLock = useLiveActivity(route)
   const upcomingStep = useRef(null)
+  // Les arrêts le long du tracé — lus dans le rappel des positions, créé une
+  // fois pour toutes — et ceux déjà annoncés.
+  const stopsRef = useRef(stops)
+  stopsRef.current = stops
+  const saidStops = useRef(new Set())
+  const lastStopSaid = useRef({})
   // Les pauses : leur genre, depuis quand, et le temps déjà passé à l'arrêt.
   // Tenues en références : le relevé GPS qui les déclenche doit lire la valeur
   // du moment, pas celle du dernier rendu.
@@ -204,41 +219,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setGuide(g)
   }, [route])
 
-  // Garder l'écran allumé pendant la sortie. Le verrou saute dès que l'onglet
-  // passe en arrière-plan : il faut le reprendre au retour, sinon l'écran
-  // s'éteint dès le premier coup d'œil au téléphone.
+  // Garder l'écran allumé pendant la sortie.
   useEffect(() => {
-    // Dans l'app native, le verrou tient pour de bon, onglet ou pas.
-    if (isNative()) {
-      const native = import('./native')
-      native.then((n) => n.keepScreenOn())
-      return () => {
-        native.then((n) => n.allowScreenOff())
-      }
-    }
-
-    let lock = null
-    let cancelled = false
-
-    const acquire = async () => {
-      if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return
-      try {
-        lock = await navigator.wakeLock.request('screen')
-      } catch {
-        /* refusé (batterie faible, onglet masqué) : sans conséquence */
-      }
-    }
-
-    const onVisible = () => {
-      if (!cancelled && document.visibilityState === 'visible') acquire()
-    }
-
-    acquire()
-    document.addEventListener('visibilitychange', onVisible)
+    if (!isNative()) return undefined
+    const native = import('./native')
+    native.then((n) => n.keepScreenOn())
     return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisible)
-      lock?.release().catch(() => {})
+      native.then((n) => n.allowScreenOff())
     }
   }, [])
 
@@ -248,8 +235,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       keepRun()
     }, 1000)
 
-    // `background` : dans l'app native, le suivi continue écran verrouillé,
-    // téléphone dans la poche — c'est toute la différence avec Safari.
+    // `background` : le suivi continue écran verrouillé, téléphone dans la poche.
     const stopWatching = watchPosition(
       (position) => {
         setError(null)
@@ -339,41 +325,6 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
 
-  // L'écran de verrouillage, dans l'app iPhone : la consigne à venir, sa
-  // distance et l'heure d'arrivée, lisibles en allumant l'écran, sans
-  // déverrouiller ni rouvrir l'app. Une activité en direct, dessinée par
-  // l'extension `LacetWidgets` — et rien d'autre : ce qu'iOS refuse d'afficher,
-  // « Mon compte » l'explique, plutôt que de le remplacer par un pis-aller.
-  useEffect(() => {
-    if (!isNative() || !route) return undefined
-    let cancelled = false
-    const native = import('./native')
-    native.then(async (n) => {
-      const first = lockScreenState({
-        route,
-        step: nextInstruction(route.instructions || [], 0, new Set()),
-        along: 0,
-        offRoute: false,
-        travelled: 0,
-        elapsedS: 0,
-      })
-      const { started } = await n.startLiveActivity(first)
-      if (cancelled) {
-        if (started) n.endLiveActivity()
-        return
-      }
-      lockReady.current = started
-      shown.current = first
-      shownAt.current = Date.now()
-    })
-    return () => {
-      cancelled = true
-      lockReady.current = false
-      native.then((n) => n.endLiveActivity())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route])
-
   /**
    * Écrit la sortie sur le disque, toutes les dix secondes.
    *
@@ -423,7 +374,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setState((s) => ({ ...s, elapsed: movingSeconds(), distance: covered.current }))
     if (kind === 'auto') {
       voice.speak('Pause automatique.', { priority: false })
-      if (isNative()) import('./native').then((n) => n.pulseHaptic())
+      haptic('pulseHaptic')
     }
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
@@ -460,25 +411,23 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
   /** Met l'écran de verrouillage à jour, sans le réveiller pour rien. */
   function refreshLockScreen(upcoming, along) {
-    if (!lockReady.current) return
-    const next = lockScreenState({
-      route: guideRef.current.route,
-      step: upcoming,
-      along,
-      offRoute: strayCount.current >= OFF_ROUTE_FIXES,
-      paused: Boolean(pausedKind.current),
-      travelled: covered.current,
-      elapsedS: movingSeconds(),
-      share: outingShare(along),
-    })
-    const now = Date.now()
     // Près d'un virage, la distance affichée doit suivre le pas : cinq secondes
     // de retard, c'est quinze mètres à pied, et le virage déjà passé à vélo.
     const minMs = upcoming && upcoming.remaining < 250 ? 1000 : 5000
-    if (!shouldRefresh(shown.current, next, now - shownAt.current, minMs)) return
-    shown.current = next
-    shownAt.current = now
-    import('./native').then((n) => n.updateLiveActivity(next))
+    refreshLock(
+      () =>
+        lockScreenState({
+          route: guideRef.current.route,
+          step: upcoming,
+          along,
+          offRoute: strayCount.current >= OFF_ROUTE_FIXES,
+          paused: Boolean(pausedKind.current),
+          travelled: covered.current,
+          elapsedS: movingSeconds(),
+          share: outingShare(along),
+        }),
+      minMs,
+    )
   }
 
   /**
@@ -593,6 +542,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (!quiet) {
       watchArrival(point, found)
       watchTurnBack(found)
+      if (!found.offRoute) announceStop(found.along)
     }
 
     const speed = runSpeed()
@@ -626,6 +576,25 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
   const say = (text) => {
     if (text) voice.speak(text)
+  }
+
+  /**
+   * « Point d'eau dans cent mètres. » Une fois par arrêt, sans couper une
+   * consigne : c'est une information, pas une manœuvre. Et pas plus d'une fois
+   * par kilomètre et par genre : à Paris, il y a une fontaine tous les deux
+   * cents mètres, et la voix n'aurait plus parlé que de ça.
+   */
+  function announceStop(along) {
+    const next = stopsRef.current.find(
+      (s) => s.along > along && s.along - along <= STOP_ALERT_M && !saidStops.current.has(`${s.kind}@${s.along}`),
+    )
+    if (!next) return
+    saidStops.current.add(`${next.kind}@${next.along}`)
+    const last = lastStopSaid.current[next.kind]
+    if (last != null && next.along - last < STOP_EVERY_M) return
+    lastStopSaid.current[next.kind] = next.along
+    const metres = Math.max(20, Math.round((next.along - along) / 10) * 10)
+    voice.speak(`${next.kind === 'water' ? "Point d'eau" : 'Toilettes'} dans ${metres} mètres.`, { priority: false })
   }
 
   /**
@@ -700,8 +669,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (verdict !== 'arrived') return
     finishing.current = true
     voice.speak('Arrivée. Sortie terminée.')
-    if (isNative()) import('./native').then((n) => n.warnHaptic())
-    else if (navigator.vibrate) navigator.vibrate([120, 80, 120, 80, 220])
+    haptic('warnHaptic')
     finish()
   }
 
@@ -715,11 +683,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    */
   function report(kind, at = null) {
     const point = at ?? here.current
-    setReporting(false)
     if (!point) return
     addReport({ lon: point[0], lat: point[1], kind })
     if (at && turnedBack.current) setTurnBack({ ...turnedBack.current, reported: true })
-    if (isNative()) import('./native').then((n) => n.pulseHaptic())
+    haptic('pulseHaptic')
     const said = REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.'
     voice.speak(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
     if (canDetour) detour(here.current ?? point, { forced: true })
@@ -768,7 +735,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       acted.current.add(0)
       previewed.current.add(0)
       voice.speak(`Nouvel itinéraire. ${next.instructions[0]?.text ?? ''}`)
-      if (isNative()) import('./native').then((n) => n.pulseHaptic())
+      haptic('pulseHaptic')
       onReroute?.(next)
     } catch {
       if (forced) {
@@ -801,6 +768,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     announced.current = new Set()
     previewed.current = new Set()
     acted.current = new Set()
+    // Les distances des arrêts se comptent désormais sur le nouveau tracé.
+    saidStops.current = new Set()
+    lastStopSaid.current = {}
     setOffRoute(false)
     setRerouteDue(null)
     setCurrent(null)
@@ -819,8 +789,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (!upcoming) return
     warned.current.add(upcoming.key)
     setAlert(upcoming)
-    if (isNative()) import('./native').then((n) => n.warnHaptic())
-    else if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+    haptic('warnHaptic')
     setTimeout(() => setAlert(null), 8000)
   }
 
@@ -890,59 +859,18 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         </div>
       )}
 
-      {/* « Combien il reste » se lit en kilomètres dans les chiffres ; en
-          courant, la question est plutôt « j'en ai pour combien de temps », et
-          « je rentre à quelle heure ». Les deux se déduisent de l'allure du
-          moment — celle qu'on tient vraiment, pas celle qu'on avait prévue. */}
-      {left !== null && (
-        <p className="live__eta">
-          Reste environ <b>{minutes(Math.round(left / 60))}</b> · fin vers{' '}
-          <b>{clockTime(Date.now() + left * 1000)}</b>
-        </p>
-      )}
+      <RunStats
+        bike={bike}
+        state={state}
+        moving={moving}
+        left={left}
+        remaining={remaining}
+        paused={paused}
+        laps={laps}
+        lap={Math.min(laps, Math.floor(Math.max(0, planAlong) / lapLength) + 1)}
+      />
 
-      {paused && (
-        <div className="live__paused" role="status">
-          <Icon name="pause" size={17} />
-          <div>
-            <b>{paused === 'auto' ? 'Pause automatique' : 'En pause'}</b>
-            <span>
-              {paused === 'auto'
-                ? 'Le chrono reprend tout seul dès que tu repars.'
-                : 'Reprends quand tu veux, ou termine la sortie.'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className={`live__clock ${paused ? 'live__clock--paused' : ''}`} role="timer" aria-label="Temps de course">
-        {clock(state.elapsed)}
-      </div>
-
-      <div className="stats stats--live">
-        <div>
-          <b>{km(state.distance)}</b>
-          <span>Distance (km)</span>
-        </div>
-        <div>
-          <b>{bike ? speed(state.distance, state.elapsed) : pace(moving)}</b>
-          <span>{bike ? 'Vitesse (km/h)' : 'Allure (/km)'}</span>
-        </div>
-        <div>
-          <b>{remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}</b>
-          <span>{remaining === null ? (bike ? 'Allure (/km)' : 'Vitesse (km/h)') : 'Restant (km)'}</span>
-        </div>
-      </div>
-
-      {/* Sur un parcours à tours, la question qu'on se pose en courant n'est pas
-          « combien de kilomètres » mais « quel tour ». Les trois tours sont
-          identiques : sans compteur, rien ne les distingue. */}
-      {laps > 1 && (
-        <div className="lapcount" role="status">
-          Tour <b>{Math.min(laps, Math.floor(Math.max(0, planAlong) / lapLength) + 1)}</b>
-          {' '}sur <b>{laps}</b>
-        </div>
-      )}
+      {route && stops.length > 0 && <NextStops stops={stops} along={along} />}
 
       {alert && (
         <div className="live__alert" role="alert">
@@ -959,59 +887,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         <div className="live__wait">Acquisition du signal GPS…</div>
       )}
 
-      {/* Ce que la carte ne sait pas, dit en passant devant.
-          Deux appuis, sans rien à viser : on est devant l'obstacle, c'est la
-          position qui fait le signalement. Le second appui relance aussitôt le
-          calcul d'un autre chemin — voir `report`. */}
-      {reporting ? (
-        <div className="signal signal--open" role="group" aria-label="Signaler un problème">
-          {REPORT_KINDS.map((k) => (
-            <button key={k.key} className="signal__kind" onClick={() => report(k.key)}>
-              <Icon name={k.icon} size={19} />
-              {k.label}
-            </button>
-          ))}
-          <button className="signal__cancel" onClick={() => setReporting(false)} aria-label="Annuler">
-            <Icon name="close" size={16} />
-          </button>
-        </div>
-      ) : (
-        <button className="signal" onClick={() => setReporting(true)} disabled={!here.current}>
-          <Icon name="cone" size={17} />
-          Signaler un problème ici
-        </button>
-      )}
+      <ReportButton disabled={!here.current} onReport={(kind) => report(kind)} />
 
-      {/* Collés au bas du panneau, à portée de pouce. En course : le profil, la
-          pause, le SOS. « Terminer » n'apparaît qu'en pause : un bouton d'arrêt
-          touché par erreur en courant effaçait la fin de la sortie. */}
-      <div className="live__controls runctl">
-        {paused ? (
-          <button className="runctl__side runctl__stop" onClick={finish}>
-            <Icon name="stop" size={18} />
-            <span>Terminer</span>
-          </button>
-        ) : (
-          <button
-            className="runctl__side"
-            onClick={() => setProfileOpen(true)}
-            disabled={!hasProfile}
-            aria-label="Voir le dénivelé prévu"
-          >
-            <Icon name="mountain" size={19} />
-            <span>Dénivelé</span>
-          </button>
-        )}
-        <button
-          className={`runctl__main ${paused ? 'runctl__main--paused' : ''}`}
-          onClick={togglePause}
-          aria-label={paused ? 'Reprendre' : 'Mettre en pause'}
-          aria-pressed={Boolean(paused)}
-        >
-          <Icon name={paused ? 'play' : 'pause'} size={30} strokeWidth={2.4} />
-        </button>
-        <SosButton position={here} distance={state.distance} elapsed={state.elapsed} className="runctl__sos" />
-      </div>
+      <RunControls
+        paused={paused}
+        onFinish={finish}
+        onProfile={hasProfile ? () => setProfileOpen(true) : null}
+        onTogglePause={togglePause}
+        here={here}
+        distance={state.distance}
+        elapsed={state.elapsed}
+      />
 
       {profileOpen && hasProfile && (
         <ElevationSheet route={route} along={planAlong} onClose={() => setProfileOpen(false)} />
@@ -1019,171 +905,3 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     </div>
   )
 }
-
-/**
- * La consigne du moment, en bandeau sur la carte — c'est ce qu'on regarde en
- * courant. Le virage en pictogramme, sa distance en très grand, la rue en
- * toutes lettres.
- */
-function RunBanner({ step, offRoute, turnBack, onBlocked, rerouting, rerouteIn, onReroute, hasGuidance, waiting }) {
-  if (rerouting) {
-    return (
-      <div className="runbar runbar--stray" role="status">
-        <span className="runbar__spin" aria-hidden="true" />
-        <div className="runbar__text">
-          <b>Nouvel itinéraire…</b>
-          <em>Recherche d'un chemin pour finir la boucle</em>
-        </div>
-      </div>
-    )
-  }
-  if (offRoute) {
-    return (
-      <div className="runbar runbar--stray" role="status">
-        <span className="runbar__turn">
-          <Icon name="warning" size={30} strokeWidth={2.2} />
-        </span>
-        <div className="runbar__text">
-          <b>Hors parcours</b>
-          <em>
-            {rerouteIn != null
-              ? rerouteIn > 0
-                ? `Nouvel itinéraire dans ${rerouteIn} s`
-                : 'Nouvel itinéraire au prochain relevé'
-              : 'Reviens sur le tracé pour reprendre le guidage'}
-          </em>
-        </div>
-        {onReroute && (
-          <button className="runbar__act" onClick={onReroute}>
-            Recalculer
-          </button>
-        )}
-      </div>
-    )
-  }
-  if (turnBack) {
-    return (
-      <div className="runbar runbar--stray" role="status">
-        <span className="runbar__turn">
-          <Icon name="uturn" size={30} strokeWidth={2.2} />
-        </span>
-        <div className="runbar__text">
-          <b>Demi-tour</b>
-          <em>
-            {turnBack.reported
-              ? 'Passage fermé signalé : il sera évité.'
-              : 'Passage fermé devant ? Signale-le, et le parcours le contournera.'}
-          </em>
-        </div>
-        {onBlocked && !turnBack.reported && (
-          <button className="runbar__act" onClick={onBlocked}>
-            Passage fermé
-          </button>
-        )}
-      </div>
-    )
-  }
-  if (!hasGuidance) {
-    return (
-      <div className="runbar runbar--idle" role="status">
-        <div className="runbar__text">
-          <em>Parcours enregistré sans consignes : suis le tracé sur la carte.</em>
-        </div>
-      </div>
-    )
-  }
-  if (!step) {
-    return (
-      <div className="runbar runbar--idle" role="status">
-        <div className="runbar__text">
-          <em>{waiting ? 'Guidage en attente du signal GPS…' : 'Suis le tracé.'}</em>
-        </div>
-      </div>
-    )
-  }
-  const distance = step.imminent ? 'Maintenant' : roundedDistance(step.remaining)
-  return (
-    <div className="runbar" role="status">
-      <span className="runbar__turn">
-        <Icon name={turnIcon(step.step.turn)} size={34} strokeWidth={2.4} />
-      </span>
-      <div className="runbar__text">
-        <b>{distance}</b>
-        <em>{step.step.text}</em>
-        {step.step.caution && <small>Traversée non protégée</small>}
-        {/* La manœuvre d'après, quand elle suit de si près qu'on ne la verrait
-            qu'une fois celle-ci passée — trop tard pour se placer. */}
-        {step.then && <span className="runbar__then">{step.then}</span>}
-      </div>
-    </div>
-  )
-}
-
-/** L'allure demandée au moteur, en secondes par kilomètre. */
-function plannedPerKm(request, bike) {
-  if (!request) return 0
-  if (bike || request.speed_kmh) return request.speed_kmh ? 3600 / request.speed_kmh : 0
-  return request.pace_sec_per_km || 0
-}
-
-/** « 42 min », « 1 h 05 » — jamais « 1:05:00 », qu'on lit comme un chrono. */
-function minutes(total) {
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  if (!h) return `${m} min`
-  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`
-}
-
-/** L'heure qu'il sera, dans l'écriture du téléphone. */
-const clockTime = (at) =>
-  new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-
-function roundedDistance(metres) {
-  if (metres >= 1000) return `${(metres / 1000).toFixed(1).replace('.', ',')} km`
-  return `${Math.round(metres / 10) * 10} m`
-}
-
-function turnIcon(turn) {
-  if (turn === 'finish') return 'flag'
-  if (turn === 'lap') return 'refresh'
-  if (turn === 'start') return 'navigation'
-  if (turn === 'uturn') return 'uturn'
-  if (turn.includes('left')) return 'turnLeft'
-  if (turn.includes('right')) return 'turnRight'
-  return 'straight'
-}
-
-/** « 00:12:07 » : le chrono de course, comme sur une montre. */
-function clock(seconds) {
-  const total = Math.floor(seconds)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':')
-}
-
-/** « 11,4 » km/h. */
-function speed(metres, seconds) {
-  if (metres < 50 || seconds <= 0) return '—'
-  return ((metres / seconds) * 3.6).toFixed(1).replace('.', ',')
-}
-
-/** « 5 minutes 30 » — la synthèse vocale lit « 5:30 » comme une heure. */
-function spoken(secondsPerKm) {
-  if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return 'inconnue'
-  // Arrondi d'abord, découpage ensuite : sinon on annonce « 4 minutes 60 ».
-  const total = Math.round(secondsPerKm)
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  if (!m) return `${s} secondes`
-  const minutes = m > 1 ? `${m} minutes` : '1 minute'
-  return s ? `${minutes} ${s}` : minutes
-}
-
-/** « 24,5 kilomètres-heure ». */
-function spokenSpeed(kmh) {
-  if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'
-  return `${String(Math.round(kmh * 10) / 10).replace('.', ',')} kilomètres-heure`
-}
-
-const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1)

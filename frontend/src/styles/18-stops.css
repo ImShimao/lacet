@@ -1,0 +1,72 @@
+/* Les points d'eau et toilettes : une ligne par genre dans le détail, un
+   repère rond sur la carte, une ligne discrète pendant la sortie. */
+
+.check__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stops {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.stops__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  align-items: start;
+}
+.stops__row .icon {
+  color: #5ab8ff;
+  margin-top: 1px;
+}
+.stops__row b {
+  color: var(--text);
+}
+
+/* Sur la carte : un rond sombre, l'icône en couleur — lisible sur les huit
+   fonds, sans rivaliser avec le tracé. */
+.poi {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(19, 17, 26, 0.92);
+  border: 1.5px solid #5ab8ff;
+  color: #5ab8ff;
+  box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.8);
+}
+.poi--toilets {
+  border-color: #c9a8ff;
+  color: #c9a8ff;
+}
+
+.nextstops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.nextstops span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.nextstops .icon {
+  color: #5ab8ff;
+}
+.nextstops b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

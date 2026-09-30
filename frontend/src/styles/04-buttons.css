@@ -1,0 +1,160 @@
+/* Les boutons, les choix segmentés, et le squelette qui tient la place pendant un calcul. */
+
+/* ══ boutons ═══════════════════════════════════════════════════════════ */
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 13px 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.btn--primary {
+  background: var(--accent-grad);
+  border-color: transparent;
+  box-shadow: 0 12px 26px -16px var(--accent-glow);
+  color: #fff;
+}
+.btn--big {
+  font-size: 15.5px;
+}
+.btn--icon {
+  flex: none;
+  width: 48px;
+  padding: 13px 0;
+}
+.btn--on {
+  color: var(--accent-text);
+  border-color: #8b5cf6;
+}
+
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--surface-3);
+  border-radius: var(--r);
+  padding: 3px;
+  gap: 3px;
+}
+.seg button {
+  padding: 13px 8px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.seg button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ══ squelette de chargement ═══════════════════════════════════════════ */
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+  border-radius: 10px;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton--line {
+  height: 16px;
+}
+.skeleton--block {
+  height: 76px;
+}
+
+/* L'avancement d'une recherche calculée sur l'appareil. La barre suit les
+   tuiles téléchargées ; pour les étapes dont on ne connaît pas la durée, un
+   reflet qui passe dit que ça avance sans promettre un pourcentage faux. */
+/* Dans l'app iPhone, seuls les champs de saisie se sélectionnent : voir
+   `main.jsx` pour la raison. Sur le web, la sélection reste normale — on y
+   copie une adresse ou un nom de rue, et rien ne vient la contrarier. */
+html.native {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.native input,
+html.native textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.progress__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.progress__label b {
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.progress__bar {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.progress__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent-grad);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.progress__bar--busy i {
+  width: 35%;
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress__bar--busy i {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

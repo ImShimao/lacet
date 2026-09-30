@@ -62,7 +62,15 @@ function reseau(tailles) {
       const z = zoomDe(url)
       const size = z === null ? 1024 : tailles[z]
       if (size === 0) throw new TypeError('Failed to fetch')
-      return { ok: true, clone: () => ({ blob: async () => ({ size }) }) }
+      return {
+        ok: true,
+        headers: { get: () => 'application/octet-stream' },
+        // Seule la taille compte ici : pas la peine d'allouer six mégaoctets.
+        arrayBuffer: async () => {
+          mises.push(url)
+          return { byteLength: size }
+        },
+      }
     }),
   )
 }
@@ -76,13 +84,8 @@ beforeEach(() => {
   }
   mises = []
   vi.stubGlobal('localStorage', stockage)
-  vi.stubGlobal('caches', {
-    open: async () => ({
-      put: async (url) => mises.push(url),
-      delete: async () => true,
-    }),
-    delete: async () => true,
-  })
+  // Présent, mais inutilisable : le magasin retombe en mémoire.
+  vi.stubGlobal('indexedDB', {})
 })
 
 afterEach(() => {

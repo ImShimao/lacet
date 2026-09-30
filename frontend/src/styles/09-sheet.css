@@ -1,0 +1,351 @@
+/* La feuille du bas et ses quatre états : repliée, détail, page, sortie. */
+
+/* ══ la feuille ═════════════════════════════════════════════════════════ */
+
+/* La poignée : seulement là où le panneau est une feuille qu'on tire (le
+   détail d'un parcours) ; ailleurs elle n'aurait rien à tirer. */
+.grabber {
+  display: block;
+  width: 100%;
+  /* Le trait ne fait que 4px de haut ; la zone qui l'attrape en fait 14, plus
+     les 5px de marge du panneau au-dessus. */
+  height: 14px;
+  margin-bottom: -4px;
+  padding: 0;
+  position: relative;
+  /* Sans cela, WebKit interprète le glissement vertical comme un défilement
+     et ne nous envoie plus rien après le premier pixel. */
+  touch-action: none;
+}
+.grabber::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  transition: background 0.12s ease, width 0.12s ease;
+}
+.grabber:active::before {
+  background: var(--accent);
+  width: 52px;
+}
+
+/* L'attribution et la consigne de placement se posent au-dessus de ce qui
+   recouvre la carte — `--sheet-cover`, mesuré par l'app. */
+.maplibregl-ctrl-bottom-left,
+.maplibregl-ctrl-bottom-right {
+  bottom: var(--sheet-cover, 0px);
+}
+.stage__hint {
+  bottom: calc(var(--sheet-cover, 0px) + 12px);
+}
+
+/* ── repliée ── */
+.shell[data-sheet='peek'] .side {
+  max-height: 78cqh;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* Le panneau transparent ne doit pas confisquer la carte : seuls ses
+   éléments visibles répondent au doigt, le reste laisse passer le geste. */
+.shell[data-sheet='peek'] .side,
+.shell[data-sheet='peek'] .side__head,
+.shell[data-sheet='peek'] .side__body,
+.shell[data-sheet='peek'] .panel {
+  pointer-events: none;
+}
+.shell[data-sheet='peek'] .sportpill,
+.shell[data-sheet='peek'] .banner,
+.shell[data-sheet='peek'] .panel > *,
+.shell[data-sheet='peek'] .panel:not(.panel--results),
+.shell[data-sheet='peek'] .side__tabs {
+  pointer-events: auto;
+}
+.shell[data-sheet='peek'] .side__head {
+  padding: 0 12px 8px;
+  border-bottom: none;
+}
+/* L'activité et ses réglages : une pastille posée **sous la recherche**,
+   avec elle. Les deux disent la même chose — ce qu'on cherche, et pour quel
+   sport — et les séparer, l'une en haut, l'autre flottant au milieu de la
+   carte au-dessus des propositions, donnait un écran encombré sans qu'on
+   sache où regarder. En haut, la carte reste dégagée.
+
+   Posée en `fixed` : elle appartient à l'en-tête du panneau, qui vit en bas
+   de l'écran, et seule cette place la sort de là. `#root` porte la
+   rotation de l'app, donc téléphone couché elle suit. */
+.shell[data-sheet='peek'] .sportpill {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 63px);
+  left: 12px;
+  z-index: 6;
+  width: auto;
+  align-self: flex-start;
+  padding: 8px 13px;
+  background: rgba(27, 24, 36, 0.94);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+}
+.shell[data-sheet='peek'] .side__head {
+  padding-bottom: 0;
+}
+.shell[data-sheet='peek'] .sportpill__spec {
+  margin-left: 6px;
+}
+.shell[data-sheet='peek'] .side__body {
+  mask-image: none;
+}
+.shell[data-sheet='peek'] .banner {
+  margin: 0 12px 8px;
+  background: #24161f;
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+}
+.shell[data-sheet='peek'] .panel {
+  padding: 0 0 2px;
+  gap: 8px;
+}
+/* Sans propositions — accueil, recherche en cours, erreur — le contenu
+   devient lui-même une carte flottante. */
+.shell[data-sheet='peek'] .panel:not(.panel--results) {
+  margin: 0 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.95);
+}
+.shell[data-sheet='peek'] .panel:not(.panel--results) .origin {
+  padding: 0;
+  border: none;
+  background: none;
+}
+/* Avec propositions : les cartes et la barre d'action, rien d'autre ; le
+   reste attend dans le détail. Un avertissement reste, lui : il change le
+   sens de ce qu'on regarde. */
+.shell[data-sheet='peek'] .panel--results > :not(.cards):not(.actionbar):not(.notice),
+.shell[data-sheet='peek'] .panel--results > .notice--detail {
+  display: none;
+}
+.shell[data-sheet='peek'] .panel--results > .notice {
+  margin: 0 12px;
+  background-color: var(--surface-2);
+}
+.shell[data-sheet='peek'] .cards {
+  margin-inline: 0;
+}
+.shell[data-sheet='peek'] .cards__dots {
+  display: none;
+}
+/* Les voisines s'estompent vers le bord au lieu d'y être tranchées — sur
+   tablette, la colonne s'arrête bien avant l'écran. */
+.shell[data-sheet='peek'] .cards__track {
+  mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+/* Posées sur la carte, les voisines ne peuvent plus s'effacer par la
+   transparence — le fond de carte transparaîtrait au travers. On les
+   assombrit à la place. */
+.shell[data-sheet='peek'] .rcard {
+  opacity: 1;
+  box-shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.95);
+}
+.shell[data-sheet='peek'] .rcard:not(.rcard--on) {
+  filter: brightness(0.6);
+}
+.shell[data-sheet='peek'] .rcard--on {
+  box-shadow:
+    0 16px 34px -16px rgba(0, 0, 0, 0.95),
+    0 14px 34px -20px var(--accent-glow);
+}
+.shell[data-sheet='peek'] .rcard__more {
+  display: inline-flex;
+}
+.shell[data-sheet='peek'] .actionbar {
+  position: static;
+  margin: 0;
+  padding: 2px 12px 0;
+  background: none;
+}
+.shell[data-sheet='peek'] .actionbar .btn--icon {
+  background: rgba(27, 24, 36, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+/* ── feuille opaque : le détail, les pages, la sortie ── */
+.shell[data-sheet='full'] .side,
+.shell[data-sheet='page'] .side,
+.shell[data-sheet='live'] .side {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -14px 44px -14px rgba(0, 0, 0, 0.95);
+}
+.shell[data-sheet='full'] .side {
+  height: 88cqh;
+  /* Le geste de fermeture : la feuille descend avec le doigt, puis revient
+     ou s'efface. Sans transformation au repos (`0px` compte comme une
+     transformation), les éléments en position fixe se caleraient sur elle. */
+  transition: transform 0.18s ease-out;
+}
+.shell[data-sheet='full'][data-dragging] .side {
+  transform: translateY(var(--sheet-drag, 0px));
+  transition: none;
+}
+/* La fermeture : la feuille finit sa course vers le bas, puis rend la place.
+   Disparaître d'un coup donnait l'impression d'un écran qui saute. */
+.shell[data-sheet='full'][data-closing] .side {
+  transform: translateY(var(--sheet-drag, 0px));
+  transition: transform 0.18s cubic-bezier(0.4, 0, 1, 1);
+}
+/* L'en-tête est la zone de préhension : le doigt doit y glisser sans que la
+   page tente de défiler. */
+.shell[data-sheet='full'] .side__head {
+  touch-action: none;
+}
+/* Détail ouvert, l'activité s'efface : c'est le parcours qu'on regarde, et
+   la pastille se retrouverait posée sur la bande de carte qui reste. */
+.shell[data-sheet='full'] .sportpill {
+  display: none;
+}
+/* Les pages de liste prennent tout l'écran. La bande de carte qui restait
+   au-dessus ne servait à rien — on y lit un historique, pas un itinéraire —
+   et elle coûtait les deux centimètres qui obligeaient à faire défiler pour
+   voir la troisième sortie. */
+.shell[data-sheet='page'] .side {
+  height: 100cqh;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+.shell[data-sheet='page'] .side__title {
+  display: block;
+  padding-inline: 4px;
+}
+.shell[data-sheet='page'] .sportpill {
+  display: none;
+}
+.shell[data-sheet='live'] .side {
+  max-height: 64cqh;
+}
+.shell[data-sheet='live'] .side__head {
+  padding-top: 14px;
+}
+/* En plein écran, l'en-tête passe sous l'encoche : c'est à lui de s'en
+   écarter, la carte ne le fait plus pour lui. */
+.shell[data-sheet='page'] .side__head {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+.shell:not([data-sheet='full']) .grabber {
+  display: none;
+}
+
+/* Feuille haute : de la carte, il ne reste qu'une bande. Ce qui y dépasse
+   encore — les boutons coupés à mi-hauteur, l'attribution posée sur le
+   tracé — ne ferait que l'encombrer. On les range le temps de la lecture. */
+.shell[data-sheet='full'] .stage__tools,
+.shell[data-sheet='page'] .stage__tools,
+.shell[data-sheet='full'] .maplibregl-ctrl-bottom-left,
+.shell[data-sheet='full'] .maplibregl-ctrl-bottom-right,
+.shell[data-sheet='page'] .maplibregl-ctrl-bottom-left,
+.shell[data-sheet='page'] .maplibregl-ctrl-bottom-right {
+  visibility: hidden;
+}
+
+.banner .banner__close {
+  padding: 8px;
+  margin: -6px -4px -6px 0;
+}
+
+/* ── contrôles de la sortie, collés au bas ────────────────────────────── */
+
+.live__controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: 0 -18px -18px;
+  padding: 18px 18px 14px;
+  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+}
+.side__body:has(.live__controls) {
+  mask-image: none;
+}
+
+/* ── petit téléphone (SE, mini) : on reprend les marges avant de rogner le texte ── */
+
+@container lacet (max-width: 380px) {
+  .side__head,
+  .panel {
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+  .banner {
+    margin-left: 13px;
+    margin-right: 13px;
+  }
+  .live {
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+  .stats > div {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .stats b {
+    font-size: 15px;
+  }
+  .stats span {
+    font-size: 9.5px;
+  }
+  .live__big b {
+    font-size: 46px;
+  }
+  .sheet {
+    padding: 10px;
+  }
+
+  .cards {
+    margin-inline: -13px;
+  }
+  .actionbar {
+    margin-inline: -13px;
+    padding-inline: 13px;
+  }
+  .rcard__km b {
+    font-size: 31px;
+  }
+}
+
+/* ── téléphone court (SE, petits Android) ─────────────────────────────
+   En 640px de haut, la carte, l'en-tête, une carte de parcours, la barre
+   d'action et les onglets ne tiennent pas tous à leur taille normale : la
+   barre finissait par masquer la proposition. On cède un peu de chaque. */
+
+@container lacet (max-height: 720px) {
+  .rcard {
+    padding: 10px 12px;
+  }
+  .rcard__top {
+    margin-bottom: 4px;
+  }
+  .rcard__km b {
+    font-size: 30px;
+  }
+  .rcard__stats {
+    margin-top: 7px;
+    padding-top: 7px;
+  }
+  .actionbar {
+    padding-block: 12px 10px;
+  }
+  .actionbar .btn {
+    padding-block: 11px;
+  }
+}

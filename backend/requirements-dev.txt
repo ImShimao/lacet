@@ -1,6 +1,4 @@
-# De quoi lancer les tests. Volontairement séparé : l'image Docker
-# n'installe que `requirements.txt`, et embarquer pytest dans un serveur
-# de production, c'est du poids et de la surface d'attaque pour rien.
+# De quoi lancer les tests du moteur de référence, en plus du moteur lui-même.
 -r requirements.txt
 pytest==8.3.4
 pytest-asyncio==0.25.0

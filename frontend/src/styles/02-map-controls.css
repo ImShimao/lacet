@@ -1,0 +1,241 @@
+/* Ce qui flotte sur la carte : la recherche d'un lieu, la colonne de boutons, la consigne de placement. */
+
+/* ══ contrôles flottants sur la carte ══════════════════════════════════ */
+
+.stage__top {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 12px;
+  width: calc(100% - 80px);
+  z-index: 5;
+}
+
+.stage__tools {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 44px : la plus petite cible qu'un pouce atteint sans viser. */
+.tool {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r);
+  background: rgba(19, 17, 26, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  color: var(--text);
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.8);
+}
+.tool--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.tool--busy {
+  color: var(--accent-text);
+}
+
+.stage__hint {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: rgba(19, 17, 26, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 13px;
+  max-width: min(440px, calc(100% - 32px));
+  text-align: center;
+  box-shadow: 0 6px 22px -8px rgba(0, 0, 0, 0.9);
+}
+
+/* recherche */
+.search {
+  position: relative;
+}
+.search__icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+  z-index: 1;
+}
+.search input {
+  width: 100%;
+  background: rgba(19, 17, 26, 0.94);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 11px 14px 11px 36px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.8);
+}
+.search input::placeholder {
+  color: var(--text-3);
+}
+/* Un champ `type="search"` porte déjà une croix, dessinée par le navigateur et
+   différente d'un navigateur à l'autre — grise, minuscule, collée au bord.
+   L'app pose la sienne : celle d'origine ferait double emploi. */
+.search input::-webkit-search-cancel-button,
+.search input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+/* De quoi effacer ce qu'on a tapé sans viser la touche retour arrière vingt
+   fois : sur téléphone, le champ occupe toute la largeur et la correction d'une
+   adresse commençait par un long grattage de clavier. */
+.search__clear {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.search input {
+  padding-right: 40px;
+}
+
+/* Un point qui pulse pendant l'appel : sans lui, une recherche lente passe pour
+   une absence de résultat, et on retape l'adresse. */
+.search__spinner {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search__spinner { animation: none; opacity: 0.6; }
+}
+
+.search__results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(19, 17, 26, 0.97);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.9);
+}
+/* Sur une carte de proposition : ce chemin-là est déjà dans l'historique. */
+.rcard__seen {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+/* L'entrée d'un parcours venu d'ailleurs : un bouton, et ce qu'il faut savoir
+   avant de s'y fier. */
+.import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+}
+.import__error {
+  color: var(--risk);
+}
+
+/* Ce que la liste annonce quand elle ne répond pas à une frappe. */
+.search__title {
+  margin: 0;
+  padding: 9px 14px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* Une liste qui ne s'ouvre que pour dire qu'elle est vide : même cadre, mais
+   du texte, pas une ligne cliquable. */
+.search__empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.search__row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+.search__row:last-child {
+  border-bottom: none;
+}
+.search__row--on {
+  background: var(--surface-2);
+}
+/* Le nom, et à droite la distance : on choisit l'enseigne la plus proche d'un
+   coup d'œil, sans lire les adresses. */
+.search__name {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.search__name > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search__name small {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent-text);
+}
+.search__row em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

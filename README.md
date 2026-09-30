@@ -43,18 +43,24 @@ par parcours. Une sortie en montagne, sans antenne, fonctionne.
 
 **Il garde ce que tu as couru.** À l'arrivée, un écran de fin : distance, temps,
 allure, dénivelé, l'écart avec le parcours prévu, et **ta trace réelle** sur la
-carte — exportable en GPX vers une montre ou Strava. Et si l'app est fermée en
-plein effort, par iOS ou par une batterie vide, elle propose de reprendre la
-sortie là où elle s'est arrêtée.
+carte — envoyée **sur Strava** d'elle-même si tu l'as connecté, ou exportée en
+GPX horodaté. Et si l'app est fermée en plein effort, par iOS ou par une
+batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
+
+**Il sait où boire.** Coche « Point d'eau » ou « Toilettes » dans « Mon
+compte » : ceux qui bordent la boucle apparaissent sur la carte, le détail dit
+le plus long tronçon sans, et pendant la sortie la voix prévient cent mètres
+avant.
 
 **Il n'envoie rien.** Pas de compte, pas de serveur, pas de suivi. Tes favoris,
 tes sorties et tes réglages ne quittent pas l'appareil — une sauvegarde
-s'exporte en un fichier si tu veux les emporter.
+s'exporte en un fichier si tu veux les emporter. Seul Strava, si tu le
+connectes, reçoit tes sorties.
 
 Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
 « Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
-position, export GPX vers une montre ou Strava, profil de dénivelé consultable
+position, export GPX horodaté vers une montre, profil de dénivelé consultable
 en pleine sortie, historique avec totaux mensuels.
 
 ## L'installer
@@ -69,34 +75,28 @@ gh release download v1.0.<numéro de compilation> --pattern Lacet.ipa
 Puis AltStore → **Mes apps → +** → `Lacet.ipa`. Le détail, et pourquoi AltStore
 plutôt qu'un autre installateur, est dans [L'app iPhone](#lapp-iphone).
 
-**Dans un navigateur.** `npm install && npm run dev` dans `frontend/`, ou
-n'importe quel hébergement de fichiers statiques : il n'y a pas de serveur à
-faire tourner.
+Lacet n'existe que sur iPhone. Il y a eu un site web et une mise en page pour
+ordinateur ; ils sont partis : personne ne court avec son PC, et chaque écran
+existait en trois versions pour une seule qui servait.
 
 ## Comment c'est fait
 
 **Tout tourne sur l'appareil.** Le moteur — données OpenStreetMap, graphe,
 sécurité, génération, notation — est écrit en JavaScript et s'exécute dans un
-*worker*, sur le téléphone ou le PC qui affiche l'app. Rien à héberger, rien à
+*worker*, sur le téléphone. Rien à héberger, rien à
 payer : l'app va chercher elle-même les rues sur Overpass, l'altitude à l'IGN,
 le vent chez Open-Meteo, et garde ce qu'elle a téléchargé.
 
-**Une app iPhone et un site web, une seule base de code.** Le site s'ouvre dans
-n'importe quel navigateur et s'installe comme une app ; l'app iPhone est ce même
-site, emballé par Capacitor, avec ce qu'une page web ne peut pas faire : GPS et
-voix écran verrouillé, activité en direct, vibrations.
-
-**Une seule version, partout.** Il y en a eu deux — « préparation » sur
-ordinateur, « complète » sur téléphone — avec un réglage pour forcer l'une ou
-l'autre quand la détection se trompait : un réglage de plus à comprendre, pour
-cacher des boutons que personne ne demandait à cacher. Démarrer une sortie,
-l'historique, le fond de carte hors ligne : tout est là sur tous les appareils,
-et c'est à la personne de décider ce qu'elle en fait.
+**Une app iPhone écrite en React.** L'interface est une page (React +
+MapLibre) emballée par Capacitor, et tout ce qu'une page ne sait pas faire passe
+par des modules natifs : GPS et voix écran verrouillé, activité en direct,
+vibrations, feuille de partage (`src/native.js`). Une seule mise en page, celle
+du téléphone tenu droit ; sur iPad, iOS l'ouvre en mode iPhone.
 
 ```
 frontend/             React + MapLibre — l'app, et le moteur (src/engine/)
 frontend/ios-overlay/ réglages iOS appliqués au projet Xcode généré
-backend/              Python + FastAPI — le moteur de référence
+backend/              Python — le moteur de référence
 .github/workflows/    compilation de l'IPA sur un Mac de GitHub
 ```
 
@@ -142,9 +142,12 @@ OpenStreetMap ignore les enseignes ouvertes trop récemment.
 
 ## Démarrer (première fois)
 
-Deux terminaux, ou la tâche VS Code plus bas.
+```bash
+cd frontend
+npm install
+```
 
-**1. Backend**
+Et pour le moteur de référence Python, une fois :
 
 ```bash
 cd backend
@@ -152,59 +155,25 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 ```
 
-**2. Frontend**
-
-```bash
-cd frontend
-npm install
-```
-
 ---
 
 ## Lancer
 
-**L'app n'a besoin que du front** : le moteur tourne dans la page.
-
 ```powershell
 cd frontend; npm run dev
 ```
 
-Puis **http://127.0.0.1:5173**. Le backend ne sert plus qu'au moteur de
-référence — ses tests, le script de parité, et l'ancienne API pour qui voudrait
-l'héberger.
+Puis **http://127.0.0.1:5173**, à la taille d'un téléphone (les outils de
+développement du navigateur, ou l'aperçu de l'éditeur). C'est l'interface, pour
+la développer — pas l'app : le GPS, la voix, l'écran de verrouillage, Strava et
+les vibrations n'existent que dans l'app installée. La position y est donc
+toujours « indisponible », et l'app retombe sur le dernier départ choisi.
 
-Dans VS Code : `Ctrl+Shift+B`, ou `Terminal → Exécuter la tâche → Lacet — tout lancer`.
-Ça démarre les deux serveurs dans deux panneaux séparés.
-
-À la main — deux terminaux. Les commandes ci-dessous sont écrites pour
-**PowerShell**, le terminal par défaut de VS Code sous Windows : il enchaîne les
-commandes avec `;`, et l'opérateur `&&` de bash y provoque une erreur d'analyse.
+Le moteur de référence peut s'interroger à part, par son API :
 
 ```powershell
 cd backend; .venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
-
-```powershell
-cd frontend; npm run dev
-```
-
-Puis **http://127.0.0.1:5173**.
-
-Le front relaie `/api` vers le backend, donc une seule adresse à retenir : pas de
-CORS à régler, et ça marchera pareil depuis le téléphone.
-
-**Pour éprouver le hors ligne**, il faut le build de production : le service
-worker ne s'enregistre pas en développement, où il mettrait en cache des modules
-que Vite recompile à chaque frappe.
-
-```powershell
-cd frontend; npm run build; npm run preview
-```
-
-Puis **http://localhost:4173**. Ce mode relaie `/api` comme le serveur de
-développement — sans quoi il faudrait tester la moitié de l'app à un endroit et
-l'autre moitié ailleurs. Arrêter le serveur et recharger la page suffit alors à
-vérifier que l'app s'ouvre sans réseau.
 
 ---
 
@@ -214,14 +183,15 @@ vérifier que l'app s'ouvre sans réseau.
 
 | Configuration | Ce qu'elle fait |
 |---|---|
-| Backend — API | Lance l'API avec rechargement auto. Les points d'arrêt fonctionnent dans tout `app/`. |
+| Backend — API | Lance l'API du moteur de référence, avec rechargement auto. |
 | Backend — tests | Lance pytest en mode debug. |
 | Backend — test réel sur une ville | Génère de vraies boucles sur Paris et affiche le résultat dans le terminal. |
 | Front — Chrome | Ouvre Chrome attaché au débogueur, points d'arrêt dans le JSX. |
 
-**Tests** — 283 côté moteur, 125 côté interface. `Ctrl+Shift+P → Exécuter la
-tâche → Lacet — tous les tests` lance les deux suites ; l'onglet « Test »
-permet de rejouer un cas à la fois. En ligne de commande :
+**Tests** — la suite Python du moteur de référence, et 527 côté app (moteur
+JavaScript et interface). `Ctrl+Shift+P → Exécuter la tâche → Lacet — tous les
+tests` lance les deux ; l'onglet « Test » permet de rejouer un cas à la fois. En
+ligne de commande :
 
 ```powershell
 cd backend; .venv\Scripts\python.exe -m pytest
@@ -236,15 +206,6 @@ personne pour le regarder : le suivi de position sur le tracé, la formulation
 des consignes vocales, et ce qu'on garde d'un parcours enregistré. Ce sont les
 seuls endroits où une erreur ne se voit pas tout de suite — elle se vit sur le
 terrain, à un carrefour.
-
-Le service worker en fait partie, et pour une raison particulière : c'est le
-seul morceau de l'app qu'on ne peut pas voir échouer en le regardant. Il ne
-s'installe qu'en production, ses décisions se prennent pendant une coupure —
-donc quand il n'y a ni console ouverte ni outil réseau pour observer — et les
-requêtes qu'il intercepte le plus, celles des tuiles, partent d'un worker de
-MapLibre qu'aucun journal de la page ne montre. `src/sw.test.js` le charge donc
-tel quel dans un faux environnement et le met en situation : réseau coupé,
-passerelle en erreur, sous-domaine différent, mise à jour de l'app.
 
 C'est d'ailleurs en les écrivant qu'est apparu un défaut qui traînait :
 l'allure affichait **« 4:60 »** dès qu'elle tombait dans la dernière
@@ -334,7 +295,7 @@ extension **signée** — et n'écrit que ce qui manque. Un bouton la montre vin
 secondes sans partir courir. La preuve indépendante : poser le widget **Lacet**
 depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
 
-### Ce que l'app native ajoute
+### Ce que fait l'app, et qu'une page ne ferait pas
 
 - **Le GPS continue écran verrouillé.** À la première sortie, iOS demande
   l'accès à la position : choisir **Toujours** (ou « Lors de l'utilisation »
@@ -345,13 +306,14 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   synthèse vocale ne le fait pas, et sans elle iOS coupe la voix au verrouillage.
 - **L'écran reste allumé** pendant la sortie si on le demande, et une vibration
   prévient avant chaque traversée.
-- **Le GPX s'exporte par la feuille de partage** d'iOS (Fichiers, Strava, AirDrop…).
+- **Le GPX s'exporte par la feuille de partage** d'iOS (Fichiers, AirDrop…) —
+  horodaté pour une sortie, pour qu'une montre ou un site y voie une activité.
 - **Elle s'ouvre sans réseau** : ses fichiers sont sur le téléphone. Les zones
   déjà explorées se recalculent sans réseau aussi — les rues téléchargées sont
   gardées quatorze jours.
 - **Les cartes hors ligne** sont rangées dans IndexedDB et lues directement par
-  la carte : il n'y a pas de service worker dans une app native, et sans ce
-  chemin une carte « gardée » restait noire une fois dehors.
+  la carte : WebKit ne fait pas tourner de service worker dans une app, et sans
+  ce chemin une carte « gardée » restait noire une fois dehors.
 - **L'écran de verrouillage guide.** Pendant une sortie guidée, une activité en
   direct affiche la consigne à venir, sa distance, l'avancée de la boucle, ce
   qui reste et l'heure d'arrivée — aussi dans la Dynamic Island, et sans
@@ -412,128 +374,47 @@ GitHub du même nom pour l'app iPhone.
 
 ---
 
-## Tester sur un téléphone, par le navigateur
+## Strava, et pourquoi pas Apple Santé
 
-Pour Android, ou un iPhone sans Sideloadly. Le PC et le téléphone doivent être
-sur **le même réseau** — ou passer par le tunnel plus bas.
+**Apple Santé ne marche pas avec AltStore.** Apple ouvre HealthKit aux comptes
+gratuits, mais AltStore ne l'active pas : il signe l'app avec les seules
+autorisations de son profil, et n'y ajoute que les groupes d'apps. HealthKit
+refuserait donc tout, sans erreur visible. Et même installé autrement, Santé
+ne mènerait pas à Strava : Strava n'y reprend que les séances de l'app Exercice
+d'Apple, pas celles d'une autre app. Il faudrait un compte développeur payant
+(99 € par an) pour signer l'app soi-même — et ce serait alors l'occasion de
+supprimer aussi le renouvellement tous les sept jours.
 
-### Le piège à connaître
+**Strava reçoit donc les sorties directement**, par son API
+(`frontend/src/strava.js`) : la trace réelle, avec l'heure de chaque point —
+retrouvée par les tours de kilomètre, puisque la trace gardée n'en a pas — pour
+que l'allure au kilomètre y soit la vraie. L'envoi part de l'écran de fin, tout
+seul si on l'a choisi, ou d'un bouton sur chaque sortie relue ; une sortie déjà
+envoyée est reconnue, et ne part pas deux fois.
 
-Safari refuse la géolocalisation en dehors d'un « contexte sécurisé ». Une
-adresse `http://192.168.x.x` n'en est pas un : la carte s'affichera, mais le GPS
-restera muet. Il faut donc du HTTPS.
+Pour l'activer, une fois :
 
-### La marche à suivre
+1. Sur <https://www.strava.com/settings/api>, crée une application (nom :
+   Lacet ; site : n'importe lequel ; **domaine de rappel d'autorisation :
+   `localhost`**). Strava donne un **Client ID** et un **Client Secret**.
+2. Ajoute-les aux secrets du dépôt, sous ces deux noms :
 
-**1. Lance la version de production, en HTTPS sur le réseau** (l'API doit
-tourner à côté, comme d'habitude) :
+   ```bash
+   gh secret set STRAVA_CLIENT_ID
+   ```
 
-```powershell
-cd frontend; npm run build; npm run preview:mobile
-```
+   ```bash
+   gh secret set STRAVA_CLIENT_SECRET
+   ```
 
-Vite affiche plusieurs adresses ; prends celle en `https://192.168.…:4173`.
+3. La compilation suivante les emporte ; dans l'app, « Mon compte → Strava →
+   Connecter Strava ».
 
-Pourquoi pas `npm run dev:mobile` ? Il marche pour la carte et le GPS, mais c'est
-le mode développement, où le service worker ne s'enregistre pas : l'app ne
-s'ouvrirait pas sans réseau, et les cartes hors ligne ne seraient pas proposées.
-C'est précisément ce qu'on veut sur un téléphone.
-
-**2. Ouvre le pare-feu Windows**, une seule fois, dans un PowerShell
-**administrateur** :
-
-```powershell
-New-NetFirewallRule -DisplayName "Lacet dev" -Direction Inbound -LocalPort 4173,5173 -Protocol TCP -Action Allow
-```
-
-Le port 8000 de l'API n'a pas besoin d'être ouvert : le téléphone ne parle
-qu'à la page, qui relaie elle-même vers l'API depuis le PC.
-
-**3. Sur le téléphone**, ouvre cette adresse (Safari sur iPhone, Chrome sur
-Android). Un avertissement de certificat apparaît — il est auto-signé, c'est
-attendu. Sur iPhone : « Afficher les détails » puis « Visiter ce site web ».
-
-**4. Installe-la** : bouton Partager → « Sur l'écran d'accueil » (Android :
-menu ⋮ → « Ajouter à l'écran d'accueil »). Elle s'ouvre alors en plein
-écran, avec son icône, sans barre d'adresse.
-
-### Ce qu'il faut savoir
-
-**Le PC ne fait que servir les fichiers.** Le calcul se fait sur le
-téléphone ; le PC doit seulement rester allumé pour que la page s'ouvre la
-première fois. Pour s'en passer tout à fait, voir
-[Héberger en ligne](#héberger-en-ligne).
-
-**Tout est rangé par adresse.** Favoris et cartes hors ligne appartiennent à
-l'adresse exacte qui les a créés : `https://192.168.1.96:4173` et une autre
-adresse sont, pour le navigateur, deux apps différentes. Si l'adresse du PC
-change (nouveau Wi-Fi, box redémarrée), le téléphone repart d'un stockage vide.
-
-**Le certificat auto-signé et le hors ligne.** Il suffit pour le GPS. Il n'est
-pas garanti qu'il suffise au service worker : les navigateurs peuvent refuser de
-l'installer derrière un certificat qu'on a dû accepter à la main. Si l'app ne
-s'ouvre pas sans réseau après l'avoir ouverte une fois en ligne, c'est la
-raison — et le tunnel ci-dessous, qui a un vrai certificat, la contourne.
-
-### Le tunnel : une vraie adresse HTTPS, même en 4G
-
-```powershell
-cd frontend; npm run build; npm run preview
-```
-
-Puis, dans un autre terminal (`winget install Cloudflare.cloudflared` la
-première fois) :
-
-```powershell
-cloudflared tunnel --url http://localhost:4173
-```
-
-L'URL affichée, en `https://xxx.trycloudflare.com`, s'ouvre directement sur le
-téléphone, sans avertissement et sans pare-feu à ouvrir. Ici c'est `preview` et
-non `preview:mobile` : le tunnel fournit lui-même le HTTPS.
-
-Deux réserves. Vite refuse par défaut les noms d'hôte qu'il ne connaît pas ;
-`vite.config.js` autorise donc `*.trycloudflare.com`, et seulement lui — sans
-cela, cette adresse répondait « Blocked request ». Et **l'URL change à chaque
-lancement** : c'est parfait pour essayer, mais une app installée depuis un
-tunnel perd ses favoris dès le tunnel suivant, pour la raison dite plus haut.
-
-### Ce qui marche sur le téléphone
-
-Le GPS temps réel, le guidage vocal tour par tour, l'alerte avant chaque
-traversée (vibration), la détection de hors-parcours, le bouton SOS, le maintien
-de l'écran allumé pendant la sortie, l'export GPX — marqué `running` ou
-`cycling` selon le sport, faute de quoi un compteur de vélo classe la sortie en
-course à pied — et le stockage local des favoris et de l'historique.
-
-Une fois installée depuis la version de production, **l'app s'ouvre sans
-réseau** : le service worker garde sa
-coquille. Le suivi GPS, le chronomètre et les consignes déjà téléchargées
-fonctionnent alors normalement, et le fond de carte suit s'il a été mis de côté
-depuis « Mes parcours ».
-
-## Héberger en ligne
-
-**Le front suffit, et c'est un site statique.** Le moteur tourne dans la page :
-il n'y a plus d'API à faire tourner. `npm run build` produit `frontend/dist/`,
-à déposer tel quel sur n'importe quel hébergeur statique gratuit — Cloudflare
-Pages, Netlify, Vercel (tous acceptent un dépôt privé). Répertoire de
-publication : `frontend/dist`, commande : `npm ci && npm run build`, dossier
-racine : `frontend`.
-
-Deux conditions : **HTTPS** (géolocalisation et service worker l'exigent, et les
-hébergeurs ci-dessus le fournissent) et **la racine du domaine** — le service
-worker et le manifeste sont servis depuis `/`.
-
-### L'ancienne voie : l'API Python
-
-`backend/app/server.py` sert encore l'API sous `/api` et l'app à la racine, et
-le `Dockerfile` construit l'ensemble (`docker build -t lacet .`, port `$PORT`,
-7860 par défaut). Le front ne l'appelle plus : c'est utile pour exposer le
-moteur de référence, pas pour faire fonctionner l'app. Si tu l'héberges,
-renseigne `LACET_USER_AGENT` avec une adresse de contact réelle — Overpass,
-Nominatim et l'IGN bloquent les applications publiques qui ne s'identifient pas —
-et prévois de la mémoire : 568 Mo mesurés après une recherche sur Paris.
+Le secret est dans l'app — il n'y a pas de serveur pour le garder. C'est
+acceptable ici parce qu'une application Strava neuve n'accepte qu'un athlète,
+son créateur : quelqu'un qui extrairait le secret de l'IPA ne pourrait rien en
+faire d'autre que se connecter… à ton application, avec son propre compte, ce
+que Strava refuserait.
 
 ---
 
@@ -934,23 +815,22 @@ fonds dessinent les mêmes données OpenStreetMap ; ce qui change, c'est le rend
 
 ## Interface
 
-L'écran est en deux parties : la carte occupe la place, le panneau de droite
-porte la lecture. Sur téléphone tenu droit, la carte occupe tout l'écran et le reste flotte
-dessus : les cartes de parcours, qu'on fait défiler du pouce, la barre d'action
-et les onglets. Toucher la carte de parcours choisie déplie son détail — profil,
-note de sécurité — et la poignée grise le replie. Le téléphone **ne pivote jamais** : couché, l'app reste dans son sens.
-Android installé la verrouille en portrait (le manifeste le demande) ; Safari,
-qui n'accorde ce verrou à aucune page, reçoit une app qui tourne d'elle-même en
-sens inverse. La carte reste alors droite par rapport à l'écran et fait pivoter
-son contenu — ses gestes restent justes sous le doigt —, et les noms de lieux
-tournent avec elle. Seuls les fonds en image (Satellite, Relief) gardent leurs
-libellés couchés : ils sont dessinés dans l'image.
+La carte occupe tout l'écran, et le reste flotte dessus : les cartes de
+parcours, qu'on fait défiler du pouce, la barre d'action et les onglets.
+Toucher la carte de parcours choisie déplie son détail — profil, note de
+sécurité, points d'eau — et la poignée grise le replie. L'app reste en
+portrait (`customize.py`) : on court téléphone en main ou au bras, et une app
+qui pivote au moindre mouvement est inutilisable en courant.
+
+Le cadrage d'une boucle tient compte de tout ce qui flotte — la recherche, la
+pastille d'activité, les boutons, le panneau du bas — pour qu'aucune partie du
+tracé ne passe dessous (`dockPadding` dans `MapView.jsx`).
 
 **La bande de parcours** est l'élément central. Elle superpose le profil
 altimétrique et le niveau de sécurité sur le même axe — celui de la distance —
 parce que les deux ne se lisent pas séparément : savoir qu'il y a 200 m
-d'exposition ne sert à rien tant qu'on ignore *où*. En la parcourant à la
-souris, le point correspondant s'allume sur la carte.
+d'exposition ne sert à rien tant qu'on ignore *où*. En la parcourant du
+doigt, le point correspondant s'allume sur la carte.
 
 **Fonds de carte** — cinq styles sans clé d'API : Nuit (le sombre de CARTO aux
 couleurs de l'app), Clair, Plan, Relief et Satellite, plus trois fonds Mapbox
@@ -959,7 +839,7 @@ avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent
 
 **Le point de départ** se pose de trois façons : le bouton de position, la
 recherche d'adresse, ou directement sur la carte — le repère se fait glisser, et
-le mode placement permet de le poser d'un clic.
+le mode placement permet de le poser d'une touche.
 
 **La boucle part de la rue, devant ce point** — pas du carrefour d'à côté, ni de
 la maison elle-même. Le point d'une adresse est posé sur le toit : on coupe la
@@ -985,24 +865,17 @@ le backend écrit chaque tronçon dans le sens du parcours, si bien que le chevr
 indique la bonne direction sans aucun calcul supplémentaire.
 
 **Les propositions** s'affichent ensemble : la retenue en couleur, les autres en
-pointillés. Cliquer l'une d'elles sur la carte la met en avant. Chacune porte sa
+pointillés. Toucher l'une d'elles sur la carte la met en avant. Chacune porte sa
 distance **et sa direction** — c'est elle qui les distingue vraiment, puisque
 toutes tombent dans la fourchette demandée. Le nombre se règle dans les filtres :
 3, 5, 8 ou 12.
 
-**Raccourcis clavier** : `Entrée` rechercher · `F` filtres · `L` ma position ·
-`P` mode placement · `1` à `9` choisir une proposition · `Échap` fermer.
-
-**Tout se fait au clavier**, et ce n'est pas une case à cocher : on arrive sur ce
-champ en tapant une adresse, les doigts sur les touches. La recherche de lieu se
-parcourt aux flèches et se valide par `Entrée` — auparavant `Entrée` ne faisait
-rien, et atteindre un résultat en tabulant le faisait disparaître, puisque
-quitter le champ fermait la liste. Les fenêtres de réglages retiennent le focus
-tant qu'elles sont ouvertes et le rendent au bouton d'origine en se fermant ;
-sans ça, la tabulation parcourt les commandes qu'elles recouvrent. Enfin, une
-région annoncée dit ce qui vient de se passer — « 5 itinéraires proposés, le
-premier : Boucle nord, 10 km, note A » — parce que le reste de l'interface
-change en silence.
+**VoiceOver et clavier.** La recherche de lieu se parcourt aux flèches et se
+valide par `Entrée` ; les fenêtres de réglages retiennent le focus tant
+qu'elles sont ouvertes et le rendent au bouton d'origine en se fermant ; la
+poignée de la feuille se manœuvre aux flèches. Et une région annoncée dit ce
+qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord,
+10 km, note A » — parce que le reste de l'interface change en silence.
 
 ## La sortie
 
@@ -1012,11 +885,13 @@ seul message ne suffit pas : trop tôt on l'oublie, trop tard on a dépassé la
 rue. Les distances sont arrondies à des repères que l'oreille retient, personne
 n'estimant 87 mètres en courant.
 
-La synthèse vocale du navigateur suffit — aucune clé, aucun réseau — mais elle
-demande trois précautions, toutes traitées dans `src/voice.js` : la liste des
-voix arrive en retard (sinon une voix anglaise lit le français), iOS exige un
-geste de l'utilisateur pour la première phrase, et la file d'attente ne se vide
-pas seule (une consigne périmée dite après le carrefour est pire que rien).
+C'est la voix d'iOS — aucune clé, aucun réseau —, qui continue écran verrouillé
+et baisse la musique le temps de parler (`src/voice.js`). Chaque consigne coupe
+la précédente : une consigne périmée dite après le carrefour est pire que rien.
+
+**Les points d'eau et toilettes**, quand ils sont cochés, s'annoncent cent
+mètres avant — « Point d'eau dans cent mètres » —, une fois par kilomètre au
+plus : à Paris, il y a une fontaine tous les deux cents mètres.
 
 **Le hors-parcours** se signale après trois relevés consécutifs à plus de 45 m
 du tracé. Un point aberrant est banal entre deux immeubles ; trois de suite,
@@ -1035,19 +910,9 @@ courant, part tout seul au premier frôlement. Le numéro reste sur l'appareil.
 moitié des sorties — on part sans savoir où l'on va — et l'exiger obligeait à
 choisir une boucle pour lancer le chronomètre.
 
-**L'app s'ouvre sans réseau.** C'est une app qu'on utilise dehors, souvent en
-périphérie, parfois en forêt : rouvrir l'onglet à mi-parcours dans une zone sans
-couverture donnait une page blanche, et la sortie en cours était perdue. Un
-service worker garde la coquille de l'app. La stratégie est **réseau d'abord** —
-une app de cartographie qui sert du vieux contenu est pire qu'une app qui ne se
-charge pas — et **rien de ce qui vient de l'API n'est gardé** : un itinéraire
-rejoué depuis un cache serait faux sans le dire.
-
-**Et quand même la coquille manque**, une page de repli s'affiche : le logo de
-l'app, ce qui se passe, et ce qui reste accessible. Sans elle, quelqu'un parti
-courir tombait sur l'écran d'erreur du navigateur, qui lui parlait de DNS. Elle
-est entièrement autonome — style, logo et polices à l'intérieur du fichier —
-puisqu'elle s'affiche précisément quand plus rien ne peut être téléchargé.
+**L'app s'ouvre sans réseau** : ses fichiers sont sur le téléphone. Les zones
+déjà explorées se recalculent sans réseau, et les parcours gardés s'ouvrent
+avec leurs consignes, leur profil et leur note.
 
 ### Les cartes hors ligne
 
@@ -1084,13 +949,13 @@ tronquée laisse des carrés noirs là où l'on court.
 
 **Les quatre sous-domaines de tuiles sont un piège.** Le rendu tire `tiles-a` à
 `tiles-d` au hasard pour chaque tuile ; une tuile enregistrée depuis l'un serait
-introuvable si le rendu demande l'autre. L'app et le service worker rangent donc
-tout sous un seul nom. Sans cela, trois tuiles sur quatre manquent — une carte
+introuvable si le rendu demande l'autre. L'app range donc tout sous un seul
+nom. Sans cela, trois tuiles sur quatre manquent — une carte
 en damier, et rien pour expliquer pourquoi.
 
 Le reste suit : les tuiles sont **partagées** entre parcours (deux boucles de la
 même ville ne se paient qu'une fois, et retirer l'une ne casse pas l'autre) ; les
-cartes vivent dans **leur propre cache**, que les mises à jour de l'app ne
+cartes vivent dans **leur propre magasin**, que les mises à jour de l'app ne
 balayent jamais ; « Mon compte » affiche la place occupée et permet de tout
 vider ; et le fond utilisé est retenu avec la carte, parce que les tuiles de
 « Sombre » ne servent pas à « Satellite ».
@@ -1238,7 +1103,7 @@ Les rues sont gardées par carreaux de 0,05° dans IndexedDB, **au format serré
 des tuiles livrées** : trois fois moins de place que les mêmes objets rangés
 tels quels, 44 ms pour relire une tuile de 4 Mo au lieu de 100, et une taille
 connue — sans quoi aucun plafond n'est possible. Le cache en a un : deux cent
-cinquante mégaoctets, ou le quart de ce que le navigateur accorde s'il promet
+cinquante mégaoctets, ou le quart de ce que WebKit accorde s'il promet
 moins, et les carreaux dont on ne s'est pas servi depuis le plus longtemps
 laissent la place. Soit environ trois fois l'Alsace : son coin, celui du
 travail, deux ou trois endroits de vacances. Il n'y a rien à épingler, rien à

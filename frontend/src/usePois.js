@@ -1,0 +1,38 @@
+import { useEffect, useState } from 'react'
+import { alongRoute, poisIn, routeBox } from './pois'
+
+/**
+ * Les points d'eau et toilettes qui bordent `route`, pour les genres cochés
+ * dans « Mon compte » (`prefs`, par exemple `{ water: true, toilets: false }`).
+ *
+ * Rien n'est demandé tant que rien n'est coché : c'est une requête de plus, et
+ * tout le monde n'en veut pas. Une réponse arrivée pour un parcours qu'on a
+ * quitté entre-temps est jetée.
+ */
+export default function usePois(route, prefs) {
+  const [found, setFound] = useState({ key: null, stops: [], complete: true })
+  const kinds = Object.keys(prefs || {}).filter((k) => prefs[k])
+  const geometry = route?.geometry
+  const key = geometry?.length > 1 && kinds.length ? `${route.id}|${geometry.length}|${kinds.join(',')}` : null
+
+  useEffect(() => {
+    if (!key) return undefined
+    let current = true
+    poisIn(routeBox(geometry)).then(
+      ({ pois, complete }) => {
+        if (!current) return
+        const wanted = pois.filter((p) => kinds.includes(p.kind))
+        setFound({ key, stops: alongRoute(geometry, wanted), complete })
+      },
+      () => current && setFound({ key, stops: [], complete: false }),
+    )
+    return () => {
+      current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  if (!key) return { stops: [], loading: false, complete: true }
+  if (found.key !== key) return { stops: [], loading: true, complete: true }
+  return { stops: found.stops, loading: false, complete: found.complete }
+}

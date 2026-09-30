@@ -1,0 +1,272 @@
+/* Les couleurs, la typographie, et l'ossature : la carte en plein écran, le panneau posé dessus. */
+
+:root {
+  /* Noir à peine teinté de violet plutôt que gris neutre : les surfaces
+     s'accordent à l'accent au lieu de le faire ressortir comme un corps
+     étranger. */
+  --bg: #0a0910;
+  --surface: #13111a;
+  --surface-2: #1b1824;
+  --surface-3: #272233;
+  --line: #2e2939;
+  --line-soft: #221e2c;
+  --text: #f2f0f7;
+  --text-2: #a39eb4;
+  /* Mesuré : 4,5:1 au moins sur les trois fonds de l'app, le minimum de la
+     norme pour du petit texte. L'ancien gris (#767089) tombait à 3,4:1 sur les
+     panneaux — la moitié des explications de l'app étaient sous le seuil. */
+  --text-3: #8a849d;
+
+  /* Deux violets, pas un : le soutenu pour les aplats (le blanc dessus reste
+     lisible), le clair pour le texte et les icônes posés sur le noir — le
+     soutenu y tomberait à 3:1, sous le seuil de lecture. */
+  --accent: #7c3aed;
+  --accent-press: #6d28d9;
+  --accent-text: #b79dff;
+  --accent-soft: rgba(139, 92, 246, 0.16);
+  --accent-line: rgba(139, 92, 246, 0.38);
+  --accent-glow: rgba(124, 58, 237, 0.6);
+  --accent-grad: linear-gradient(135deg, #9061f9 0%, #6d28d9 100%);
+
+  --safe: #32d74b;
+  --caution: #ffd426;
+  --risk: #ff6a45;
+  --info: #4a9eff;
+
+  --display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --r: 14px;
+  --side: 400px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+/* L'app entière est un conteneur : sa mise en page se règle sur **sa** taille,
+   pas sur celle de l'écran. D'ordinaire les deux se confondent ; téléphone
+   couché, l'app garde son format portrait tourné d'un quart, et doit garder
+   la disposition qui va avec. */
+#root {
+  height: 100vh;
+  height: 100dvh;
+  container: lacet / size;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 14.5px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Lu par les lecteurs d'écran, invisible à l'œil. `display: none` ne
+   conviendrait pas : le contenu en serait aussi retiré de l'arbre
+   d'accessibilité, et ne serait donc plus annoncé du tout. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Les icônes prennent la couleur du texte et s'alignent sur sa ligne de base. */
+.icon {
+  display: block;
+  flex: none;
+}
+.muted {
+  color: var(--text-3);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.5;
+}
+.center {
+  text-align: center;
+}
+
+/* ══ ossature ══════════════════════════════════════════════════════════
+   La carte occupe tout l'écran, et ce qui sert à choisir — cartes de
+   parcours, barre d'action, onglets — flotte par-dessus, dans le panneau
+   posé en bas (`.side`). Le détail d'un parcours s'y déplie à la demande,
+   en feuille, et se replie pour rendre la carte.
+
+   Quatre états, posés par l'app sur `.shell` (`data-sheet`) :
+     · peek — repliée : rien d'opaque, que des éléments flottants ;
+     · full — le détail d'un parcours, en feuille haute ;
+     · page — Mes parcours, Mon compte : des listes, en plein écran ;
+     · live — la sortie en cours : ses chiffres, sous une carte dégagée.
+   ────────────────────────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Son habillage — transparent ou feuille opaque — dépend de l'état : voir
+   plus bas, « la feuille ». */
+.side {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  min-height: 0;
+}
+.side__head {
+  padding: 5px 18px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.side__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  /* Dégradé en pied de zone : une ligne coupée net se lit comme une fin de
+     contenu, alors qu'il reste à faire défiler. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+  scrollbar-width: thin;
+}
+/* Sur la carte, le titre seul : l'explication complète prenait cinq lignes
+   et repoussait les propositions hors de l'écran. Le bouton d'à côté porte
+   la solution qui compte. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 18px 0;
+  padding: 8px 8px 8px 11px;
+  border-radius: var(--r);
+  background: rgba(255, 106, 69, 0.1);
+  border: 1px solid rgba(255, 106, 69, 0.28);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.banner button {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px;
+  flex: none;
+}
+/* Les onglets : une gélule flottante. */
+.side__tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 4px 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 5px;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(27, 24, 36, 0.94);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.95);
+}
+.tab {
+  padding: 7px 4px 6px;
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.tab .icon {
+  opacity: 0.9;
+}
+/* L'onglet actif porte une pastille : la couleur seule se perdait sur un
+   libellé de 10px. */
+.tab--on {
+  color: var(--accent-text);
+  font-weight: 700;
+  background: var(--accent-soft);
+}
+
+.side__title {
+  display: none;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.sportpill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 14px;
+  text-align: left;
+}
+.sportpill b {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.sportpill__spec {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.sportpill__gear {
+  color: var(--text-3);
+}

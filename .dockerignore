@@ -1,9 +1,0 @@
-**/node_modules
-**/dist
-**/.venv
-**/.cache
-**/__pycache__
-**/.pytest_cache
-**/.env
-**/*.pyc
-lacet-concept.html

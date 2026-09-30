@@ -24,19 +24,14 @@
 // Ils sont téléchargés une fois et servent à tous les suivants ; seul le lot de
 // tuiles est propre à chaque boucle.
 //
-// **Deux endroits où ranger, selon où tourne l'app.** Dans le navigateur, les
-// fichiers vont dans l'API de cache, où le service worker les reprend quand le
-// réseau manque. L'app iPhone, elle, n'a pas de service worker — WebKit n'en
-// fait pas tourner sous son adresse `capacitor://` — et le même rangement y
-// donnait une carte téléchargée, annoncée « hors ligne ✓ », et noire une fois
-// dehors. Les fichiers y vont donc dans IndexedDB, et c'est la carte elle-même
-// qui vient les y lire (`offlineRequest`, `loadOffline`).
+// **Les fichiers vont dans IndexedDB, et la carte vient les y lire**
+// (`offlineRequest`, `loadOffline`). L'app n'a pas de service worker — WebKit
+// n'en fait pas tourner sous son adresse `capacitor://` — : ranger les tuiles
+// dans l'API de cache donnait une carte téléchargée, annoncée « hors ligne ✓ »,
+// et noire une fois dehors.
 
 import { store } from './engine/store'
-import { isNative } from './platform'
 import { load, save } from './storage'
-
-const CACHE = 'lacet-maps-v1'
 
 // Les tuiles de CARTO s'arrêtent là ; au-delà, le rendu agrandit. En deçà, on
 // descend jusqu'au zoom 10 pour que dézoomer ne fasse pas un trou : cela ne
@@ -77,8 +72,8 @@ const MARGIN = 1
 // accents français ; 256–511 le latin étendu, pour les œ et les noms d'ailleurs.
 const GLYPH_RANGES = ['0-255', '256-511']
 
-/** Même normalisation que le service worker : les quatre sous-domaines de
- *  tuiles sont équivalents, on range tout sous un seul nom.
+/** Les quatre sous-domaines de tuiles sont équivalents : on range tout sous
+ *  un seul nom.
  *
  *  L'adresse est aussi mise sous sa forme canonique — espaces encodés, virgules
  *  laissées telles quelles — qui est celle que le réseau reçoit. MapLibre
@@ -94,43 +89,22 @@ export function mapKey(url) {
   }
 }
 
-/** L'API de cache est-elle là ? Elle manque en contexte non sécurisé — une
- *  adresse http://192.168.x.x sur le réseau local, par exemple. On le demande à
- *  chaque appel plutôt qu'une fois au chargement : figé dans une constante, ce
- *  test devenait impossible à éprouver, et c'est justement le genre de détail
- *  qui casse en silence chez quelqu'un d'autre. */
-export const isAvailable = () =>
-  isNative() ? typeof indexedDB !== 'undefined' : typeof caches !== 'undefined'
+/** IndexedDB est-il là ? Demandé à chaque appel plutôt qu'une fois au
+ *  chargement : figé dans une constante, ce test devenait impossible à éprouver. */
+export const isAvailable = () => typeof indexedDB !== 'undefined'
 
-/** Les fichiers de carte de l'app iPhone, dans IndexedDB. */
+/** Les fichiers de carte, dans IndexedDB. */
 const deviceFiles = store('maps')
 
 /**
- * L'endroit où ranger, avec la même façade des deux côtés.
- *
- * `put` rend la taille enregistrée : c'est elle qui fait avancer le plafond en
- * octets, et elle doit être la vraie, pas celle qu'annonce un en-tête.
+ * Range un fichier téléchargé. Rend la taille enregistrée : c'est elle qui fait
+ * avancer le plafond en octets, et elle doit être la vraie, pas celle
+ * qu'annonce un en-tête.
  */
-async function openFiles() {
-  if (isNative()) {
-    return {
-      async put(url, response) {
-        const bytes = await response.arrayBuffer()
-        await deviceFiles.set(url, { type: response.headers.get('content-type') || '', bytes })
-        return bytes.byteLength
-      },
-      delete: (url) => deviceFiles.delete(url),
-    }
-  }
-  const cache = await caches.open(CACHE)
-  return {
-    async put(url, response) {
-      const copy = response.clone()
-      await cache.put(url, response)
-      return (await copy.blob()).size
-    },
-    delete: (url) => cache.delete(url),
-  }
+async function keepFile(url, response) {
+  const bytes = await response.arrayBuffer()
+  await deviceFiles.set(url, { type: response.headers.get('content-type') || '', bytes })
+  return bytes.byteLength
 }
 
 /** Clé d'un parcours dans le journal des cartes gardées. */
@@ -349,13 +323,12 @@ async function describeStyle(source) {
  * répondu.
  */
 export async function download(route, mapStyle, onProgress) {
-  if (!isAvailable()) throw new Error("Ce navigateur ne sait pas garder de carte hors ligne.")
+  if (!isAvailable()) throw new Error("Le stockage de l'appareil ne répond pas : impossible de garder la carte.")
 
   const { templates, shared } = await describeStyle(mapStyle.style)
   if (!templates.length) throw new Error("Ce fond de carte ne peut pas être gardé hors ligne.")
 
   const { levels } = tilePlan(route.geometry, templates.length)
-  const files = await openFiles()
 
   // En série plutôt qu'en rafale : ce sont des serveurs publics et gratuits, et
   // cinquante requêtes simultanées depuis chaque utilisateur seraient un abus.
@@ -370,7 +343,7 @@ export async function download(route, mapStyle, onProgress) {
       try {
         const response = await fetch(url, { mode: 'cors' })
         if (response.ok) {
-          bytes += await files.put(url, response)
+          bytes += await keepFile(url, response)
           count += 1
         }
       } catch {
@@ -457,9 +430,8 @@ export async function remove(route) {
   delete journal[keyOf(route)]
   const encoreUtiles = new Set(Object.values(journal).flatMap((e) => e.urls || []))
 
-  const files = await openFiles()
   for (const url of entry.urls || []) {
-    if (!encoreUtiles.has(url)) await files.delete(url)
+    if (!encoreUtiles.has(url)) await deviceFiles.delete(url)
   }
 
   save({ offlineMaps: journal })
@@ -468,13 +440,12 @@ export async function remove(route) {
 
 /** Vide tout — appelé par l'effacement des données. */
 export async function clear() {
-  if (isNative()) await deviceFiles.clear()
-  else if (isAvailable()) await caches.delete(CACHE)
+  await deviceFiles.clear()
   save({ offlineMaps: {} })
   forgetStored()
 }
 
-// --- la carte lit ce qui est gardé (app iPhone) ------------------------------
+// --- la carte lit ce qui est gardé -------------------------------------------
 
 export const OFFLINE_PROTOCOL = 'lacet-carte'
 
@@ -512,7 +483,7 @@ function forgetStored() {
  * le fournisseur en change.
  */
 export function offlineRequest(url, resourceType) {
-  if (!isNative() || !url.startsWith('http') || !storedSet().has(mapKey(url))) return undefined
+  if (!url.startsWith('http') || !storedSet().has(mapKey(url))) return undefined
   const first = resourceType === 'Style' || resourceType === 'Source' ? 'reseau' : 'appareil'
   return { url: `${OFFLINE_PROTOCOL}://${first}/${url}` }
 }

@@ -25,8 +25,8 @@ export default class ErrorBoundary extends Component {
       <div className="crash">
         <h1>Quelque chose a cassé</h1>
         <p>
-          L'application s'est arrêtée sur une erreur. Le détail est dans la console du
-          navigateur.
+          L'application s'est arrêtée sur l'erreur ci-dessous. Relance-la ; si ça
+          recommence, garde ce message : il dit ce qui a cassé.
         </p>
         <pre>{String(this.state.error?.message || this.state.error)}</pre>
         <button className="btn btn--primary" onClick={() => window.location.reload()}>

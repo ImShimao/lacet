@@ -4,9 +4,8 @@ import Icon from './Icon.jsx'
 import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
-import { currentTurn, onTurn } from './orientation'
 
-// Les cartes gardées hors ligne, dans l'app iPhone : `offlineRequest` détourne
+// Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
 maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
 
@@ -17,11 +16,27 @@ const NAV_ZOOM = 17
 const NAV_PITCH = 50
 const NAV_LOW = 0.22
 
+// Deux repères d'arrêt du même genre plus proches que ça, le long du tracé,
+// n'en font qu'un sur la carte.
+const THIN_M = 120
+
+// Les pictogrammes des repères d'arrêt, les mêmes que dans `Icon.jsx` : la carte
+// les pose hors de React, en HTML.
+const svg = (inner) =>
+  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`
+const POI_SVG = {
+  water: svg('<path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z"/>'),
+  toilets: svg(
+    '<circle cx="7" cy="4.5" r="1.6"/><circle cx="17" cy="4.5" r="1.6"/><path d="M5 21v-6H4l1.2-6.5h3.6L10 15H9v6"/><path d="M15 21v-5.5h-1V9h6v6.5h-1V21"/><path d="M12 3v18"/>',
+  ),
+}
+
 export default function MapView({
   styleKey,
   start,
   route,
   ghost,
+  stops = [],
   position,
   accuracy,
   cursor,
@@ -72,8 +87,6 @@ export default function MapView({
       container: container.current,
       center: [2.3522, 48.8566],
       zoom: 12,
-      // Téléphone couché : la carte reste droite et fait pivoter son contenu.
-      bearing: -currentTurn(),
       // Posée nous-mêmes, en bas à gauche : à droite, elle tombait au-dessus
       // des cartes de parcours, entre deux boutons, et donnait l'impression
       // d'un élément oublié là. À gauche, le coin est libre.
@@ -99,7 +112,6 @@ export default function MapView({
     const setup = () => {
       if (!instance.getStyle() || instance.getSource('route')) return
       addLayers(instance)
-      alignLabels(instance, currentTurn())
       setRevision((n) => n + 1)
     }
     instance.on('load', setup)
@@ -120,13 +132,12 @@ export default function MapView({
       if (event.originalEvent && nav.current.navigate) navZoom.current = instance.getZoom()
     })
 
-    // La boussole : son aiguille montre le nord de l'écran — celui de l'app,
-    // qui peut avoir pivoté avec le téléphone couché. Mise à jour à même le
-    // bouton, sans passer par React : la carte tourne à chaque image.
+    // La boussole : son aiguille montre le nord. Mise à jour à même le bouton,
+    // sans passer par React : la carte tourne à chaque image.
     const needle = () => {
       const button = handlers.current.compassRef?.current
       if (!button) return
-      const north = -(instance.getBearing() + currentTurn())
+      const north = -instance.getBearing()
       const angle = ((north % 360) + 360) % 360
       button.style.setProperty('--north', `${north}deg`)
       button.dataset.rotated = String(Math.min(angle, 360 - angle) > 1 || instance.getPitch() > 1)
@@ -165,19 +176,11 @@ export default function MapView({
         handlers.current.onPlace?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
       }
-      // Cliquer une proposition affichée en gris la met en avant : c'est le
+      // Toucher une proposition affichée en gris la met en avant : c'est le
       // geste naturel quand on compare trois tracés sur la carte.
       const hit = instance.queryRenderedFeatures(event.point, { layers: ['ghost-hit'] })
       const id = hit[0]?.properties?.id
       if (id) handlers.current.onPickRoute?.(id)
-    })
-
-    // Le curseur devient une main au-dessus d'une proposition cliquable.
-    instance.on('mousemove', 'ghost-hit', () => {
-      if (!handlers.current.placing) instance.getCanvas().style.cursor = 'pointer'
-    })
-    instance.on('mouseleave', 'ghost-hit', () => {
-      if (!handlers.current.placing) instance.getCanvas().style.cursor = ''
     })
 
     // MapLibre ne surveille que le redimensionnement de la *fenêtre*, jamais
@@ -228,13 +231,6 @@ export default function MapView({
     m.setPaintProperty('ghost-line', 'line-color', theme === 'dark' ? '#A8B2BC' : '#3A4550')
   }, [theme, revision])
 
-  // --- curseur de placement --------------------------------------------------
-  useEffect(() => {
-    const m = map.current
-    if (!m) return
-    m.getCanvas().style.cursor = placing ? 'crosshair' : ''
-  }, [placing])
-
   // --- recadrage explicite --------------------------------------------------
   // Volontairement piloté par un jeton (`focus.at`) plutôt que par la position
   // du départ : se géolocaliser ou choisir une adresse doit amener la carte sur
@@ -271,7 +267,6 @@ export default function MapView({
         element: el,
         draggable: true,
         anchor: 'bottom',
-        rotation: currentTurn(),
       })
       startMarker.current.on('dragend', () => {
         const { lat, lng } = startMarker.current.getLngLat()
@@ -299,7 +294,7 @@ export default function MapView({
     if (!liveMarker.current) {
       const el = document.createElement('div')
       el.className = 'dot-live'
-      liveMarker.current = new maplibregl.Marker({ element: el, rotation: currentTurn() })
+      liveMarker.current = new maplibregl.Marker({ element: el })
       liveMarker.current.setLngLat(position).addTo(m)
     } else {
       liveMarker.current.setLngLat(position)
@@ -311,7 +306,7 @@ export default function MapView({
     liveMarker.current.getElement().classList.toggle('dot-live--nav', pointed)
     liveMarker.current.setRotationAlignment(pointed ? 'map' : 'viewport')
     liveMarker.current.setPitchAlignment(pointed ? 'map' : 'viewport')
-    liveMarker.current.setRotation(pointed ? heading : currentTurn())
+    liveMarker.current.setRotation(pointed ? heading : 0)
 
     // Le cercle de précision dit la vérité sur la fiabilité du point : à 300 m
     // près, afficher un point net serait un mensonge.
@@ -349,7 +344,7 @@ export default function MapView({
     if (!line?.length) return
     setLocked(false)
     const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
-    m.fitBounds(bounds, { padding: dockPadding(m), bearing: -currentTurn(), pitch: 0, duration: 800 })
+    m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 0, duration: 800 })
   }, [overview])
 
   const lastNorth = useRef(northAt)
@@ -357,7 +352,7 @@ export default function MapView({
     const m = map.current
     if (!m || northAt === lastNorth.current) return
     lastNorth.current = northAt
-    m.easeTo({ bearing: -currentTurn(), pitch: 0, duration: 500 })
+    m.easeTo({ bearing: 0, pitch: 0, duration: 500 })
   }, [northAt])
 
   // Chaque départ reprend une carte suivie ; chaque arrivée la redresse, pour
@@ -371,26 +366,38 @@ export default function MapView({
       navZoom.current = NAV_ZOOM
     }
     if (!navigate && wasNavigating.current && m) {
-      m.easeTo({ pitch: 0, bearing: -currentTurn(), duration: 600 })
+      m.easeTo({ pitch: 0, bearing: 0, duration: 600 })
     }
     wasNavigating.current = Boolean(navigate)
   }, [navigate])
 
-  // --- téléphone couché -----------------------------------------------------------
-  // L'app tourne pour rester dans le sens du téléphone ; la carte, restée droite,
-  // pivote son contenu d'autant, et les repères avec elle.
-  useEffect(
-    () =>
-      onTurn((t) => {
-        const { navigate: navigating, heading: course, locked: following, orientation: facing } = nav.current
-        const pointed = navigating && course != null
-        map.current?.jumpTo({ bearing: pointed && following && facing !== 'north' ? course - t : -t })
-        if (map.current?.getStyle()) alignLabels(map.current, t)
-        startMarker.current?.setRotation(t)
-        liveMarker.current?.setRotation(pointed ? course : t)
-      }),
-    [],
-  )
+  // --- points d'eau et toilettes -------------------------------------------------
+  // Des repères HTML plutôt qu'une couche de symboles : deux des fonds (Relief,
+  // Satellite) n'ont pas de jeu de glyphes, et un symbole n'y s'afficherait pas.
+  // Ils sont peu nombreux — une poignée le long d'une boucle.
+  const stopMarkers = useRef([])
+  useEffect(() => {
+    const m = map.current
+    if (!m || !revision) return undefined
+    for (const marker of stopMarkers.current) marker.remove()
+    // En ville, une fontaine tous les deux cents mètres : un repère par
+    // tronçon de cent vingt mètres suffit à les voir, sans couvrir le tracé.
+    const shown = stops.filter(
+      (stop, i) => !stops.slice(0, i).some((o) => o.kind === stop.kind && Math.abs(o.along - stop.along) < THIN_M),
+    )
+    stopMarkers.current = shown.map((stop) => {
+      const el = document.createElement('div')
+      el.className = `poi poi--${stop.kind}`
+      el.setAttribute('role', 'img')
+      el.setAttribute('aria-label', `${stop.kind === 'water' ? "Point d'eau" : 'Toilettes'}${stop.name ? ` — ${stop.name}` : ''}`)
+      el.innerHTML = POI_SVG[stop.kind]
+      return new maplibregl.Marker({ element: el }).setLngLat([stop.lon, stop.lat]).addTo(m)
+    })
+    return () => {
+      for (const marker of stopMarkers.current) marker.remove()
+      stopMarkers.current = []
+    }
+  }, [stops, revision])
 
   // --- point survolé sur la bande de parcours ----------------------------------
   useEffect(() => {
@@ -443,27 +450,24 @@ export default function MapView({
 /**
  * Le cadrage de la carte en course.
  *
- * Le cap passe en haut de l'écran — celui de l'app, qui peut avoir pivoté avec
- * le téléphone couché, d'où la soustraction. Le coureur est décalé vers le bas
- * de la partie visible, dans le sens de l'app lui aussi. Le zoom est celui du
- * départ, ou celui qu'on a choisi du bout des doigts depuis.
+ * Le cap passe en haut de l'écran. Le coureur est décalé vers le bas de la
+ * partie visible. Le zoom est celui du départ, ou celui qu'on a choisi du bout
+ * des doigts depuis.
  *
  * `north` : la carte reste nord en haut, à plat, comme une carte papier — le
  * coureur au centre, puisqu'il peut aller dans n'importe quel sens.
  */
 function navCamera(m, position, heading, zoom, relock, north = false) {
-  const turn = currentTurn()
   const [ox, oy] = visibleCentre(m)
   const pad = dockPadding(m)
   const visible = m.getContainer().clientHeight - pad.top - pad.bottom
   const shift = north ? 0 : Math.max(0, visible) * NAV_LOW
-  const rad = (turn * Math.PI) / 180
   return {
     center: position,
-    bearing: north ? -turn : heading == null ? m.getBearing() : heading - turn,
+    bearing: north ? 0 : heading == null ? m.getBearing() : heading,
     pitch: north ? 0 : NAV_PITCH,
     zoom,
-    offset: [ox - shift * Math.sin(rad), oy + shift * Math.cos(rad)],
+    offset: [ox, oy + shift],
     duration: relock ? 800 : 950,
     // Linéaire en suivi : les positions arrivent chaque seconde, et une
     // animation qui ralentit à la fin de chacune fait avancer la carte par
@@ -476,22 +480,23 @@ function navCamera(m, position, heading, zoom, relock, north = false) {
 
 /**
  * Marges à réserver autour du tracé : tout ce qui flotte sur la carte et en
- * cache une partie — le panneau, la recherche, la colonne de boutons.
+ * cache une partie — le panneau, la recherche, la pastille d'activité, la
+ * colonne de boutons, le bandeau de consigne.
  *
  * Mesurées à l'écran au moment du cadrage plutôt que codées en dur : la
- * disposition change avec l'écran, avec la feuille repliée ou dépliée, et,
- * téléphone couché, tout le décor a pivoté d'un quart de tour autour d'une
- * carte restée droite. Chaque élément est rangé contre le bord de carte qu'il
- * longe, et la marge de ce bord s'étend jusqu'à lui.
+ * disposition change avec la taille de l'iPhone, avec la feuille repliée ou
+ * dépliée. Chaque élément est rangé contre le bord de carte qu'il longe, et la
+ * marge de ce bord s'étend jusqu'à lui.
  *
- * Seul compte ce qui **recouvre** la carte : le panneau latéral du grand écran
- * est posé à côté, il ne lui prend rien.
+ * La pastille d'activité est comptée à part : posée en `fixed` sous la
+ * recherche, elle n'agrandit pas le panneau dont elle fait partie. Oubliée, elle
+ * cachait le haut de la boucle — souvent le départ lui-même.
  */
 function dockPadding(m) {
   const map = m.getContainer().getBoundingClientRect()
   const pad = { top: 32, bottom: 32, left: 32, right: 32 }
 
-  for (const selector of ['.side', '.stage__top', '.stage__tools', '.runbar']) {
+  for (const selector of ['.side', '.stage__top', '.sportpill', '.stage__tools', '.runbar']) {
     const el = document.querySelector(selector)
     if (!el) continue
     const r = el.getBoundingClientRect()
@@ -538,26 +543,6 @@ function shrink(pad, a, b, size) {
 function visibleCentre(m) {
   const p = dockPadding(m)
   return [(p.left - p.right) / 2, (p.top - p.bottom) / 2]
-}
-
-/**
- * Téléphone couché, les noms de lieux tournent avec l'app.
- *
- * MapLibre garde les libellés ponctuels — villes, quartiers, commerces — droits
- * par rapport à l'écran. La carte restant droite quand l'app pivote, ils
- * apparaissaient couchés ; on leur donne la rotation de l'app. Les noms de rue
- * suivent leur rue, ils n'ont pas besoin qu'on s'en mêle. Les fonds en image
- * (satellite, relief) portent leurs libellés dans l'image : rien à faire.
- */
-function alignLabels(m, t) {
-  for (const layer of m.getStyle()?.layers || []) {
-    const layout = layer.layout || {}
-    if (layer.type !== 'symbol') continue
-    if ((layout['symbol-placement'] ?? 'point') !== 'point') continue
-    if (layout['text-rotation-alignment'] === 'map') continue
-    if (layout['text-field'] !== undefined) m.setLayoutProperty(layer.id, 'text-rotate', t)
-    if (layout['icon-image'] !== undefined) m.setLayoutProperty(layer.id, 'icon-rotate', t)
-  }
 }
 
 /**
@@ -640,8 +625,8 @@ function addLayers(m) {
       'line-dasharray': [2, 1.6],
     },
   })
-  // Zone de clic élargie et invisible : viser un trait de 3 px à la souris est
-  // frustrant, et impossible au doigt.
+  // Zone de toucher élargie et invisible : viser un trait de 3 px au doigt est
+  // impossible.
   m.addLayer({
     id: 'ghost-hit',
     type: 'line',

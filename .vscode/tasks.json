@@ -49,20 +49,6 @@
       }
     },
     {
-      "label": "front: dev (iPhone, HTTPS)",
-      "type": "shell",
-      "command": "npm run dev:mobile",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
-      "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "dedicated",
-        "group": "lacet"
-      }
-    },
-    {
       "label": "front: tests",
       "type": "shell",
       "command": "npm test",
@@ -96,15 +82,6 @@
         "kind": "build",
         "isDefault": true
       }
-    },
-    {
-      "label": "Lacet — tout lancer (iPhone)",
-      "dependsOn": [
-        "back: api",
-        "front: dev (iPhone, HTTPS)"
-      ],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
     }
   ],
   "inputs": [

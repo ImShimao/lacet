@@ -13,15 +13,10 @@ import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import '@fontsource/ibm-plex-mono/latin-600.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import './styles.css'
+import './styles/index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
-import { startOrientationLock } from './orientation'
 import { isNative } from './platform'
-
-// Avant le rendu : téléphone couché, l'app doit s'ouvrir déjà dans le bon sens
-// plutôt que de pivoter sous les yeux après coup.
-startOrientationLock()
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -31,27 +26,13 @@ createRoot(document.getElementById('root')).render(
   </React.StrictMode>,
 )
 
-// Le service worker n'est enregistré qu'en production. En développement, il
-// mettrait en cache des modules que Vite recompile à chaque frappe, et on
-// passerait la journée à se demander pourquoi une modification ne s'affiche pas.
-// Dans l'app native, les fichiers de l'app sont déjà sur le téléphone : elle
-// s'ouvre sans réseau par construction, et WebKit n'accepte de toute façon pas
-// de service worker hors des adresses http(s).
+// Dans l'app, rien ne se sélectionne : un appui long faisait surgir le menu
+// « Copier / Rechercher / Traduire » d'iOS par-dessus la carte, au moment
+// précis où l'on garde le doigt sur l'écran pour lire. Le style s'accroche à
+// cette classe (`styles/04-buttons.css`).
 if (isNative()) {
-  // Dans l'app, rien ne se sélectionne : un appui long faisait surgir le menu
-  // « Copier / Rechercher / Traduire » d'iOS par-dessus la carte, au moment
-  // précis où l'on garde le doigt sur l'écran pour lire. C'est le réflexe d'une
-  // page web, pas d'une app. Le style s'accroche à cette classe (`styles.css`).
   document.documentElement.classList.add('native')
   import('./native').then((native) => native.bootNative())
-} else if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  // Après `load` : l'enregistrement lance des téléchargements, et les faire
-  // concurrencer ceux de la page retarde le premier affichage.
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((error) => {
-      // Refusé en contexte non sécurisé, ou par les réglages du navigateur.
-      // L'app fonctionne sans — elle ne s'ouvrira simplement pas hors ligne.
-      console.info('Lacet — hors ligne indisponible :', error.message)
-    })
-  })
+  // Le retour de Strava, après l'autorisation, arrive par une adresse `lacet://`.
+  import('./strava').then((strava) => strava.listen())
 }

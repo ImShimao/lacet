@@ -18,14 +18,11 @@ INK = (0x0A, 0x09, 0x10)
 VIOLET = (0x8B, 0x5C, 0xF6)
 WHITE = (0xFF, 0xFF, 0xFF)
 
-OUT = Path(__file__).resolve().parent.parent / "public"
 # Sources de l'app iPhone : `@capacitor/assets` en tire toutes les tailles
 # d'icône et d'écran de lancement que Xcode réclame.
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
 SIZES = {
-    "icon-180.png": 180,  # apple-touch-icon
-    "icon-192.png": 192,
-    "icon-512.png": 512,
+    "icon-192.png": 192,  # l'icône de la source AltStore (scripts/altstore_source.py)
 }
 SUPERSAMPLE = 4
 
@@ -148,21 +145,10 @@ def ios_resources() -> None:
 
 
 def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+    RESOURCES.mkdir(parents=True, exist_ok=True)
     for name, size in SIZES.items():
-        write_png(OUT / name, size, size, render(size))
-        print(f"  {name}  ({size}×{size})")
-
-    # Version vectorielle pour l'onglet du navigateur.
-    (OUT / "icon.svg").write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
-        '<rect width="100" height="100" fill="#0A0910"/>'
-        '<circle cx="50" cy="50" r="30" fill="none" stroke="#8B5CF6" stroke-width="7.6"/>'
-        '<circle cx="50" cy="80" r="8.5" fill="#FFFFFF"/>'
-        "</svg>\n",
-        encoding="utf-8",
-    )
-    print("  icon.svg")
+        write_png(RESOURCES / name, size, size, render(size))
+        print(f"  resources/{name}  ({size}×{size})")
 
     ios_resources()
 
