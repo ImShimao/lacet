@@ -64,6 +64,46 @@ export function spoken(secondsPerKm) {
   return s ? `${whole} ${s}` : whole
 }
 
+const UNITS = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize']
+const TENS = ['', 'dix', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante']
+
+/** Un nombre de 1 à 999 en toutes lettres, à l'ancienne : « vingt et un », « quatre-vingts ». */
+function cardinal(n) {
+  if (n >= 100) {
+    const hundreds = Math.floor(n / 100)
+    const rest = n % 100
+    const head = hundreds > 1 ? `${UNITS[hundreds]} cent${rest ? '' : 's'}` : 'cent'
+    return rest ? `${head} ${cardinal(rest)}` : head
+  }
+  if (n <= 16) return UNITS[n]
+  if (n < 20) return `dix-${UNITS[n - 10]}`
+  // Soixante-dix et quatre-vingt-dix se comptent sur la dizaine d'avant.
+  const ten = n < 70 ? Math.floor(n / 10) : n < 80 ? 6 : 8
+  const unit = n - (ten === 8 ? 80 : ten * 10)
+  const word = ten === 8 ? 'quatre-vingt' : TENS[ten]
+  if (!unit) return ten === 8 ? 'quatre-vingts' : word
+  if ((unit === 1 || unit === 11) && ten < 8) return `${word} et ${cardinal(unit)}`
+  return `${word}-${cardinal(unit)}`
+}
+
+/**
+ * « premier », « troisième », « vingt et unième » — un rang dit en toutes
+ * lettres.
+ *
+ * La synthèse vocale lit « 3e » comme « trois e » selon la voix choisie : les
+ * mots, eux, se prononcent toujours.
+ */
+export function ordinal(n) {
+  if (!Number.isInteger(n) || n < 1 || n > 999) return `${n}e`
+  if (n === 1) return 'premier'
+  // « quatre-vingts » et « deux cents » perdent leur s : « quatre-vingtième ».
+  const word = cardinal(n).replace(/(vingt|cent)s$/, '$1')
+  if (word.endsWith('cinq')) return `${word}uième`
+  if (word.endsWith('neuf')) return `${word.slice(0, -1)}vième`
+  if (word.endsWith('e')) return `${word.slice(0, -1)}ième`
+  return `${word}ième`
+}
+
 /** « 24,5 kilomètres-heure ». */
 export function spokenSpeed(kmh) {
   if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'

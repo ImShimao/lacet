@@ -21,7 +21,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
-import { capitalize, plannedPerKm, spoken, spokenSpeed } from './runFormat'
+import { capitalize, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
@@ -481,20 +481,21 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
     const every = SPLIT_EVERY_KM[sport] ?? 1
     if (Math.floor(done / every) <= Math.floor(previous / every)) return
-    const said = `${done} kilomètre${done > 1 ? 's' : ''}.`
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      voice.speak(`${said} Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
+      voice.speak(`${done} kilomètres. Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
       return
     }
-    const average = `allure moyenne ${spoken(elapsed / (travelled / 1000))}`
-    // Deux bornes franchies d'un coup n'ont pas de temps propre à dire.
-    voice.speak(
-      gap === 1 && each > 0
-        ? `${said} Ce kilomètre en ${spoken(each)}, ${average}.`
-        : `${said} ${capitalize(average)}.`,
-      { priority: false },
-    )
+    // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
+    // compte pas les annonces, et la borne dite par son rang répond d'un coup
+    // aux deux questions — où en suis-je, et à quelle allure.
+    const which = `${capitalize(ordinal(done))} kilomètre`
+    const average = `Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
+    // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
+    // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
+    let said = `${which}. ${average}`
+    if (gap === 1 && each > 0) said = done === 1 ? `${which} à ${spoken(each)}.` : `${which} à ${spoken(each)}. ${average}`
+    voice.speak(said, { priority: false })
   }
 
   /**

@@ -333,7 +333,24 @@ describe('la distance et les kilomètres', () => {
     await courir(relevés)
     const dit = voice.speak.mock.calls.map(([d]) => d)
     // La borne tombe au relevé qui la franchit, un pas de vingt mètres plus loin.
-    expect(dit).toEqual([expect.stringMatching(/^1 kilomètre\. Ce kilomètre en 4 minutes 1\d, allure moyenne 4 minutes 1\d\.$/)])
+    // Par son rang, pas « ce kilomètre » ; et sans moyenne au premier, qui
+    // répéterait le même temps.
+    expect(dit).toEqual([expect.stringMatching(/^Premier kilomètre à 4 minutes 1\d\.$/)])
+  })
+
+  it('dit les bornes suivantes par leur rang, avec la moyenne', async () => {
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const t0 = 1_700_000_000_000
+    const relevés = []
+    for (let m = 0; m <= 3040; m += 20) relevés.push([m, t0 + m * 250])
+    await courir(relevés)
+    const dit = voice.speak.mock.calls.map(([d]) => d)
+    expect(dit).toEqual([
+      expect.stringMatching(/^Premier kilomètre à 4 minutes 1\d\.$/),
+      expect.stringMatching(/^Deuxième kilomètre à 4 minutes 1\d\. Allure moyenne 4 minutes 1\d\.$/),
+      expect.stringMatching(/^Troisième kilomètre à 4 minutes 1\d\. Allure moyenne 4 minutes 1\d\.$/),
+    ])
   })
 })
 

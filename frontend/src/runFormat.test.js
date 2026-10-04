@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clock, minutes, plannedPerKm, roundedDistance, speed, spoken, spokenSpeed, turnIcon } from './runFormat'
+import { clock, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenSpeed, turnIcon } from './runFormat'
 
 describe('ce que l’écran de course écrit', () => {
   it('écrit une durée en heures et minutes, jamais comme un chrono', () => {
@@ -51,5 +51,29 @@ describe('ce que la voix dit', () => {
   it('dit une vitesse en kilomètres-heure', () => {
     expect(spokenSpeed(24.46)).toBe('24,5 kilomètres-heure')
     expect(spokenSpeed(0)).toBe('inconnue')
+  })
+})
+
+describe('le rang d’un kilomètre, dit à voix haute', () => {
+  it('dit le rang en toutes lettres, que la voix prononce sans hésiter', () => {
+    expect(ordinal(1)).toBe('premier')
+    expect(ordinal(2)).toBe('deuxième')
+    expect(ordinal(3)).toBe('troisième')
+    expect(ordinal(5)).toBe('cinquième')
+    expect(ordinal(9)).toBe('neuvième')
+    expect(ordinal(11)).toBe('onzième')
+    expect(ordinal(17)).toBe('dix-septième')
+  })
+
+  it('suit les règles des nombres composés', () => {
+    expect(ordinal(21)).toBe('vingt et unième')
+    expect(ordinal(42)).toBe('quarante-deuxième')
+    expect(ordinal(71)).toBe('soixante et onzième')
+    expect(ordinal(80)).toBe('quatre-vingtième')
+    expect(ordinal(81)).toBe('quatre-vingt-unième')
+    expect(ordinal(99)).toBe('quatre-vingt-dix-neuvième')
+    expect(ordinal(100)).toBe('centième')
+    expect(ordinal(200)).toBe('deux centième')
+    expect(ordinal(201)).toBe('deux cent unième')
   })
 })
