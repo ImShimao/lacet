@@ -84,10 +84,15 @@ export const DURATIONS = [30, 45, 60, 90]
 /**
  * Ce qu'on peut refuser de croiser.
  *
- * Trois cases, et pas dix : chacune doit répondre à une gêne qu'on a vraiment
- * eue — les cent mètres de dénivelé avalés dans un escalier, la départementale
- * sans trottoir, le chemin noir à dix-huit heures en décembre. Les clés sont
- * celles de `AVOIDS`, dans `engine/weights.js`.
+ * Deux cases, et pas dix : chacune doit répondre à une gêne qu'on a vraiment
+ * eue — les cent mètres de dénivelé avalés dans un escalier, le chemin noir à
+ * dix-huit heures en décembre. Les clés sont celles de `AVOIDS`, dans
+ * `engine/weights.js`.
+ *
+ * Il y en avait une troisième, « Grands axes » : la départementale sans
+ * trottoir. Elle disait la même chose que « Sûr », avec le même critère — une
+ * route à 80 sans trottoir ni accotement —, et personne ne voyait la
+ * différence entre les deux. « Sûr » l'a absorbée (voir `toRequest`).
  *
  * Ce qui manque à cette liste, et qu'aucune donnée ne donne : le portail fermé
  * et le chantier d'hier. Ceux-là ne s'évitent qu'une fois vus — c'est ce que
@@ -95,7 +100,6 @@ export const DURATIONS = [30, 45, 60, 90]
  */
 export const AVOIDABLE = [
   { key: 'steps', label: 'Escaliers', hint: 'Les volées de marches', sport: 'run' },
-  { key: 'busy', label: 'Grands axes', hint: 'Les voies au contact du trafic' },
   { key: 'unlit', label: 'Rues non éclairées', hint: 'Seulement celles données comme telles' },
 ]
 
@@ -404,7 +408,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             />
             <p className="field__hint">
               {draft.safety === 'safe'
-                ? "Écarte les itinéraires qui longent une route à 80 km/h ou plus sans trottoir ni accotement, ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
+                ? "Contourne chaque bout de route à 80 km/h ou plus sans trottoir ni accotement, et écarte les boucles qui en gardent ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
                 : 'Montre aussi les itinéraires exposés, avec le détail des portions concernées.'}
             </p>
           </Field>

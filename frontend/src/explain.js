@@ -91,7 +91,7 @@ const safety = (sport) => {
       {
         icon: 'shield',
         label: 'Sûr',
-        text: `Écarte toute boucle qui longe une route rapide sans trottoir ni accotement, ou qui la traverse sans passage protégé. Au plus ${safe[0]} % du parcours au contact du trafic, jamais plus de ${safe[1]} m d'affilée.`,
+        text: `Contourne, tronçon par tronçon, les routes rapides sans trottoir ni accotement, puis écarte toute boucle qui en garde trop ou qui les traverse sans passage protégé : au plus ${safe[0]} % du parcours au contact du trafic, jamais plus de ${safe[1]} m d'affilée. C'est ce que faisait la case « Grands axes », qui n'existe plus.`,
       },
       {
         icon: 'warning',
@@ -116,14 +116,14 @@ const AVOID = {
       text: "Les volées de marches d'OpenStreetMap (`highway=steps`). Cent mètres de dénivelé pris dans un escalier, ce n'est pas la même sortie qu'une côte régulière — et à vélo, ils sont interdits de toute façon.",
     },
     {
-      icon: 'warning',
-      label: 'Grands axes',
-      text: "Les voies où l'on court au contact du trafic : une route rapide sans trottoir ni accotement. Le réglage « Sécurité » écarte la boucle entière au-delà d'un seuil ; cette case, elle, écarte chaque tronçon, un par un.",
-    },
-    {
       icon: 'moon',
       label: 'Rues non éclairées',
       text: "Les voies explicitement données comme non éclairées (`lit=no`). Celles qui ne disent rien ne sont pas pénalisées : la moitié des rues d'un village n'ont simplement pas l'information, et les écarter viderait la carte.",
+    },
+    {
+      icon: 'shield',
+      label: 'Et la circulation ?',
+      text: "C'est le réglage « Sécurité » qui s'en charge : en « Sûr », chaque bout de route rapide sans trottoir est contourné. Il n'y a rien à cocher en plus.",
     },
   ],
 }

@@ -109,8 +109,10 @@ export function normalizeRequest(input) {
     //   variation, avoid_bearings  « Régénérer d'autres boucles » : tourner les
     //                              polygones d'un cran et fuir les directions
     //                              déjà montrées. Propre à l'écran.
-    //   avoid                      Les cases « Éviter » (escaliers, grands axes,
-    //                              rues non éclairées) — voir `weights.js`.
+    //   avoid                      Les cases « Éviter » (escaliers, rues non
+    //                              éclairées), et les grands axes que « Sûr »
+    //                              ajoute de lui-même — voir `weights.js` et
+    //                              `toRequest`.
     //   blocked                    Les signalements faits en courant. Ils ne
     //                              quittent jamais l'appareil, et un serveur
     //                              n'aurait rien à en faire.

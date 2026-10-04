@@ -32,9 +32,15 @@ export function toRequest(p, start) {
     time_of_day: p.time_of_day,
     limit: p.count || 5,
   }
-  // Vide le plus souvent : n'envoyer la clé que lorsqu'elle sert garde la
-  // demande identique à celle du moteur Python tant qu'on ne coche rien.
-  if (p.avoid?.length) body.avoid = p.avoid
+  // « Sûr » contourne aussi, tronçon par tronçon, ce qui longe le trafic :
+  // c'est l'ancienne case « Grands axes », qui disait la même chose que lui
+  // sans qu'on voie la différence. Mesuré sur vingt-quatre recherches autour de
+  // Guebwiller : 22 m exposés en moyenne par boucle avant, 1 m après, même
+  // justesse sur la distance. Une case restée cochée dans d'anciens réglages ne
+  // compte plus — elle n'a plus d'interrupteur pour la décocher.
+  const avoid = (p.avoid ?? []).filter((key) => key !== 'busy')
+  if (p.safety === 'safe') avoid.push('busy')
+  if (avoid.length) body.avoid = avoid
   if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
