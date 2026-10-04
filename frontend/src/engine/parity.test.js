@@ -35,10 +35,10 @@ const expected = readGz('expected.json.gz')
 const fakeElevation = (lon, lat) => 100 + pymod(lon * 100000, 97) + pymod(lat * 100000, 53) * 0.5
 
 async function fakeFetchMany(routes) {
-  // Le moteur Python n'a qu'une source à cet endroit, et son seuil est le fin :
-  // la parité se juge à seuil égal.
+  // Le moteur Python n'a qu'une source à cet endroit, et c'est la fine : la
+  // parité se juge à lissage et seuil égaux.
   return routes.map((coords) =>
-    coords.length ? { values: coords.map(([lon, lat]) => fakeElevation(lon, lat)), threshold: 2 } : null,
+    coords.length ? { values: coords.map(([lon, lat]) => fakeElevation(lon, lat)), coarse: false } : null,
   )
 }
 

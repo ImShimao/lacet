@@ -45,12 +45,13 @@ class Settings(BaseSettings):
     # "none"          : pas de dénivelé (génération plus rapide)
     elevation_provider: str = "ign"
     elevation_fallback: str = "opentopodata"
-    elevation_sample_m: int = 100  # un point tous les 100 m le long du tracé
+    elevation_sample_m: int = 50  # un point tous les 50 m le long du tracé — voir `elevation.py`
     elevation_timeout_s: int = 20
 
-    # Seuil de bruit du MNT : une variation continue inférieure à ce seuil
-    # n'est pas comptée dans le D+. Sans ça, SRTM gonfle le dénivelé de 30-50 %.
-    ascent_threshold_m: float = 2.0
+    # Seuil de bruit du MNT fin (IGN) : une variation continue inférieure à ce
+    # seuil n'est pas comptée dans le D+. Le lissage a déjà effacé l'essentiel
+    # du tremblement — voir `elevation.py` ; le modèle grossier a le sien.
+    ascent_threshold_m: float = 1.0
 
     # --- Cache ------------------------------------------------------------
     cache_dir: Path = BACKEND_DIR / ".cache"

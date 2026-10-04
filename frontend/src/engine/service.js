@@ -18,9 +18,9 @@ import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py
 import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
-import { ascentDescent, currentWind, fetchMany, isNight, smooth, tailwindFinish } from './environment'
+import { ELEVATION_STEP_M, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
 
-export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: 100, elevationBudgetMs: null }
+export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: ELEVATION_STEP_M, elevationBudgetMs: null }
 
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
 const ELEVATION_TOLERANCE_PER_KM = 5
@@ -39,7 +39,10 @@ const GRADE_PENALTY = 0.9
 const GRADE_RANK = { A: 0, B: 1, C: 2 }
 const CROSSINGS_REFERENCE = 3
 const GOOD_ROUNDNESS = 0.55
-const MAX_ELEVATION_SAMPLES = 300
+// Six cents points par boucle : le pas de cinquante mètres tient jusqu'à 30 km.
+// Au-delà il s'allonge, et l'IGN, qui prend cinq mille points par envoi, rend
+// encore toute une recherche ordinaire — onze boucles de 20 km — en une fois.
+const MAX_ELEVATION_SAMPLES = 600
 // Ce qu'on accorde au relief avant de s'en passer. L'IGN répond en deux à
 // quatre secondes ; mais quand il refuse, le repli part en dizaines de petites
 // requêtes, puis chez un autre fournisseur qui met les siennes en file — et le
@@ -384,9 +387,10 @@ export async function planLoops(input, deps) {
     elevationGaveUp = fetched === null
     ;(fetched ?? []).forEach((relief, i) => {
       if (relief?.values?.length) {
-        const smoothed = smooth(relief.values)
-        // Le seuil voyage avec le profil : c'est la source qui le fixe.
-        profiles.set(i, [smoothed, profilePoints(shortlist[i], smoothed, sampleM), relief.threshold, sampleM])
+        // Lissage et seuil voyagent avec le profil : c'est la source qui les
+        // fixe — voir `shapeRelief`.
+        const { values, threshold } = shapeRelief(relief, sampleM)
+        profiles.set(i, [values, profilePoints(shortlist[i], values, sampleM), threshold, sampleM])
       }
     })
   }

@@ -190,7 +190,7 @@ describe('le secours', () => {
   })
 
   it('mesure le relief des boucles de secours', async () => {
-    // Les altitudes reviennent en `{values, threshold}` : lues comme une liste,
+    // Les altitudes reviennent en `{values, coarse}` : lues comme une liste,
     // elles ne donnaient jamais de dénivelé.
     const trajets = fakeValhalla(5)
     const fetchImpl = async (url, init = {}) => {

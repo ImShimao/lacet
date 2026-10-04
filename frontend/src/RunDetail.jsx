@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import { StravaButton } from './Strava.jsx'
+import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
 
@@ -148,11 +149,13 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
           en partie de là.
         </p>
       )}
-      {entry.actual_ascent_m == null && (
+      {entry.actual_ascent_m == null ? (
         <p className="muted small">
-          Pas de dénivelé mesuré : le GPS du téléphone n'a pas donné l'altitude pendant cette
-          sortie.
+          Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n'ont donné
+          l'altitude pendant cette sortie.
         </p>
+      ) : (
+        <AscentNote entry={entry} />
       )}
       {!entry.track?.length && (
         <p className="muted small">

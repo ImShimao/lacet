@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 import asyncio
 
 from .config import settings
-from .elevation import ascent_descent, fetch_many, smooth
+from .elevation import ascent_descent, fetch_many, shape_relief
 from .geo import haversine_m, resample
 from .navigation import build_instructions
 from .models import (
@@ -150,8 +150,9 @@ CROSSINGS_REFERENCE = 3.0
 # ne plus distinguer une belle boucle d'une boucle correcte.
 GOOD_ROUNDNESS = 0.55
 
-# Plafond de points d'altitude par itinéraire, quelle que soit sa longueur.
-MAX_ELEVATION_SAMPLES = 300
+# Plafond de points d'altitude par itinéraire, quelle que soit sa longueur :
+# le pas de 50 m tient jusqu'à 30 km, puis s'allonge.
+MAX_ELEVATION_SAMPLES = 600
 
 CARDINALS = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"]
 
@@ -306,8 +307,8 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
 
     # --- altitude ---------------------------------------------------------
     profiles: dict[int, tuple[list[float], list[ElevationPoint]]] = {}
-    # Un point tous les 100 m convient à 10 km ; à 200 km, ça ferait 2 000
-    # points et une vingtaine d'allers-retours réseau. On plafonne l'effort.
+    # Un point tous les 50 m convient jusqu'à 30 km ; à 200 km, ça ferait
+    # 4 000 points par boucle. On plafonne l'effort.
     sample_m = max(settings.elevation_sample_m, target_m / MAX_ELEVATION_SAMPLES)
 
     if req.with_elevation and shortlist:
@@ -318,12 +319,13 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         fetched = await fetch_many(sampled)
         for i, (points, relief) in enumerate(zip(sampled, fetched)):
             if relief and relief.values:
-                elevations = smooth(relief.values)
-                # Le seuil voyage avec le profil : c'est la source qui le fixe.
+                # Lissage et seuil voyagent avec le profil : c'est la source qui
+                # les fixe — voir `elevation.shape_relief`.
+                elevations, threshold = shape_relief(relief, sample_m)
                 profiles[i] = (
                     elevations,
                     _profile_points(shortlist[i], elevations, sample_m),
-                    relief.threshold,
+                    threshold,
                 )
     lap("elevation")
 

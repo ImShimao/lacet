@@ -6,7 +6,7 @@
 // envoi à la fois vers Valhalla), et le cache vit dans IndexedDB.
 
 import { store } from './store'
-import { degrees, pyFixed, pyHypot, pymod, pyRound, pyRoundInt, pySum, radians } from './py'
+import { degrees, pyFixed, pyHypot, pymod, pyRound, pyRoundInt, radians } from './py'
 
 // === Soleil ===================================================================
 
@@ -165,21 +165,43 @@ const IGN_BATCH = 5000
 const ROUND = 5
 const ELEVATION_TILE = 0.05
 /**
- * Le seuil d'hystérésis — et pourquoi il dépend de la source.
+ * Compter le dénivelé : tous les combien, lissé comment, à partir de quand.
  *
- * Un modèle d'altitude tremble d'autant plus qu'il est grossier. Mesuré sur dix
- * boucles, cache vidé entre les deux fournisseurs : en montagne, l'IGN (1 m) et
- * Valhalla (~30 m) s'accordent à 1 ou 7 % près ; en ville plate, Valhalla
- * annonce 72 m de D+ à Paris contre 17, 35 à Strasbourg contre 8, 23 à Mulhouse
- * contre 2. Ce n'est pas du relief, c'est la grille qui tremble — et un seuil
- * de deux mètres compte ce tremblement comme des côtes.
+ * Le calcul d'avant — un point tous les 100 m, une moyenne sur trois points,
+ * un seuil de deux mètres — rabotait les côtes. Une moyenne sur trois points
+ * espacés de cent mètres, c'est un lissage sur trois cents : une bosse de
+ * quinze mètres sur deux cents y fond de moitié. On annonçait 150 m, on en
+ * montait 200.
  *
- * Huit mètres l'effacent : Paris retombe à 19, Strasbourg à 8, Mulhouse à 8,
- * pendant que les Vosges ne perdent que 5 %. Le seuil suit donc la source, et
- * la France garde ses deux mètres.
+ * Mesuré le 4 octobre 2026 sur 54 boucles proposées par l'app autour de
+ * Guebwiller, Soultz, Buhl, Cernay et Bollwiller — de la plaine aux Vosges —,
+ * contre leur altitude IGN relevée tous les cinq mètres (lissée sur une
+ * quinzaine de mètres, seuil d'un mètre : ce que mesure un altimètre) :
+ *
+ *                                total     écart moyen   pire boucle
+ *   avant (100 m, 3 pts, 2 m)    −10 %        15 %          −48 %
+ *   après (50 m, 60 m, 1 m)       −1 %       1,7 %          10 %
+ *
+ * L'écart venait presque tout entier du lissage : sans lui, cent mètres de pas
+ * suffisaient déjà (2,5 %). Cinquante mètres gardent les bosses courtes, et un
+ * noyau triangulaire de soixante mètres — un point voisin compte pour un
+ * sixième — efface le tremblement du modèle sans toucher au relief. Triangle et
+ * non gaussienne : sans exponentielle, le calcul est le même au bit près dans
+ * le moteur Python de référence.
+ *
+ * Les ponts et passages souterrains, où le modèle de terrain voit la rivière ou
+ * le talus, ne pesaient que 0,3 % sur ces 54 boucles : pas de traitement à part.
+ *
+ * **Le modèle grossier** (Valhalla, ~30 m, hors de France) tremble davantage :
+ * en ville plate, un seuil de deux mètres lui faisait annoncer 72 m de D+ à
+ * Paris contre 17. Mesuré sur les mêmes boucles, son meilleur réglage est un
+ * noyau de cent mètres et un seuil de trois : −2 % au total et 11 % d'écart
+ * moyen, contre −14 % et 21 % avec l'ancien seuil de huit mètres.
  */
-const ASCENT_THRESHOLD_M = 2
-export const COARSE_THRESHOLD_M = 8
+export const ELEVATION_STEP_M = 50
+const FINE = { kernelM: 60, thresholdM: 1 }
+const COARSE = { kernelM: 100, thresholdM: 3 }
+const ASCENT_THRESHOLD_M = FINE.thresholdM
 
 const elevationStore = store('elevation')
 
@@ -269,16 +291,17 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
   // Un tracé dont un seul point manque n'a pas de profil : mieux vaut « D+ — »
   // qu'un dénivelé calculé sur des trous. Les autres tracés gardent le leur.
   //
-  // Chaque tracé rend ses altitudes **et le seuil qui leur convient** : le plus
-  // grossier de ses points décide. Une boucle à cheval sur la frontière ne
-  // mérite pas la finesse française sur sa moitié suisse.
+  // Chaque tracé dit **si ses altitudes sont grossières** : le plus grossier de
+  // ses points décide du lissage et du seuil (voir `shapeRelief`). Une boucle à
+  // cheval sur la frontière ne mérite pas la finesse française sur sa moitié
+  // suisse.
   return routes.map((coords) => {
     if (!coords.length) return null
     const kept = coords.map((c) => wanted.get(roundKey(c)))
     if (kept.some((v) => v === null || v === undefined)) return null
     return {
       values: kept.map((v) => (typeof v === 'object' ? v.z : v)),
-      threshold: kept.some((v) => typeof v === 'object' && v.c) ? COARSE_THRESHOLD_M : ASCENT_THRESHOLD_M,
+      coarse: kept.some((v) => typeof v === 'object' && v.c),
     }
   })
 }
@@ -435,15 +458,41 @@ export function ascentDescent(elevations, threshold = ASCENT_THRESHOLD_M) {
   return [pyRound(ascent, 1), pyRound(descent, 1)]
 }
 
-/** Moyenne glissante — `smooth`. */
-export function smooth(elevations, window = 3) {
-  if (window < 2 || elevations.length < window) return elevations
-  const half = Math.trunc(window / 2)
+/**
+ * Les altitudes d'un tracé échantillonné tous les `stepM` mètres, prêtes à
+ * compter : lissées selon la finesse de leur source, avec le seuil qui leur
+ * convient — `shape_relief`. `relief` est ce que rend `fetchMany`.
+ */
+export function shapeRelief(relief, stepM = ELEVATION_STEP_M) {
+  const { kernelM, thresholdM } = relief.coarse ? COARSE : FINE
+  return { values: smoothAlong(relief.values, stepM, kernelM), threshold: thresholdM }
+}
+
+/**
+ * Lissage triangulaire le long du tracé — `smooth_along`. Un voisin à `d`
+ * mètres pèse `1 − d / kernelM` ; au-delà du noyau, rien. Aux deux bouts, le
+ * noyau tronqué est renormalisé.
+ *
+ * Les sommes se font une à une, dans l'ordre : c'est ce qui garde le résultat
+ * identique au bit près à celui de Python.
+ */
+export function smoothAlong(elevations, stepM, kernelM) {
+  const reach = Math.floor(kernelM / stepM)
+  if (reach < 1 || elevations.length < 3) return elevations.slice()
+  const weights = []
+  for (let k = 0; k <= reach; k += 1) weights.push(1 - (k * stepM) / kernelM)
   const out = []
   for (let i = 0; i < elevations.length; i += 1) {
-    const lo = Math.max(0, i - half)
-    const hi = Math.min(elevations.length, i + half + 1)
-    out.push(pySum(elevations.slice(lo, hi)) / (hi - lo))
+    let sum = 0
+    let total = 0
+    for (let k = -reach; k <= reach; k += 1) {
+      const j = i + k
+      if (j < 0 || j >= elevations.length) continue
+      const w = weights[Math.abs(k)]
+      sum += elevations[j] * w
+      total += w
+    }
+    out.push(sum / total)
   }
   return out
 }

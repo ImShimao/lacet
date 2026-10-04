@@ -10,5 +10,6 @@ import UIKit
 class LacetBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(LiveActivityPlugin())
+        bridge?.registerPluginInstance(AltimeterPlugin())
     }
 }

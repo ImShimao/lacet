@@ -23,7 +23,7 @@ import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, tilesFor } from './overpass'
 import { fetchArea } from './overpass'
-import { currentWind, fetchMany, smooth } from './environment'
+import { ELEVATION_STEP_M, currentWind, fetchMany, shapeRelief } from './environment'
 import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
 import { planRemote } from './remote'
 
@@ -266,12 +266,12 @@ self.onmessage = async ({ data }) => {
       }
       let elev = null
       try {
-        const sampleM = 100
+        const sampleM = ELEVATION_STEP_M
         const points = resample(geometry, sampleM).map(([, c]) => c)
         const [relief] = await fetchMany([points])
         if (relief?.values?.length) {
-          const smoothed = smooth(relief.values)
-          elev = [smoothed, null, relief.threshold, sampleM]
+          const { values, threshold } = shapeRelief(relief, sampleM)
+          elev = [values, null, threshold, sampleM]
         }
       } catch {
         /* sans relief : le parcours reste juste */

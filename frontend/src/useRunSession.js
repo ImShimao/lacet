@@ -99,7 +99,14 @@ export default function useRunSession({ toEntry, remember }) {
           toEntry(
             // Les temps de chaque kilomètre sont gardés avec le reste : ils ne se
             // retrouvent pas après coup.
-            { distance: pending.covered, elapsed: pending.elapsed, trail: pending.trail, splits: pending.splits },
+            {
+              distance: pending.covered,
+              elapsed: pending.elapsed,
+              trail: pending.trail,
+              splits: pending.splits,
+              ascent: pending.ascent ?? null,
+              ascentSource: pending.ascentSource ?? null,
+            },
             { route: pending.route, free: !pending.route, sport: pending.sport || sport },
           ),
         ),

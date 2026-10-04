@@ -9,12 +9,14 @@ import pytest
 from app.elevation import (
     COARSE_THRESHOLD_M,
     ElevationCache,
+    Relief,
     _fetch_with_fallback,
     _ign_values,
     _opentopo_values,
     ascent_descent,
     fetch_many,
-    smooth,
+    shape_relief,
+    smooth_along,
 )
 from app.geo import bearing_deg, haversine_m, point_in_ring, resample
 from app.solar import is_night
@@ -32,13 +34,13 @@ class TestDenivele:
         Sans seuil, ces oscillations de ±1 m donneraient D+ ≈ 9 m sur du plat.
         """
         noisy = [100, 101, 100, 101, 100, 99, 100, 101, 100, 99]
-        ascent, descent = ascent_descent(noisy)
+        ascent, descent = ascent_descent(noisy, threshold=2.0)
         assert ascent == 0.0
         assert descent == 0.0
 
     def test_vraie_bosse_dans_le_bruit(self):
         series = [100, 101, 100, 108, 107, 108, 100, 101, 100]
-        ascent, descent = ascent_descent(series)
+        ascent, descent = ascent_descent(series, threshold=2.0)
         assert ascent == pytest.approx(8.0)
         assert descent == pytest.approx(8.0)
 
@@ -60,12 +62,35 @@ class TestDenivele:
 
 class TestLissage:
     def test_pic_isole_attenue(self):
-        out = smooth([100, 100, 130, 100, 100], window=3)
+        out = smooth_along([100, 100, 130, 100, 100], 50, 60)
         assert out[2] < 130
         assert len(out) == 5
 
     def test_serie_courte_inchangee(self):
-        assert smooth([100, 101], window=5) == [100, 101]
+        assert smooth_along([100, 101], 50, 60) == [100, 101]
+
+    def test_noyau_plus_court_que_le_pas(self):
+        """Des points tous les 100 m et un noyau de 60 : rien à lisser."""
+        assert smooth_along([100, 104, 100, 104], 100, 60) == [100, 104, 100, 104]
+
+    def test_le_tremblement_du_modele_ne_monte_pas(self):
+        """Un mètre de bruit, un point sur deux : le lissage l'efface avant le seuil."""
+        noisy = [100.0 + (i % 2) for i in range(40)]
+        values, threshold = shape_relief(Relief(noisy, False), 50)
+        assert ascent_descent(values, threshold)[0] == 0.0
+
+    def test_une_bosse_courte_garde_sa_hauteur(self):
+        """Le défaut corrigé : quinze mètres de bosse sur deux cents fondaient de
+        moitié dans l'ancienne moyenne sur trois points espacés de cent mètres."""
+        flat = [200.0] * 10
+        bump = [205.0, 210.0, 215.0, 210.0, 205.0]
+        values, threshold = shape_relief(Relief(flat + bump + flat, False), 50)
+        assert ascent_descent(values, threshold)[0] == pytest.approx(15.0, abs=2.5)
+
+    def test_le_grossier_lisse_et_seuille_davantage(self):
+        values, threshold = shape_relief(Relief([100.0, 102.0, 100.0, 102.0, 100.0], True), 50)
+        assert threshold == COARSE_THRESHOLD_M
+        assert ascent_descent(values, threshold)[0] == 0.0
 
 
 class TestGeometrie:
@@ -177,9 +202,9 @@ class TestCouverture:
         self._fournisseurs(monkeypatch, ign, monde)
         monkeypatch.setattr("app.elevation._cache", ElevationCache(tmp_path))
         fin = asyncio.run(fetch_many([[(7.1, 47.5), (7.15, 47.5)]]))[0]
-        assert fin.threshold == 2.0
+        assert fin.coarse is False
         mêlé = asyncio.run(fetch_many([[(7.1, 47.6), (7.3, 47.6)]]))[0]
-        assert mêlé.threshold == COARSE_THRESHOLD_M
+        assert mêlé.coarse is True
 
     def test_sans_profil_plutot_qu_un_faux(self, monkeypatch, tmp_path):
         def ign(coords):

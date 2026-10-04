@@ -92,6 +92,9 @@ export function runEntry(stats, { route, free, sport }, params) {
     actual_distance_m: Math.round(stats.distance),
     actual_duration_s: Math.round(stats.elapsed),
     actual_ascent_m: stats.ascent ?? null,
+    // « baro » ou « gps » : un dénivelé au baromètre se compare au prévu, celui
+    // du GPS beaucoup moins — l'écran le dit.
+    actual_ascent_source: stats.ascent != null ? (stats.ascentSource ?? 'gps') : null,
     // Ce qu'on a réellement couru, allégé — voir `trail.js`.
     track: stats.trail?.length > 1 ? stats.trail : null,
     // Le temps de chaque kilomètre, et le temps passé à l'arrêt : relevés

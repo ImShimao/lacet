@@ -12,9 +12,19 @@ Deux fournisseurs, tous deux gratuits et sans clé :
 
 Point important : le D+ n'est **pas** la somme des variations positives. Un MNT
 est bruité, et ce bruit s'accumule à chaque point — une boucle plate ressort
-alors à « D+ 90 m ». On applique donc un seuil d'hystérésis : une montée n'est
-comptabilisée qu'au-delà de `ascent_threshold_m` de variation continue. Sans ce
-filtre, les chiffres sortent 30 à 50 % au-dessus de ceux d'une montre GPS.
+alors à « D+ 90 m ». On lisse donc légèrement, puis on applique un seuil
+d'hystérésis : une montée n'est comptabilisée qu'au-delà de `ascent_threshold_m`
+de variation continue.
+
+Mais trop lisser rabote les côtes. Le réglage d'avant — un point tous les 100 m,
+une moyenne sur trois points, deux mètres de seuil — sous-estimait de 10 % en
+moyenne, et jusqu'à moitié sur les boucles vallonnées. Mesuré le 4 octobre 2026
+sur 54 boucles de l'app autour de Guebwiller, contre leur altitude IGN relevée
+tous les cinq mètres : un point tous les 50 m, un noyau triangulaire de 60 m et
+un mètre de seuil ramènent l'écart à −1 % au total et 1,7 % par boucle (pire
+cas 10 %). Le modèle grossier, lui, prend un noyau de 100 m et trois mètres de
+seuil (−2 % et 11 %, contre −14 % et 21 % avec l'ancien seuil de huit). Le
+détail est dans `frontend/src/engine/environment.js`, qui fait le même calcul.
 
 Deuxième point important : les altitudes sont **mises en commun et mises en
 cache**. Dès qu'on propose cinq ou dix itinéraires, les interroger un par un
@@ -50,14 +60,12 @@ OPENTOPO_DATASETS = "eudem25m,srtm30m"
 
 BATCH = 100  # points par requête — limite d'OpenTopoData, et prudent pour IGN
 
-# Le seuil d'hystérésis dépend de la finesse de la source. Mesuré sur dix
-# boucles, cache vidé entre les fournisseurs : en montagne, un modèle à 1 m et
-# un modèle à 30 m s'accordent à 1 ou 7 % près ; en ville plate, le grossier
-# annonce 72 m de D+ à Paris contre 17, 35 à Strasbourg contre 8, 23 à Mulhouse
-# contre 2. Ce n'est pas du relief, c'est la grille qui tremble — et deux mètres
-# comptent ce tremblement comme des côtes. Huit l'effacent sans abîmer la
-# montagne (−5 % dans les Vosges).
-COARSE_THRESHOLD_M = 8.0
+# Le lissage et le seuil dépendent de la finesse de la source. Un modèle à 30 m
+# tremble : en ville plate, deux mètres de seuil lui faisaient annoncer 72 m de
+# D+ à Paris contre 17. Ce n'est pas du relief, c'est la grille qui tremble.
+FINE_KERNEL_M = 60.0
+COARSE_KERNEL_M = 100.0
+COARSE_THRESHOLD_M = 3.0
 
 # Un point sans donnée — pas un point à zéro mètre. L'IGN couvre la France et
 # répond -99999 partout ailleurs ; prendre ces -99999 pour le niveau de la mer
@@ -82,10 +90,10 @@ def _round(c: Coord) -> Coord:
 
 
 class Relief(NamedTuple):
-    """Les altitudes d'un tracé, et le seuil que leur source mérite."""
+    """Les altitudes d'un tracé, et si leur source est grossière."""
 
     values: list[float]
-    threshold: float
+    coarse: bool
 
 
 async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
@@ -126,8 +134,8 @@ async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
     # Un tracé dont un seul point manque n'a pas de profil : mieux vaut
     # « D+ — » qu'un dénivelé calculé sur des trous. Les autres gardent le leur.
     #
-    # Chaque tracé rend ses altitudes **et le seuil qui leur convient** : le plus
-    # grossier de ses points décide.
+    # Chaque tracé dit **si ses altitudes sont grossières** : le plus grossier
+    # de ses points décide du lissage et du seuil (voir `shape_relief`).
     out: list[Relief | None] = []
     for coords in routes:
         if not coords:
@@ -137,16 +145,7 @@ async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
         if any(v is None for v in kept):
             out.append(None)
             continue
-        out.append(
-            Relief(
-                values=[v[0] for v in kept],
-                threshold=(
-                    COARSE_THRESHOLD_M
-                    if any(v[1] for v in kept)
-                    else settings.ascent_threshold_m
-                ),
-            )
-        )
+        out.append(Relief(values=[v[0] for v in kept], coarse=any(v[1] for v in kept)))
     return out
 
 
@@ -377,14 +376,39 @@ def ascent_descent(elevations: list[float], threshold: float | None = None) -> t
     return round(ascent, 1), round(descent, 1)
 
 
-def smooth(elevations: list[float], window: int = 3) -> list[float]:
-    """Moyenne glissante — lisse les pics isolés avant le calcul du profil."""
-    if window < 2 or len(elevations) < window:
-        return elevations
-    half = window // 2
+def shape_relief(relief: Relief, step_m: float) -> tuple[list[float], float]:
+    """Les altitudes d'un tracé échantillonné tous les `step_m` mètres, prêtes à
+    compter : lissées selon la finesse de leur source, et le seuil qui leur
+    convient."""
+    if relief.coarse:
+        return smooth_along(relief.values, step_m, COARSE_KERNEL_M), COARSE_THRESHOLD_M
+    return smooth_along(relief.values, step_m, FINE_KERNEL_M), settings.ascent_threshold_m
+
+
+def smooth_along(elevations: list[float], step_m: float, kernel_m: float) -> list[float]:
+    """Lissage triangulaire le long du tracé : un voisin à `d` mètres pèse
+    `1 − d / kernel_m`, et plus rien au-delà du noyau. Aux deux bouts, le noyau
+    tronqué est renormalisé.
+
+    Triangle et non gaussienne, et sommes faites une à une dans l'ordre : sans
+    exponentielle ni `sum` compensée, le résultat est le même au bit près que
+    celui du moteur JavaScript.
+    """
+    reach = math.floor(kernel_m / step_m)
+    if reach < 1 or len(elevations) < 3:
+        return list(elevations)
+    weights = [1 - (k * step_m) / kernel_m for k in range(reach + 1)]
     out: list[float] = []
-    for i in range(len(elevations)):
-        lo = max(0, i - half)
-        hi = min(len(elevations), i + half + 1)
-        out.append(sum(elevations[lo:hi]) / (hi - lo))
+    n = len(elevations)
+    for i in range(n):
+        total_z = 0.0
+        total_w = 0.0
+        for k in range(-reach, reach + 1):
+            j = i + k
+            if j < 0 or j >= n:
+                continue
+            w = weights[abs(k)]
+            total_z += elevations[j] * w
+            total_w += w
+        out.append(total_z / total_w)
     return out

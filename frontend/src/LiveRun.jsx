@@ -83,6 +83,12 @@ const STOP_EVERY_M = 1000
 // toutes les deux minutes, tous les cinq.
 const SPLIT_EVERY_KM = { run: 1, bike: 5 }
 
+// Le cumul du baromètre est relu toutes les cinq secondes : le dernier mètre
+// monté avant « Terminer » n'est pas une affaire. Et il ne fait foi qu'après
+// une demi-minute de relevés — un par seconde environ.
+const BARO_READ_MS = 5000
+const BARO_MIN_SAMPLES = 30
+
 const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
 
 /**
@@ -185,7 +191,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const autoPause = useRef(load().autoPause !== false)
   // La trace réellement suivie, et le dénivelé qu'elle a coûté (voir `trail.js`).
   const trace = useRef(null)
-  if (!trace.current) trace.current = trailRecorder(resuming?.trail ?? [])
+  if (!trace.current) trace.current = trailRecorder(resuming?.trail ?? [], resuming?.ascent ?? 0)
+  // Le dénivelé au baromètre — voir `measuredAscent`. `base` : celui d'avant une
+  // reprise ; `reading` : le dernier cumul rendu par le module natif.
+  const baro = useRef({ base: resuming?.ascent ?? 0, reading: null })
   // Une sortie reprise après une coupure repart de ses propres chiffres.
   const resumed = useRef(false)
   if (!resumed.current) {
@@ -218,6 +227,25 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     guideRef.current = g
     setGuide(g)
   }, [route])
+
+  // Le baromètre mesure pendant toute la sortie ; on relit son cumul de loin
+  // en loin. Le cumul vit côté natif : rien n'est perdu entre deux lectures.
+  useEffect(() => {
+    if (!isNative()) return undefined
+    const native = import('./native')
+    native.then((n) => n.startAltimeter())
+    const poll = setInterval(() => {
+      native
+        .then((n) => n.readAltimeter())
+        .then((reading) => {
+          if (reading) baro.current.reading = reading
+        })
+    }, BARO_READ_MS)
+    return () => {
+      clearInterval(poll)
+      native.then((n) => n.stopAltimeter())
+    }
+  }, [])
 
   // Garder l'écran allumé pendant la sortie.
   useEffect(() => {
@@ -304,7 +332,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         }
         last.current = point
         lastAt.current = at
-        trace.current.push(point, position.coords.altitude ?? null)
+        trace.current.push(point, position.coords.altitude ?? null, position.coords.altitudeAccuracy ?? null)
         if (route) {
           followRoute(point)
           warnCrossing(point)
@@ -343,7 +371,26 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       elapsed: movingSeconds(now),
       trail: trace.current.points,
       splits: splits.current,
+      ...measuredAscent(),
     })
+  }
+
+  /**
+   * Le dénivelé monté jusqu'ici, et d'où il vient.
+   *
+   * Le baromètre d'abord : l'altitude du GPS tremble de plusieurs mètres, et le
+   * dénivelé qu'on en tirait servait de juge au dénivelé annoncé — un juge plus
+   * bruité que l'accusé. Le GPS ne prend le relais que si le baromètre n'a rien
+   * dit : iPhone qui refuse l'accès aux mouvements, ou installation d'avant le
+   * module.
+   */
+  function measuredAscent() {
+    const reading = baro.current.reading
+    if (reading?.samples >= BARO_MIN_SAMPLES && Number.isFinite(reading.ascent)) {
+      return { ascent: Math.round(baro.current.base + reading.ascent), ascentSource: 'baro' }
+    }
+    if (trace.current.points.length > 2) return { ascent: trace.current.ascent, ascentSource: 'gps' }
+    return { ascent: null, ascentSource: null }
   }
 
   /** Le temps en mouvement, pauses déduites — celui qui fait l'allure. */
@@ -812,7 +859,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
       // reprendre, et un point tous les huit mètres y suffit.
       trail: simplify(trace.current.points),
-      ascent: trace.current.points.length > 2 ? trace.current.ascent : null,
+      ...measuredAscent(),
       rerouted: Boolean(guideRef.current.route?.rerouted),
       splits: splits.current.slice(),
       pausedS: Math.round(pausedMs.current / 1000),

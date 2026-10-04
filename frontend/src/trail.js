@@ -16,7 +16,9 @@
 // **L'altitude du GPS est du bruit.** Elle saute de cinq mètres d'un relevé à
 // l'autre, immeuble ou pas. Additionner les écarts positifs donnerait des
 // centaines de mètres de dénivelé sur un parcours plat. On lisse, puis on ne
-// compte une montée qu'au-delà d'un seuil.
+// compte une montée qu'au-delà d'un seuil. Ce n'est plus qu'un repli : le
+// dénivelé d'une sortie vient du baromètre (voir `LiveRun.jsx`) dès qu'il
+// répond, et celui-ci ne sert qu'à un iPhone qui le refuse.
 //
 // **L'arrêt ne se trace pas.** En pause — à un feu, à la fontaine — le
 // tremblement du GPS dessinerait une pelote de trois mètres de large.
@@ -28,6 +30,10 @@ const KEEP_EVERY_M = 8
 const CORNER_M = 4
 // Ce qu'il faut monter, une fois l'altitude lissée, pour que ça compte.
 const CLIMB_M = 3
+// Au-delà de cette incertitude verticale annoncée par le GPS — sous les arbres,
+// entre deux immeubles —, l'altitude du relevé n'est pas lue : elle ferait des
+// bonds de vingt mètres que le lissage ne rattrape pas.
+const ALTITUDE_ACCURACY_LIMIT_M = 15
 // Lissage de l'altitude : moyenne mobile exponentielle.
 const SMOOTH = 0.25
 
@@ -44,13 +50,14 @@ function metres(a, b) {
  * Enregistre la trace d'une sortie, point par point.
  *
  * `push` ne retient un relevé que s'il apporte quelque chose ; `points` rend la
- * trace, `ascent` le dénivelé positif mesuré.
+ * trace, `ascent` le dénivelé positif mesuré. `ascent` repart de `climbed` :
+ * une sortie reprise après une coupure ne perd pas ses côtes d'avant.
  */
-export function trailRecorder(initial = []) {
+export function trailRecorder(initial = [], climbed = 0) {
   const points = initial.map((p) => [p[0], p[1]])
   let smoothed = null
   let reference = null
-  let ascent = 0
+  let ascent = climbed || 0
 
   return {
     get points() {
@@ -60,8 +67,9 @@ export function trailRecorder(initial = []) {
       return Math.round(ascent)
     },
     /** Rend `true` si le point a été gardé. */
-    push(point, altitude = null) {
-      if (altitude !== null && Number.isFinite(altitude)) {
+    push(point, altitude = null, altitudeAccuracy = null) {
+      const trusted = !(altitudeAccuracy > ALTITUDE_ACCURACY_LIMIT_M)
+      if (altitude !== null && Number.isFinite(altitude) && trusted) {
         smoothed = smoothed === null ? altitude : smoothed + SMOOTH * (altitude - smoothed)
         if (reference === null) reference = smoothed
         else if (smoothed - reference >= CLIMB_M) {

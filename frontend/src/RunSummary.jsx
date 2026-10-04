@@ -2,6 +2,7 @@ import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
 import { StravaButton } from './Strava.jsx'
+import AscentNote from './AscentNote.jsx'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -67,11 +68,13 @@ export default function RunSummary({ entry, onClose, onStrava }) {
           {entry.rerouted ? ' Un nouveau chemin a été calculé en route.' : ''}
         </p>
       )}
-      {entry.actual_ascent_m == null && (
+      {entry.actual_ascent_m == null ? (
         <p className="muted small">
-          Le dénivelé demande l'altitude du GPS, que ton téléphone n'a pas donnée
-          pendant cette sortie.
+          Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n'ont donné
+          l'altitude pendant cette sortie.
         </p>
+      ) : (
+        <AscentNote entry={entry} />
       )}
 
       <StravaButton entry={entry} auto onSent={onStrava} />

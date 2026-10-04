@@ -65,11 +65,21 @@ describe('le détail d’une sortie', () => {
 
   it('n’invente ni dénivelé ni tours quand ils manquent', () => {
     rendre(sortie({ actual_ascent_m: null, splits: null, track: null }))
-    expect(screen.getByText(/pas donné l'altitude/)).toBeTruthy()
+    expect(screen.getByText(/n'ont donné l'altitude/)).toBeTruthy()
     expect(screen.queryByText(/au plus vite/)).toBeNull()
     expect(screen.getByText(/plus gardée/)).toBeTruthy()
     // Sans trace, rien à exporter.
     expect(screen.queryByText('Exporter la trace')).toBeNull()
+  })
+
+  it('dit d’où vient le dénivelé mesuré', () => {
+    // Au baromètre, il se compare au prévu ; au GPS, ce n'est qu'un ordre de
+    // grandeur — et une sortie d'avant le baromètre n'a pas de source : GPS.
+    rendre(sortie({ actual_ascent_m: 162, actual_ascent_source: 'baro', ascent_m: 158.4 }))
+    expect(screen.getByText(/mesuré au baromètre du téléphone — 158 m étaient prévus/)).toBeTruthy()
+    cleanup()
+    rendre(sortie({ actual_ascent_m: 162, ascent_m: 158.4 }))
+    expect(screen.getByText(/altitude du GPS/)).toBeTruthy()
   })
 
   it('ne compare pas une sortie libre à un plan qui n’existe pas', () => {

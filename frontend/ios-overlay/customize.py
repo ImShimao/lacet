@@ -46,6 +46,12 @@ def info_plist() -> None:
         "pour la distance et le guidage vocal."
     )
     plist["NSLocationAlwaysUsageDescription"] = plist["NSLocationAlwaysAndWhenInUseUsageDescription"]
+    # Le baromètre (`AltimeterPlugin.swift`) : sans cette phrase, iOS ferme
+    # l'app à la première lecture au lieu de poser la question.
+    plist["NSMotionUsageDescription"] = (
+        "Lacet mesure le dénivelé de tes sorties avec le baromètre du téléphone, "
+        "bien plus précis que l'altitude du GPS."
+    )
 
     # Ce qui fait l'intérêt de l'app native : le GPS et la voix continuent quand
     # le téléphone est dans la poche. Sans ces deux modes, iOS suspend l'app

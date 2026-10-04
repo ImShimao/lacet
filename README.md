@@ -752,6 +752,33 @@ tout ce que la variété peut rapporter :
 Ce n'est pas un rejet : s'il n'existe que des boucles hors fourchette, elles
 sont proposées — simplement jamais devant une boucle conforme.
 
+### Le dénivelé annoncé, et celui qu'on monte
+
+`frontend/src/engine/environment.js` · `backend/app/elevation.py`
+
+Le dénivelé annoncé se calculait sur un point tous les 100 m, lissé par une
+moyenne de trois points — trois cents mètres — avec un seuil de deux mètres. Il
+rabotait les côtes courtes : « on annonce 150 m, on en monte 200 ». Mesuré le
+4 octobre 2026 sur 54 boucles de l'app autour de Guebwiller, contre leur
+altitude IGN relevée tous les cinq mètres :
+
+| Réglage | Total | Écart moyen | Pire boucle |
+|---|---|---|---|
+| Avant : 100 m, moyenne sur 3 points, seuil 2 m | −10 % | 15 % | −48 % |
+| Après : 50 m, noyau triangulaire de 60 m, seuil 1 m | −1 % | 1,7 % | 10 % |
+
+Hors de France (Valhalla, ~30 m), le noyau passe à 100 m et le seuil à 3 m :
+−2 % et 11 %, contre −14 % et 21 % avec l'ancien seuil de huit mètres. Les ponts
+et passages souterrains, où le modèle de terrain voit la rivière ou le talus, ne
+pesaient que 0,3 % : pas de traitement à part.
+
+**Le dénivelé mesuré** vient du **baromètre** de l'iPhone
+(`ios-overlay/live-activity/App/AltimeterPlugin.swift`), cumulé côté natif
+pendant toute la sortie : lissage de quatre secondes, seuil d'un mètre compté
+depuis le creux. L'altitude du GPS, qui tremble de plusieurs mètres, ne sert
+plus que de repli — iPhone qui refuse l'accès à « Mouvements et forme » — et le
+bilan dit alors que ce n'est qu'un ordre de grandeur.
+
 ## Le guidage
 
 `backend/app/navigation.py`
@@ -784,7 +811,8 @@ une décision réelle.
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `LACET_ELEVATION_PROVIDER` | `ign` | `ign` (France, 1–5 m) · `opentopodata` (monde) · `none` |
-| `LACET_ASCENT_THRESHOLD_M` | `2.0` | Seuil d'hystérésis du D+. Sans lui, le bruit du modèle d'altitude gonfle le dénivelé de 30 à 50 %. |
+| `LACET_ELEVATION_SAMPLE_M` | `50` | Un point d'altitude tous les N mètres. Voir « Le dénivelé annoncé, et celui qu'on monte ». |
+| `LACET_ASCENT_THRESHOLD_M` | `1.0` | Seuil d'hystérésis du D+ (modèle fin, après lissage). Sans lui, le bruit du modèle d'altitude gonfle le dénivelé ; trop haut, il rabote les côtes. |
 | `LACET_SECTORS` | `16` | Directions explorées. Moins = plus rapide, plus = plus varié. |
 | `LACET_MAX_CANDIDATES` | `32` | Boucles brutes générées avant filtrage. Quatre formes × huit orientations. |
 | `LACET_CACHE_TTL_DAYS` | `14` | Durée de vie du cache OSM. Passée cette date on retélécharge — mais si tous les miroirs sont muets, l'extrait périmé sert quand même. |

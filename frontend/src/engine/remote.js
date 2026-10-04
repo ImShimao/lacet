@@ -20,7 +20,7 @@
 // On reste poli avec un service offert : quelques requêtes par recherche, un
 // nom d'agent qui dit qui appelle, et jamais quand les rues sont là.
 
-import { ascentDescent, fetchMany, smooth } from './environment'
+import { ELEVATION_STEP_M, ascentDescent, fetchMany, shapeRelief } from './environment'
 import { haversineM, resample } from './geo'
 import { headings, turnOf, turnPhrase } from './navigation'
 import { pymod, pyRound } from './py'
@@ -33,9 +33,9 @@ const TIMEOUT_MS = 12_000
 // proposer des boucles différentes sans multiplier les requêtes sur un service
 // qu'on ne paie pas.
 const SHAPES = [4, 3]
-// Le relief se demande comme pour les autres itinéraires : c'est le même
-// service d'altitudes, et un dénivelé connu ne coûte qu'une requête de plus.
-const ELEVATION_STEP_M = 100
+// Le relief se demande comme pour les autres itinéraires — même service
+// d'altitudes, même pas (`ELEVATION_STEP_M`) : un dénivelé connu ne coûte
+// qu'une requête de plus.
 const HEADINGS = [0, 90, 180, 270]
 // Une route n'est jamais droite : le périmètre réel dépasse celui du polygone
 // visé d'environ un quart. On vise donc plus petit, puis on corrige.
@@ -362,8 +362,8 @@ async function addElevation(routes, fetchImpl) {
     // restaient sans dénivelé.
     fetched.forEach((relief, i) => {
       if (!relief?.values?.length) return
-      const lissees = smooth(relief.values)
-      const [ascent, descent] = ascentDescent(lissees, relief.threshold)
+      const { values: lissees, threshold } = shapeRelief(relief, ELEVATION_STEP_M)
+      const [ascent, descent] = ascentDescent(lissees, threshold)
       routes[i].ascent_m = pyRound(ascent, 1)
       routes[i].descent_m = pyRound(descent, 1)
       routes[i].elevation_profile = lissees.map((ele, k) => ({

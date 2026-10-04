@@ -185,7 +185,7 @@ describe('parcourir à l’envers', () => {
       {
         loadGraph: async () => graph,
         fetchElevations: async (routes) =>
-          routes.map((coords) => ({ values: coords.map(([lon], i) => 100 + i + lon), threshold: 2 })),
+          routes.map((coords) => ({ values: coords.map(([lon], i) => 100 + i + lon), coarse: false })),
         wind: async () => null,
         onReversible: (r) => {
           gardé = r

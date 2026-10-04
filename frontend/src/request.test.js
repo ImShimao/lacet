@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULTS } from './FiltersSheet.jsx'
-import { toRequest } from './request'
+import { runEntry, toRequest } from './request'
 
 const start = { lat: 47.9, lon: 7.2 }
 
@@ -22,5 +22,21 @@ describe('la demande au moteur', () => {
     // pèserait sans qu'on puisse savoir pourquoi.
     expect(toRequest({ ...DEFAULTS, safety: 'standard', avoid: ['busy', 'unlit'] }, start).avoid).toEqual(['unlit'])
     expect(toRequest({ ...DEFAULTS, safety: 'safe', avoid: ['busy', 'steps'] }, start).avoid).toEqual(['steps', 'busy'])
+  })
+})
+
+describe('l’entrée d’historique', () => {
+  const route = { id: 'r', name: 'Boucle', distance_m: 5000, geometry: [[7.2, 47.9], [7.21, 47.9]], segments: [] }
+
+  it('garde d’où vient le dénivelé mesuré', () => {
+    const entry = runEntry({ distance: 5000, elapsed: 1500, ascent: 62, ascentSource: 'baro' }, { route, sport: 'run' }, DEFAULTS)
+    expect(entry.actual_ascent_m).toBe(62)
+    expect(entry.actual_ascent_source).toBe('baro')
+  })
+
+  it('ne donne pas de source à un dénivelé absent', () => {
+    const entry = runEntry({ distance: 5000, elapsed: 1500, ascent: null }, { route, sport: 'run' }, DEFAULTS)
+    expect(entry.actual_ascent_m).toBeNull()
+    expect(entry.actual_ascent_source).toBeNull()
   })
 })

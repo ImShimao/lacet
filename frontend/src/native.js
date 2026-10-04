@@ -29,9 +29,10 @@ import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech
 // Ce module-là ne s'importe pas : il se déclare, sous le nom qu'il porte côté natif.
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation')
 
-// Celui-ci est écrit pour Lacet, dans l'app elle-même
-// (`ios-overlay/live-activity/App/LiveActivityPlugin.swift`).
+// Ceux-ci sont écrits pour Lacet, dans l'app elle-même
+// (`ios-overlay/live-activity/App/LiveActivityPlugin.swift`, `AltimeterPlugin.swift`).
 const LiveActivity = registerPlugin('LiveActivity')
+const Altimeter = registerPlugin('Altimeter')
 
 // --- démarrage ----------------------------------------------------------------
 
@@ -89,6 +90,7 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
           latitude: location.latitude,
           accuracy: location.accuracy,
           altitude: location.altitude,
+          altitudeAccuracy: location.altitudeAccuracy ?? null,
           speed: location.speed,
           heading: location.bearing ?? null,
         },
@@ -212,6 +214,20 @@ export const lockScreenStatus = () => LiveActivity.status().catch(() => null)
  * installation, ou sur une page gardée en cache.
  */
 export const appVersion = () => App.getInfo().catch(() => null)
+
+// --- baromètre ------------------------------------------------------------------
+
+/**
+ * Le dénivelé mesuré au baromètre, cumulé côté natif pendant la sortie.
+ *
+ * `startAltimeter` remet le cumul à zéro et rend `{ available }` ;
+ * `readAltimeter` et `stopAltimeter` rendent `{ ascent, descent, samples,
+ * error? }`. Tous rendent `null` quand le module manque — une installation
+ * d'avant le baromètre : la sortie se rabat alors sur l'altitude du GPS.
+ */
+export const startAltimeter = () => Altimeter.start().catch(() => null)
+export const readAltimeter = () => Altimeter.read().catch(() => null)
+export const stopAltimeter = () => Altimeter.stop().catch(() => null)
 
 // --- fichiers, liens ----------------------------------------------------------
 
