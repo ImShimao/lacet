@@ -10,7 +10,7 @@ import PlaceSheet from './PlaceSheet.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
-import Account from './Account.jsx'
+import Account, { sectionTitle } from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools } from './MapTools.jsx'
@@ -40,6 +40,9 @@ export default function App() {
   const [poiPrefs, setPoiPrefs] = useState(stored.pois || { water: false, toilets: false })
 
   const [tab, setTab] = useState('explore')
+  // La page ouverte dans « Mon compte », ou `null` pour son sommaire. Tenue
+  // ici parce que c'est l'en-tête de l'app qui porte le retour.
+  const [accountPage, setAccountPage] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [stylesOpen, setStylesOpen] = useState(false)
   const [detail, setDetail] = useState(true)
@@ -405,8 +408,17 @@ export default function App() {
         {!running && (
           <header className="side__head" {...sheetGesture()}>
             <SheetGrabber open={sheetMode === 'full'} onSet={setSheet} />
-            {!viewing && tab !== 'explore' && (
-              <h2 className="side__title">{tab === 'routes' ? 'Mes parcours' : 'Mon compte'}</h2>
+            {!viewing && tab === 'account' && accountPage ? (
+              <div className="side__nav">
+                <button className="side__back" onClick={() => setAccountPage(null)}>
+                  <Icon name="chevronLeft" size={19} />
+                  Mon compte
+                </button>
+                <h2 className="side__title">{sectionTitle(accountPage)}</h2>
+              </div>
+            ) : (
+              !viewing &&
+              tab !== 'explore' && <h2 className="side__title">{tab === 'routes' ? 'Mes parcours' : 'Mon compte'}</h2>
             )}
             {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
                 une fois les boucles affichées — le panneau ne montre plus alors
@@ -509,8 +521,11 @@ export default function App() {
             />
           ) : tab === 'account' ? (
             <Account
+              page={accountPage}
+              onPage={setAccountPage}
               params={params}
               geo={geo}
+              history={history}
               poiPrefs={poiPrefs}
               onPoiPrefs={(patch) =>
                 setPoiPrefs((prev) => {
@@ -598,6 +613,8 @@ export default function App() {
               // l'écran. On croyait trois boutons morts.
               setViewing(null)
               run.closeSummary()
+              // Toucher « Mon compte » ramène à son sommaire, d'où qu'on vienne.
+              setAccountPage(null)
               setTab(key)
               if (key === 'explore') setSheet('peek')
             }}

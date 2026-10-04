@@ -1,0 +1,195 @@
+/* Mon compte : le sommaire, ses familles de réglages, et le retour depuis une page. */
+
+/* ══ en-tête d'une page ════════════════════════════════════════════════ */
+
+/* Le retour au sommaire, au-dessus du titre de la page — là où l'iPhone le met
+   dans ses propres Réglages, et donc là où le pouce le cherche. */
+.side__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.side__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  /* Une cible de 44 px de haut, sans décaler le titre : la marge négative
+     rend la place que le remplissage prend. */
+  min-height: 44px;
+  margin: -10px 0 -8px -9px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  color: var(--accent-text);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.side__back:active {
+  background: var(--accent-soft);
+}
+
+/* ══ le sommaire ═══════════════════════════════════════════════════════ */
+
+.acct {
+  gap: 18px;
+}
+
+/* Qui l'on est : l'activité du moment, et ce qu'on a déjà couru. */
+.acct__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--accent-line);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(144, 97, 249, 0.28), transparent 60%),
+    var(--surface-2);
+}
+.acct__who {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.acct__avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #fff;
+  background: var(--accent-grad);
+  box-shadow: 0 10px 24px -12px var(--accent-glow);
+}
+.acct__who b {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+.acct__who em {
+  display: block;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.acct__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.acct__stats > div {
+  min-width: 0;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgba(10, 9, 16, 0.42);
+}
+.acct__stats b {
+  display: block;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acct__stats span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* Une famille : son nom en petites capitales, puis ses lignes d'un seul bloc. */
+.acct__group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.acct__label {
+  margin: 0 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.menu {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.menu__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+  transition: background 0.12s ease;
+}
+.menu__row:last-child {
+  border-bottom: none;
+}
+.menu__row:active {
+  background: var(--surface-3);
+}
+.menu__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.menu__icon--risk {
+  background: rgba(255, 106, 69, 0.14);
+  color: var(--risk);
+}
+.menu__icon--strava {
+  background: rgba(252, 82, 0, 0.14);
+  color: #ff8a4c;
+}
+.menu__text {
+  flex: 1;
+  min-width: 0;
+}
+.menu__text b {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.menu__text em {
+  display: block;
+  margin-top: 1px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu__chev {
+  color: var(--text-3);
+}
+.acct__foot {
+  text-align: center;
+  padding: 0 12px;
+}
+
+/* ══ une page ═══════════════════════════════════════════════════════════ */
+
+.acct--page {
+  gap: 13px;
+}
+/* La première rubrique d'une page touche l'en-tête : pas de marge à rattraper. */
+.acct--page > .section:first-child {
+  margin-top: 0;
+}

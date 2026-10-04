@@ -287,7 +287,7 @@ la renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi. Trois apps
 actives au maximum, et **l'extension en consomme une** : Lacet en prend donc
 deux.
 
-**Ce que le téléphone sait dire.** « Mon compte → Écran verrouillé » vérifie les
+**Ce que le téléphone sait dire.** « Mon compte → Pendant la sortie » vérifie les
 cinq conditions d'une activité en direct — iOS 16.2, activités autorisées dans
 Réglages, extension dans le paquet, extension **rattachée** à l'app
 (`fr.lacet.app` → `fr.lacet.app.widgets`, sinon iOS refuse de la lancer), et

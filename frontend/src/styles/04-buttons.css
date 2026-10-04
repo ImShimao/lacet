@@ -62,7 +62,11 @@
   font-weight: 600;
   color: var(--text-2);
 }
-.seg button[aria-pressed='true'] {
+/* `aria-pressed` pour les boutons-bascules, `aria-checked` pour les groupes de
+   boutons radio (la pause automatique) : sans le second, son choix ne se
+   voyait pas — les deux moitiés restaient grises. */
+.seg button[aria-pressed='true'],
+.seg button[aria-checked='true'] {
   background: var(--surface);
   color: var(--text);
 }

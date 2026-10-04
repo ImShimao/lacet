@@ -164,6 +164,8 @@ const PATHS = {
   minus: <path d="M5.5 12h13" />,
   chevronDown: <path d="m6.5 9.5 5.5 5.5 5.5-5.5" />,
   chevronUp: <path d="m6.5 14.5 5.5-5.5 5.5 5.5" />,
+  chevronLeft: <path d="m14.5 6.5-5.5 5.5 5.5 5.5" />,
+  chevronRight: <path d="m9.5 6.5 5.5 5.5-5.5 5.5" />,
 
   // --- navigation --------------------------------------------------------
   routes: (

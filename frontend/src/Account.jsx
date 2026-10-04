@@ -1,11 +1,22 @@
 /**
- * Mon compte : le profil local, le contact d'urgence, les cartes gardées.
+ * Mon compte : un sommaire, et une page par sujet.
+ *
+ * L'écran empilait quatorze rubriques les unes sous les autres — poids,
+ * Strava, cartes hors ligne, contact d'urgence, version de l'app… — et l'on
+ * faisait défiler le tout pour trouver le réglage qu'on venait changer. Le
+ * sommaire range ces rubriques en trois familles, comme les Réglages de
+ * l'iPhone : ce qu'on règle, ce que l'app garde, et ce qu'il faut savoir
+ * d'elle. Chaque ligne dit déjà l'essentiel — « 70 kg », « Connecté » — et
+ * n'a besoin d'être ouverte que pour le changer.
  *
  * Tout y est local à l'appareil — c'est le propos de l'écran, et la raison
  * pour laquelle il ne dépend de rien d'autre que du stockage de l'app.
+ *
+ * La page ouverte est tenue par l'app (`page`, `onPage`) : c'est son en-tête
+ * qui porte le retour au sommaire, et l'onglet le referme quand on y revient.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { COUNTS, MOMENTS, SPORTS, Segmented } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
@@ -13,73 +24,261 @@ import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from 
 import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
+import * as strava from './strava'
 import { StravaSetting } from './Strava.jsx'
 import { StopsSetting } from './Stops.jsx'
+import { KINDS } from './pois'
 
-export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored }) {
-  const [confirm, setConfirm] = useState(false)
-  const [contact, setContact] = useState(() => load().emergencyContact || '')
-  // L'effacement vide aussi les cartes ; le compteur, lui, a lu le journal en
-  // arrivant. Sans ce rappel il continuerait d'annoncer seize mégaoctets sur un
-  // stockage vide — le genre de chiffre périmé qu'on croit sur parole.
-  const [version, setVersion] = useState(0)
+/** Les familles du sommaire, dans leur ordre. */
+const GROUPS = ['Paramètres', 'Données', 'Infos']
+
+/**
+ * Les pages de « Mon compte ». `tone` teinte la pastille : on retrouve une
+ * ligne à sa couleur bien avant de l'avoir lue.
+ */
+export const SECTIONS = [
+  { key: 'profile', group: 'Paramètres', icon: 'user', title: 'Profil' },
+  { key: 'search', group: 'Paramètres', icon: 'sliders', title: 'Recherche' },
+  { key: 'run', group: 'Paramètres', icon: 'play', title: 'Pendant la sortie' },
+  { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
+  { key: 'strava', group: 'Paramètres', icon: 'upload', title: 'Strava', tone: 'strava' },
+  { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
+  { key: 'backup', group: 'Données', icon: 'download', title: 'Sauvegarde' },
+  { key: 'about', group: 'Infos', icon: 'info', title: 'À propos' },
+]
+
+/** Le titre d'une page, pour l'en-tête de l'app. */
+export const sectionTitle = (key) => SECTIONS.find((s) => s.key === key)?.title ?? 'Mon compte'
+
+export default function Account({ page = null, onPage = () => {}, ...props }) {
+  const top = useRef(null)
+  // Une page s'ouvre en haut : sans ça, elle héritait du défilement du
+  // sommaire, et « Sauvegarde » s'ouvrait sur son dernier paragraphe.
+  useLayoutEffect(() => {
+    top.current?.closest('.side__body')?.scrollTo?.(0, 0)
+  }, [page])
+
+  const known = SECTIONS.some((s) => s.key === page)
   return (
-    <div className="panel">
-      <div className="origin">
-        <span className="origin__pin">
-          <Icon name="user" size={18} />
-        </span>
-        <div>
-          <b>Profil local</b>
-          <em>tout est stocké sur cet appareil</em>
+    <div className={`panel acct ${known ? 'acct--page' : ''}`} ref={top}>
+      {known ? <SectionPage page={page} {...props} /> : <Summary onPage={onPage} {...props} />}
+    </div>
+  )
+}
+
+/** Le sommaire : qui l'on est, puis une ligne par page. */
+function Summary({ onPage, params, geo, history = [], poiPrefs }) {
+  const runs = history.filter((h) => h.actual_distance_m > 0)
+  const totalKm = runs.reduce((sum, h) => sum + h.actual_distance_m, 0) / 1000
+  const sport = SPORTS.find((s) => s.key === params.sport)
+  const position =
+    geo.status === 'ready' ? `± ${Math.round(geo.accuracy)} m` : geo.status === 'denied' ? 'bloquée' : '—'
+
+  return (
+    <>
+      <div className="acct__card">
+        <div className="acct__who">
+          <span className="acct__avatar">
+            <Icon name={sport?.icon ?? 'user'} size={24} />
+          </span>
+          <div>
+            <b>Profil local</b>
+            <em>
+              {[sport?.label, surfaceLabel(params.surface), params.safety === 'safe' ? 'Sûr' : 'Standard']
+                .filter(Boolean)
+                .join(' · ')}
+            </em>
+          </div>
+        </div>
+        <div className="acct__stats">
+          <div>
+            <b>{runs.length}</b>
+            <span>sortie{runs.length > 1 ? 's' : ''}</span>
+          </div>
+          <div>
+            <b>{String(totalKm >= 100 ? Math.round(totalKm) : Math.round(totalKm * 10) / 10).replace('.', ',')}</b>
+            <span>kilomètres</span>
+          </div>
+          <div>
+            <b>{position}</b>
+            <span>GPS</span>
+          </div>
         </div>
       </div>
 
-      <div className="rows">
-        <Row label="Activité" value={SPORTS.find((s) => s.key === params.sport)?.label} />
-        <Row label="Terrain" value={surfaceLabel(params.surface)} />
-        <Row label="Mode sécurité" value={params.safety === 'safe' ? 'Sûr' : 'Standard'} />
-        <Row
-          label="Position"
-          value={
-            geo.status === 'ready'
-              ? `± ${Math.round(geo.accuracy)} m`
-              : geo.status === 'denied'
-                ? 'bloquée'
-                : '—'
-          }
-        />
-      </div>
+      {GROUPS.map((group) => (
+        <section className="acct__group" key={group} aria-label={group}>
+          <h3 className="acct__label">{group}</h3>
+          <div className="menu">
+            {SECTIONS.filter((s) => s.group === group).map((s) => (
+              <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
+                <span className={`menu__icon ${s.tone ? `menu__icon--${s.tone}` : ''}`}>
+                  <Icon name={s.icon} size={18} />
+                </span>
+                <span className="menu__text">
+                  <b>{s.title}</b>
+                  <em>{summaryOf(s.key, { params, poiPrefs })}</em>
+                </span>
+                <Icon name="chevronRight" size={17} className="menu__chev" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
 
-      <h3 className="section">Recherche</h3>
-      <SearchSettings params={params} onProfile={onProfile} />
-
-      <h3 className="section">Sur le parcours</h3>
-      <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
-
-      <h3 className="section">Poids</h3>
-      <p className="muted small">
-        Sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
+      <p className="muted small acct__foot">
+        Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.
       </p>
-      <div className="rows">
-        <NumberRow
-          label="Poids"
-          unit="kg"
-          value={params.weight_kg || 70}
-          min={30}
-          max={200}
-          onChange={(weight_kg) => onProfile({ weight_kg })}
-        />
-      </div>
+    </>
+  )
+}
 
-      <h3 className="section">Pendant la sortie</h3>
-      <AutoPauseSetting />
-      <LockScreenSetting />
+/**
+ * Ce que dit une ligne du sommaire sous son titre : l'état du moment plutôt
+ * qu'une description. « 70 kg » répond à la question avant qu'on ouvre.
+ */
+function summaryOf(key, { params, poiPrefs }) {
+  const saved = load()
+  switch (key) {
+    case 'profile':
+      return `Poids ${params.weight_kg || 70} kg`
+    case 'search': {
+      const moment = MOMENTS.find((m) => m.key === (params.time_of_day ?? 'auto'))?.label ?? 'Auto'
+      return `Moment ${moment.toLowerCase()} · ${params.count ?? 5} boucles proposées`
+    }
+    case 'run': {
+      const stops = Object.entries(KINDS)
+        .filter(([kind]) => poiPrefs?.[kind])
+        .map(([, k]) => k.label.toLowerCase())
+      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, ...stops].join(' · ')
+    }
+    case 'safety': {
+      const reports = activeReports().length
+      const contact = saved.emergencyContact ? `SOS vers ${saved.emergencyContact}` : "Pas de contact d'urgence"
+      return reports ? `${contact} · ${reports} signalement${reports > 1 ? 's' : ''}` : contact
+    }
+    case 'strava': {
+      const s = strava.status()
+      if (!s.configured) return 'Pas disponible dans cette version'
+      if (!s.connected) return 'Non connecté'
+      const name = [s.athlete?.firstname, s.athlete?.lastname].filter(Boolean).join(' ')
+      return [name ? `Connecté · ${name}` : 'Connecté', s.auto ? 'envoi automatique' : null].filter(Boolean).join(' · ')
+    }
+    case 'storage': {
+      const info = usage()
+      if (!info) return 'Sorties, cartes et rues gardées'
+      const { history, favorites } = info.counts
+      return `${mo(info.bytes)} · ${history} sortie${history > 1 ? 's' : ''}, ${favorites} favori${favorites > 1 ? 's' : ''}`
+    }
+    case 'backup':
+      return 'Exporter, restaurer ou tout effacer'
+    case 'about':
+      return 'Version, confidentialité, sources'
+    default:
+      return ''
+  }
+}
 
-      <h3 className="section">Strava</h3>
-      <StravaSetting />
+/** Une page de « Mon compte ». */
+function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored }) {
+  switch (page) {
+    case 'profile':
+      return (
+        <>
+          <p className="muted small">
+            Le poids sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
+          </p>
+          <div className="rows">
+            <NumberRow
+              label="Poids"
+              unit="kg"
+              value={params.weight_kg || 70}
+              min={30}
+              max={200}
+              onChange={(weight_kg) => onProfile({ weight_kg })}
+            />
+          </div>
+          <p className="muted small">
+            L'activité, le terrain et le niveau de sécurité se règlent dans les filtres, au moment
+            de chercher une boucle : ils changent d'une sortie à l'autre.
+          </p>
+        </>
+      )
+    case 'search':
+      return <SearchSettings params={params} onProfile={onProfile} />
+    case 'run':
+      return (
+        <>
+          <h3 className="section">Pause automatique</h3>
+          <AutoPauseSetting />
+          <LockScreenSetting />
+          <h3 className="section">Le long du parcours</h3>
+          <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
+        </>
+      )
+    case 'safety':
+      return (
+        <>
+          <h3 className="section">Contact d'urgence</h3>
+          <EmergencyContact />
+          <h3 className="section">Mes signalements</h3>
+          <MyReports />
+        </>
+      )
+    case 'strava':
+      return <StravaSetting />
+    case 'storage':
+      return (
+        <>
+          <h3 className="section">Sorties et favoris</h3>
+          <StoredData />
+          <h3 className="section">Cartes hors ligne</h3>
+          <OfflineStorage />
+          <h3 className="section">Rues gardées</h3>
+          <KeptStreets />
+        </>
+      )
+    case 'backup':
+      return (
+        <>
+          <BackupRows onRestored={onRestored} />
+          <h3 className="section">Tout effacer</h3>
+          <ClearData onClearData={onClearData} />
+        </>
+      )
+    case 'about':
+      return (
+        <>
+          <h3 className="section">Version</h3>
+          <BuildStamp />
+          <LastSearch />
+          <h3 className="section">Confidentialité</h3>
+          <p className="muted small">
+            Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil. Seuls partent
+            sur le réseau : les rues et les altitudes autour du départ, le lieu qu'on cherche par
+            son nom, et — si tu l'as connecté — ce que tu envoies à Strava.
+          </p>
+          <h3 className="section">Sources</h3>
+          <p className="disclaimer">
+            Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © OpenFreeMap,
+            © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI et Valhalla (FOSSGIS) · Recherche de
+            lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
+          </p>
+        </>
+      )
+    default:
+      return null
+  }
+}
 
-      <h3 className="section">Contact d'urgence</h3>
+/**
+ * Le numéro que le bouton SOS prépare. Enregistré à chaque frappe : il n'y a
+ * pas de bouton « Valider » à oublier avant de partir courir.
+ */
+function EmergencyContact() {
+  const [contact, setContact] = useState(() => load().emergencyContact || '')
+  return (
+    <>
       <p className="muted small">
         Le bouton SOS prépare un SMS vers ce numéro avec ta position.{' '}
         <b>L'app ne l'envoie pas</b> : c'est toi qui appuies sur envoyer.
@@ -89,6 +288,7 @@ export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData
         type="tel"
         inputMode="tel"
         autoComplete="tel"
+        aria-label="Numéro du contact d'urgence"
         placeholder="06 12 34 56 78"
         value={contact}
         onChange={(e) => {
@@ -96,34 +296,24 @@ export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData
           save({ emergencyContact: e.target.value.trim() })
         }}
       />
+    </>
+  )
+}
 
-      <h3 className="section">Sorties et favoris gardés</h3>
-      {/* Pas de `key` indexée sur `version` ici, contrairement aux compteurs
-          voisins : cette section garde son propre état — « tant de libérés » —
-          et le remontage le faisait disparaître à l'instant même où il devait
-          s'afficher. Ce qu'elle mesure ne dépend d'ailleurs pas de
-          l'effacement global, qui est ce que `version` sert à rafraîchir. */}
-      <StoredData />
-
-      <h3 className="section">Mes signalements</h3>
-      <MyReports />
-
-      <h3 className="section">Cartes hors ligne</h3>
-      <OfflineStorage key={`cartes-${version}`} />
-
-      <h3 className="section">Rues gardées</h3>
-      <KeptStreets key={`rues-${version}`} />
-
-      <h3 className="section">Sauvegarde</h3>
-      <BackupRows onRestored={onRestored} />
-
-      <h3 className="section">L'app</h3>
-      <BuildStamp />
-      <LastSearch />
+/**
+ * Tout effacer, en deux temps : un appui ne suffit pas à perdre des mois de
+ * sorties. Les compteurs des autres pages relisent le stockage en s'ouvrant —
+ * ils ne peuvent donc pas annoncer des mégaoctets disparus.
+ */
+function ClearData({ onClearData }) {
+  const [confirm, setConfirm] = useState(false)
+  const [done, setDone] = useState(false)
+  return (
+    <>
       <p className="muted small">
-        Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.
+        Favoris, sorties, réglages, cartes et rues gardées, et l'accès à Strava. Fais une
+        sauvegarde avant si tu veux pouvoir revenir en arrière.
       </p>
-
       {confirm ? (
         <div className="row">
           <button className="btn" onClick={() => setConfirm(false)}>
@@ -134,7 +324,7 @@ export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData
             onClick={async () => {
               await onClearData()
               setConfirm(false)
-              setVersion((v) => v + 1)
+              setDone(true)
             }}
           >
             Confirmer l'effacement
@@ -145,13 +335,8 @@ export default function Account({ params, geo, poiPrefs, onPoiPrefs, onClearData
           Effacer mes données
         </button>
       )}
-
-      <p className="disclaimer">
-        Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © OpenFreeMap,
-        © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI et Valhalla (FOSSGIS) · Recherche de
-        lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
-      </p>
-    </div>
+      {done && <p className="muted small">Tout est effacé : l'app repart comme au premier jour.</p>}
+    </>
   )
 }
 
@@ -239,13 +424,6 @@ function KeptStreets() {
   )
 }
 
-/**
- * Ce que les cartes hors ligne occupent, et de quoi tout reprendre.
- *
- * Un chiffre plutôt qu'une promesse : ces fichiers sont les seuls de l'app à se
- * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
- * finit par être vidé par iOS — au pire moment, sans prévenir.
- */
 /**
  * Le poids de ce qui est gardé dans le petit stockage de l'app, et ce qu'il en reste.
  *
@@ -382,6 +560,13 @@ function MyReports() {
   )
 }
 
+/**
+ * Ce que les cartes hors ligne occupent, et de quoi tout reprendre.
+ *
+ * Un chiffre plutôt qu'une promesse : ces fichiers sont les seuls de l'app à se
+ * compter en mégaoctets, et un stockage qui grossit sans qu'on puisse le voir
+ * finit par être vidé par iOS — au pire moment, sans prévenir.
+ */
 function OfflineStorage() {
   const [total, setTotal] = useState(() => offline.totalBytes())
   const [count, setCount] = useState(() => offline.storedCount())
@@ -470,15 +655,6 @@ function AutoPauseSetting() {
   )
 }
 
-/**
- * L'écran de verrouillage pendant une sortie guidée : ce que l'iPhone permet,
- * et de quoi le vérifier sans partir courir.
- *
- * L'activité en direct dépend de trois choses qui ne se voient pas — la
- * version d'iOS, un réglage, et une extension que certaines installations hors
- * App Store retirent. Plutôt que de laisser l'écran vide sans explication,
- * l'app dit laquelle manque, et se rabat sur une notification silencieuse.
- */
 /**
  * L'écran de verrouillage pendant une sortie guidée.
  *
