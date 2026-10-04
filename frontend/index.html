@@ -4,13 +4,19 @@
     <meta charset="UTF-8" />
     <!-- `viewport-fit=cover` pour passer sous l'encoche.
 
-         Le zoom de page était bloqué, au motif que la carte gère le sien. Mais
-         une app de course se lit aussi en plein soleil, essoufflé, et par des
-         yeux qui ne sont pas ceux de son auteur : couper le zoom prive de
-         l'agrandissement les seules personnes qui en dépendent. C'est une
-         exigence d'accessibilité (WCAG 1.4.4), pas un détail. La carte, elle,
-         garde ses gestes : MapLibre revendique le sien sur sa propre toile. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+         Le zoom de page est bloqué. Il avait été rouvert au nom de
+         l'accessibilité, quand Lacet se lisait aussi dans un navigateur ; dans
+         l'app, il cassait tout : toucher la recherche — un champ écrit en moins
+         de 16 px — faisait zoomer iOS sur la page entière, qui restait
+         agrandie, coupée sur la droite, la barre du bas hors d'atteinte. Une app
+         native ne se pince pas ; ceux qui ont besoin d'agrandir passent par le
+         Zoom d'iOS (Réglages › Accessibilité), qui vaut pour toutes les apps,
+         celle-ci comprise. La carte, elle, garde ses gestes : MapLibre
+         revendique le pincement sur sa propre toile. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <title>Lacet</title>
   </head>
   <body>
