@@ -70,7 +70,6 @@ class Settings(BaseSettings):
     graph_cache_nodes: int = 320_000
 
     # --- Génération -------------------------------------------------------
-    max_distance_km: float = 42.0
     sectors: int = 16  # nombre de directions explorées autour du départ
     # Candidats bruts générés avant filtrage. Quatre formes × huit orientations
     # font trente-deux boucles possibles ; plafonner à douze, comme avant, en
@@ -78,12 +77,6 @@ class Settings(BaseSettings):
     # matière dont il a besoin pour proposer des directions vraiment
     # différentes. Le portail L3 et le dédoublonnage en éliminent la moitié.
     max_candidates: int = 32
-
-    # --- API --------------------------------------------------------------
-    cors_origins: list[str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ]
 
 
 settings = Settings()

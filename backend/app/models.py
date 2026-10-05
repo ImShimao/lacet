@@ -204,14 +204,3 @@ class LoopResponse(BaseModel):
     routes: list[RouteCandidate]
     rejected: list[Rejected]
     meta: dict
-
-
-class GpxRequest(BaseModel):
-    sport: Sport = Sport.run
-
-    # Bornes explicites : ce point d'entrée reçoit une géométrie déjà calculée,
-    # mais rien ne garantit qu'elle vienne bien de l'app. Un tracé de 200 km
-    # échantillonné finement dépasse rarement 60 000 points.
-    name: str = Field(default="Boucle Lacet", max_length=120)
-    geometry: list[list[float]] = Field(min_length=2, max_length=200_000)
-    elevation: list[float] | None = Field(default=None, max_length=200_000)

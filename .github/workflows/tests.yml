@@ -1,0 +1,60 @@
+# Les deux moteurs, à chaque envoi.
+#
+# `ios.yml` ne tourne que quand le front change, et ne lance que ses tests à
+# lui : une modification du moteur Python — la référence, celle où chaque seuil
+# est justifié — partait sans qu'aucun test ne la voie. Et rien ne vérifiait que
+# l'oracle de parité avait été refait : `parity.test.js` comparait alors le
+# JavaScript à l'ancienne réponse de Python, et restait vert.
+#
+# Sur Linux, pas sur le Mac : rien ici n'a besoin de Xcode, et une minute de
+# macOS en coûte dix.
+
+name: Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8 exige Node 22, comme dans `ios.yml`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Dépendances
+        run: |
+          (cd frontend && npm ci)
+          pip install -r backend/requirements-dev.txt
+
+      - name: Moteur de référence (Python)
+        working-directory: backend
+        run: python -m pytest
+
+      # Rejoue Python sur les extraits figés et compare à l'oracle versionné, à la
+      # tolérance de `parity.test.js` — pas au bit près : la bibliothèque
+      # mathématique de Linux n'est pas celle du PC qui l'a écrit.
+      - name: Oracle de parité à jour
+        working-directory: backend
+        run: python scripts/parity_dump.py --check
+
+      - name: App (moteur JavaScript et interface)
+        working-directory: frontend
+        run: npm test

@@ -13,10 +13,11 @@ JavaScript (rues OpenStreetMap → graphe → boucles notées) qui s'exécute da
   `graph`, `dijkstra`, `weights`, `loops`, `safety`, `service` (entrée `planLoops`), `reroute`,
   `navigation`, `matcher`, et les rues (`overpass`, `archive`, `tilestore`, `region`).
 - `frontend/ios-overlay/` — ce qui distingue Lacet d'un projet Capacitor vierge (`customize.py`, plugins Swift).
-- `backend/app/` — le moteur de référence Python, servi par FastAPI (`main.py`) : `osm/` (Overpass,
-  extraction, graphe), `routing/` (dijkstra, loops, weights), `safety/` (risk, gate, exclusion, night),
-  `elevation.py`, `wind.py`, `solar.py`, `service.py`.
-- `.github/workflows/ios.yml` — compile l'IPA sur un Mac de GitHub.
+- `backend/app/` — le moteur de référence Python (sans serveur : l'app calcule tout sur le téléphone) :
+  `osm/` (Overpass, extraction, graphe), `routing/` (dijkstra, loops, weights), `safety/` (risk, gate,
+  exclusion, night), `elevation.py`, `wind.py`, `solar.py`, `service.py` (entrée `plan_loops`).
+- `.github/workflows/ios.yml` — compile l'IPA sur un Mac de GitHub ; `tests.yml` — les deux suites et la
+  parité, sur Linux, à chaque push.
 
 ### Moteur JS ↔ moteur Python
 
@@ -32,6 +33,8 @@ seuil est justifié et testé.
   `Math.round` ou d'une somme naïve.
 - Changer un calcul partagé = modifier Python **et** JS, relancer `parity_dump.py`, puis
   `parity.test.js`. Ce qui est propre à l'app (ex. `door.js`, le départ devant la porte) reste en JS.
+- `parity_dump.py --check` dit, sans rien écrire, si l'oracle est à jour. `.github/workflows/tests.yml`
+  le lance à chaque push, avec pytest et Vitest : un oracle oublié fait échouer la CI.
 
 ## Commandes
 
@@ -44,9 +47,8 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
 - Installer : `(cd frontend && npm install)` ;
   `(cd backend && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements-dev.txt)`
 - Front : `npm run dev` dans `frontend/` → http://127.0.0.1:5173, à taille de téléphone (ni GPS, ni voix,
-  ni baromètre hors de l'app). Dans l'app Claude, lance plutôt les aperçus `lacet-front` et `lacet-api`
-  de `.claude/launch.json`.
-- API : `(cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000 --reload)` → `/docs`
+  ni baromètre hors de l'app). Dans l'app Claude, lance plutôt l'aperçu `lacet-front` de
+  `.claude/launch.json`.
 - Tests front (Vitest) : un fichier : `(cd frontend && npx vitest run src/engine/reroute.test.js)` ;
   toute la suite : `(cd frontend && npm test)`
 - Tests back (pytest, déjà en `-q`) : un fichier : `(cd backend && .venv/Scripts/python.exe -m pytest tests/test_loops.py)` ;
@@ -94,5 +96,5 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
   Un changement du moteur ajoute toujours `parity.test.js`.
 - Avant d'écrire du nouveau code, vérifie si une fonction existante du projet fait déjà le travail.
   Préfère la solution la plus simple.
-- Pour Capacitor, MapLibre, Vite, Vitest, FastAPI : consulte Context7 avant d'utiliser une API dont tu
+- Pour Capacitor, MapLibre, Vite, Vitest : consulte Context7 avant d'utiliser une API dont tu
   n'es pas sûr de la version.

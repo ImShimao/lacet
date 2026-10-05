@@ -2,6 +2,7 @@
 
     python scripts/parity_dump.py            # rejoue les cas à partir des extraits figés
     python scripts/parity_dump.py --fetch    # télécharge d'abord les extraits réels manquants
+    python scripts/parity_dump.py --check    # vérifie, sans rien écrire, que l'oracle est à jour
 
 Le moteur de l'app tourne désormais sur le téléphone, en JavaScript. Ce module
 Python reste la référence : c'est ici que chaque seuil est justifié et testé.
@@ -194,12 +195,34 @@ def solar_table() -> list:
     return rows
 
 
+def first_gap(old, new, path: str = "") -> str | None:
+    """Le premier écart entre deux oracles, à la tolérance de `parity.test.js`.
+
+    Pas une comparaison des fichiers : gzip y inscrit l'heure d'écriture, et le
+    PC et la CI n'ont pas la même bibliothèque mathématique — un sinus peut y
+    différer au dernier bit sans que rien n'ait changé.
+    """
+    if isinstance(old, dict) and isinstance(new, dict):
+        if old.keys() != new.keys():
+            return f"{path} : clés {sorted(old.keys() ^ new.keys())}"
+        return next((g for k in old if (g := first_gap(old[k], new[k], f"{path}.{k}"))), None)
+    if isinstance(old, list) and isinstance(new, list):
+        if len(old) != len(new):
+            return f"{path} : {len(old)} éléments, puis {len(new)}"
+        return next((g for i, (a, b) in enumerate(zip(old, new)) if (g := first_gap(a, b, f"{path}[{i}]"))), None)
+    numbers = (int, float)
+    if isinstance(old, numbers) and isinstance(new, numbers) and not isinstance(old, bool):
+        return None if abs(old - new) <= 1e-9 * max(1.0, abs(old), abs(new)) else f"{path} : {old!r} → {new!r}"
+    return None if old == new else f"{path} : {old!r} → {new!r}"
+
+
 async def main() -> None:
+    check = "--check" in sys.argv
     if "--fetch" in sys.argv:
         await fetch_real()
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for name in ("grid9", "grid9-danger", "grid15"):
+    for name in () if check else ("grid9", "grid9-danger", "grid15"):
         with gzip.open(extract_path(name), "wt", encoding="utf-8") as fh:
             json.dump(load_extract(name), fh)
 
@@ -217,8 +240,19 @@ async def main() -> None:
         )
         results.append(result)
 
+    oracle = {"cases": results, "solar": solar_table()}
+    if check:
+        # Un changement du moteur Python sans oracle refait : `parity.test.js`
+        # comparerait alors le JavaScript à l'ancienne réponse, et resterait vert.
+        with gzip.open(OUT / "expected.json.gz", "rt", encoding="utf-8") as fh:
+            gap = first_gap(json.load(fh), json.loads(json.dumps(oracle)), "oracle")
+        if gap:
+            sys.exit(f"Oracle périmé — relance scripts/parity_dump.py.\nPremier écart : {gap}")
+        print("Oracle à jour.")
+        return
+
     with gzip.open(OUT / "expected.json.gz", "wt", encoding="utf-8") as fh:
-        json.dump({"cases": results, "solar": solar_table()}, fh)
+        json.dump(oracle, fh)
     print(f"→ {OUT / 'expected.json.gz'}")
 
 

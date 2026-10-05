@@ -168,11 +168,10 @@ la développer — pas l'app : le GPS, la voix, l'écran de verrouillage, le
 baromètre et les vibrations n'existent que dans l'app installée. La position y est donc
 toujours « indisponible », et l'app retombe sur le dernier départ choisi.
 
-Le moteur de référence peut s'interroger à part, par son API :
-
-```powershell
-cd backend; .venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
+Le moteur de référence Python n'a plus de serveur : l'app calcule tout sur le
+téléphone. Il s'interroge par ses tests, par `scripts/smoke.py` (plus bas), et
+par `scripts/parity_dump.py`, qui écrit la réponse que le moteur de l'app doit
+reproduire.
 
 ---
 
@@ -182,12 +181,11 @@ cd backend; .venv\Scripts\python.exe -m uvicorn app.main:app --reload
 
 | Configuration | Ce qu'elle fait |
 |---|---|
-| Backend — API | Lance l'API du moteur de référence, avec rechargement auto. |
 | Backend — tests | Lance pytest en mode debug. |
 | Backend — test réel sur une ville | Génère de vraies boucles sur Paris et affiche le résultat dans le terminal. |
 | Front — Chrome | Ouvre Chrome attaché au débogueur, points d'arrêt dans le JSX. |
 
-**Tests** — la suite Python du moteur de référence, et 527 côté app (moteur
+**Tests** — la suite Python du moteur de référence, et 544 côté app (moteur
 JavaScript et interface). `Ctrl+Shift+P → Exécuter la tâche → Lacet — tous les
 tests` lance les deux ; l'onglet « Test » permet de rejouer un cas à la fois. En
 ligne de commande :
@@ -199,6 +197,11 @@ cd backend; .venv\Scripts\python.exe -m pytest
 ```powershell
 cd frontend; npm test
 ```
+
+GitHub les relance à chaque envoi (`.github/workflows/tests.yml`), avec
+`scripts/parity_dump.py --check` : un changement du moteur Python dont l'oracle
+de parité n'a pas été refait fait échouer la vérification, au lieu de laisser le
+JavaScript se comparer à l'ancienne réponse.
 
 Les tests d'interface portent sur ce qui tourne **pendant** la sortie, sans
 personne pour le regarder : le suivi de position sur le tracé, la formulation
@@ -225,10 +228,6 @@ libres : `scripts/smoke.py 47.2184 -1.5536 12`.
 Le script affiche les itinéraires retenus, leur note, **et** ceux qui ont été
 écartés avec le motif. Le premier appel télécharge les données (10 à 30 s selon
 la ville) ; les suivants sortent du cache disque et sont quasi instantanés.
-
-**Documentation de l'API** — <http://127.0.0.1:8000/docs>, interactive.
-Et <http://127.0.0.1:8000/explain> montre le modèle de sécurité appliqué à des
-cas types : pratique pour vérifier d'un coup d'œil qu'il n'a pas dérivé.
 
 ---
 
