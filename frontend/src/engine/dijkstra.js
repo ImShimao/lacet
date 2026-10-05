@@ -77,8 +77,14 @@ function blank(n) {
   }
 }
 
-export function dijkstra(graph, source, weights, { maxDist = null, target = null, penalties = null, slack = 1.15 } = {}) {
+/**
+ * Plus courts chemins depuis `source` — `dijkstra` en Python. `oneway` à faux
+ * ignore les sens uniques : l'accrochage d'une trace importée suit ce qui a été
+ * réellement parcouru, contresens non cartographié compris.
+ */
+export function dijkstra(graph, source, weights, { maxDist = null, target = null, penalties = null, slack = 1.15, oneway = true } = {}) {
   const { edgeA, edgeB, edgeLen, adjOffset, adjEdges } = graph
+  const sens = oneway ? graph.edgeOneway : null
   const n = graph.nodeCount
   const res = blank(n)
   const { dist, cost, prevNode, prevEdge, reached } = res
@@ -108,6 +114,8 @@ export function dijkstra(graph, source, weights, { maxDist = null, target = null
       const e = adjEdges[k]
       const v = edgeA[e] === u ? edgeB[e] : edgeA[e]
       if (settled[v]) continue
+      // Sens unique à vélo : 1 se prend depuis A, -1 depuis B.
+      if (sens && sens[e] && (edgeA[e] === u) !== (sens[e] > 0)) continue
 
       const nd = du + edgeLen[e]
       if (nd > limit) continue
@@ -143,6 +151,7 @@ export function astar(
   { minFactor, maxDist = null, penalties = null, blocked = null, sector = null, allowed = null, epsilon = 1 },
 ) {
   const { edgeA, edgeB, edgeLen, adjOffset, adjEdges, nodeLon, nodeLat } = graph
+  const sens = graph.edgeOneway
   const n = graph.nodeCount
   const goal = [nodeLon[target], nodeLat[target]]
   const hFactor = minFactor * epsilon
@@ -188,6 +197,7 @@ export function astar(
       const v = edgeA[e] === u ? edgeB[e] : edgeA[e]
       if (settled[v]) continue
       if (gate !== null && !gate[sector[v]]) continue
+      if (sens && sens[e] && (edgeA[e] === u) !== (sens[e] > 0)) continue
 
       const nd = du + edgeLen[e]
       if (nd > limit) continue

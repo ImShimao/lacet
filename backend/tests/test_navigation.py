@@ -78,6 +78,58 @@ class TestStructure:
         assert build_instructions(graph, start, cand) == []
 
 
+def _fourche():
+    """Une fourche : la rue Haute s'infléchit de 35° à droite au carrefour J,
+    pendant que la ruelle du Puits continue tout droit vers le nord."""
+    import math
+
+    lat0, lon0 = 48.80, 2.30
+    ky, kx = 1 / 110_540, 1 / (111_320 * math.cos(math.radians(lat0)))
+
+    def at(x: float, y: float) -> dict[str, float]:
+        return {"lat": lat0 + y * ky, "lon": lon0 + x * kx}
+
+    rad = math.radians(35)
+    bend = (200 * math.sin(rad), 200 * math.cos(rad))
+    tags = {"highway": "residential", "sidewalk": "both"}
+    payload = {
+        "elements": [
+            {"type": "way", "id": 1, "tags": {**tags, "name": "Rue Haute"},
+             "nodes": [1, 2, 3], "geometry": [at(0, -200), at(0, 0), at(*bend)]},
+            {"type": "way", "id": 2, "tags": {**tags, "name": "Ruelle du Puits"},
+             "nodes": [2, 4], "geometry": [at(0, 0), at(0, 200)]},
+        ]
+    }
+    graph = build_graph(payload)
+    node = {k: graph.nearest_node(p["lon"], p["lat"]) for k, p in
+            {"A": at(0, -200), "J": at(0, 0), "B": at(*bend), "C": at(0, 200)}.items()}
+
+    def route(*names: str) -> list[str]:
+        from app.routing.loops import Candidate
+
+        nodes = [node[n] for n in names]
+        edges = [
+            next(e for e in graph.adj[u] if graph.edges[e].other(u) == v)
+            for u, v in zip(nodes, nodes[1:])
+        ]
+        steps = build_instructions(graph, nodes[0], Candidate(edges=edges, nodes=nodes))
+        return [s.text for s in steps if s.turn not in {"start", "finish"}]
+
+    return route
+
+
+class TestFourches:
+    """Une fourche se dit, même douce : c'est là qu'on se trompe de branche."""
+
+    def test_la_rue_qui_s_infléchit_se_dit_quand_une_autre_continue_tout_droit(self):
+        # 35°, sous le seuil d'un virage : sans la règle, rien n'était dit, et
+        # l'on prenait la ruelle d'en face.
+        assert _fourche()("A", "J", "B") == ["Serre à droite dans la rue Haute"]
+
+    def test_quitter_la_rue_pour_continuer_tout_droit_se_dit(self):
+        assert _fourche()("A", "J", "C") == ["Continue tout droit dans la ruelle du Puits"]
+
+
 class TestSobriete:
     """Le cœur du sujet : ne dire que ce qui se décide."""
 

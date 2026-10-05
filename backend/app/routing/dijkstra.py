@@ -1,7 +1,9 @@
 """Plus courts chemins pondérés : Dijkstra et A*.
 
-Le graphe est traité comme non orienté : `oneway` ne s'applique pas à un piéton.
-(`oneway:foot=yes` existe mais reste marginal ; il serait à ajouter ici.)
+Le graphe est non orienté, sauf les sens uniques à vélo (`Edge.oneway`, voir
+`safety.exclusion.oneway_for`) : un sens unique ne s'impose pas au piéton, mais
+une boucle à vélo qui remonte une rue en sens interdit n'est pas un itinéraire.
+(`oneway:foot=yes` existe mais reste marginal ; il serait à ajouter là-bas.)
 
 Deux choix structurent ce module, et ils viennent du même constat : la boucle
 interne s'exécute des dizaines de millions de fois par requête sur un
@@ -102,6 +104,8 @@ def dijkstra(
             edge = edges[eidx]
             v = edge.b if edge.a == u else edge.a
             if settled[v]:
+                continue
+            if edge.oneway and (edge.a == u) != (edge.oneway > 0):
                 continue
 
             nd = du + edge.length_m
@@ -227,6 +231,8 @@ def astar(
             if settled[v]:
                 continue
             if gate is not None and not gate[sector[v]]:
+                continue
+            if edge.oneway and (edge.a == u) != (edge.oneway > 0):
                 continue
 
             nd = du + edge.length_m

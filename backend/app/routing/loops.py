@@ -55,7 +55,7 @@ import math
 from collections import Counter
 from dataclasses import dataclass, field
 
-from ..geo import Coord, bearing_deg, haversine_m, roundness
+from ..geo import Coord, backtrack_share, bearing_deg, haversine_m, roundness
 from ..osm.graph import Graph
 from ..safety.gate import RouteStats
 from ..safety.night import unlit_length
@@ -234,6 +234,7 @@ class Candidate:
     stats: RouteStats | None = None
     bearing: float = 0.0
     roundness: float = 0.0  # 1 = cercle, 0 = aller-retour — voir `geo.roundness`
+    backtrack: float = 0.0  # part en crochet en U — voir `geo.backtrack_share`
     shape: int = 0  # nombre de sommets visés — 0 pour un repli aller-retour
     laps: int = 1  # nombre de tours à parcourir — voir `repeat_loop`
 
@@ -859,6 +860,7 @@ def measure(graph: Graph, start: int, cand: Candidate, *, night: bool) -> None:
     cand.segments = segments
     cand.crossings = crossings
     cand.roundness = roundness(geometry)
+    cand.backtrack = backtrack_share(geometry)
     cand.bearing = _loop_bearing(graph.nodes[start], geometry)
     cand.stats = RouteStats(
         distance_m=total,
@@ -961,6 +963,7 @@ def repeat_loop(graph: Graph, start: int, cand: Candidate, laps: int) -> Candida
     measure(graph, start, repeated, night=cand.stats.unlit_m is not None)
 
     repeated.roundness = cand.roundness
+    repeated.backtrack = cand.backtrack
     repeated.stats.overlap_share = cand.stats.overlap_share
     repeated.bearing = cand.bearing
     repeated.shape = cand.shape

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.safety.exclusion import is_excluded
+from app.safety.exclusion import is_excluded, oneway_for
 from app.safety.risk import (
     EXPOSED_RISK,
     classify_surface,
@@ -259,3 +259,44 @@ class TestVelo:
         tags = {"highway": "residential", "bicycle": "no"}
         assert is_excluded(tags, sport="bike") is not None
         assert is_excluded(tags, sport="run") is None
+
+    def test_piste_interdite_aux_pietons_ouverte_au_velo(self):
+        """Le marquage même d'une piste cyclable séparée : elle manquait au graphe vélo."""
+        tags = {"highway": "cycleway", "foot": "no"}
+        assert is_excluded(tags, sport="bike") is None
+        assert is_excluded(tags, sport="run") is not None
+
+    def test_acces_ferme_rouvert_pour_le_velo_par_bicycle(self):
+        tags = {"highway": "service", "access": "no", "bicycle": "designated"}
+        assert is_excluded(tags, sport="bike") is None
+        assert is_excluded(tags, sport="run") is not None
+        assert is_excluded({**tags, "foot": "yes"}, sport="run") is None
+
+    def test_une_piste_cyclable_protege_aussi_le_coureur(self):
+        """Pas de voitures : ni « trottoir supposé », ni exposée hors agglomération."""
+        for builtup in (True, False):
+            sep, inferred, _ = separation({"highway": "cycleway"}, in_builtup=builtup)
+            assert sep == 2.0 and not inferred
+
+    def test_sens_unique_a_velo_pas_a_pied(self):
+        tags = {"highway": "residential", "oneway": "yes"}
+        assert oneway_for(tags, "run") == 0
+        assert oneway_for(tags, "bike") == 1
+        assert oneway_for({**tags, "oneway": "-1"}, "bike") == -1
+        assert oneway_for({"highway": "primary", "junction": "roundabout"}, "bike") == 1
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"oneway:bicycle": "no"},
+            {"cycleway": "opposite_lane"},
+            {"cycleway:left": "opposite_track"},
+            {"cycleway:left": "lane", "cycleway:left:oneway": "-1"},
+        ],
+    )
+    def test_contresens_cyclable(self, extra):
+        assert oneway_for({"highway": "residential", "oneway": "yes", **extra}, "bike") == 0
+
+    def test_voie_verte_sans_revetement_tague_n_est_pas_un_sentier(self):
+        assert classify_surface({"highway": "path", "bicycle": "designated"}) == "paved"
+        assert classify_surface({"highway": "path"}) == "trail"

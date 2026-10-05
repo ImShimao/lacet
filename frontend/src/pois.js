@@ -15,8 +15,10 @@ import { planarDistance } from './engine/geo'
 
 // Un carreau fait 0,05° de côté — cinq kilomètres sur quatre en France.
 const TILE_DEG = 0.05
-// Les fontaines ne bougent guère : un mois avant de redemander.
-const TTL_MS = 30 * 86_400_000
+// Les fontaines ne bougent guère, mais la carte s'en remplit : celle qu'on
+// ajoute soi-même à OpenStreetMap, gardée un mois, restait un mois invisible.
+// Une semaine, pour une requête de quelques kilooctets.
+const TTL_MS = 7 * 86_400_000
 // Au-delà de cette distance du tracé, ce n'est plus « sur le parcours ».
 export const NEAR_M = 150
 // Deux relevés du même robinet, à quelques mètres, ne font qu'un arrêt.

@@ -211,6 +211,18 @@ self.onmessage = async ({ data }) => {
       }
       if (result?.meta && load.partial) result.meta.partial = true
       if (result?.meta && load.sources) result.meta.sources = load.sources
+      // À vélo, une boucle qui emprunte un sens unique ne se parcourt que dans
+      // son sens : retournée, elle le remonterait. L'écran n'offre alors pas
+      // l'autre sens — voir `reverse`. Ajouté ici, hors de `planLoops`, dont la
+      // réponse reste celle du moteur Python.
+      const sens = lastReversible?.graph.edgeOneway
+      if (sens && result?.routes) {
+        for (const kept of lastReversible.routes) {
+          if (!kept.cand.edges.some((e) => sens[e])) continue
+          const route = result.routes.find((r) => r.id === kept.id)
+          if (route) route.oneway = true
+        }
+      }
 
       // Le moteur a tourné mais n'a rien trouvé : le réseau du coin est peut-être
       // trop maigre dans ce qu'on a pu en charger. On essaie le secours avant de
@@ -302,6 +314,10 @@ self.onmessage = async ({ data }) => {
       // Le graphe a été remplacé depuis : il faudrait tout retélécharger pour
       // retourner une boucle, ce qui n'en vaut pas la peine. L'écran le dira.
       self.postMessage({ id, type: 'error', error: { name: 'StaleRoute', message: 'À refaire : cette boucle n’est plus en mémoire.' } })
+      return
+    }
+    if (gardé.cand.edges.some((e) => lastReversible.graph.edgeOneway?.[e])) {
+      self.postMessage({ id, type: 'error', error: { name: 'OneWay', message: 'Cette boucle emprunte des sens uniques : à vélo, elle ne se parcourt que dans ce sens.' } })
       return
     }
     try {

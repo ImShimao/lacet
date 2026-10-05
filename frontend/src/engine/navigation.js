@@ -19,6 +19,10 @@ const SLIGHT_DEG = 30
 const TURN_DEG = 55
 const SHARP_DEG = 115
 const UTURN_DEG = 155
+// Une fourche se dit, même douce — voir `FORK_DEG` dans `navigation.py`.
+const FORK_DEG = 45
+const DISTINCT_DEG = 20
+const STRAIGHT_DEG = 12
 const MERGE_DISTANCE_M = 25
 const NAME_CHANGE_MIN_M = 120
 const NAME_REPEAT_M = 400
@@ -43,8 +47,8 @@ const PHRASES = new Map([
 const SHORT = new Map([
   ['left', 'à gauche'],
   ['right', 'à droite'],
-  ['slight_left', 'à gauche'],
-  ['slight_right', 'à droite'],
+  ['slight_left', 'légèrement à gauche'],
+  ['slight_right', 'légèrement à droite'],
   ['sharp_left', 'franchement à gauche'],
   ['sharp_right', 'franchement à droite'],
   ['uturn', 'demi-tour'],
@@ -144,16 +148,17 @@ function rawSteps(graph, start, cand, quiet = null) {
   let outBearing = null
   let lastNamed = null
   const announced = new Map()
+  let came = null
 
   for (const e of cand.edges) {
     const coords = graph.coordsFrom(e, cursor)
     const name = graph.edgeName[e]
     const length = graph.edgeLen[e]
 
-    if (outBearing !== null && cursor !== quiet) {
+    if (outBearing !== null && came !== null && cursor !== quiet) {
       const inBearing = bearingFromStart(coords)
       const angle = pymod(inBearing - outBearing + 180, 360) - 180
-      const turn = classify(angle)
+      let turn = classify(angle)
 
       const roadChanged = name !== lastNamed
       const fresh =
@@ -173,8 +178,13 @@ function rawSteps(graph, start, cand, quiet = null) {
       // Une consigne ne sert qu'à choisir. Là où il n'y a rien à choisir, il
       // n'y a rien à dire : la rue emmène.
       const choix = graph.adjOffset[cursor + 1] - graph.adjOffset[cursor] > 2
+      const fork =
+        choix && magnitude < TURN_DEG
+          ? forkTurn(graph, cursor, e, came, outBearing, angle, name === graph.edgeName[came])
+          : null
+      if (fork) turn = fork
 
-      if ((choix && (magnitude >= TURN_DEG || (magnitude >= SLIGHT_DEG && roadChanged))) || namedChange) {
+      if ((choix && (magnitude >= TURN_DEG || (magnitude >= SLIGHT_DEG && roadChanged))) || namedChange || fork) {
         if (name) announced.set(name, travelled)
         const [lon, lat] = coords[0]
         const rlon = pyRound(lon, 6)
@@ -191,9 +201,28 @@ function rawSteps(graph, start, cand, quiet = null) {
     travelled += length
     outBearing = bearingToEnd(coords)
     if (name) lastNamed = name
+    came = e
     cursor = graph.other(e, cursor)
   }
   return steps
+}
+
+/** La manœuvre à dire à une fourche, ou `null` quand le chemin va de soi — `_fork_turn`. */
+function forkTurn(graph, node, chosen, came, outBearing, angle, sameRoad) {
+  const forward = []
+  for (let k = graph.adjOffset[node]; k < graph.adjOffset[node + 1]; k += 1) {
+    const alt = graph.adjEdges[k]
+    if (alt === chosen || alt === came) continue
+    const a = pymod(bearingFromStart(graph.coordsFrom(alt, node)) - outBearing + 180, 360) - 180
+    if (Math.abs(a) < FORK_DEG && Math.abs(a - angle) >= DISTINCT_DEG) forward.push(a)
+  }
+  if (!forward.length) return null
+  if (sameRoad && forward.every((a) => Math.abs(angle) <= Math.abs(a))) return null
+  if (Math.abs(angle) >= SLIGHT_DEG) return classify(angle)
+  if (Math.abs(angle) < STRAIGHT_DEG) return 'straight'
+  if (angle < 0 && forward.every((a) => a > angle)) return 'slight_left'
+  if (angle > 0 && forward.every((a) => a < angle)) return 'slight_right'
+  return 'straight'
 }
 
 /**
@@ -298,7 +327,28 @@ function classify(angle) {
 }
 
 const phrase = (turn, road) => `${PHRASES.get(turn) ?? 'Continue'}${on(road)}`
-const on = (road) => (road ? ` sur ${road}` : '')
+
+// Le type de voie et ce qui se dit devant — `_VOIES` dans `navigation.py`.
+const VOIES = new Map([
+  ['rue', 'dans la rue'], ['ruelle', 'dans la ruelle'], ['venelle', 'dans la venelle'],
+  ['impasse', "dans l'impasse"], ['allée', "dans l'allée"], ['avenue', "dans l'avenue"],
+  ['passage', 'dans le passage'], ['cour', 'dans la cour'], ['square', 'dans le square'],
+  ['faubourg', 'dans le faubourg'], ['montée', 'dans la montée'], ['route', 'sur la route'],
+  ['chemin', 'sur le chemin'], ['sentier', 'sur le sentier'], ['boulevard', 'sur le boulevard'],
+  ['quai', 'sur le quai'], ['place', 'sur la place'], ['pont', 'sur le pont'], ['voie', 'sur la voie'],
+  ['piste', 'sur la piste'], ['promenade', 'sur la promenade'], ['esplanade', "sur l'esplanade"],
+  ['cours', 'sur le cours'], ['digue', 'sur la digue'], ['mail', 'sur le mail'],
+  ['parvis', 'sur le parvis'], ['rond-point', 'sur le rond-point'],
+])
+
+/** « dans la rue de l'Oberharth », « sur l'avenue Foch » — ou « sur Ladhof ». */
+export function on(road) {
+  if (!road) return ''
+  const space = road.indexOf(' ')
+  const voie = space > 0 ? VOIES.get(road.slice(0, space).toLowerCase()) : undefined
+  const rest = space > 0 ? road.slice(space + 1) : ''
+  return voie && rest ? ` ${voie} ${rest}` : ` sur ${road}`
+}
 const startText = (heading, road) => `Départ — pars vers ${headingWords(heading)}${on(road)}.`
 
 const bearingFromStart = (coords) => bearingDeg(coords[0], advance(coords, BEARING_SPAN_M))

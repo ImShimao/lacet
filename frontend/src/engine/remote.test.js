@@ -114,7 +114,7 @@ describe('le secours', () => {
     expect(route.geometry.length).toBeGreaterThan(10)
     expect(route.distance_m).toBeGreaterThan(1000)
     expect(route.instructions[0]).toMatchObject({ turn: 'start', dist_m: 0, road: 'Rue du Test' })
-    expect(route.instructions[0].text).toMatch(/^Départ — pars vers .+ sur Rue du Test\.$/)
+    expect(route.instructions[0].text).toMatch(/^Départ — pars vers .+ dans la rue du Test\.$/)
 
     // **Aucune note inventée.** C'est la propriété qui compte le plus ici.
     expect(route.safety).toBeNull()
@@ -174,9 +174,9 @@ describe('le secours', () => {
     expect(geometry.length).toBe(61)
     expect(instructions.map((s) => s.turn)).toEqual(['start', 'right', 'left', 'finish'])
     expect(instructions.map((s) => s.text)).toEqual([
-      expect.stringMatching(/^Départ — pars vers l'est sur Rue du Test\.$/),
-      'Tourne à droite sur Rue Pasteur',
-      'Tourne à gauche sur Rue Haute',
+      expect.stringMatching(/^Départ — pars vers l'est dans la rue du Test\.$/),
+      'Tourne à droite dans la rue Pasteur',
+      'Tourne à gauche dans la rue Haute',
       'Tu es revenu au point de départ. Boucle terminée.',
     ])
     // Chaque consigne tombe là où le calculateur la place, en mètres depuis le départ.

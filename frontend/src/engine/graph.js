@@ -15,7 +15,7 @@
 import { haversineM, planarDistance, pointInRing, ringBbox } from './geo'
 import { pairs, pointAt } from './extract'
 import { pyfloordiv, pyRound, pySum, radians } from './py'
-import { closedBarrier, evaluateEdge, isExcluded, tunnelIsUnprotected } from './safety'
+import { closedBarrier, evaluateEdge, isExcluded, onewayFor, tunnelIsUnprotected } from './safety'
 
 const BUILTUP_DENSITY_M = 15_000
 const DENSITY_CELL_M = 400
@@ -60,6 +60,8 @@ export class Graph {
     this.edgeName = []
     this.edgeWayId = []
     this.edgeTunnel = []
+    // Sens permis à vélo : 1 de A vers B, -1 de B vers A, 0 les deux — voir `onewayFor`.
+    this.edgeOneway = []
     this.coords = null
     this.adjOffset = null
     this.adjEdges = null
@@ -237,6 +239,7 @@ export class Graph {
     this.edgeCoordCount = Int32Array.from(this.edgeCoordCount)
     this.edgeWayId = Float64Array.from(this.edgeWayId)
     this.edgeTunnel = Uint8Array.from(this.edgeTunnel)
+    this.edgeOneway = Int8Array.from(this.edgeOneway)
     this.link()
   }
 
@@ -426,6 +429,8 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
     const inBuiltup = builtup.isBuiltup(flat[2 * mid], flat[2 * mid + 1])
     const safety = evaluateEdge(tags, { inBuiltup, sport })
     const tunnel = tunnelIsUnprotected(tags) ? 1 : 0
+    // Les arêtes suivent l'ordre des nœuds de la voie : `oneway=yes` va de A vers B.
+    const oneway = onewayFor(tags, sport)
     // `tags.get("name") or tags.get("ref")` rend la dernière valeur évaluée :
     // une référence vide donne "", pas None, et la navigation fait la différence.
     const name = (tags.name || tags.ref) ?? null
@@ -459,6 +464,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
       graph.edgeName.push(name)
       graph.edgeWayId.push(way.id)
       graph.edgeTunnel.push(tunnel)
+      graph.edgeOneway.push(oneway)
       if (gateIds.size) {
         const e = graph.edgeA.length - 1
         for (const [id, end] of [[a, i === 0], [b, j === n - 1]]) {

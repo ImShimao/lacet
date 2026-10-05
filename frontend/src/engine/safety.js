@@ -46,7 +46,7 @@ const EXCLUDED_HIGHWAY = new Set([
   'motorway', 'motorway_link', 'trunk', 'trunk_link', 'construction', 'proposed',
   'raceway', 'bus_guideway', 'escape', 'corridor', 'elevator',
 ])
-const FOOT_ALLOWED = new Set(['yes', 'designated', 'permissive', 'destination', 'official'])
+const ALLOWED = new Set(['yes', 'designated', 'permissive', 'destination', 'official'])
 const SAC_FORBIDDEN = new Set([
   'demanding_mountain_hiking', 'alpine_hiking', 'demanding_alpine_hiking', 'difficult_alpine_hiking',
 ])
@@ -65,17 +65,43 @@ export function isExcluded(tags, { allowTrail = false, sport = 'run' } = {}) {
   if (EXCLUDED_HIGHWAY.has(highway)) return `highway=${highway}`
   if (NON_ROUTABLE.has(highway)) return `highway=${highway}`
 
-  const foot = tags.foot
-  if (foot === 'no' || foot === 'private') return `foot=${foot}`
+  // Chacun ses droits : à vélo, `foot=no` ne ferme rien — c'est le marquage
+  // d'une piste cyclable interdite aux piétons —, et `access=no` se rouvre par
+  // `bicycle`. Voir `exclusion.py`.
+  const own = sport === 'bike' ? tags.bicycle : tags.foot
+  if (sport !== 'bike' && (own === 'no' || own === 'private')) return `foot=${own}`
 
   const access = tags.access
-  if ((access === 'no' || access === 'private') && !has(FOOT_ALLOWED, foot)) return `access=${access}`
+  if ((access === 'no' || access === 'private') && !has(ALLOWED, own)) return `access=${access}`
 
   if (tags.route === 'ferry') return 'route=ferry'
   if (tunnelIsUnprotected(tags)) return 'tunnel sans trottoir'
   if (!allowTrail && has(SAC_FORBIDDEN, tags.sac_scale)) return `sac_scale=${tags.sac_scale}`
   if (tags.highway === 'road' && tags.area === 'yes') return 'surface indéfinie'
   return null
+}
+
+// === sens unique ==============================================================
+
+const ONEWAY_FORWARD = new Set(['yes', '1', 'true'])
+const ONEWAY_BACKWARD = new Set(['-1', 'reverse'])
+const CONTRAFLOW = new Set(['opposite', 'opposite_lane', 'opposite_track', 'opposite_share_busway'])
+const CYCLEWAY_KEYS = ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both']
+const CYCLEWAY_ONEWAY_KEYS = ['cycleway:left:oneway', 'cycleway:right:oneway', 'cycleway:both:oneway']
+
+/** Le sens permis : 1 dans le sens de la voie, -1 à rebours, 0 les deux — `oneway_for`. */
+export function onewayFor(tags, sport = 'run') {
+  if (sport !== 'bike') return 0
+  const own = tags['oneway:bicycle']
+  if (own === undefined) {
+    if (CYCLEWAY_KEYS.some((key) => has(CONTRAFLOW, tags[key]))) return 0
+    if (CYCLEWAY_ONEWAY_KEYS.some((key) => tags[key] === 'no' || tags[key] === '-1')) return 0
+  }
+  const value = own !== undefined ? own : tags.oneway
+  if (has(ONEWAY_FORWARD, value)) return 1
+  if (has(ONEWAY_BACKWARD, value)) return -1
+  if (value === undefined && (tags.junction === 'roundabout' || tags.junction === 'circular')) return 1
+  return 0
 }
 
 // === barrières ================================================================
@@ -141,7 +167,6 @@ const SIDEWALK_ABSENT = new Set(['no', 'none'])
 const SIDEWALK_SIDES = ['sidewalk:left', 'sidewalk:right', 'sidewalk:both']
 const CYCLEWAY_SIDES = ['cycleway:left', 'cycleway:right', 'cycleway:both']
 const SHOULDER_PRESENT = new Set(['yes', 'both', 'left', 'right'])
-const FOOT_ON_CYCLEWAY = new Set(['yes', 'designated', 'permissive'])
 const CYCLEWAY_PRESENT = new Set(['track', 'lane', 'opposite_track', 'opposite_lane', 'share_busway', 'yes'])
 const BIKE_DESIGNATED = new Set(['designated', 'yes'])
 const BIKE_PATHS = new Set(['path', 'footway', 'track'])
@@ -214,9 +239,8 @@ function separationBike(tags, inBuiltup) {
 function separation(tags, inBuiltup) {
   const highway = tags.highway ?? ''
   if (DEDICATED_HIGHWAY.has(highway)) return [2, false, 'voie dédiée']
-  if (highway === 'cycleway' && has(FOOT_ON_CYCLEWAY, tags.foot)) {
-    return [2, false, 'piste cyclable ouverte aux piétons']
-  }
+  // Pas de voitures sur une piste cyclable — voir `separation` dans `risk.py`.
+  if (highway === 'cycleway') return [2, false, 'piste cyclable, sans voitures']
   const sidewalk = hasSidewalk(tags)
   if (sidewalk === true) return [2, false, 'trottoir tagué']
   if (has(SHOULDER_PRESENT, tags.shoulder)) return [1, false, 'accotement']
@@ -240,6 +264,8 @@ export function classifySurface(tags) {
   if (TRAIL_SURFACES.has(surface)) return 'trail'
 
   const highway = tags.highway ?? ''
+  // Une voie verte sans revêtement tagué n'est pas un sentier — voir `risk.py`.
+  if (highway === 'path' && tags.bicycle === 'designated') return 'paved'
   if (highway === 'path' || highway === 'bridleway') return 'trail'
   if (highway === 'track') {
     return tags.tracktype === 'grade1' || tags.tracktype === 'grade2' ? 'gravel' : 'trail'
@@ -281,7 +307,25 @@ export function evaluateEdge(tags, { inBuiltup, sport = 'run' }) {
     highway: tags.highway ?? '',
     inBuiltup,
     level: levelOf(risk),
+    carFree: isCarFree(tags, sport),
   })
+}
+
+// === sans voitures ============================================================
+//
+// Propre au moteur de l'app : la préférence « voies sans voitures » des filtres
+// (`weights.js`). Pas le trottoir dessiné à part (`footway=sidewalk`) : il longe
+// la rue, son bruit et ses portières. À vélo, ni le trottoir ni la zone
+// piétonne, sauf ouverts aux vélos : on y roule au pas.
+const CAR_FREE = new Set(['cycleway', 'footway', 'path', 'pedestrian', 'track', 'bridleway'])
+const CAR_FREE_BIKE = new Set(['cycleway', 'path', 'track', 'bridleway'])
+
+function isCarFree(tags, sport) {
+  if (tags.footway === 'sidewalk') return false
+  const highway = tags.highway ?? ''
+  if (sport !== 'bike') return CAR_FREE.has(highway)
+  if (CAR_FREE_BIKE.has(highway)) return true
+  return (highway === 'footway' || highway === 'pedestrian') && has(BIKE_DESIGNATED, tags.bicycle)
 }
 
 // === L4 — nuit ================================================================

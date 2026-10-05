@@ -20,8 +20,9 @@ EXCLUDED_HIGHWAY = {
     "elevator",
 }
 
-# Valeurs de `foot`/`access` qui rouvrent explicitement le passage.
-_FOOT_ALLOWED = {"yes", "designated", "permissive", "destination", "official"}
+# Valeurs de `foot` (ou `bicycle`, à vélo) qui rouvrent explicitement un passage
+# fermé par `access`.
+_ALLOWED = {"yes", "designated", "permissive", "destination", "official"}
 
 # Difficulté de sentier au-delà de laquelle on sort du domaine « course à pied ».
 _SAC_FORBIDDEN = {
@@ -58,12 +59,17 @@ def is_excluded(
     if highway in _NON_ROUTABLE:
         return f"highway={highway}"
 
-    foot = tags.get("foot")
-    if foot in {"no", "private"}:
-        return f"foot={foot}"
+    # Chacun ses droits. Un vélo n'a que faire de `foot=no` — c'est même le
+    # marquage d'une piste cyclable interdite aux piétons —, et un `access=no`
+    # se rouvre pour lui par `bicycle`, pas par `foot`. Mesuré dans le centre de
+    # Lyon : neuf kilomètres de pistes manquaient au graphe vélo, et les boucles
+    # les contournaient par la chaussée.
+    own = tags.get("bicycle") if sport == "bike" else tags.get("foot")
+    if sport != "bike" and own in {"no", "private"}:
+        return f"foot={own}"
 
     access = tags.get("access")
-    if access in {"no", "private"} and foot not in _FOOT_ALLOWED:
+    if access in {"no", "private"} and own not in _ALLOWED:
         return f"access={access}"
 
     if tags.get("route") == "ferry":
@@ -81,6 +87,42 @@ def is_excluded(
         return "surface indéfinie"
 
     return None
+
+
+# --- sens unique ---------------------------------------------------------------
+
+_ONEWAY_FORWARD = {"yes", "1", "true"}
+_ONEWAY_BACKWARD = {"-1", "reverse"}
+# Le contresens cyclable, sous ses différentes écritures.
+_CONTRAFLOW = {"opposite", "opposite_lane", "opposite_track", "opposite_share_busway"}
+_CYCLEWAY_KEYS = ("cycleway", "cycleway:left", "cycleway:right", "cycleway:both")
+_CYCLEWAY_ONEWAY_KEYS = ("cycleway:left:oneway", "cycleway:right:oneway", "cycleway:both:oneway")
+
+
+def oneway_for(tags: dict[str, str], sport: str = "run") -> int:
+    """Le sens permis : 1 dans le sens de la voie, -1 à rebours, 0 les deux.
+
+    À pied, aucun : un sens unique ne s'impose pas au piéton. À vélo, si — le
+    graphe l'ignorait, et une boucle pouvait remonter une rue en sens interdit.
+    Sauf contresens cyclable : `oneway:bicycle=no`, une bande ou une piste
+    `opposite`, ou une bande dont le propre sens dit qu'elle remonte la rue.
+    """
+    if sport != "bike":
+        return 0
+    own = tags.get("oneway:bicycle")
+    if own is None:
+        if any(tags.get(key) in _CONTRAFLOW for key in _CYCLEWAY_KEYS):
+            return 0
+        if any(tags.get(key) in {"no", "-1"} for key in _CYCLEWAY_ONEWAY_KEYS):
+            return 0
+    value = own if own is not None else tags.get("oneway")
+    if value in _ONEWAY_FORWARD:
+        return 1
+    if value in _ONEWAY_BACKWARD:
+        return -1
+    if value is None and tags.get("junction") in {"roundabout", "circular"}:
+        return 1
+    return 0
 
 
 _PEDESTRIAN_HIGHWAY = {"footway", "path", "pedestrian", "steps", "cycleway", "living_street"}

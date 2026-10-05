@@ -201,10 +201,10 @@ describe('la sortie guidée', () => {
 
     const dit = voice.speak.mock.calls.map(([texte]) => texte)
     expect(dit.filter((d) => d.startsWith('Départ'))).toEqual([
-      'Départ — rejoins Rue du Moulin et pars à droite, puis dans 100 mètres, à gauche sur Rue Haute.',
+      'Départ — rejoins Rue du Moulin et pars à droite, puis dans 100 mètres, à gauche dans la rue Haute.',
     ])
     expect(dit.filter((d) => d.startsWith('Maintenant'))).toEqual([
-      'Maintenant, tourne à gauche sur Rue Haute, puis dans 100 mètres, à gauche sur Rue Basse.',
+      'Maintenant, tourne à gauche sur Rue Haute, puis dans 100 mètres, à gauche dans la rue Basse.',
       'Maintenant, tourne à gauche sur Rue Basse, puis dans 100 mètres, à gauche.',
       'Maintenant, tourne à gauche, puis arrivée dans 100 mètres.',
     ])

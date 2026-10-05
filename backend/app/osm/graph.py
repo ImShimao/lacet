@@ -21,7 +21,7 @@ from typing import Any
 
 from ..geo import Coord, haversine_m, planar_distance, point_in_ring, ring_bbox
 from .extract import Extract, Way, read as read_extract
-from ..safety.exclusion import is_excluded, tunnel_is_unprotected
+from ..safety.exclusion import is_excluded, oneway_for, tunnel_is_unprotected
 from ..safety.risk import EdgeSafety, evaluate_edge
 
 log = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ class Edge:
     way_id: int
     name: str | None
     tunnel: bool
+    oneway: int = 0  # 1 : de a vers b seulement ; -1 : de b vers a — voir `oneway_for`
 
     def other(self, node: int) -> int:
         return self.b if self.a == node else self.a
@@ -430,6 +431,9 @@ def build_graph(
         tunnel = tunnel_is_unprotected(tags)
         name = tags.get("name") or tags.get("ref")
         way_id = way.id
+        # Les arêtes suivent l'ordre des nœuds de la voie : `oneway=yes` permet
+        # donc d'aller de `a` vers `b`, pas l'inverse.
+        oneway = oneway_for(tags, sport)
 
         splits = [0]
         splits += [i for i in range(1, len(node_ids) - 1) if node_ids[i] in junctions]
@@ -458,6 +462,7 @@ def build_graph(
                     way_id=way_id,
                     name=name,
                     tunnel=tunnel,
+                    oneway=oneway,
                 )
             )
             graph.adj[ra].append(idx)

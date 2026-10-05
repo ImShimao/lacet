@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import io
 import json
 import sys
 from pathlib import Path
@@ -93,6 +94,16 @@ async def fake_fetch_many(routes):
     ]
 
 
+def write_gz(path: Path, data) -> None:
+    """Écrit `data` en JSON compressé, sans date dans l'en-tête.
+
+    `gzip.open` y inscrivait l'heure : chaque passage « modifiait » les trois
+    damiers sans que rien n'ait changé, et le diff du commit s'en encombrait.
+    """
+    with gzip.GzipFile(path, "wb", mtime=0) as raw, io.TextIOWrapper(raw, encoding="utf-8") as fh:
+        json.dump(data, fh)
+
+
 def extract_path(name: str) -> Path:
     return OUT / f"extract-{name}.json.gz"
 
@@ -115,8 +126,7 @@ async def fetch_real() -> None:
         if path.exists():
             continue
         extract = await fetch_area(spec["lat"], spec["lon"], spec["radius_m"], target_m=spec["target_m"])
-        with gzip.open(path, "wt", encoding="utf-8") as fh:
-            json.dump(to_cache(extract), fh)
+        write_gz(path, to_cache(extract))
         print(f"extrait {name} : {len(extract.ways)} voies → {path.stat().st_size / 1e6:.1f} Mo compressés")
 
 
@@ -217,14 +227,16 @@ def first_gap(old, new, path: str = "") -> str | None:
 
 
 async def main() -> None:
+    # Les « → » et « nœuds » du journal faisaient planter le script dans une
+    # console Windows redirigée — après l'écriture de l'oracle, heureusement.
+    sys.stdout.reconfigure(errors="replace")
     check = "--check" in sys.argv
     if "--fetch" in sys.argv:
         await fetch_real()
 
     OUT.mkdir(parents=True, exist_ok=True)
     for name in () if check else ("grid9", "grid9-danger", "grid15"):
-        with gzip.open(extract_path(name), "wt", encoding="utf-8") as fh:
-            json.dump(load_extract(name), fh)
+        write_gz(extract_path(name), load_extract(name))
 
     results = []
     for case in CASES:
@@ -251,8 +263,7 @@ async def main() -> None:
         print("Oracle à jour.")
         return
 
-    with gzip.open(OUT / "expected.json.gz", "wt", encoding="utf-8") as fh:
-        json.dump(oracle, fh)
+    write_gz(OUT / "expected.json.gz", oracle)
     print(f"→ {OUT / 'expected.json.gz'}")
 
 

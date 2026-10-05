@@ -120,6 +120,10 @@ export const DEFAULTS = {
   // les boucles, et l'imposer à qui ne l'a pas demandé serait décider à sa
   // place — un escalier est parfois le raccourci qu'on cherche.
   avoid: [],
+  // Pistes, chemins et allées d'abord, la route quand il le faut — voir
+  // `engine/weights.js`. Coché par défaut : c'est ce qu'on cherche en sortant
+  // courir, et la sécurité seule ne départageait pas une piste d'une rue à 30.
+  carfree: true,
   // Distance exacte : ±2,5 % au lieu de ±10 %. Réservé à qui vise une distance
   // précise — plus c'est serré, moins il y a de boucles qui conviennent.
   precise: false,
@@ -383,6 +387,23 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                   onClick={() => set({ surface: t.key })}
                 />
               ))}
+            </div>
+            {/* Absent des réglages d'avant : coché, comme par défaut. */}
+            <div className="checks checks--after">
+              <button
+                role="checkbox"
+                aria-checked={draft.carfree !== false}
+                className={`check ${draft.carfree !== false ? 'check--on' : ''}`}
+                onClick={() => set({ carfree: draft.carfree === false })}
+              >
+                <span className="check__box">
+                  <Icon name="check" size={13} />
+                </span>
+                <span>
+                  Voies sans voitures d'abord
+                  <em>Pistes, chemins et allées ; la route quand il le faut</em>
+                </span>
+              </button>
             </div>
           </Field>
 

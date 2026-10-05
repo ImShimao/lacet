@@ -90,7 +90,7 @@ describe('le départ devant la porte', () => {
     const [lon, lat] = home.point
     const { routes } = await planLoops({ lat, lon, distance_km: 4, sport: 'run', limit: 1 }, deps)
     const [depart] = routes[0].instructions
-    expect(depart.text).toMatch(/^Départ — en sortant, pars (à gauche|à droite|tout droit)( sur .+)?\.$/)
+    expect(depart.text).toMatch(/^Départ — en sortant, pars (à gauche|à droite|tout droit)( (sur|dans) .+)?\.$/)
     expect(depart.road).toBe(graph.edgeName[home.e])
     expect(haversineM([depart.lon, depart.lat], routes[0].geometry[0])).toBeLessThan(0.2)
   }, 30_000)

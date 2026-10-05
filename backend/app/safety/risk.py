@@ -67,7 +67,6 @@ _SIDEWALK_ABSENT = {"no", "none"}
 _SIDEWALK_SIDES = ("sidewalk:left", "sidewalk:right", "sidewalk:both")
 _CYCLEWAY_SIDES = ("cycleway:left", "cycleway:right", "cycleway:both")
 _SHOULDER_PRESENT = {"yes", "both", "left", "right"}
-_FOOT_ON_CYCLEWAY = {"yes", "designated", "permissive"}
 
 # --- vélo -----------------------------------------------------------------
 # Ce qui protège un cycliste n'est pas ce qui protège un coureur. Un trottoir
@@ -239,8 +238,14 @@ def separation(tags: dict[str, str], *, in_builtup: bool) -> tuple[float, bool, 
     if highway in DEDICATED_HIGHWAY:
         return 2.0, False, "voie dédiée"
 
-    if highway == "cycleway" and tags.get("foot") in _FOOT_ON_CYCLEWAY:
-        return 2.0, False, "piste cyclable ouverte aux piétons"
+    # Une piste cyclable n'a pas de voitures, et elle n'est dans le graphe que si
+    # `foot` ne l'interdit pas. Seules celles marquées `foot=yes` comptaient
+    # comme protégées ; les autres tombaient dans la règle du doute, comme une
+    # rue : « trottoir probable » en ville, « aucun trottoir supposé » ailleurs —
+    # et la piste qui longe la zone commerciale de Guebwiller comptait comme non
+    # protégée.
+    if highway == "cycleway":
+        return 2.0, False, "piste cyclable, sans voitures"
 
     sidewalk = has_sidewalk(tags)
     if sidewalk is True:
@@ -295,6 +300,12 @@ def classify_surface(tags: dict[str, str]) -> str:
 
     # Pas de tag `surface` : on déduit de la classe de voie.
     highway = tags.get("highway", "")
+    if highway == "path" and tags.get("bicycle") == "designated":
+        # Un chemin réservé aux vélos — voie verte, piste mixte — se déduit
+        # comme une `cycleway` : revêtu. Pris pour un sentier, il coûtait 1,6
+        # fois sa longueur à vélo et 2,3 fois à pied en « Route », et les boucles
+        # le contournaient par la chaussée.
+        return "paved"
     if highway in {"path", "bridleway"}:
         return "trail"
     if highway == "track":

@@ -39,6 +39,7 @@ const GRADE_PENALTY = 0.9
 const GRADE_RANK = { A: 0, B: 1, C: 2 }
 const CROSSINGS_REFERENCE = 3
 const GOOD_ROUNDNESS = 0.55
+const BACKTRACK_WEIGHT = 1.6
 // Six cents points par boucle : le pas de cinquante mètres tient jusqu'à 30 km.
 // Au-delà il s'allonge, et l'IGN, qui prend cinq mille points par envoi, rend
 // encore toute une recherche ordinaire — onze boucles de 20 km — en une fois.
@@ -128,6 +129,10 @@ export function normalizeRequest(input) {
     //                              recherche de lieux la donne : c'est elle
     //                              qu'on rejoint en sortant, même si une autre
     //                              voie passe plus près des murs.
+    //   carfree                    « Voies sans voitures d'abord » : pistes,
+    //                              chemins et allées coûtent moins qu'une rue —
+    //                              voir `weights.js`. Actif par défaut, comme
+    //                              `doorstep` ; la parité le coupe.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -137,6 +142,7 @@ export function normalizeRequest(input) {
     blocked: input.blocked ?? [],
     doorstep: input.doorstep ?? true,
     street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
+    carfree: input.carfree !== false,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -318,6 +324,7 @@ export async function planLoops(input, deps) {
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
     avoid: req.avoid,
     blocked,
+    carfree: req.carfree,
   })
 
   const windTask = windOf(req.lat, req.lon)
@@ -483,6 +490,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
     avoid: req.avoid,
     blocked: blockedEdges(graph, req.blocked),
+    carfree: req.carfree,
   })
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
@@ -599,7 +607,8 @@ export function preliminaryScore(cand, targetM, tolerance) {
     Math.max(0, 1 - s.unprotectedCrossings / CROSSINGS_REFERENCE) * 0.25
   const variety = 1 - Math.min(1, s.overlapShare)
   const shape = Math.min(1, cand.roundness / GOOD_ROUNDNESS)
-  return 0.32 * distance + 0.4 * safety + 0.1 * variety + 0.18 * shape
+  // Le crochet en U — voir `preliminary_score` en Python.
+  return 0.32 * distance + 0.4 * safety + 0.1 * variety + 0.18 * shape - BACKTRACK_WEIGHT * cand.backtrack
 }
 
 const gradePenalty = (cand) => GRADE_PENALTY * GRADE_RANK[gradeRoute(cand.stats)[0]]

@@ -41,6 +41,8 @@ export function toRequest(p, start) {
   const avoid = (p.avoid ?? []).filter((key) => key !== 'busy')
   if (p.safety === 'safe') avoid.push('busy')
   if (avoid.length) body.avoid = avoid
+  // Actif par défaut dans le moteur : seul le refus se dit.
+  if (p.carfree === false) body.carfree = false
   if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min

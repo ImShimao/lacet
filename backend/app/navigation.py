@@ -53,6 +53,19 @@ TURN_DEG = 55.0
 SHARP_DEG = 115.0
 UTURN_DEG = 155.0
 
+# **Une fourche se dit, même douce.** Sous le seuil d'un virage, rien n'était
+# dit — y compris quand une autre voie partait tout droit à côté : la rue
+# s'infléchissait de trente-cinq degrés, la ruelle d'en face continuait, et
+# l'on prenait la ruelle. Une autre voie qui part vers l'avant (à moins de
+# `FORK_DEG`) et se distingue de la nôtre (d'au moins `DISTINCT_DEG`) demande
+# qu'on dise laquelle prendre — sauf quand on reste sur la même voie et qu'elle
+# est la plus droite : là, on continue sans y penser.
+FORK_DEG = 45.0
+DISTINCT_DEG = 20.0
+# En deçà, la voie prise à une fourche se dit « tout droit » : l'écart ne se
+# voit pas sur le terrain.
+STRAIGHT_DEG = 12.0
+
 # Deux manœuvres plus proches que ça sont fusionnées en une seule phrase.
 MERGE_DISTANCE_M = 25.0
 
@@ -230,12 +243,13 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
     # Dernière voie **nommée** empruntée, et distance à laquelle on l'a annoncée.
     last_named: str | None = None
     announced: dict[str, float] = {}
+    came: int | None = None
 
     for eidx in cand.edges:
         edge = graph.edges[eidx]
         coords = edge.coords_from(cursor)
 
-        if out_bearing is not None:
+        if out_bearing is not None and came is not None:
             in_bearing = _bearing_from_start(coords)
             angle = (in_bearing - out_bearing + 180.0) % 360.0 - 180.0
             turn = _classify(angle)
@@ -265,11 +279,18 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
             # Une consigne ne sert qu'à choisir. Là où il n'y a rien à choisir,
             # il n'y a rien à dire : la rue emmène.
             choix = len(graph.adj[cursor]) > 2
+            fork = (
+                _fork_turn(graph, cursor, eidx, came, out_bearing, angle, edge.name == graph.edges[came].name)
+                if choix and magnitude < TURN_DEG
+                else None
+            )
+            if fork:
+                turn = fork
 
             if (
                 choix
                 and (magnitude >= TURN_DEG or (magnitude >= SLIGHT_DEG and road_changed))
-            ) or named_change:
+            ) or named_change or fork:
                 if edge.name:
                     announced[edge.name] = travelled
                 lon, lat = coords[0]
@@ -290,9 +311,48 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
         out_bearing = _bearing_to_end(coords)
         if edge.name:
             last_named = edge.name
+        came = eidx
         cursor = edge.other(cursor)
 
     return steps
+
+
+def _fork_turn(
+    graph: Graph,
+    node: int,
+    chosen: int,
+    came: int,
+    out_bearing: float,
+    angle: float,
+    same_road: bool,
+) -> str | None:
+    """La manœuvre à dire à une fourche, ou None quand le chemin va de soi.
+
+    Voir `FORK_DEG`. Sous le seuil d'une inflexion, la voie prise se situe par
+    rapport aux autres : la plus à gauche d'une fourche « serre à gauche », celle
+    du milieu continue « tout droit ».
+    """
+    forward: list[float] = []
+    for alt in graph.adj[node]:
+        if alt == chosen or alt == came:
+            continue
+        bearing = _bearing_from_start(graph.edges[alt].coords_from(node))
+        a = (bearing - out_bearing + 180.0) % 360.0 - 180.0
+        if abs(a) < FORK_DEG and abs(a - angle) >= DISTINCT_DEG:
+            forward.append(a)
+    if not forward:
+        return None
+    if same_road and all(abs(angle) <= abs(a) for a in forward):
+        return None
+    if abs(angle) >= SLIGHT_DEG:
+        return _classify(angle)
+    if abs(angle) < STRAIGHT_DEG:
+        return "straight"
+    if angle < 0 and all(a > angle for a in forward):
+        return "slight_left"
+    if angle > 0 and all(a < angle for a in forward):
+        return "slight_right"
+    return "straight"
 
 
 def _merge_all(steps: list[Instruction]) -> list[Instruction]:
@@ -418,20 +478,57 @@ def _phrase(turn: str, road: str | None) -> str:
     return f"{_PHRASES.get(turn, 'Continue')}{_on(road)}"
 
 
+# Le type de voie, en tête du nom OpenStreetMap, et ce qui se dit devant. OSM
+# écrit « Rue de l'Oberharth », sans article : l'app disait « tourne à droite
+# sur Rue de l'Oberharth », là où l'on dit « dans la rue de l'Oberharth ».
+_VOIES = {
+    "rue": "dans la rue",
+    "ruelle": "dans la ruelle",
+    "venelle": "dans la venelle",
+    "impasse": "dans l'impasse",
+    "allée": "dans l'allée",
+    "avenue": "dans l'avenue",
+    "passage": "dans le passage",
+    "cour": "dans la cour",
+    "square": "dans le square",
+    "faubourg": "dans le faubourg",
+    "montée": "dans la montée",
+    "route": "sur la route",
+    "chemin": "sur le chemin",
+    "sentier": "sur le sentier",
+    "boulevard": "sur le boulevard",
+    "quai": "sur le quai",
+    "place": "sur la place",
+    "pont": "sur le pont",
+    "voie": "sur la voie",
+    "piste": "sur la piste",
+    "promenade": "sur la promenade",
+    "esplanade": "sur l'esplanade",
+    "cours": "sur le cours",
+    "digue": "sur la digue",
+    "mail": "sur le mail",
+    "parvis": "sur le parvis",
+    "rond-point": "sur le rond-point",
+}
+
+
 def _on(road: str | None) -> str:
     if not road:
         return ""
-    # « sur la rue X », « sur le boulevard X », « sur l'avenue X » : le nom OSM
-    # porte déjà son article dans l'immense majorité des cas français.
-    return f" sur {road}"
+    head, _, rest = road.partition(" ")
+    voie = _VOIES.get(head.lower())
+    # Un nom sans type reconnu — « Grand'Rue », « Ladhof » — garde « sur ».
+    return f" {voie} {rest}" if voie and rest else f" sur {road}"
 
 
 def _short(turn: str) -> str:
     return {
         "left": "à gauche",
         "right": "à droite",
-        "slight_left": "à gauche",
-        "slight_right": "à droite",
+        # « légèrement », comme la voix le dit déjà (`guidance.js`) : réduit à
+        # « à gauche », le second temps d'une chicane passait pour un virage net.
+        "slight_left": "légèrement à gauche",
+        "slight_right": "légèrement à droite",
         "sharp_left": "franchement à gauche",
         "sharp_right": "franchement à droite",
         "uturn": "demi-tour",

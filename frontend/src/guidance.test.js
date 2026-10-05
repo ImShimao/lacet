@@ -91,7 +91,7 @@ describe('deux virages rapprochés', () => {
     const following = followingStep(liste, 1)
     expect(chains(following, PIED)).toBe(true)
     expect(announcement(liste[1], 10, { stage: 'act', following, speed: PIED })).toBe(
-      'Maintenant, tourne à droite sur Rue de Lorraine, puis dans 60 mètres, à gauche sur Rue Pasteur.',
+      'Maintenant, tourne à droite sur Rue de Lorraine, puis dans 60 mètres, à gauche dans la rue Pasteur.',
     )
   })
 
@@ -116,14 +116,14 @@ describe('deux virages rapprochés', () => {
   it('complète le départ du premier virage, qui le coupait aussi', () => {
     const following = followingStep(liste, 0)
     expect(announcement(liste[0], 0, { stage: 'act', following, speed: PIED })).toBe(
-      'Départ — rejoins Rue des Tonneliers et pars à droite, puis dans 100 mètres, à droite sur Rue de Lorraine.',
+      'Départ — rejoins Rue des Tonneliers et pars à droite, puis dans 100 mètres, à droite dans la rue de Lorraine.',
     )
   })
 
   it('dit, après un virage, qu’il n’y a plus rien avant longtemps', () => {
     const following = followingStep(liste, 3)
     expect(announcement(liste[3], 5, { stage: 'act', following, speed: PIED })).toBe(
-      'Maintenant, tourne à droite. Prochaine consigne dans 1,5 kilomètre.',
+      'Maintenant, tourne à droite, puis continue pendant 1,5 kilomètre.',
     )
   })
 

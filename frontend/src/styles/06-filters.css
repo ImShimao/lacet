@@ -330,6 +330,10 @@
   display: grid;
   gap: 8px;
 }
+/* Une case sous des tuiles, dans le même champ : sans écart, elle s'y collait. */
+.checks--after {
+  margin-top: 10px;
+}
 .check {
   display: grid;
   grid-template-columns: auto 1fr;

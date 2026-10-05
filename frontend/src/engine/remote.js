@@ -22,7 +22,7 @@
 
 import { ELEVATION_STEP_M, ascentDescent, fetchMany, shapeRelief } from './environment'
 import { haversineM, resample } from './geo'
-import { headings, turnOf, turnPhrase } from './navigation'
+import { headings, on, turnOf, turnPhrase } from './navigation'
 import { pymod, pyRound } from './py'
 
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route'
@@ -183,7 +183,7 @@ export function readTrip(trip) {
     if (start) {
       const [heading] = headings(geometry)
       const words = CARDINALS[Math.trunc(pymod(heading + 22.5, 360) / 45)]
-      instructions.push(instruction(0, 'start', road, `Départ — pars vers ${words}${road ? ` sur ${road}` : ''}.`, geometry[0]))
+      instructions.push(instruction(0, 'start', road, `Départ — pars vers ${words}${on(road)}.`, geometry[0]))
       continue
     }
     if (finish) {

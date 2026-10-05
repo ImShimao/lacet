@@ -111,6 +111,47 @@ def roundness(coords: list[Coord]) -> float:
     return min(1.0, 4.0 * math.pi * area / (perimeter * perimeter))
 
 
+# Le crochet en U, échantillonné tous les vingt mètres. Les écarts sont donnés
+# en échantillons entiers et non en mètres : `round(12.5)` vaut 12 en Python et
+# 13 en JavaScript, et la parité des deux moteurs n'y survivrait pas.
+BACKTRACK_STEP_M = 20.0
+BACKTRACK_NEAR_M = 40.0
+BACKTRACK_GAP_MIN = 13  # 260 m : en deçà, c'est un virage serré, pas un crochet
+BACKTRACK_GAP_MAX = 75  # 1,5 km : au-delà, c'est la boucle qui se referme
+BACKTRACK_STEM = 10  # 200 m : la rue de la maison, prise à l'aller et au retour
+BACKTRACK_OPPOSITE_DEG = 135.0
+
+
+def backtrack_share(coords: list[Coord]) -> float:
+    """Part du tracé qui revient sur ses pas par une voie voisine.
+
+    Le crochet en U : aller au bout d'une branche, revenir par la rue d'à côté.
+    Ce ne sont pas les mêmes rues, donc le recouvrement ne le voit pas ; la
+    boucle reste ronde, donc la rondeur non plus. Mesuré sur les boucles de
+    Beaune et de Lyon : une sur cinq en avait un, de 250 à 550 m — et c'est ce
+    qu'on remarque en courant, un détour qui ne mène nulle part.
+
+    Un point compte quand, entre 260 m et 1,5 km plus tôt, le tracé est passé à
+    moins de 40 m dans l'autre sens. La rue du départ, prise à l'aller et au
+    retour, ne compte pas : on ne choisit pas où l'on habite.
+    """
+    samples = [c for _, c in resample(coords, BACKTRACK_STEP_M)]
+    n = len(samples)
+    if n < BACKTRACK_GAP_MIN + 2:
+        return 0.0
+    heads = [bearing_deg(samples[k], samples[k + 1]) for k in range(n - 1)]
+    hits = 0
+    for j in range(BACKTRACK_GAP_MIN, n - 1):
+        for i in range(j - BACKTRACK_GAP_MIN, max(-1, j - BACKTRACK_GAP_MAX - 1), -1):
+            if i < BACKTRACK_STEM and j >= n - 1 - BACKTRACK_STEM:
+                continue
+            turn = abs((heads[i] - heads[j] + 180.0) % 360.0 - 180.0)
+            if turn > BACKTRACK_OPPOSITE_DEG and haversine_m(samples[i], samples[j]) < BACKTRACK_NEAR_M:
+                hits += 1
+                break
+    return hits / (n - 1)
+
+
 def point_in_ring(pt: Coord, ring: list[Coord]) -> bool:
     """Ray casting. `ring` est une liste de (lon, lat), fermée ou non."""
     x, y = pt

@@ -264,7 +264,9 @@ function viterbi(graph, points, lattice, sigmaM, betaM) {
       const runs = new Map()
       for (const u of previous) {
         if (!runs.has(u.exit)) {
-          runs.set(u.exit, dijkstra(graph, u.exit, graph.edgeLen, { maxDist: limite }))
+          // Sans sens uniques : la trace dit où l'on est passé, et un contresens
+          // cyclable absent de la carte ne doit pas la détourner.
+          runs.set(u.exit, dijkstra(graph, u.exit, graph.edgeLen, { maxDist: limite, oneway: false }))
         }
       }
 

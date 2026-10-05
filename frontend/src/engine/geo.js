@@ -78,6 +78,37 @@ export function roundness(coords) {
   return Math.min(1, (4 * Math.PI * area) / (perimeter * perimeter))
 }
 
+// Le crochet en U — voir `backtrack_share` dans `geo.py`, où les seuils sont
+// justifiés. Les écarts sont en échantillons entiers, pour que les deux moteurs
+// n'arrondissent pas différemment.
+const BACKTRACK_STEP_M = 20
+const BACKTRACK_NEAR_M = 40
+const BACKTRACK_GAP_MIN = 13
+const BACKTRACK_GAP_MAX = 75
+const BACKTRACK_STEM = 10
+const BACKTRACK_OPPOSITE_DEG = 135
+
+/** Part du tracé qui revient sur ses pas par une voie voisine — `backtrack_share`. */
+export function backtrackShare(coords) {
+  const samples = resample(coords, BACKTRACK_STEP_M).map(([, c]) => c)
+  const n = samples.length
+  if (n < BACKTRACK_GAP_MIN + 2) return 0
+  const heads = []
+  for (let k = 0; k < n - 1; k += 1) heads.push(bearingDeg(samples[k], samples[k + 1]))
+  let hits = 0
+  for (let j = BACKTRACK_GAP_MIN; j < n - 1; j += 1) {
+    for (let i = j - BACKTRACK_GAP_MIN; i > Math.max(-1, j - BACKTRACK_GAP_MAX - 1); i -= 1) {
+      if (i < BACKTRACK_STEM && j >= n - 1 - BACKTRACK_STEM) continue
+      const turn = Math.abs(pymod(heads[i] - heads[j] + 180, 360) - 180)
+      if (turn > BACKTRACK_OPPOSITE_DEG && haversineM(samples[i], samples[j]) < BACKTRACK_NEAR_M) {
+        hits += 1
+        break
+      }
+    }
+  }
+  return hits / (n - 1)
+}
+
 /** Lancer de rayon. `ring` : liste de (lon, lat), fermée ou non. */
 export function pointInRing(pt, ring) {
   const [x, y] = pt

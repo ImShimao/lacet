@@ -6,7 +6,7 @@
 // expliqué dans le module Python, qui fait foi.
 
 import { astar, dijkstra, INF, nodeSequence, reconstruct } from './dijkstra'
-import { bearingDeg, haversineM, roundness } from './geo'
+import { backtrackShare, bearingDeg, haversineM, roundness } from './geo'
 import { degrees, pyfloordiv, pymod, pyMax, pyMin, pyRoundInt, pySum, radians } from './py'
 import { EXPOSED_RISK, RouteStats, unlitLength } from './safety'
 
@@ -77,6 +77,7 @@ export class Candidate {
     this.stats = null
     this.bearing = 0
     this.roundness = 0
+    this.backtrack = 0
     this.shape = 0
     this.laps = 1
     this._edgeSet = null
@@ -488,6 +489,7 @@ export function measure(graph, start, cand, { night }) {
   cand.segments = segments
   cand.crossings = crossings
   cand.roundness = roundness(geometry)
+  cand.backtrack = backtrackShare(geometry)
   cand.bearing = loopBearing(graph.node(start), geometry)
   cand.stats = new RouteStats({
     distanceM: total,
@@ -573,6 +575,7 @@ export function repeatLoop(graph, start, cand, laps) {
   measure(graph, start, repeated, { night: cand.stats.unlitM !== null })
 
   repeated.roundness = cand.roundness
+  repeated.backtrack = cand.backtrack
   repeated.stats.overlapShare = cand.stats.overlapShare
   repeated.bearing = cand.bearing
   repeated.shape = cand.shape

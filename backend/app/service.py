@@ -150,6 +150,10 @@ CROSSINGS_REFERENCE = 3.0
 # ne plus distinguer une belle boucle d'une boucle correcte.
 GOOD_ROUNDNESS = 0.55
 
+# Poids du crochet en U dans le classement — voir `preliminary_score` et
+# `geo.backtrack_share`.
+BACKTRACK_WEIGHT = 1.6
+
 # Plafond de points d'altitude par itinéraire, quelle que soit sa longueur :
 # le pas de 50 m tient jusqu'à 30 km, puis s'allonge.
 MAX_ELEVATION_SAMPLES = 600
@@ -587,7 +591,14 @@ def preliminary_score(cand: Candidate, target_m: float, tolerance: float) -> flo
     variety = 1.0 - min(1.0, s.overlap_share)
     # Une boucle bien ronde vaut mieux qu'un tracé étiré, à sécurité égale.
     shape = min(1.0, cand.roundness / GOOD_ROUNDNESS)
-    return 0.32 * distance + 0.40 * safety + 0.10 * variety + 0.18 * shape
+    # Le crochet en U coûte ce que coûterait d'être loin de la distance visée :
+    # un dixième du tracé en crochet pèse comme 5 % d'écart sur la distance.
+    # Assez pour qu'une boucle sans détour passe devant ; trop peu pour qu'elle
+    # passe devant une boucle plus sûre — la note pèse 0,9 par cran.
+    return (
+        0.32 * distance + 0.40 * safety + 0.10 * variety + 0.18 * shape
+        - BACKTRACK_WEIGHT * cand.backtrack
+    )
 
 
 def grade_penalty(cand: Candidate) -> float:

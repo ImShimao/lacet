@@ -25,6 +25,8 @@
 // L'annonce dit maintenant « arrivée dans 100 mètres », et le constat vient
 // au bon moment — pour l'arrivée, c'est `arrival.js` qui le dit.
 
+import { on } from './engine/navigation'
+
 // Allure par défaut, en mètres par seconde, tant qu'aucune vitesse n'est
 // mesurée : six minutes au kilomètre à pied, vingt kilomètres-heure à vélo.
 export const DEFAULT_SPEED = { run: 2.8, bike: 5.5 }
@@ -49,9 +51,11 @@ const ACT_MAX_M = 50
 // En dessous, deux manœuvres n'en font qu'une à dire : « puis tout de suite ».
 const RIGHT_AFTER_M = 30
 
-// Au-delà, après un virage, on dit quand viendra le suivant : savoir qu'on a un
-// kilomètre et demi devant soi dispense de guetter chaque carrefour.
-const QUIET_STRETCH_M = 800
+// Au-delà, après un virage, on dit combien de temps on garde la direction :
+// « puis continue pendant 600 mètres ». Savoir ce qu'on a devant soi dispense
+// de guetter chaque carrefour. Huit cents mètres d'abord : sous ce seuil, on ne
+// savait jamais si le silence venait d'une longue ligne droite ou d'un oubli.
+const QUIET_STRETCH_M = 300
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
@@ -101,9 +105,11 @@ export function announcement(step, remaining, { stage = 'act', following = null,
   // tout ce qui viendra avant la prochaine annonce.
   const now = stage === 'act' || step.turn === 'start'
   const joined = now ? chains(following, speed) : chains(following, speed) && following.gap <= RIGHT_AFTER_M
-  const after = joined ? thenClause(following) : ''
   const calm = now && !joined ? quietStretch(following) : null
-  const tail = calm ? ` ${calm}` : ''
+  // La ligne droite qui suit se dit dans la phrase de la manœuvre ; l'arrivée,
+  // elle, garde sa phrase à elle.
+  const after = joined ? thenClause(following) : calm && !calm.finish ? `, puis continue pendant ${calm.distance}` : ''
+  const tail = calm?.finish ? ` Arrivée dans ${calm.distance}.` : ''
 
   if (step.turn === 'start') return `${trimDot(step.text)}${after}.${tail}`
   if (step.turn === 'finish') {
@@ -111,7 +117,10 @@ export function announcement(step, remaining, { stage = 'act', following = null,
     // d'arrivée, au point le plus proche : le dire ici le doublerait, et trop tôt.
     return stage === 'preview' ? `Arrivée dans ${distanceWords(remaining)}.` : null
   }
-  if (step.turn === 'lap') return stage === 'act' ? `${step.text}${tail}` : null
+  if (step.turn === 'lap') {
+    if (stage !== 'act') return null
+    return calm && !calm.finish ? `${step.text} Continue pendant ${calm.distance}.` : `${step.text}${tail}`
+  }
 
   if (stage === 'preview') {
     return `Dans ${distanceWords(remaining)}, ${lower(step.text)}${after}.${warning}`
@@ -123,24 +132,19 @@ export function announcement(step, remaining, { stage = 'act', following = null,
   return `Maintenant, ${lower(step.text)}${after}.${warning}${tail}`
 }
 
-/**
- * « , puis tout de suite à gauche sur rue Pasteur » — ou, après un virage,
- * l'annonce du calme qui suit : « Prochaine consigne dans 1,5 kilomètre. »
- */
+/** « , puis tout de suite à gauche dans la rue Pasteur » */
 function thenClause({ step, gap }) {
   if (step.turn === 'finish') {
     return gap <= RIGHT_AFTER_M ? ', puis tu arrives' : `, puis arrivée dans ${distanceWords(gap)}`
   }
-  const move = `${SHORT[step.turn] ?? 'continue'}${step.road ? ` sur ${step.road}` : ''}`
+  const move = `${SHORT[step.turn] ?? 'continue'}${on(step.road)}`
   return gap <= RIGHT_AFTER_M ? `, puis tout de suite ${move}` : `, puis dans ${distanceWords(gap)}, ${move}`
 }
 
 /** Après un virage, la longueur sans consigne qui suit, si elle vaut d'être dite. */
 function quietStretch(following) {
   if (!following || following.gap < QUIET_STRETCH_M || following.step.turn === 'lap') return null
-  return following.step.turn === 'finish'
-    ? `Arrivée dans ${distanceWords(following.gap)}.`
-    : `Prochaine consigne dans ${distanceWords(following.gap)}.`
+  return { finish: following.step.turn === 'finish', distance: distanceWords(following.gap) }
 }
 
 /**

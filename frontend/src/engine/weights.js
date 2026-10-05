@@ -55,17 +55,30 @@ const AVOIDS = {
 
 export const AVOID_KEYS = Object.keys(AVOIDS)
 
+// === sans voitures ===========================================================
+//
+// Propre à l'app, comme les évitements : la case « Voies sans voitures
+// d'abord » des filtres, cochée par défaut. Une piste, un chemin, une allée
+// coûtent alors moins qu'une rue — même calme, même à 30 : la sécurité seule ne
+// les départage pas, et le moteur prenait la plus courte. Mesuré à Guebwiller,
+// le long de la zone commerciale : il fallait descendre sous 0,68 pour que la
+// piste cyclable batte les voies de service et la pénétrante voisines. À 0,6,
+// la route ne sert plus que là où il n'y a pas d'autre passage — ou pour
+// varier les boucles.
+const CAR_FREE_FACTOR = 0.6
+
 const FOOT_ONLY_FACTOR = 4
 const FOOT_ONLY_HIGHWAY = new Set(['footway', 'pedestrian'])
 const STEPS_FACTOR = 3
 const NIGHT_MIN_FACTOR = 0.7 * 0.9
 
 export class Profile {
-  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null }) {
+  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null, carfree = false }) {
     this.lam = lam
     this.surface = surface
     this.night = night
     this.sport = sport
+    this.carfree = carfree
     this.factors = (sport === 'bike' ? SURFACE_FACTOR_BIKE : SURFACE_FACTOR)[surface]
     this.avoid = avoid.filter((key) => key in AVOIDS).map((key) => AVOIDS[key])
     this.blocked = blocked
@@ -81,6 +94,7 @@ export class Profile {
       w *= STEPS_FACTOR
     }
     if (this.night) w *= nightFactor(s)
+    if (this.carfree && s.carFree) w *= CAR_FREE_FACTOR
     for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
     if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
     // Un portail fermé connu d'OpenStreetMap pèse comme un signalement : c'est
@@ -99,10 +113,13 @@ export class Profile {
   get minFactor() {
     let factor = pyMin(this.factors.values())
     if (this.night) factor *= NIGHT_MIN_FACTOR
+    // L'heuristique d'A* reste admissible : une voie sans voitures descend sous
+    // le facteur de surface.
+    if (this.carfree) factor *= CAR_FREE_FACTOR
     return factor
   }
 }
 
-export function buildProfile(surface, safety, night, sport = 'run', { avoid = [], blocked = null } = {}) {
-  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked })
+export function buildProfile(surface, safety, night, sport = 'run', { avoid = [], blocked = null, carfree = false } = {}) {
+  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree })
 }

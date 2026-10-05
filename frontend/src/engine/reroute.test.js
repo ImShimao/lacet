@@ -61,7 +61,7 @@ describe('le recalcul en course', () => {
     })
     expect(near(detour.coords.at(-1), at(6, 2))).toBe(true)
     expect(detour.connectM).toBeCloseTo(300, -1)
-    expect(detour.steps[0].text).toMatch(/Tourne à droite sur Rue 2 pour rejoindre le parcours/)
+    expect(detour.steps[0].text).toMatch(/Tourne à droite dans la rue 2 pour rejoindre le parcours/)
     expect(detour.steps.at(-1).text).toMatch(/Tourne à gauche : tu retrouves le parcours/)
   })
 

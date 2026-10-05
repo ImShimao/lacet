@@ -277,6 +277,9 @@ export function openDoor(
       safety: graph.edgeSafety[e],
       name: graph.edgeName[e],
       tunnel: graph.edgeTunnel[e],
+      // La seconde moitié garde le sens de la rue : elle va, comme elle, de
+      // l'amont vers l'aval.
+      oneway: graph.edgeOneway[e],
     })
   }
 
@@ -298,6 +301,7 @@ export function openDoor(
       safety: evaluateEdge({ highway: 'footway' }, { inBuiltup: true, sport }),
       name: null,
       tunnel: 0,
+      oneway: 0,
     })
   }
 
@@ -317,6 +321,7 @@ export function openDoor(
   g.edgeCoordCount = grow(Int32Array, graph.edgeCoordCount, edges.map((x) => graph.edgeCoordCount[x.like]))
   g.edgeWayId = grow(Float64Array, graph.edgeWayId, edges.map((x) => graph.edgeWayId[x.like]))
   g.edgeTunnel = grow(Uint8Array, graph.edgeTunnel, edges.map((x) => x.tunnel))
+  g.edgeOneway = grow(Int8Array, graph.edgeOneway, edges.map((x) => x.oneway))
   g.edgeSafety = graph.edgeSafety.concat(edges.map((x) => x.safety))
   g.edgeName = graph.edgeName.concat(edges.map((x) => x.name))
   if (shapes.has(e)) {

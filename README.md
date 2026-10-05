@@ -421,7 +421,27 @@ est normal, et une app qui imposerait un détour serait inutilisable.
 | Voie rapide | — | exclue en L0 |
 
 La séparation dépend du sport : un trottoir protège un coureur, pas un cycliste —
-lui a besoin d'une bande ou d'une piste cyclable.
+lui a besoin d'une bande ou d'une piste cyclable. Une piste cyclable, elle, protège
+les deux : pas de voitures.
+
+**Chaque sport ses droits d'accès.** À vélo, ce qui ouvre ou ferme une voie se lit
+sur `bicycle`, pas sur `foot` : une piste interdite aux piétons (`foot=no`) reste à
+lui, un `access=no` se rouvre par `bicycle=yes`. Et **les sens uniques
+s'appliquent à vélo** (`oneway`, giratoires), sauf contresens cyclable
+(`oneway:bicycle=no`, bandes `opposite`). Mesuré dans le centre de Lyon : avant,
+les trente-deux boucles vélo candidates remontaient toutes un sens interdit — dix-sept
+kilomètres en tout ; après, aucune. À pied, rien ne change : un sens unique ne
+s'impose pas au piéton. Une boucle vélo qui emprunte un sens unique ne se propose
+pas « dans l'autre sens ».
+
+**Voies sans voitures d'abord** — une case des filtres, cochée par défaut, propre
+à l'app (`engine/weights.js`). La sécurité seule ne départage pas une piste d'une
+rue à 30 : le moteur prenait la plus courte, et longeait une zone commerciale à
+Guebwiller plutôt que la piste cyclable d'à côté. Pistes, chemins et allées
+coûtent désormais 0,6 fois leur longueur ; la route ne sert que là où il n'y a
+pas d'autre passage, ou pour varier les boucles. Sur cet exemple : 890 m sur la
+piste au lieu de 197, pour 78 m de plus. Le trottoir dessiné à part ne compte
+pas — il longe la rue.
 
 **L2 — la règle du doute** (`risk.py`). Le tag `sidewalk` manque sur la majorité
 des rues françaises. L'inférence est **asymétrique** : trottoir probable en zone
@@ -769,8 +789,21 @@ cinq minutes.
   Sinon c'est le dessin de la voie, pas une décision.
 - **« Tout droit »** ne se dit que pour confirmer un changement de nom, sur une
   voie assez longue pour que l'information serve.
+- **Une fourche se dit, même douce.** Quand une autre voie part vers l'avant
+  (à moins de 45°), on dit laquelle prendre : « serre à droite dans la rue
+  Haute » quand la rue s'infléchit et que la ruelle d'en face continue,
+  « continue tout droit » quand c'est elle qu'on prend. On se tait seulement
+  si l'on reste sur la même voie et qu'elle est la plus droite. Mesuré sur les
+  boucles de Beaune et de Lyon : 2 % de consignes en plus, toutes à des
+  fourches qui étaient muettes.
 - **Deux manœuvres à moins de 25 m** deviennent une phrase : « tourne à droite
   puis tout de suite à gauche ».
+- **La voie se nomme comme on la dit** : « dans la rue Pasteur », « sur
+  l'avenue Foch », « sur le chemin de Halage ». OpenStreetMap écrit « Rue
+  Pasteur », sans article ; l'app disait « sur Rue Pasteur ».
+- **Après un virage, la ligne droite se dit** quand elle dépasse 300 m :
+  « Maintenant, tourne à droite dans la rue Pasteur, puis continue pendant
+  600 mètres. » (`guidance.js`)
 
 L'angle se mesure sur une vingtaine de mètres de part et d'autre, pas sur les
 deux points qui encadrent l'intersection : OSM place un point tous les quelques
@@ -852,7 +885,7 @@ revient ; le repère s'y pose après la recherche. Quand la recherche d'adresse
 donne le nom de la rue, c'est elle qu'on rejoint, même si une autre voie passe
 plus près des murs — une maison d'angle, un jardin qui donne sur un chemin. La
 première consigne dit de quel côté partir : « Départ — en sortant, pars à
-droite sur rue des Tonneliers. » (`engine/door.js`)
+droite dans la rue des Tonneliers. » (`engine/door.js`)
 
 **Le sens de parcours** est marqué par des chevrons le long du tracé. Ce n'est
 pas décoratif : les consignes de navigation, le profil altimétrique et

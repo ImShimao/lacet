@@ -75,9 +75,10 @@ async function runCase(entry) {
   const seen = { graph: null, raw: [] }
 
   // Le départ devant la porte est propre à l'app (voir `door.js`) : Python part
-  // du carrefour, et c'est ce départ-là qu'on compare.
+  // du carrefour, et c'est ce départ-là qu'on compare. La préférence pour les
+  // voies sans voitures aussi (`weights.js`) : Python n'en a pas.
   const response = await planLoops(
-    { with_elevation: false, time_of_day: 'day', doorstep: false, ...c.req },
+    { with_elevation: false, time_of_day: 'day', doorstep: false, carfree: false, ...c.req },
     {
       loadGraph: async ({ sport, allowTrail }) => buildGraph(extract, { sport, allowTrail }),
       fetchElevations: fakeFetchMany,
