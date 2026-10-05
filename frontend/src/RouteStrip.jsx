@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { haversine, km, surfaceLabel } from './format'
+import { haversine, km, profileRange, surfaceLabel } from './format'
 
 /**
  * La bande de parcours : le profil altimétrique et le niveau de sécurité sur un
@@ -28,7 +28,9 @@ const W = 660
 const H_ELEV = 92
 const H_BAND = 11
 const H = H_ELEV + H_BAND + 16
-const PAD = { top: 8, right: 6, left: 30 }
+// La marge de gauche porte les altitudes : quatre chiffres à la taille de
+// `.strip__tick`, un col des Alpes compris.
+const PAD = { top: 8, right: 6, left: 52 }
 
 export default function RouteStrip({ route, onScrub }) {
   const [cursor, setCursor] = useState(null)
@@ -91,7 +93,7 @@ export default function RouteStrip({ route, onScrub }) {
                   y2={model.y(t)}
                   className="strip__grid"
                 />
-                <text x={PAD.left - 5} y={model.y(t) + 3} className="strip__tick">
+                <text x={PAD.left - 6} y={model.y(t) + 6} className="strip__tick">
                   {Math.round(t)}
                 </text>
               </g>
@@ -200,17 +202,8 @@ function build(route) {
   let ticks = []
 
   if (hasElevation) {
-    const elevations = points.map((p) => p.ele_m)
-    let lo = Math.min(...elevations)
-    let hi = Math.max(...elevations)
-    // Un parcours plat ne doit pas s'étirer sur toute la hauteur : ce serait
-    // donner à deux mètres de variation l'allure d'un col.
-    if (hi - lo < 20) {
-      const mid = (hi + lo) / 2
-      lo = mid - 10
-      hi = mid + 10
-    }
-    y = (e) => PAD.top + (1 - (e - lo) / (hi - lo)) * (H_ELEV - PAD.top)
+    const [lo, hi] = profileRange(points.map((p) => p.ele_m))
+    y =(e) => PAD.top + (1 - (e - lo) / (hi - lo)) * (H_ELEV - PAD.top)
     ticks = [lo, (lo + hi) / 2, hi]
     line = points.map((p) => `${x(p.dist_m)},${y(p.ele_m)}`).join(' L')
 

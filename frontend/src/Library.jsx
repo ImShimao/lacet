@@ -88,12 +88,11 @@ export default function Library({ saved, history, onOpen, onOpenRun, onImport, p
         </div>
       ) : (
         <>
+          {/* Deux lignes, pas six : l'explication complète repoussait la liste
+              sous le pli à chaque ouverture de l'onglet. */}
           <p className="muted small">
-            Le tracé, les consignes et le profil sont déjà sur l'appareil : ces
-            parcours s'ouvrent sans réseau. L'icône à droite ajoute <b>le fond de
-            carte</b>, la seule pièce qui manque pour se repérer hors couverture —
-            compter un à deux mégaoctets à la campagne, une quinzaine en plein
-            centre-ville, où chaque tuile porte les bâtiments et les commerces.
+            Ces parcours s'ouvrent sans réseau. L'icône à droite ajoute <b>le fond de carte</b> :
+            1 à 2 Mo à la campagne, une quinzaine en ville.
           </p>
           <div className="list">
             {rows.map((r, i) => (
@@ -347,7 +346,7 @@ function WeeklyVolume({ history }) {
           tableau ci-dessous. */}
       <div className="weeks__plot" aria-hidden="true">
         {semaines.map((s, i) => (
-          <div className="weeks__col" key={s.key} title={`${s.label} : ${km(s.metres, 1).replace('.', ',')} km`}>
+          <div className="weeks__col" key={s.key} title={`${s.label} : ${km(s.metres, 1)} km`}>
             <i
               style={{ height: `${s.metres ? Math.max(3, (s.metres / haut) * 100) : 0}%` }}
               data-now={i === semaines.length - 1 || undefined}
@@ -447,11 +446,11 @@ function Totals({ history, profile }) {
         </div>
         <div>
           <b>{sums.count}</b>
-          <span>sorties</span>
+          <span>{sums.count > 1 ? 'sorties' : 'sortie'}</span>
         </div>
         <div>
-          <b>{Math.round(sums.time / 3600)}</b>
-          <span>heures</span>
+          <b>{timeTotal(sums.time)[0]}</b>
+          <span>{timeTotal(sums.time)[1]}</span>
         </div>
         <div>
           <b>{km(week, 0)}</b>
@@ -500,6 +499,17 @@ function dayLabel(iso) {
   return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+/**
+ * Le temps total, et son unité. Arrondi à l'heure, il affichait « 0 heures »
+ * après trois sorties de vingt minutes, et « 1 heures » après cinquante-sept.
+ */
+export function timeTotal(seconds) {
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return [minutes, minutes > 1 ? 'minutes' : 'minute']
+  const hours = Math.round(minutes / 60)
+  return [hours, hours > 1 ? 'heures' : 'heure']
+}
+
 /** L'en-tête d'un mois : combien de sorties, de kilomètres, d'heures. */
 function MonthHeader({ label, runs }) {
   const distance = runs.reduce((m, r) => m + (r.actual_distance_m || 0), 0)
@@ -508,7 +518,7 @@ function MonthHeader({ label, runs }) {
     <div className="monthhead">
       <b>{label}</b>
       <span>
-        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1).replace('.', ',')} km · {duration(time)}
+        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1)} km · {duration(time)}
       </span>
     </div>
   )

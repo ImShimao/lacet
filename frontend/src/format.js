@@ -1,4 +1,7 @@
-export const km = (metres, digits = 2) => (metres / 1000).toFixed(digits)
+// La virgule française, partout : chaque écran la remettait — ou l'oubliait —
+// à sa façon, et la même sortie s'affichait « 5,23 » dans l'historique et
+// « 5.23 » sur l'écran de fin.
+export const km = (metres, digits = 2) => (metres / 1000).toFixed(digits).replace('.', ',')
 
 export function duration(seconds) {
   const h = Math.floor(seconds / 3600)
@@ -22,6 +25,27 @@ export function pace(secondsPerKm) {
 }
 
 export const percent = (share) => `${Math.round(share * 100)} %`
+
+// Une boucle plate doit avoir l'air plate. Resserré sur l'amplitude réelle —
+// vingt mètres sur dix kilomètres, à Colmar —, l'axe des altitudes donnait à la
+// moindre bosse l'allure d'un col, et l'on doutait d'avoir demandé « plat ».
+const MIN_PROFILE_RANGE_M = 60
+
+/**
+ * Les bornes de l'axe des altitudes d'un profil : au moins soixante mètres, et
+ * le profil posé vers le bas, comme un terrain — pas flottant au milieu.
+ */
+export function profileRange(elevations) {
+  let lo = Infinity
+  let hi = -Infinity
+  for (const e of elevations) {
+    if (e < lo) lo = e
+    if (e > hi) hi = e
+  }
+  if (hi - lo >= MIN_PROFILE_RANGE_M) return [lo, hi]
+  const floor = lo - (MIN_PROFILE_RANGE_M - (hi - lo)) / 4
+  return [floor, floor + MIN_PROFILE_RANGE_M]
+}
 
 const SURFACE_LABELS = {
   // revêtements constatés sur le tracé

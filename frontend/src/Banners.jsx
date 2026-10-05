@@ -13,8 +13,7 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
       <span>
         <b>Sortie interrompue.</b>{' '}
         <span>
-          {km(pending.covered, 1).replace('.', ',')} km en {Math.round(pending.elapsed / 60)} min,{' '}
-          {Math.round((Date.now() - pending.at) / 60000)} min plus tôt.
+          {km(pending.covered, 1)} km en {Math.round(pending.elapsed / 60)} min, {ago(Date.now() - pending.at)}.
         </span>
       </span>
       <button className="banner__act" onClick={onResume}>
@@ -28,6 +27,18 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
       </button>
     </div>
   )
+}
+
+/**
+ * « à l'instant », « il y a 25 min », « il y a 3 h ». Une sortie reste
+ * proposée douze heures : le bandeau disait « 0 min plus tôt » au relancement
+ * immédiat, et « 540 min plus tôt » le lendemain matin.
+ */
+export function ago(ms) {
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 1) return "à l'instant"
+  if (minutes < 60) return `il y a ${minutes} min`
+  return `il y a ${Math.round(minutes / 60)} h`
 }
 
 /**

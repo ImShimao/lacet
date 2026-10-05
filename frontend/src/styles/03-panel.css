@@ -140,9 +140,11 @@
   stroke: var(--line);
   stroke-width: 1;
 }
+/* En unités du dessin, qui fait 660 de large : sur un iPhone, il s'affiche à
+   moitié de sa taille. Les 8,5 d'avant donnaient des altitudes de quatre pixels. */
 .strip__tick {
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: 17px;
   fill: var(--text-3);
   text-anchor: end;
 }

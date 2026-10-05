@@ -423,7 +423,7 @@ export default function App() {
             )}
             {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
                 une fois les boucles affichées — le panneau ne montre plus alors
-                que le favori, l'export, la regénération et « Démarrer ». Avant la
+                que le favori, l'export, la régénération et « Démarrer ». Avant la
                 recherche, le bouton « Filtres » est juste là, sous les yeux, et
                 deux entrées pour le même réglage encombraient le haut de l'écran
                 pour rien. Elle revient donc avec les propositions. */}
@@ -487,7 +487,7 @@ export default function App() {
               }}
             />
           ) : summary ? (
-            <RunSummary entry={summary} onClose={() => run.closeSummary()} />
+            <RunSummary entry={summary} history={history} onClose={() => run.closeSummary()} />
           ) : running ? (
             <LiveRun
               route={freeRun ? null : selected}
@@ -575,7 +575,8 @@ export default function App() {
               // rouvert, un fichier importé ou un tracé du calculateur public
               // aboutissaient à « cette boucle n'est plus en mémoire ».
               onReverse={
-                selected && !selected.remote && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id)
+                // À vélo, une boucle à sens unique ne se retourne pas (`worker.js`).
+                selected && !selected.remote && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id)
                   ? reverseSelected
                   : null
               }

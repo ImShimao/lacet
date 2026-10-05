@@ -36,6 +36,11 @@
 .btn--big {
   font-size: 15.5px;
 }
+/* Le geste secondaire d'une rangée prend la place de son mot, pas la moitié :
+   à parts égales, « Refaire ce parcours » passait sur deux lignes. */
+.btn--fit {
+  flex: none;
+}
 .btn--icon {
   flex: none;
   width: 48px;

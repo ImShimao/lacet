@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { duration, haversine, km, pace, percent, surfaceLabel } from './format'
+import { duration, haversine, km, pace, percent, profileRange, surfaceLabel } from './format'
 
 /**
  * Le formatage des chiffres affichés.
@@ -61,13 +61,28 @@ describe('duration', () => {
 })
 
 describe('km', () => {
-  it('convertit avec deux décimales par défaut', () => {
-    expect(km(10_012)).toBe('10.01')
+  it('convertit avec deux décimales par défaut, à la française', () => {
+    expect(km(10_012)).toBe('10,01')
   })
 
   it('accepte une autre précision', () => {
-    expect(km(10_012, 1)).toBe('10.0')
+    expect(km(10_012, 1)).toBe('10,0')
     expect(km(10_012, 0)).toBe('10')
+  })
+})
+
+describe('profileRange', () => {
+  it('donne à une boucle plate un axe où elle a l’air plate', () => {
+    // Vingt mètres d'écart : ils n'occupent qu'un tiers de la hauteur, en bas.
+    const [lo, hi] = profileRange([187, 199, 207, 190])
+    expect(hi - lo).toBe(60)
+    expect(lo).toBeLessThan(187)
+    expect(hi).toBeGreaterThan(207)
+    expect((187 - lo) / (hi - lo)).toBeLessThan(0.25)
+  })
+
+  it('suit le relief quand il y en a', () => {
+    expect(profileRange([200, 450, 320])).toEqual([200, 450])
   })
 })
 

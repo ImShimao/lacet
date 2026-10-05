@@ -102,6 +102,10 @@ export default function SearchBar({ onPick, near = null }) {
     setAnswered(null)
     setFailed(false)
     setOpen(false)
+    // Le départ est choisi : le clavier de l'iPhone se range. Le champ restait
+    // actif — la liste garde le focus pour que le clic l'atteigne —, et le
+    // clavier couvrait « Trouver ma boucle », le geste suivant.
+    field.current?.blur()
   }
 
   const onKeyDown = (event) => {
@@ -232,5 +236,5 @@ export default function SearchBar({ onPick, near = null }) {
 /** « 350 m », « 2,4 km », « 38 km » : la précision qui sert à choisir. */
 function distanceText(metres) {
   if (metres < 950) return `${Math.max(50, Math.round(metres / 50) * 50)} m`
-  return `${km(metres, metres < 20_000 ? 1 : 0).replace('.', ',')} km`
+  return `${km(metres, metres < 20_000 ? 1 : 0)} km`
 }

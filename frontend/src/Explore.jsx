@@ -16,6 +16,7 @@ import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
+import { reliefMismatch } from './explain'
 import { km } from './format'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
@@ -170,6 +171,7 @@ export default function Explore({
   }
 
   const terrain = TERRAINS[params.sport].find((t) => t.key === params.surface)
+  const relief = reliefMismatch(params.elevation, routes)
 
   const exportGpx = async () => {
     setExporting(true)
@@ -219,6 +221,15 @@ export default function Explore({
           Le relief n'a pas répondu à temps : ces boucles sont classées sans lui, et leur
           dénivelé reste inconnu. Relance la recherche — les altitudes arrivées entre-temps
           sont gardées.
+        </div>
+      )}
+      {/* Le relief, lui, a répondu — mais le coin n'a pas celui qu'on demande.
+          Le dire, plutôt que de laisser croire que ces boucles sont des côtes. */}
+      {relief && (
+        <div className="notice">
+          {relief.kind === 'hilly'
+            ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
+            : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
         </div>
       )}
       {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher
@@ -336,8 +347,8 @@ export default function Explore({
         <button
           className="btn btn--icon"
           onClick={onRegenerate ?? onSearch}
-          title="Regénérer d'autres boucles"
-          aria-label="Regénérer d'autres boucles"
+          title="Régénérer d'autres boucles"
+          aria-label="Régénérer d'autres boucles"
         >
           <Icon name="refresh" size={19} />
         </button>

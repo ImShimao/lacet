@@ -1,7 +1,10 @@
+import { useMemo } from 'react'
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
 import AscentNote from './AscentNote.jsx'
+import { Splits, Standing } from './RunDetail.jsx'
+import { standing } from './knownRoutes'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -14,8 +17,13 @@ import AscentNote from './AscentNote.jsx'
  * carte la dessine derrière ce panneau, et l'export GPX la donne telle quelle,
  * horodatée, pour une montre ou un autre service — Strava compris, qui
  * l'importe depuis son site.
+ *
+ * Les temps au kilomètre et la comparaison aux passages d'avant sont ceux de
+ * `RunDetail.jsx` : ils n'apparaissaient qu'en rouvrant la sortie depuis
+ * l'historique, alors que c'est en arrivant, essoufflé, qu'on veut savoir si
+ * l'on a battu dimanche dernier.
  */
-export default function RunSummary({ entry, onClose }) {
+export default function RunSummary({ entry, history = [], onClose }) {
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
@@ -23,6 +31,8 @@ export default function RunSummary({ entry, onClose }) {
   const speed = seconds > 0 ? (distance / seconds) * 3.6 : 0
   const planned = entry.free ? null : entry.distance_m || null
   const gap = planned ? distance - planned : null
+  const rang = useMemo(() => standing(entry, history), [entry, history])
+  const splits = entry.splits?.length ? entry.splits : null
 
   return (
     <div className="panel summary">
@@ -56,13 +66,20 @@ export default function RunSummary({ entry, onClose }) {
         </div>
       </div>
 
+      {entry.paused_s > 0 && (
+        <p className="muted small">
+          Chrono arrêté {duration(entry.paused_s)} — feux, pauses, attentes : le temps ci-dessus
+          est celui en mouvement.
+        </p>
+      )}
+
+      {rang && <Standing rang={rang} bike={bike} />}
+
+      {splits && <Splits splits={splits} bike={bike} />}
+
       {gap !== null && (
         <p className="muted small">
-          Prévu {km(planned, 1).replace('.', ',')} km — tu as fait{' '}
-          <b>
-            {gap >= 0 ? '+' : '−'}
-            {Math.abs(Math.round(gap))} m
-          </b>{' '}
+          Prévu {km(planned, 1)} km — tu as fait <b>{Math.abs(Math.round(gap))} m</b>{' '}
           {gap >= 0 ? 'de plus' : 'de moins'}.
           {entry.rerouted ? ' Un nouveau chemin a été calculé en route.' : ''}
         </p>
@@ -78,9 +95,9 @@ export default function RunSummary({ entry, onClose }) {
 
       <div className="row">
         {entry.track?.length > 1 && (
-          <button className="btn" onClick={() => downloadRun(entry)}>
+          <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
             <Icon name="download" size={16} />
-            Exporter ma trace
+            Exporter
           </button>
         )}
         <button className="btn btn--primary" onClick={onClose}>

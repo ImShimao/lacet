@@ -74,6 +74,33 @@ const RELIEF = {
   ],
 }
 
+// Les bandes de `ELEVATION_BAND_PER_KM`, dans `engine/service.js` : hors de sa
+// bande, une boucle est pénalisée au classement — mais proposée quand même, s'il
+// n'y a rien d'autre.
+const RELIEF_BAND_PER_KM = { flat: [0, 10], hilly: [12, Infinity] }
+
+/**
+ * Le relief demandé que le terrain n'a pas pu donner : « Côtes » en plaine,
+ * « Plat » en montagne. Rend `{ kind, ascent }` — la boucle qui s'en approche
+ * le plus, et son D+ — ou `null` quand au moins une boucle tient la bande.
+ *
+ * Le moteur choisit au plus près de la cible sans pouvoir inventer de colline :
+ * à Colmar, « Côtes » rendait cinq boucles de 8 à 23 m de D+ sur 10 km, sans un
+ * mot. On demandait des côtes ; on croyait les avoir.
+ */
+export function reliefMismatch(elevation, routes) {
+  const band = RELIEF_BAND_PER_KM[elevation]
+  const measured = (routes ?? []).filter((r) => r.ascent_m != null && r.distance_m > 0)
+  if (!band || !measured.length) return null
+  const perKm = (r) => r.ascent_m / (r.distance_m / 1000)
+  if (elevation === 'hilly') {
+    const best = measured.reduce((a, b) => (perKm(b) > perKm(a) ? b : a))
+    return perKm(best) < band[0] ? { kind: 'hilly', ascent: Math.round(best.ascent_m) } : null
+  }
+  const best = measured.reduce((a, b) => (perKm(b) < perKm(a) ? b : a))
+  return perKm(best) > band[1] ? { kind: 'flat', ascent: Math.round(best.ascent_m) } : null
+}
+
 // Les plafonds de `THRESHOLDS`, dans `engine/safety.js` : un vélo roule sur la
 // chaussée par nature, et ses plafonds sont plus larges.
 const SAFETY_LIMITS = {

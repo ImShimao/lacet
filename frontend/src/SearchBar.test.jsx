@@ -51,14 +51,18 @@ const lieu = (short, extra = {}) => ({
 })
 
 describe('la recherche d’un départ', () => {
-  it('propose ce qu’elle a trouvé, et le choisit', async () => {
+  it('propose ce qu’elle a trouvé, le choisit, et range le clavier', async () => {
     cherche.mockResolvedValue([lieu('Guebwiller')])
     const onPick = vi.fn()
     render(<SearchBar onPick={onPick} />)
 
+    screen.getByRole('combobox').focus()
     taper('guebwiller')
     fireEvent.click(await screen.findByRole('option', { name: /Guebwiller/ }))
     expect(onPick).toHaveBeenCalledWith({ lat: 47.9, lon: 7.2, label: 'Guebwiller' })
+    // Le champ resté actif gardait le clavier de l'iPhone ouvert par-dessus
+    // « Trouver ma boucle ».
+    expect(document.activeElement).not.toBe(screen.getByRole('combobox'))
   })
 
   it('dit qu’elle n’a rien trouvé, sans faire croire à une panne', async () => {

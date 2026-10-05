@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
+import { profileRange } from './format'
 import useModal from './useModal'
 
 /**
@@ -97,16 +98,9 @@ function build(profile) {
   if (!profile || profile.length < 2) return null
   const points = profile.map((p) => [p.dist_m, p.ele_m])
   const total = points[points.length - 1][0] || 1
-  const eles = points.map((p) => p[1])
-  let min = Math.min(...eles)
-  let max = Math.max(...eles)
-  // Au moins 40 m d'amplitude : un parcours plat ne doit pas ressembler à une
-  // chaîne de montagnes parce que l'axe s'est resserré sur trois mètres.
-  if (max - min < 40) {
-    const mid = (max + min) / 2
-    min = mid - 20
-    max = mid + 20
-  }
+  // Le même axe que la bande de parcours, avant le départ : la boucle ne doit
+  // pas changer d'allure entre l'écran qui la propose et celui qui la suit.
+  const [min, max] = profileRange(points.map((p) => p[1]))
   const model = { points, total, min, max }
   const coords = points.map(([d, e]) => `${x(model, d).toFixed(1)},${y(model, e).toFixed(1)}`)
   model.line = `M${coords.join('L')}`

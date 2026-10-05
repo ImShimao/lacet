@@ -77,7 +77,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
       </div>
 
       <div className="rundet__big">
-        <b>{km(distance).replace('.', ',')}</b>
+        <b>{km(distance)}</b>
         <span>KILOMÈTRES PARCOURUS</span>
       </div>
 
@@ -118,7 +118,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
         <div className="rundet__plan">
           <div>
             <span>Prévu</span>
-            <b>{km(planned, 1).replace('.', ',')} km</b>
+            <b>{km(planned, 1)} km</b>
           </div>
           <div>
             <span>Écart</span>
@@ -165,9 +165,9 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
 
       <div className="row">
         {entry.track?.length > 1 && (
-          <button className="btn" onClick={() => downloadRun(entry)}>
+          <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
             <Icon name="download" size={16} />
-            Exporter la trace
+            Exporter
           </button>
         )}
         {!entry.free && entry.geometry?.length > 1 && (
@@ -211,7 +211,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
  * chemin diffèrent de quelques centaines de mètres, et un temps brut ferait
  * passer un détour par la boulangerie pour un jour sans.
  */
-function Standing({ rang, bike }) {
+export function Standing({ rang, bike }) {
   const ecart = (s) => `${s <= 0 ? '−' : '+'}${pace(Math.abs(s))}`
   return (
     <div className={`standing ${rang.record ? 'standing--record' : ''}`}>
@@ -251,10 +251,17 @@ const jour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric'
  * où ai-je coulé ? Une colonne de chiffres y répond mal ; la longueur des
  * barres se lit d'un coup d'œil. La plus longue est le kilomètre le plus lent —
  * c'est le temps qui est mis en regard, pas la vitesse.
+ *
+ * Les barres partent de quatre cinquièmes du kilomètre le plus rapide, pas de
+ * zéro : depuis zéro, 5:01 et 5:31 — trente secondes, un vrai coup de mou —
+ * faisaient des barres presque égales. Deux secondes d'écart, elles, restent à
+ * peine visibles, comme il se doit.
  */
-function Splits({ splits, bike }) {
+export function Splits({ splits, bike }) {
   const worst = Math.max(...splits.map((s) => s.seconds))
   const best = Math.min(...splits.map((s) => s.seconds))
+  const floor = best * 0.8
+  const width = (seconds) => Math.max(8, ((seconds - floor) / Math.max(1, worst - floor)) * 100)
   return (
     <div className="splits">
       <div className="splits__head">
@@ -267,7 +274,7 @@ function Splits({ splits, bike }) {
         <div key={s.km} className="splits__row">
           <span>{s.km}</span>
           <i
-            style={{ width: `${Math.max(8, (s.seconds / worst) * 100)}%` }}
+            style={{ width: `${width(s.seconds)}%` }}
             data-best={s.seconds === best || undefined}
           />
           <b>{pace(s.seconds)}</b>

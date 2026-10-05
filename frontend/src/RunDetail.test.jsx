@@ -42,6 +42,7 @@ describe('le détail d’une sortie', () => {
 
   it('montre ce qui a été couru, avant ce qui était prévu', () => {
     rendre(sortie())
+    expect(screen.getByRole('button', { name: 'Exporter la trace en GPX' })).toBeTruthy()
     expect(screen.getByText('10,18')).toBeTruthy()
     expect(screen.getByText('52:02')).toBeTruthy()
     expect(screen.getByText('137 m')).toBeTruthy()
@@ -69,7 +70,7 @@ describe('le détail d’une sortie', () => {
     expect(screen.queryByText(/au plus vite/)).toBeNull()
     expect(screen.getByText(/plus gardée/)).toBeTruthy()
     // Sans trace, rien à exporter.
-    expect(screen.queryByText('Exporter la trace')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Exporter la trace en GPX' })).toBeNull()
   })
 
   it('dit d’où vient le dénivelé mesuré', () => {
