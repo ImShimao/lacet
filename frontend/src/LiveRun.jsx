@@ -112,6 +112,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const [state, setState] = useState({ distance: 0, elapsed: 0, points: 0 })
   const [error, setError] = useState(null)
   const [alert, setAlert] = useState(null)
+  const alertTimer = useRef(null)
   const [progress, setProgress] = useState(null)
   const [current, setCurrent] = useState(null)
   const [offRoute, setOffRoute] = useState(false)
@@ -220,6 +221,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   useEffect(() => {
     voice.setEnabled(speaking)
   }, [speaking])
+
+  useEffect(() => () => clearTimeout(alertTimer.current), [])
 
   // Un autre parcours — ce qui n'arrive qu'au démarrage : on repart de lui.
   useEffect(() => {
@@ -838,7 +841,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     warned.current.add(upcoming.key)
     setAlert(upcoming)
     haptic('warnHaptic')
-    setTimeout(() => setAlert(null), 8000)
+    // Chaque alerte a ses huit secondes : le minuteur de la précédente, laissé
+    // en place, effaçait celle-ci au bout de trois quand deux traversées se
+    // suivaient de près.
+    clearTimeout(alertTimer.current)
+    alertTimer.current = setTimeout(() => setAlert(null), 8000)
   }
 
   /**

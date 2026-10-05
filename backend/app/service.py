@@ -483,6 +483,9 @@ def _lap_options(
 
 
 # Ce qu'on dit quand on repêche : la vérité, et ce qu'elle laisse comme choix.
+# Rangé sous les codes de refus de `run_gate`, pas sous les noms des mesures :
+# rangés sous `longest_exposed_m` et `unprotected_crossings`, deux de ces
+# messages n'étaient jamais trouvés, et l'on retombait sur le message général.
 _SALVAGED_MESSAGE = {
     "shape": (
         "Il n'y a pas de vraie boucle d'ici à cette distance — le réseau n'en offre pas. "
@@ -492,11 +495,11 @@ _SALVAGED_MESSAGE = {
         "Tout ce qui part d'ici longe la route plus que les seuils ne l'autorisent. Voici les "
         "moins exposés, avec le détail des portions concernées — à toi de juger."
     ),
-    "longest_exposed_m": (
+    "longest_exposed": (
         "Chaque trajet d'ici comporte une longue portion au contact du trafic. Voici les plus "
         "courtes, avec le détail — à toi de juger."
     ),
-    "unprotected_crossings": (
+    "crossings": (
         "Les trajets d'ici traversent des routes sans passage protégé. Voici ceux qui en "
         "comptent le moins, avec le détail — à toi de juger."
     ),

@@ -70,6 +70,23 @@ class TestPortail:
         )
         assert len(result.failures) == 3
 
+    def test_chaque_refus_a_son_message_de_repechage(self):
+        """Le repêchage explique le refus le plus fréquent par son code.
+
+        Deux messages étaient rangés sous le nom de la mesure plutôt que sous le
+        code du refus : un village où tout traversait la départementale lisait
+        le message général, jamais celui qui parlait des traversées.
+        """
+        from app.service import _SALVAGED_MESSAGE
+
+        for overrides in (
+            {"exposed_m": 500.0, "longest_exposed_m": 100.0},
+            {"exposed_m": 200.0, "longest_exposed_m": 200.0},
+            {"unprotected_crossings": 3},
+        ):
+            code = run_gate(stats(**overrides), "safe").failures[0].code
+            assert code in _SALVAGED_MESSAGE, code
+
 
 class TestNote:
     def test_note_a(self):

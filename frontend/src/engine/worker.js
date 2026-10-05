@@ -21,8 +21,7 @@
 import { buildGraph } from './graph'
 import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
-import { clearTiles, detailLevel, tilesFor } from './overpass'
-import { fetchArea } from './overpass'
+import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
 import { ELEVATION_STEP_M, currentWind, fetchMany, shapeRelief } from './environment'
 import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
 import { planRemote } from './remote'
@@ -63,34 +62,32 @@ function remember(entry) {
   }
 }
 
-// Les chargements en cours : leur zone, et qui attend de leurs nouvelles.
+// Les chargements en cours : leur zone, qui attend de leurs nouvelles, et ce
+// qu'ils ont mesuré.
 const loads = []
 
-// Le temps du dernier chargement, en deux parts : les rues, puis le graphe.
-// `planLoops` ne voit qu'un `loadGraph` opaque et compte tout comme du
-// téléchargement ; sans ce partage, impossible de savoir, téléphone en main, si
-// une recherche lente attend le réseau ou calcule.
-let lastLoad = { fetch: 0, graph: 0 }
-
-// Vrai quand la dernière zone chargée n'a pas toutes ses tuiles : une bordure
-// restée chez Overpass, qui tardait trop pour qu'on l'attende.
-let lastPartial = false
-
-// D'où venaient les rues de la dernière zone chargée : « livrée », « archives »,
-// « Overpass », « appareil ».
-let lastSources = null
-
-async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress) {
+/**
+ * Ce qu'un chargement dit de lui-même, rempli dans `info` :
+ *
+ * - `fetch`, `graph` : son temps, en deux parts — les rues, puis le graphe.
+ *   `planLoops` ne voit qu'un `loadGraph` opaque et compte tout comme du
+ *   téléchargement ; sans ce partage, impossible de savoir, téléphone en main, si
+ *   une recherche lente attend le réseau ou calcule ;
+ * - `partial` : une bordure manque, restée chez Overpass, qui tardait trop pour
+ *   qu'on l'attende — l'écran le dit ;
+ * - `sources` : d'où venaient les rues — « livrée », « archives », « Overpass »,
+ *   « appareil ».
+ *
+ * Propre à chaque demande, et non gardé « pour le dernier chargement » : une
+ * préparation d'avance qui finissait pendant une recherche lui prêtait sa
+ * bordure manquante, et l'écran annonçait des rues absentes qui étaient là.
+ */
+async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, progress, info = {}) {
   const level = detailLevel(targetM)
   const area = { lat, lon, radiusM }
   const needed = tilesFor(lat, lon, radiusM).map(([ix, iy]) => `${ix}:${iy}`)
   const cached = findGraph(level, sport, allowTrail, area)
-  if (cached) {
-    lastLoad = { fetch: 0, graph: 0 }
-    lastPartial = false
-    lastSources = null
-    return cached
-  }
+  if (cached) return cached
 
   // Un chargement déjà en cours sur ces rues — celui lancé d'avance, le plus
   // souvent : on le rejoint, et sa progression devient la nôtre. Le relancer en
@@ -103,12 +100,16 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     await Promise.allSettled(overlapping.map((l) => l.promise))
     for (const l of overlapping) l.listeners.delete(progress)
     const ready = findGraph(level, sport, allowTrail, area)
-    if (ready) return ready
+    if (ready) {
+      // Le chargement rejoint est le nôtre : ses mesures aussi.
+      Object.assign(info, ...overlapping.map((l) => l.info))
+      return ready
+    }
     // Pas tout à fait la même zone, ou un autre sport : on construit le nôtre,
     // mais les tuiles communes sont désormais sur l'appareil.
   }
 
-  const entry = { level, tiles: new Set(needed), listeners: new Set([progress]), promise: null }
+  const entry = { level, tiles: new Set(needed), listeners: new Set([progress]), promise: null, info: {} }
   const notify = (stage, fraction) => {
     for (const listener of entry.listeners) listener(stage, fraction)
   }
@@ -122,18 +123,23 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     notify('graph', 0)
     const fetched = performance.now()
     const graph = buildGraph(extract, { allowTrail, sport })
-    lastLoad = { fetch: (fetched - startedAt) / 1000, graph: (performance.now() - fetched) / 1000 }
+    entry.info = {
+      fetch: (fetched - startedAt) / 1000,
+      graph: (performance.now() - fetched) / 1000,
+      partial: Boolean(extract.partial),
+      sources: extract.sources ?? null,
+    }
     // Un graphe à qui il manque une bordure n'est pas gardé : les tuiles qui
     // tardaient finissent d'arriver en fond, et la recherche suivante doit en
     // profiter plutôt que de réutiliser un réseau tronqué.
-    lastPartial = Boolean(extract.partial)
-    lastSources = extract.sources ?? null
     if (!extract.partial) remember({ level, sport, allowTrail, ...area, graph })
     return graph
   })()
   loads.push(entry)
   try {
-    return await entry.promise
+    const graph = await entry.promise
+    Object.assign(info, entry.info)
+    return graph
   } finally {
     loads.splice(loads.indexOf(entry), 1)
   }
@@ -184,13 +190,13 @@ self.onmessage = async ({ data }) => {
     }
 
     try {
-      lastLoad = { fetch: 0, graph: 0 }
+      const load = { fetch: 0, graph: 0, partial: false, sources: null }
       // Ce qu'on gardait pour retourner les boucles d'avant tient un graphe
       // dérivé — celui du départ devant la porte (`door.js`). Lâché dès
       // maintenant, il ne coexiste pas avec celui de la recherche qui commence.
       lastReversible = null
       const result = await planLoops(payload, {
-        loadGraph: (args) => loadGraph(args, progress),
+        loadGraph: (args) => loadGraph(args, progress, load),
         onProgress: progress,
         onReversible: (r) => {
           lastReversible = r
@@ -200,11 +206,11 @@ self.onmessage = async ({ data }) => {
       // rend le détail, arrondi comme le reste de ses mesures.
       const timings = result?.meta?.timings_s
       if (timings) {
-        timings.graph = Math.round(lastLoad.graph * 100) / 100
+        timings.graph = Math.round(load.graph * 100) / 100
         timings.fetch = Math.max(0, Math.round((timings.fetch - timings.graph) * 100) / 100)
       }
-      if (result?.meta && lastPartial) result.meta.partial = true
-      if (result?.meta && lastSources) result.meta.sources = lastSources
+      if (result?.meta && load.partial) result.meta.partial = true
+      if (result?.meta && load.sources) result.meta.sources = load.sources
 
       // Le moteur a tourné mais n'a rien trouvé : le réseau du coin est peut-être
       // trop maigre dans ce qu'on a pu en charger. On essaie le secours avant de

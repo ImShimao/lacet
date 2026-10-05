@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { haversineM } from './geo'
-import { SETTINGS, extractRadiusM, planLoops, reverseRoute } from './service'
+import { RouteStats, runGate } from './safety'
+import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, reverseRoute } from './service'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -151,6 +152,24 @@ describe('un village sans boucle', () => {
     expect(result.meta.relaxed).toBe(true)
     expect(result.meta.message).toMatch(/longe la route/i)
   }, 30_000)
+
+  it('a un message pour chaque refus, rangé sous son code', () => {
+    // Deux messages étaient rangés sous le nom de la mesure plutôt que sous le
+    // code du refus : un village où tout traversait la départementale lisait le
+    // message général, jamais celui qui parlait des traversées.
+    const base = {
+      distanceM: 10_000, exposedM: 0, longestExposedM: 0, unprotectedCrossings: 0, protectedCrossings: 0,
+      tunnelUnlitM: 0, closureM: 0, overlapShare: 0, protectedM: 10_000, inferredM: 0,
+    }
+    for (const overrides of [
+      { exposedM: 500, longestExposedM: 100 },
+      { exposedM: 200, longestExposedM: 200 },
+      { unprotectedCrossings: 3 },
+    ]) {
+      const { code } = runGate(new RouteStats({ ...base, ...overrides }), 'safe').failures[0]
+      expect(SALVAGED_MESSAGE, code).toHaveProperty(code)
+    }
+  })
 
   it('ne fait pas passer un repêchage pour une recommandation', async () => {
     const result = await planLoops(

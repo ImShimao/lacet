@@ -262,6 +262,18 @@ export default function App() {
   const shownRoute = running ? (freeRun ? null : liveRoute ?? selected) : viewing || summary ? null : selected
   const stops = usePois(shownRoute, poiPrefs)
 
+  // Ce que dessine la carte : la sortie relue ou terminée prend la place du
+  // parcours. Mémorisé, et pas pour la vitesse : `MapView` recadre la carte à
+  // chaque nouveau tracé, et un objet refait à chaque rendu en était un. On
+  // zoomait sur un carrefour d'une sortie relue, et la carte revenait d'elle-même
+  // au cadrage complet au rendu suivant — à chaque relevé GPS, position suivie.
+  const mapRoute = useMemo(() => {
+    if (viewing) return { ...viewing, geometry: viewing.track ?? viewing.geometry ?? [], segments: [], crossings: [] }
+    if (summary?.track) return { ...summary, geometry: summary.track, segments: [], crossings: [] }
+    if (running) return freeRun ? null : liveRoute ?? selected
+    return selected
+  }, [viewing, summary, running, freeRun, liveRoute, selected])
+
   const sport = SPORTS.find((s) => s.key === params.sport)
   const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
@@ -312,17 +324,7 @@ export default function App() {
         <MapView
           styleKey={mapStyle}
           start={start}
-          route={
-            viewing
-              ? { ...viewing, geometry: viewing.track ?? viewing.geometry ?? [], segments: [], crossings: [] }
-              : summary?.track
-              ? { ...summary, geometry: summary.track, segments: [], crossings: [] }
-              : running && freeRun
-                ? null
-                : running
-                  ? liveRoute ?? selected
-                  : selected
-          }
+          route={mapRoute}
           ghost={!running ? result?.routes : null}
           stops={stops.stops}
           position={running ? livePosition : geo.position}

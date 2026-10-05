@@ -117,6 +117,42 @@ describe('la sortie guidée', () => {
     expect(bilan.distance).toBeLessThan(500)
   })
 
+  it('laisse ses huit secondes à une traversée qui suit de près la précédente', async () => {
+    // Deux traversées : l'une au départ, l'autre au coin opposé du carré, hors
+    // de portée d'alerte tant qu'on n'a pas fait un côté.
+    const [lon, lat] = geometry[0]
+    const loin = geometry[10]
+    const route = {
+      ...boucle,
+      crossings: [
+        { lon, lat, protected: true },
+        { lon: loin[0], lat: loin[1], protected: false },
+      ],
+    }
+    vi.useFakeTimers()
+    try {
+      render(<LiveRun route={route} request={null} sport="run" stage={null} onPosition={() => {}} onStop={() => {}} />)
+      let t = Date.now()
+      await relever(geometry[0], t)
+      expect(screen.getByText(/passage protégé/)).toBeTruthy()
+
+      // Cinq secondes plus tard, au premier coin : la seconde traversée.
+      await act(async () => vi.advanceTimersByTime(5000))
+      t += 5000
+      await relever(geometry[5], t)
+      expect(screen.getByText(/pas de passage protégé/)).toBeTruthy()
+
+      // Le minuteur de la première tombe ici : il ne doit pas emporter la seconde.
+      await act(async () => vi.advanceTimersByTime(4000))
+      expect(screen.queryByText(/pas de passage protégé/)).not.toBeNull()
+
+      await act(async () => vi.advanceTimersByTime(5000))
+      expect(screen.queryByText(/Traversée dans/)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('ne se termine pas au milieu du tour', async () => {
     const onStop = vi.fn()
     render(
