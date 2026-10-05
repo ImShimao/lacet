@@ -49,16 +49,31 @@ export const sectionTitle = (key) => SECTIONS.find((s) => s.key === key)?.title 
 
 export default function Account({ page = null, onPage = () => {}, ...props }) {
   const top = useRef(null)
+  // Où l'on en était dans le sommaire au moment d'ouvrir une page.
+  const summaryAt = useRef(0)
+  const scroller = () => top.current?.closest('.side__body') ?? null
+  const known = SECTIONS.some((s) => s.key === page)
+
   // Une page s'ouvre en haut : sans ça, elle héritait du défilement du
-  // sommaire, et « Sauvegarde » s'ouvrait sur son dernier paragraphe.
+  // sommaire, et « Sauvegarde » s'ouvrait sur son dernier paragraphe. Le
+  // sommaire, lui, se retrouve là où on l'avait laissé : descendu jusqu'à
+  // « À propos », on y revenait tout en haut, et il fallait redescendre.
+  // Avant l'affichage, pour ne pas voir la page sauter.
   useLayoutEffect(() => {
-    top.current?.closest('.side__body')?.scrollTo?.(0, 0)
+    const body = scroller()
+    if (body) body.scrollTop = known ? 0 : summaryAt.current
   }, [page])
 
-  const known = SECTIONS.some((s) => s.key === page)
+  // Relevé au moment du toucher, pas après : la page ouverte, plus courte que
+  // le sommaire, aurait déjà ramené le défilement vers le haut.
+  const open = (key) => {
+    summaryAt.current = scroller()?.scrollTop ?? 0
+    onPage(key)
+  }
+
   return (
     <div className={`panel acct ${known ? 'acct--page' : ''}`} ref={top}>
-      {known ? <SectionPage page={page} {...props} /> : <Summary onPage={onPage} {...props} />}
+      {known ? <SectionPage page={page} {...props} /> : <Summary onPage={open} {...props} />}
     </div>
   )
 }
