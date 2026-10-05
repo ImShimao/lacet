@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
-import { StravaButton } from './Strava.jsx'
 import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
@@ -22,7 +21,7 @@ import { standing } from './knownRoutes'
  * `LiveRun.jsx`). Les sorties d'avant ne les ont pas : on ne les invente pas à
  * partir de la trace, dont les points n'ont pas d'heure.
  */
-export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose, onStrava }) {
+export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
   // Le nom en cours d'édition, ou `null` quand on ne le modifie pas.
   const [nom, setNom] = useState(null)
@@ -163,8 +162,6 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
           pour laisser de la place. Les chiffres, eux, restent.
         </p>
       )}
-
-      <StravaButton key={entry.ranAt} entry={entry} onSent={(id) => onStrava?.(entry, id)} />
 
       <div className="row">
         {entry.track?.length > 1 && (

@@ -43,8 +43,8 @@ par parcours. Une sortie en montagne, sans antenne, fonctionne.
 
 **Il garde ce que tu as couru.** À l'arrivée, un écran de fin : distance, temps,
 allure, dénivelé, l'écart avec le parcours prévu, et **ta trace réelle** sur la
-carte — envoyée **sur Strava** d'elle-même si tu l'as connecté, ou exportée en
-GPX horodaté. Et si l'app est fermée en plein effort, par iOS ou par une
+carte, qui s'exporte en GPX horodaté — pour une montre, Garmin Connect ou le
+site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
 batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
 
 **Il sait où boire.** Coche « Point d'eau » ou « Toilettes » dans « Mon
@@ -54,8 +54,7 @@ avant.
 
 **Il n'envoie rien.** Pas de compte, pas de serveur, pas de suivi. Tes favoris,
 tes sorties et tes réglages ne quittent pas l'appareil — une sauvegarde
-s'exporte en un fichier si tu veux les emporter. Seul Strava, si tu le
-connectes, reçoit tes sorties.
+s'exporte en un fichier si tu veux les emporter.
 
 Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
 « Le club ») à une touche, pause automatique aux feux, alerte
@@ -165,8 +164,8 @@ cd frontend; npm run dev
 
 Puis **http://127.0.0.1:5173**, à la taille d'un téléphone (les outils de
 développement du navigateur, ou l'aperçu de l'éditeur). C'est l'interface, pour
-la développer — pas l'app : le GPS, la voix, l'écran de verrouillage, Strava et
-les vibrations n'existent que dans l'app installée. La position y est donc
+la développer — pas l'app : le GPS, la voix, l'écran de verrouillage, le
+baromètre et les vibrations n'existent que dans l'app installée. La position y est donc
 toujours « indisponible », et l'app retombe sur le dernier départ choisi.
 
 Le moteur de référence peut s'interroger à part, par son API :
@@ -376,7 +375,7 @@ GitHub du même nom pour l'app iPhone.
 
 ---
 
-## Strava, et pourquoi pas Apple Santé
+## Apple Santé et Strava
 
 **Apple Santé ne marche pas avec AltStore.** Apple ouvre HealthKit aux comptes
 gratuits, mais AltStore ne l'active pas : il signe l'app avec les seules
@@ -387,36 +386,12 @@ d'Apple, pas celles d'une autre app. Il faudrait un compte développeur payant
 (99 € par an) pour signer l'app soi-même — et ce serait alors l'occasion de
 supprimer aussi le renouvellement tous les sept jours.
 
-**Strava reçoit donc les sorties directement**, par son API
-(`frontend/src/strava.js`) : la trace réelle, avec l'heure de chaque point —
-retrouvée par les tours de kilomètre, puisque la trace gardée n'en a pas — pour
-que l'allure au kilomètre y soit la vraie. L'envoi part de l'écran de fin, tout
-seul si on l'a choisi, ou d'un bouton sur chaque sortie relue ; une sortie déjà
-envoyée est reconnue, et ne part pas deux fois.
-
-Pour l'activer, une fois :
-
-1. Sur <https://www.strava.com/settings/api>, crée une application (nom :
-   Lacet ; site : n'importe lequel ; **domaine de rappel d'autorisation :
-   `localhost`**). Strava donne un **Client ID** et un **Client Secret**.
-2. Ajoute-les aux secrets du dépôt, sous ces deux noms :
-
-   ```bash
-   gh secret set STRAVA_CLIENT_ID
-   ```
-
-   ```bash
-   gh secret set STRAVA_CLIENT_SECRET
-   ```
-
-3. La compilation suivante les emporte ; dans l'app, « Mon compte → Strava →
-   Connecter Strava ».
-
-Le secret est dans l'app — il n'y a pas de serveur pour le garder. C'est
-acceptable ici parce qu'une application Strava neuve n'accepte qu'un athlète,
-son créateur : quelqu'un qui extrairait le secret de l'IPA ne pourrait rien en
-faire d'autre que se connecter… à ton application, avec son propre compte, ce
-que Strava refuserait.
+**L'envoi direct vers Strava a été retiré** (octobre 2026). Une sortie
+s'exporte en GPX horodaté depuis son écran de fin ou sa fiche — l'heure de
+chaque point retrouvée par les tours de kilomètre (`frontend/src/runGpx.js`),
+pour que l'allure au kilomètre y soit la vraie — et le site de Strava l'importe
+(« Téléverser une activité »). Les jetons qu'une version précédente avait
+gardés sont effacés au lancement (`frontend/src/main.jsx`).
 
 ---
 

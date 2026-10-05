@@ -1,7 +1,6 @@
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
-import { StravaButton } from './Strava.jsx'
 import AscentNote from './AscentNote.jsx'
 
 /**
@@ -13,10 +12,10 @@ import AscentNote from './AscentNote.jsx'
  *
  * La trace affichée est **celle qu'on a réellement suivie**, pas le plan : la
  * carte la dessine derrière ce panneau, et l'export GPX la donne telle quelle,
- * horodatée, pour une montre ou un autre service. Strava, lui, la reçoit
- * directement — d'elle-même si l'envoi automatique est choisi.
+ * horodatée, pour une montre ou un autre service — Strava compris, qui
+ * l'importe depuis son site.
  */
-export default function RunSummary({ entry, onClose, onStrava }) {
+export default function RunSummary({ entry, onClose }) {
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
@@ -76,8 +75,6 @@ export default function RunSummary({ entry, onClose, onStrava }) {
       ) : (
         <AscentNote entry={entry} />
       )}
-
-      <StravaButton entry={entry} auto onSent={onStrava} />
 
       <div className="row">
         {entry.track?.length > 1 && (

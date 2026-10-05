@@ -101,18 +101,6 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       return put('history', history.map((s) => (meme(s, entry) ? { ...s, name: propre } : s)), setHistory)
     },
 
-    /**
-     * Ajoute des champs à une sortie gardée — son envoi sur Strava.
-     *
-     * Relue sur le disque plutôt que dans l'état : l'envoi se termine quelques
-     * secondes après avoir été lancé, et une sortie rangée entre-temps ne doit
-     * pas disparaître sous une liste d'avant.
-     */
-    patch(entry, fields) {
-      const current = load().history || history
-      return put('history', current.map((s) => (meme(s, entry) ? { ...s, ...fields } : s)), setHistory)
-    },
-
     /** Retire une sortie — un test, un départ déclenché dans la poche. */
     forget(entry) {
       return put('history', history.filter((sortie) => !meme(sortie, entry)), setHistory)

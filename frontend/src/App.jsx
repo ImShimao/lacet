@@ -29,7 +29,6 @@ import { km } from './format'
 import { load, save } from './storage'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
-import * as strava from './strava'
 
 export default function App() {
   const stored = useMemo(() => load(), [])
@@ -484,18 +483,9 @@ export default function App() {
                 library.forget(r)
                 setViewing(null)
               }}
-              onStrava={(r, id) => {
-                const sent = { id, at: new Date().toISOString() }
-                library.patch(r, { strava: sent })
-                setViewing({ ...r, strava: sent })
-              }}
             />
           ) : summary ? (
-            <RunSummary
-              entry={summary}
-              onClose={() => run.closeSummary()}
-              onStrava={(id) => library.patch(summary, { strava: { id, at: new Date().toISOString() } })}
-            />
+            <RunSummary entry={summary} onClose={() => run.closeSummary()} />
           ) : running ? (
             <LiveRun
               route={freeRun ? null : selected}
@@ -549,8 +539,6 @@ export default function App() {
                 await offline.clear()
                 // Les rues et altitudes gardées pour calculer hors ligne aussi.
                 await clearEngineData()
-                // Et l'accès à Strava : effacer, c'est que l'app oublie tout.
-                await strava.disconnect()
                 library.clear()
               }}
               onRestored={() => {

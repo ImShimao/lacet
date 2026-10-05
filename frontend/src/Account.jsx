@@ -2,11 +2,11 @@
  * Mon compte : un sommaire, et une page par sujet.
  *
  * L'écran empilait quatorze rubriques les unes sous les autres — poids,
- * Strava, cartes hors ligne, contact d'urgence, version de l'app… — et l'on
+ * cartes hors ligne, contact d'urgence, version de l'app… — et l'on
  * faisait défiler le tout pour trouver le réglage qu'on venait changer. Le
  * sommaire range ces rubriques en trois familles, comme les Réglages de
  * l'iPhone : ce qu'on règle, ce que l'app garde, et ce qu'il faut savoir
- * d'elle. Chaque ligne dit déjà l'essentiel — « 70 kg », « Connecté » — et
+ * d'elle. Chaque ligne dit déjà l'essentiel — « 70 kg », « Pause auto activée » — et
  * n'a besoin d'être ouverte que pour le changer.
  *
  * Tout y est local à l'appareil — c'est le propos de l'écran, et la raison
@@ -24,8 +24,6 @@ import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from 
 import { activeReports, kindLabel, removeReport } from './reports'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
-import * as strava from './strava'
-import { StravaSetting } from './Strava.jsx'
 import { StopsSetting } from './Stops.jsx'
 import { KINDS } from './pois'
 
@@ -41,7 +39,6 @@ export const SECTIONS = [
   { key: 'search', group: 'Paramètres', icon: 'sliders', title: 'Recherche' },
   { key: 'run', group: 'Paramètres', icon: 'play', title: 'Pendant la sortie' },
   { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
-  { key: 'strava', group: 'Paramètres', icon: 'upload', title: 'Strava', tone: 'strava' },
   { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
   { key: 'backup', group: 'Données', icon: 'download', title: 'Sauvegarde' },
   { key: 'about', group: 'Infos', icon: 'info', title: 'À propos' },
@@ -157,13 +154,6 @@ function summaryOf(key, { params, poiPrefs }) {
       const contact = saved.emergencyContact ? `SOS vers ${saved.emergencyContact}` : "Pas de contact d'urgence"
       return reports ? `${contact} · ${reports} signalement${reports > 1 ? 's' : ''}` : contact
     }
-    case 'strava': {
-      const s = strava.status()
-      if (!s.configured) return 'Pas disponible dans cette version'
-      if (!s.connected) return 'Non connecté'
-      const name = [s.athlete?.firstname, s.athlete?.lastname].filter(Boolean).join(' ')
-      return [name ? `Connecté · ${name}` : 'Connecté', s.auto ? 'envoi automatique' : null].filter(Boolean).join(' · ')
-    }
     case 'storage': {
       const info = usage()
       if (!info) return 'Sorties, cartes et rues gardées'
@@ -225,8 +215,6 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
           <MyReports />
         </>
       )
-    case 'strava':
-      return <StravaSetting />
     case 'storage':
       return (
         <>
@@ -255,8 +243,8 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
           <h3 className="section">Confidentialité</h3>
           <p className="muted small">
             Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil. Seuls partent
-            sur le réseau : les rues et les altitudes autour du départ, le lieu qu'on cherche par
-            son nom, et — si tu l'as connecté — ce que tu envoies à Strava.
+            sur le réseau : les rues et les altitudes autour du départ, et le lieu qu'on cherche par
+            son nom. Une sortie ne quitte le téléphone que si tu exportes sa trace.
           </p>
           <h3 className="section">Sources</h3>
           <p className="disclaimer">
@@ -311,8 +299,8 @@ function ClearData({ onClearData }) {
   return (
     <>
       <p className="muted small">
-        Favoris, sorties, réglages, cartes et rues gardées, et l'accès à Strava. Fais une
-        sauvegarde avant si tu veux pouvoir revenir en arrière.
+        Favoris, sorties, réglages, cartes et rues gardées. Fais une sauvegarde avant si tu
+        veux pouvoir revenir en arrière.
       </p>
       {confirm ? (
         <div className="row">

@@ -33,6 +33,14 @@ createRoot(document.getElementById('root')).render(
 if (isNative()) {
   document.documentElement.classList.add('native')
   import('./native').then((native) => native.bootNative())
-  // Le retour de Strava, après l'autorisation, arrive par une adresse `lacet://`.
-  import('./strava').then((strava) => strava.listen())
+}
+
+// L'envoi vers Strava a été retiré de l'app (octobre 2026). Les jetons d'accès
+// qu'une version précédente avait gardés ne servent plus à rien, et ce sont des
+// clés : ils ne restent pas sur le téléphone.
+try {
+  localStorage.removeItem('lacet-strava')
+  localStorage.removeItem('lacet-strava-state')
+} catch {
+  /* stockage refusé : rien à effacer */
 }

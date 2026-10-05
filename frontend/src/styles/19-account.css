@@ -152,10 +152,6 @@
   background: rgba(255, 106, 69, 0.14);
   color: var(--risk);
 }
-.menu__icon--strava {
-  background: rgba(252, 82, 0, 0.14);
-  color: #ff8a4c;
-}
 .menu__text {
   flex: 1;
   min-width: 0;
