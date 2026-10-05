@@ -1,5 +1,4 @@
 import ActivityKit
-import AVFoundation
 import Capacitor
 import Foundation
 
@@ -21,8 +20,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "duck", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "unduck", returnType: CAPPluginReturnPromise),
     ]
 
     /// Le paquet de l'extension qui dessine l'activité, s'il est là.
@@ -177,28 +174,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             result["enabled"] = false
         }
         call.resolve(result)
-    }
-
-    // === la voix par-dessus la musique ========================================
-
-    /// Baisse la musique le temps d'une consigne, et la remet ensuite.
-    ///
-    /// La session audio de l'app mélange avec ce qui joue déjà : sans rien de
-    /// plus, la voix se perd dans le refrain, précisément au carrefour où l'on
-    /// avait besoin d'elle. `.duckOthers` baisse l'autre app pendant que la
-    /// nôtre est active — d'où l'activation juste avant la phrase et la
-    /// désactivation juste après, plutôt qu'une musique en sourdine toute la
-    /// sortie. `notifyOthersOnDeactivation` lui rend son volume tout de suite.
-    @objc func duck(_ call: CAPPluginCall) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers, .duckOthers])
-        try? session.setActive(true)
-        call.resolve()
-    }
-
-    @objc func unduck(_ call: CAPPluginCall) {
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
-        call.resolve()
     }
 
     @available(iOS 16.1, *)

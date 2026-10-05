@@ -24,15 +24,16 @@ import { KeepAwake } from '@capacitor-community/keep-awake'
 import { Share } from '@capacitor/share'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { StatusBar, Style } from '@capacitor/status-bar'
-import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech'
 
 // Ce module-là ne s'importe pas : il se déclare, sous le nom qu'il porte côté natif.
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation')
 
 // Ceux-ci sont écrits pour Lacet, dans l'app elle-même
-// (`ios-overlay/live-activity/App/LiveActivityPlugin.swift`, `AltimeterPlugin.swift`).
+// (`ios-overlay/live-activity/App/` : `LiveActivityPlugin.swift`,
+// `AltimeterPlugin.swift`, `VoicePlugin.swift`).
 const LiveActivity = registerPlugin('LiveActivity')
 const Altimeter = registerPlugin('Altimeter')
+const Voice = registerPlugin('Voice')
 
 // --- démarrage ----------------------------------------------------------------
 
@@ -119,34 +120,18 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
 // --- voix ---------------------------------------------------------------------
 
 /**
- * Consigne dite par la voix d'iOS. `QueueStrategy.Flush` coupe la phrase en
- * cours : une consigne de navigation périmée est pire que pas de consigne.
+ * Consigne dite par la voix d'iOS, en français.
  *
- * La session audio (lecture en arrière-plan, mélange avec la musique, mode
- * silencieux ignoré) est réglée au lancement de l'app, côté natif : le module
- * de synthèse ne le fait pas lui-même.
+ * `priority` coupe la phrase en cours — une consigne périmée est pire que pas
+ * de consigne ; sans lui, la phrase attend son tour. La musique baisse le temps
+ * de la phrase et remonte dès que la voix s'est tue : c'est le module natif qui
+ * s'en charge (`VoicePlugin.swift`), sur ce que la voix fait vraiment.
  */
-export function speakNative(text, { priority = true } = {}) {
-  return TextToSpeech.speak({
-    text,
-    lang: 'fr-FR',
-    rate: 1.05,
-    pitch: 1,
-    volume: 1,
-    queueStrategy: priority ? QueueStrategy.Flush : QueueStrategy.Add,
-  }).catch(() => {})
-}
+export const speakNative = (text, { priority = true } = {}) =>
+  Voice.speak({ text, flush: priority }).catch(() => {})
 
-export const stopSpeechNative = () => TextToSpeech.stop().catch(() => {})
-
-/**
- * Baisse la musique le temps d'une consigne, et la remet ensuite.
- *
- * Sans ça, la voix passe *par-dessus* le morceau sans le baisser : au volume
- * où l'on écoute en courant, « tourne à droite » se perd dans le refrain.
- */
-export const duckAudio = () => LiveActivity.duck().catch(() => {})
-export const unduckAudio = () => LiveActivity.unduck().catch(() => {})
+/** Se tait, et rend le son aux autres apps. */
+export const stopSpeechNative = () => Voice.stop().catch(() => {})
 
 // --- écran, vibration ---------------------------------------------------------
 

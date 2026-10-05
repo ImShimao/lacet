@@ -10,7 +10,7 @@
 # perdue à la génération suivante.
 #
 # Les fichiers source ont déjà été copiés par `customize.py` :
-#   ios/App/App/{LacetRunAttributes,LiveActivityPlugin,AltimeterPlugin,LacetBridgeViewController}.swift
+#   ios/App/App/{LacetRunAttributes,LiveActivityPlugin,AltimeterPlugin,VoicePlugin,LacetBridgeViewController}.swift
 #   ios/App/LacetWidgets/{LacetWidgets.swift,Info.plist}
 
 require 'xcodeproj'
@@ -31,7 +31,7 @@ app_group = project.main_group.children.find { |g| g.isa == 'PBXGroup' && g.path
   abort("Groupe « App » introuvable : le modèle de Capacitor a changé.")
 
 # --- côté app : le module natif et la structure partagée ------------------------
-app_sources = %w[LacetRunAttributes.swift LiveActivityPlugin.swift AltimeterPlugin.swift LacetBridgeViewController.swift]
+app_sources = %w[LacetRunAttributes.swift LiveActivityPlugin.swift AltimeterPlugin.swift VoicePlugin.swift LacetBridgeViewController.swift]
 app_refs = app_sources.map { |name| app_group.new_reference(name) }
 app.add_file_references(app_refs)
 shared = app_refs.first

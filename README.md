@@ -301,9 +301,11 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   l'accès à la position : choisir **Toujours** (ou « Lors de l'utilisation »
   puis « Toujours » quand iOS le repropose). Sans cela, la distance se fige dès
   que le téléphone part dans la poche.
-- **Le guidage vocal aussi**, et il passe par-dessus la musique, même en mode
-  silencieux. La session audio est réglée dans `AppDelegate` : le module de
-  synthèse vocale ne le fait pas, et sans elle iOS coupe la voix au verrouillage.
+- **Le guidage vocal aussi**, même en mode silencieux. La voix vient d'un
+  module écrit pour Lacet (`ios-overlay/live-activity/App/VoicePlugin.swift`) :
+  il baisse la musique — et met un podcast en pause — le temps d'une consigne,
+  puis rend le son dès que la voix s'est tue. La session audio de repos, elle,
+  est réglée dans `AppDelegate` : sans elle, iOS coupe la voix au verrouillage.
 - **L'écran reste allumé** pendant la sortie si on le demande, et une vibration
   prévient avant chaque traversée.
 - **Le GPX s'exporte par la feuille de partage** d'iOS (Fichiers, AirDrop…) —
@@ -914,8 +916,12 @@ rue. Les distances sont arrondies à des repères que l'oreille retient, personn
 n'estimant 87 mètres en courant.
 
 C'est la voix d'iOS — aucune clé, aucun réseau —, qui continue écran verrouillé
-et baisse la musique le temps de parler (`src/voice.js`). Chaque consigne coupe
-la précédente : une consigne périmée dite après le carrefour est pire que rien.
+et baisse la musique le temps de parler (`VoicePlugin.swift`). Chaque consigne
+coupe la précédente : une consigne périmée dite après le carrefour est pire que
+rien. La musique remonte sur ce que la voix fait vraiment, et non sur un compte
+de phrases : avec l'extension de synthèse d'avant, une seule fin de phrase
+perdue — une consigne qui en coupait une autre — la laissait en sourdine
+jusqu'au bout de la sortie.
 
 **Les points d'eau et toilettes**, quand ils sont cochés, s'annoncent cent
 mètres avant — « Point d'eau dans cent mètres » —, une fois par kilomètre au

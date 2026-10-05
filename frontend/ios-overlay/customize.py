@@ -105,14 +105,12 @@ AUDIO_SETUP = """
             ]
             WKWebsiteDataStore.default().removeData(ofTypes: caches, modifiedSince: .distantPast) {}
         }
-        // Session audio du guidage vocal. Le module de synthèse vocale ne la règle
-        // pas lui-même : sans elle, iOS coupe la voix dès que l'écran se verrouille,
-        // et la rend muette en mode silencieux.
+        // Session audio du guidage vocal, au repos. Sans elle, iOS coupe la voix
+        // dès que l'écran se verrouille, et la rend muette en mode silencieux.
         //
-        // `.mixWithOthers` et non `.duckOthers` : baisser la musique pendant une
-        // consigne serait plus confortable, mais la synthèse laisse ensuite la
-        // session active, et la musique resterait baissée toute la sortie après la
-        // première consigne. La voix passe donc par-dessus, à plein volume.
+        // `.mixWithOthers` et non `.duckOthers` : au repos, la musique joue à son
+        // volume. C'est `VoicePlugin.swift` qui la baisse le temps d'une consigne,
+        // puis rend la session — et le volume — dès que la voix s'est tue.
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers])
         } catch {
