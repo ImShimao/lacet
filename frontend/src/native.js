@@ -222,6 +222,17 @@ export const stopAltimeter = () => Altimeter.stop().catch(() => null)
  */
 export const openExternal = (url) => AppLauncher.openUrl({ url })
 
+// La copie des favoris, des sorties et des réglages — voir `storage.js`. Dans
+// `Library` sans sauvegarde iCloud : iOS ne la vide pas comme le stockage de la
+// WebView, elle n'apparaît pas dans l'app Fichiers, et elle ne quitte pas
+// l'appareil — ce que « Mon compte » promet.
+const STORE_COPY = { path: 'lacet-store.json', directory: Directory.LibraryNoCloud, encoding: Encoding.UTF8 }
+
+export const writeStoreCopy = (text) => Filesystem.writeFile({ ...STORE_COPY, data: text }).catch(() => {})
+
+/** Le texte de la copie, ou `null` s'il n'y en a pas. */
+export const readStoreCopy = () => Filesystem.readFile(STORE_COPY).then(({ data }) => data, () => null)
+
 /** Écrit un fichier et ouvre la feuille de partage d'iOS pour l'emporter. */
 export async function shareTextFile(filename, text, mime) {
   const { uri } = await Filesystem.writeFile({

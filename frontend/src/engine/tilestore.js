@@ -90,15 +90,23 @@ export async function readTile(key) {
   }
 }
 
-/** Range une tuile, et fait de la place si le budget est dépassé. */
-export async function writeTile(key, at, extract) {
+/**
+ * Range une tuile, et fait de la place si le budget est dépassé.
+ *
+ * `at` date les rues, `used` l'usage : les deux se confondent pour une tuile
+ * qui arrive d'Overpass, pas pour une tuile des archives, dont les rues datent
+ * du dernier découpage mensuel. Rangée avec cette date-là comme dernier usage,
+ * elle passait pour la plus vieille du cache, et c'est elle — la ville qu'on
+ * venait d'ouvrir — que le ménage jetait en premier.
+ */
+export async function writeTile(key, at, extract, used = at) {
   const data = JSON.stringify(toRegionTile(extract))
   await tiles.set(key, { at, data })
   await enqueue(async () => {
     const book = await journal()
     const previous = book.tiles[key]
     book.total += data.length - (previous?.bytes ?? 0)
-    book.tiles[key] = { bytes: data.length, used: at }
+    book.tiles[key] = { bytes: data.length, used }
     await evict(book, await allowance())
     await tiles.set(USAGE_KEY, book)
   })

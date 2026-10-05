@@ -17,23 +17,37 @@ import './styles/index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { isNative } from './platform'
+import { mirrorTo, restoreFrom } from './storage'
 
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>,
-)
+async function start() {
+  const native = isNative() ? await import('./native').catch(() => null) : null
+  if (native) {
+    // Avant le premier rendu : `App` lit le magasin en se créant, et doit y
+    // trouver ce que la copie a gardé si iOS a vidé le stockage — voir
+    // `storage.js`. Le fichier n'est lu que dans ce cas-là.
+    await restoreFrom(native.readStoreCopy)
+    mirrorTo(native.writeStoreCopy)
+  }
 
-// Dans l'app, rien ne se sélectionne : un appui long faisait surgir le menu
-// « Copier / Rechercher / Traduire » d'iOS par-dessus la carte, au moment
-// précis où l'on garde le doigt sur l'écran pour lire. Le style s'accroche à
-// cette classe (`styles/04-buttons.css`).
-if (isNative()) {
-  document.documentElement.classList.add('native')
-  import('./native').then((native) => native.bootNative())
+  createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>,
+  )
+
+  // Dans l'app, rien ne se sélectionne : un appui long faisait surgir le menu
+  // « Copier / Rechercher / Traduire » d'iOS par-dessus la carte, au moment
+  // précis où l'on garde le doigt sur l'écran pour lire. Le style s'accroche à
+  // cette classe (`styles/04-buttons.css`).
+  if (native) {
+    document.documentElement.classList.add('native')
+    native.bootNative()
+  }
 }
+
+start()
 
 // L'envoi vers Strava a été retiré de l'app (octobre 2026). Les jetons d'accès
 // qu'une version précédente avait gardés ne servent plus à rien, et ce sont des

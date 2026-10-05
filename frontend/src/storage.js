@@ -69,7 +69,9 @@ export function save(patch) {
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      localStorage.setItem(KEY, JSON.stringify(next))
+      const text = JSON.stringify(next)
+      localStorage.setItem(KEY, text)
+      mirrorSoon(text)
       return next
     } catch {
       const history = next.history || []
@@ -98,6 +100,66 @@ export function save(patch) {
 }
 
 let refusedAt = null
+
+// --- la copie sur fichier -------------------------------------------------------
+//
+// iOS peut vider le stockage d'une WebView quand le téléphone manque de place :
+// la documentation de Capacitor demande de le tenir pour temporaire. Or c'est là
+// que vivent l'historique des sorties et les favoris — ce qu'on ne refait pas.
+// Chaque écriture est donc recopiée, un instant plus tard, dans un fichier de
+// l'app (`native.js`), et relue au lancement si le stockage est revenu vide.
+
+// Les écritures arrivent en rafale — régler un filtre en fait plusieurs de
+// suite — et une seule copie suffit.
+const MIRROR_DELAY_MS = 1000
+let mirror = null
+let mirrorTimer = null
+
+function mirrorSoon(text) {
+  if (!mirror) return
+  clearTimeout(mirrorTimer)
+  mirrorTimer = setTimeout(() => mirror(text), MIRROR_DELAY_MS)
+}
+
+/**
+ * Branche la copie sur fichier : `write(texte)` reçoit le magasin entier.
+ *
+ * Le magasin du moment est recopié tout de suite : sans ça, une installation
+ * mise à jour n'aurait de copie qu'à sa première écriture, et rien ne protégeait
+ * l'historique d'ici là.
+ */
+export function mirrorTo(write) {
+  mirror = write
+  try {
+    const text = localStorage.getItem(KEY)
+    if (text) mirrorSoon(text)
+  } catch {
+    /* stockage refusé : rien à recopier */
+  }
+}
+
+/**
+ * Remet le magasin en place depuis sa copie, s'il a disparu. Rend `true` si
+ * c'est le cas. `read()` rend le texte de la copie, ou `null`.
+ *
+ * Un magasin présent n'est jamais remplacé : c'est lui le plus récent.
+ */
+export async function restoreFrom(read) {
+  try {
+    if (localStorage.getItem(KEY) !== null) return false
+  } catch {
+    return false
+  }
+  const text = await read()
+  if (!text) return false
+  try {
+    JSON.parse(text)
+    localStorage.setItem(KEY, text)
+    return true
+  } catch {
+    return false
+  }
+}
 
 // Ce que le navigateur accorde à une origine, en pratique : cinq mégaoctets,
 // chez Chrome comme chez Safari. Approximatif par nature — c'est un ordre de

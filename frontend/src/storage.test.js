@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { exportAll, importAll, load, recentPlaces, rememberPlace, save, slim } from './storage'
+import { exportAll, importAll, load, mirrorTo, recentPlaces, rememberPlace, restoreFrom, save, slim } from './storage'
 
 /**
  * La persistance locale.
@@ -223,6 +223,51 @@ describe('la sauvegarde', () => {
   it('refuse un fichier qui n’en est pas une', () => {
     expect(() => importAll('{"app":"autre"}')).toThrow(/sauvegarde Lacet/)
     expect(() => importAll('pas du json')).toThrow(/sauvegarde Lacet/)
+  })
+})
+
+/**
+ * La copie sur fichier : iOS peut vider le stockage de la WebView quand le
+ * téléphone manque de place, et l'historique des sorties partirait avec.
+ */
+describe('la copie sur fichier', () => {
+  it('recopie les écritures, groupées', () => {
+    vi.useFakeTimers()
+    try {
+      const write = vi.fn()
+      mirrorTo(write)
+      save({ params: { sport: 'run' } })
+      save({ history: [{ name: 'Boucle du dimanche' }] })
+      expect(write).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1000)
+      expect(write).toHaveBeenCalledTimes(1)
+      const copie = JSON.parse(write.mock.calls[0][0])
+      expect(copie.history[0].name).toBe('Boucle du dimanche')
+      expect(copie.params.sport).toBe('run')
+    } finally {
+      mirrorTo(null)
+      vi.useRealTimers()
+    }
+  })
+
+  it('remet en place un magasin vidé par iOS', async () => {
+    const copie = JSON.stringify({ history: [{ name: 'Boucle du dimanche' }] })
+    expect(await restoreFrom(async () => copie)).toBe(true)
+    expect(load().history[0].name).toBe('Boucle du dimanche')
+  })
+
+  it('ne remplace jamais un magasin présent', async () => {
+    save({ history: [{ name: 'Plus récente' }] })
+    const read = vi.fn(async () => JSON.stringify({ history: [] }))
+    expect(await restoreFrom(read)).toBe(false)
+    expect(read).not.toHaveBeenCalled()
+    expect(load().history[0].name).toBe('Plus récente')
+  })
+
+  it('ignore une copie absente ou abîmée', async () => {
+    expect(await restoreFrom(async () => null)).toBe(false)
+    expect(await restoreFrom(async () => '{tronqué')).toBe(false)
+    expect(localStorage.getItem('lacet.v1')).toBeNull()
   })
 })
 

@@ -76,17 +76,17 @@ const hedgeDelayFor = (tiles) =>
 // calculé pour la plus longue boucle acceptée, et les tuiles du bord ne servent
 // qu'aux rares boucles qui vont l'effleurer.
 const CORE_SHARE = 0.6
-// Ce qu'on accorde à Overpass pour ces tuiles de bordure avant de chercher sans
-// elles. Mesuré chez quelqu'un à deux kilomètres de la limite de l'Alsace : deux
-// des six tuiles d'une recherche de 5 km manquaient à la carte livrée, et la
-// barre restait à 80 % le temps qu'Overpass réponde — une minute, ou jamais.
-// Quatre tuiles suffisaient pourtant à tracer la boucle.
 // Âge à partir duquel une copie déjà sur l'appareil vaut la peine d'être
 // comparée aux archives. Les archives sont refaites tous les mois : en deçà, la
 // copie locale est au moins aussi bonne, et l'aller-retour ne rapporterait
 // qu'une seconde d'attente — y compris chez soi, où la carte livrée suffit.
 const ARCHIVE_AFTER_MS = 30 * 86_400_000
 
+// Ce qu'on accorde à Overpass pour ces tuiles de bordure avant de chercher sans
+// elles. Mesuré chez quelqu'un à deux kilomètres de la limite de l'Alsace : deux
+// des six tuiles d'une recherche de 5 km manquaient à la carte livrée, et la
+// barre restait à 80 % le temps qu'Overpass réponde — une minute, ou jamais.
+// Quatre tuiles suffisaient pourtant à tracer la boucle.
 const PERIPHERAL_WAIT_MS = 6_000
 // **Le temps qu'on s'autorise à attendre les rues, en tout.**
 //
@@ -425,7 +425,7 @@ export async function fetchArea(args) {
       // recherche n'a pas à les attendre.
       if (keep.length) {
         setTimeout(() => {
-          for (const [key, copy] of keep) writeTile(key, copy.at, copy.extract).catch(() => {})
+          for (const [key, copy] of keep) writeTile(key, copy.at, copy.extract, now()).catch(() => {})
         }, 0)
       }
     }

@@ -78,6 +78,20 @@ describe('les rues gardées', () => {
     expect(bytes).toBeLessThanOrEqual(seule * 2.5)
   })
 
+  it('ne prend pas une tuile des archives pour la plus vieille du cache', async () => {
+    // Ses rues datent du découpage du mois — mais on vient de s'en servir.
+    await writeTile('0:1:1', 1000, tile(120, 1))
+    const seule = (await tileUsage()).bytes
+    setBudget(Math.round(seule * 2.5))
+
+    await writeTile('0:2:2', 500, tile(120, 2), 3000)
+    await writeTile('0:3:3', 4000, tile(120, 3))
+
+    expect(await readTile('0:2:2')).not.toBeNull()
+    expect((await readTile('0:2:2')).at).toBe(500)
+    expect(await readTile('0:1:1')).toBeNull()
+  })
+
   it('annonce ce que pèse le cache même quand il a été rempli ailleurs', async () => {
     // Les tuiles s'écrivent dans le worker, l'écran « Mon compte » les compte
     // depuis la page : deux exemplaires du module, un seul magasin. L'écran
