@@ -861,6 +861,10 @@ function useHold(step, delays = { first: 420, min: 55 }) {
   const start = (event) => {
     // Un seul doigt, et pas de sélection ni de zoom déclenchés par l'appui long.
     event.preventDefault()
+    // Un second doigt lançait une seconde répétition sans arrêter la première :
+    // lever la main n'en arrêtait qu'une, et le poids filait jusqu'à sa borne,
+    // réécrit sur le disque vingt fois par seconde.
+    stop()
     action.current()
     let delay = delays.first
     const tick = () => {

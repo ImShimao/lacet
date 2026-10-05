@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -66,5 +66,34 @@ describe('Mon compte', () => {
   it('ne propose plus Strava', () => {
     render(<Ecran />)
     expect(screen.queryByText('Strava')).toBeNull()
+  })
+
+  it('arrête de compter quand on lâche, même posé à deux doigts', async () => {
+    vi.useFakeTimers()
+    try {
+      const onProfile = vi.fn()
+      render(
+        <Account
+          page="profile"
+          params={DEFAULTS}
+          geo={{ status: 'idle' }}
+          history={[]}
+          poiPrefs={{}}
+          onPoiPrefs={() => {}}
+          onProfile={onProfile}
+          onClearData={async () => {}}
+          onRestored={() => {}}
+        />,
+      )
+      const plus = screen.getByRole('button', { name: 'Augmenter poids' })
+      fireEvent.pointerDown(plus)
+      fireEvent.pointerDown(plus)
+      fireEvent.pointerUp(plus)
+      const auLacher = onProfile.mock.calls.length
+      await act(async () => vi.advanceTimersByTime(3000))
+      expect(onProfile.mock.calls.length).toBe(auLacher)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

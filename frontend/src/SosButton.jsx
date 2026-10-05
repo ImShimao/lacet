@@ -33,6 +33,10 @@ export default function SosButton({ position, distance, elapsed, className = '' 
   }, [])
 
   const begin = () => {
+    // Un second doigt sur le bouton relançait un minuteur sans arrêter le
+    // premier : lever la main n'annulait que le dernier, et l'alerte partait
+    // quand même. Un appui à la fois.
+    cancel()
     const startedAt = Date.now()
     const step = () => {
       const ratio = Math.min(1, (Date.now() - startedAt) / HOLD_MS)
@@ -71,7 +75,7 @@ export default function SosButton({ position, distance, elapsed, className = '' 
     )
   }
 
-  function sendTo(contact) {
+  async function sendTo(contact) {
     const text = message()
     // `sms:` ouvre l'application de messagerie avec le texte prérempli. Le
     // séparateur diffère : « ?body= » sur Android, « &body= » sur iOS. Mettre
@@ -80,8 +84,17 @@ export default function SosButton({ position, distance, elapsed, className = '' 
     // ou « 06-12-34 », tels qu'on les tape, ne sont pas des numéros pour Messages.
     const href = `sms:${contact.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(text)}`
     // Le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre de la façon
-    // dont WebKit traite un lien d'un autre schéma.
-    import('./native').then((n) => n.openExternal(href))
+    // dont WebKit traite un lien d'un autre schéma. Et s'il n'y parvient pas —
+    // lien refusé, aucune app pour l'ouvrir —, la feuille de partage prend le
+    // relais : un SOS qui échoue sans rien dire est le pire des cas.
+    try {
+      const native = await import('./native')
+      const { completed } = (await native.openExternal(href)) ?? {}
+      if (completed !== false) return
+    } catch {
+      /* le partage, ci-dessous */
+    }
+    await shareInstead()
   }
 
   async function shareInstead() {
