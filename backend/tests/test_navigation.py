@@ -8,6 +8,8 @@ le plus répandu du genre, et il ne se voit pas sur une carte.
 
 from __future__ import annotations
 
+from collections import Counter
+
 import pytest
 
 from app.models import SafetyMode, SurfacePref
@@ -17,7 +19,6 @@ from app.navigation import (
     SLIGHT_DEG,
     TURN_DEG,
     build_instructions,
-    summarize,
 )
 from app.osm.graph import build_graph
 from app.routing.loops import generate_loops, repeat_loop
@@ -197,7 +198,7 @@ class TestResume:
     def test_compte_les_manoeuvres(self, scene, profile):
         graph, start, loops = _loops(scene, profile)
         steps = build_instructions(graph, start, loops[0])
-        counts = summarize(steps)
+        counts = Counter(step.turn for step in steps)
         assert counts["start"] == 1
         assert counts["finish"] == 1
         assert sum(counts.values()) == len(steps)

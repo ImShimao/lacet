@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from ..models import SafetyMode, Sport, SurfacePref
 from ..osm.graph import Edge, Graph
 from ..safety.night import night_factor
+from ..safety.risk import CYCLE_FACILITY
 
 LAMBDA = {
     SafetyMode.safe: 4.0,
@@ -43,6 +44,11 @@ SURFACE_FACTOR_BIKE: dict[str, dict[str, float]] = {
 # Voies piétonnes à vélo : praticables en descendant de selle, donc autorisées
 # mais lourdement pénalisées. Les exclure couperait des passages parfois
 # incontournables (ponts, traversées de places).
+#
+# Seules celles ouvertes aux vélos y échappent. Le test portait sur la
+# séparation, qui vaut 2 aussi pour toute zone piétonne — sans voitures, elle
+# est sûre — : la pénalité ne touchait donc jamais `pedestrian`, et les boucles
+# à vélo traversaient les rues piétonnes du centre comme des pistes.
 FOOT_ONLY_FACTOR = 4.0
 FOOT_ONLY_HIGHWAY = {"footway", "pedestrian"}
 
@@ -72,7 +78,7 @@ class Profile:
         w = edge.length_m * (1.0 + self.lam * s.risk)
         w *= self._factors.get(s.surface, 1.0)
         if self.sport == "bike":
-            if s.highway in FOOT_ONLY_HIGHWAY and not s.separation >= 2.0:
+            if s.highway in FOOT_ONLY_HIGHWAY and s.reason != CYCLE_FACILITY:
                 w *= FOOT_ONLY_FACTOR
         elif s.highway == "steps":
             w *= STEPS_FACTOR

@@ -23,6 +23,18 @@ describe('la demande au moteur', () => {
     expect(toRequest({ ...DEFAULTS, safety: 'standard', avoid: ['busy', 'unlit'] }, start).avoid).toEqual(['unlit'])
     expect(toRequest({ ...DEFAULTS, safety: 'safe', avoid: ['busy', 'steps'] }, start).avoid).toEqual(['steps', 'busy'])
   })
+
+  it('traduit en allure la vitesse d’un coureur qui compte en km/h', () => {
+    // Le moteur ne lit la vitesse qu'à vélo : envoyée seule, elle était
+    // ignorée, et une heure à 12 km/h se calculait à 6:30 du kilomètre.
+    const course = { ...DEFAULTS, sport: 'run', speedUnit: 'speed', speed_kmh: 12, mode: 'duration', duration_min: 60 }
+    const body = toRequest(course, start)
+    expect(body.pace_sec_per_km).toBe(300)
+    expect(body.speed_kmh).toBeUndefined()
+    // Au-delà de ce que le moteur accepte, l'allure s'arrête à sa borne.
+    expect(toRequest({ ...course, speed_kmh: 40 }, start).pace_sec_per_km).toBe(150)
+    expect(toRequest({ ...DEFAULTS, sport: 'bike', speed_kmh: 22 }, start).speed_kmh).toBe(22)
+  })
 })
 
 describe('l’entrée d’historique', () => {

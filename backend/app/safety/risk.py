@@ -22,6 +22,16 @@ from dataclasses import dataclass
 # Note : depuis 2018 le hors-agglomération est à 80, mais une trentaine de
 # départements sont repassés à 90 sur une partie de leur réseau. On reste à 80 :
 # c'est la valeur qui produit le moins de faux négatifs de sécurité.
+#
+# Sauf pour les voies communales (`unclassified`) : la limite y est de 80, mais
+# on ne roule pas à 80 sur une route étroite, sans marquage, qui dessert trois
+# hameaux et les vignes. À 80, elles comptaient toutes comme « exposées », comme
+# une départementale : autour de Meursault, où elles sont presque les seules
+# routes goudronnées hors du bourg, la recherche à pied ne rendait que des tours
+# de 2 km répétés quatre fois, et à vélo de route des boucles à 30 % de terre.
+# À 60, leur risque (0,44) les laisse pénalisées sans les classer exposées :
+# cinq vraies boucles à pied, notées A ou B, et des boucles vélo goudronnées à
+# 95 %. Les départementales (`tertiary` et au-dessus) restent à 80.
 DEFAULT_SPEED_KMH: dict[str, float] = {
     "primary": 80.0,
     "primary_link": 60.0,
@@ -29,7 +39,7 @@ DEFAULT_SPEED_KMH: dict[str, float] = {
     "secondary_link": 60.0,
     "tertiary": 80.0,
     "tertiary_link": 50.0,
-    "unclassified": 80.0,
+    "unclassified": 60.0,
     "residential": 50.0,
     "living_street": 20.0,
     "service": 30.0,
@@ -100,6 +110,10 @@ RISK_SCALE_KMH = 30.0
 EXPOSED_RISK = 1.5
 
 MAX_RISK = 8.0
+
+# Le motif de séparation d'une voie ouverte aux vélos : c'est lui que le profil
+# vélo lit pour savoir qu'une voie piétonne se roule (voir `weights.py`).
+CYCLE_FACILITY = "aménagement cyclable"
 
 
 @dataclass(frozen=True)
@@ -185,13 +199,19 @@ def has_sidewalk(tags: dict[str, str]) -> bool | None:
 
 
 def has_cycleway(tags: dict[str, str]) -> bool:
-    """Aménagement cyclable présent sur ce tronçon ?"""
+    """Aménagement cyclable présent sur ce tronçon ?
+
+    Une zone piétonne ouverte aux vélos en est un, comme un chemin : sans elle
+    dans la liste, la rue piétonne `bicycle=yes` restait une voie piétonne, et
+    le profil vélo la pénalisait comme un trottoir (voir `weights.py`).
+    """
     if tags.get("highway") == "cycleway":
         return True
     if tags.get("bicycle") in _BIKE_DESIGNATED and tags.get("highway") in {
         "path",
         "footway",
         "track",
+        "pedestrian",
     }:
         return True
     if tags.get("cycleway") in _CYCLEWAY_PRESENT:
@@ -213,7 +233,7 @@ def separation_bike(tags: dict[str, str], *, in_builtup: bool) -> tuple[float, b
     highway = tags.get("highway", "")
 
     if has_cycleway(tags):
-        return 2.0, False, "aménagement cyclable"
+        return 2.0, False, CYCLE_FACILITY
 
     if highway in {"path", "track", "bridleway", "living_street", "pedestrian"}:
         return 2.0, False, "voie sans trafic motorisé"

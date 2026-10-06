@@ -23,7 +23,7 @@ import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
 import { ELEVATION_STEP_M, currentWind, fetchMany, shapeRelief } from './environment'
-import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, reverseRoute } from './service'
+import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, pointKey, reverseRoute } from './service'
 import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
@@ -151,6 +151,14 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
 // l'écran, et une boucle d'hier n'a plus de graphe sous elle.
 let lastReversible = null
 
+// Les boucles montrées depuis la dernière recherche ordinaire, en ensembles de
+// points : « Régénérer » les fait passer après les neuves (`freshFirst`). Trois
+// écrans au plus — au-delà, mieux vaut revoir une boucle qu'en manquer.
+const MAX_SHOWN = 15
+let shown = []
+// Le numéro de la dernière recherche lancée : seule elle garde ses boucles.
+let latestPlan = 0
+
 // Une boucle, pas `Math.min(...trace)` : une trace importée compte jusqu'à
 // soixante mille points, et WebKit refuse un appel à plus de 65 536 arguments —
 // bien avant, parfois, faute de pile dans un worker.
@@ -195,13 +203,26 @@ self.onmessage = async ({ data }) => {
       // dérivé — celui du départ devant la porte (`door.js`). Lâché dès
       // maintenant, il ne coexiste pas avec celui de la recherche qui commence.
       lastReversible = null
+      if (!payload.variation) shown = []
+      const mine = ++latestPlan
+      let reversible = null
       const result = await planLoops(payload, {
         loadGraph: (args) => loadGraph(args, progress, load),
         onProgress: progress,
         onReversible: (r) => {
-          lastReversible = r
+          reversible = r
         },
+        shown,
       })
+      // Une recherche remplacée en cours de calcul — les filtres changés entre-
+      // temps — peut finir après celle qui l'a remplacée. Ce qu'elle garderait
+      // ne serait pas ce qui est à l'écran : « autre sens » échouait alors sur
+      // les boucles affichées.
+      if (mine === latestPlan && reversible) {
+        lastReversible = reversible
+        for (const kept of reversible.routes) shown.push(new Set(kept.cand.geometry.map(pointKey)))
+        shown = shown.slice(-MAX_SHOWN)
+      }
       // `planLoops` a compté tout le chargement comme du téléchargement : on lui
       // rend le détail, arrondi comme le reste de ses mesures.
       const timings = result?.meta?.timings_s
@@ -215,9 +236,9 @@ self.onmessage = async ({ data }) => {
       // son sens : retournée, elle le remonterait. L'écran n'offre alors pas
       // l'autre sens — voir `reverse`. Ajouté ici, hors de `planLoops`, dont la
       // réponse reste celle du moteur Python.
-      const sens = lastReversible?.graph.edgeOneway
+      const sens = reversible?.graph.edgeOneway
       if (sens && result?.routes) {
-        for (const kept of lastReversible.routes) {
+        for (const kept of reversible.routes) {
           if (!kept.cand.edges.some((e) => sens[e])) continue
           const route = result.routes.find((r) => r.id === kept.id)
           if (route) route.oneway = true

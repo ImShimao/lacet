@@ -19,7 +19,7 @@ const state = vi.hoisted(() => {
     })
     return { promise, resolve }
   }
-  return { deferred, zones: new Map(), gate: null }
+  return { deferred, zones: new Map(), gates: new Map(), gate: null }
 })
 
 vi.mock('./overpass', () => ({
@@ -41,14 +41,17 @@ vi.mock('./service', () => {
   return {
     normalizeRequest: (x) => x,
     graphRequest: (payload) => args(payload.lat),
-    planLoops: async (payload, { loadGraph }) => {
+    planLoops: async (payload, { loadGraph, onReversible }) => {
       await loadGraph(args(payload.lat))
-      await state.gate.promise
-      return { routes: [{ id: 'r0' }], meta: { timings_s: { fetch: 0 } } }
+      await (state.gates.get(payload.lat) ?? state.gate).promise
+      const id = `r${payload.lat}`
+      onReversible({ graph: {}, routes: [{ id, cand: { edges: [], geometry: [] } }] })
+      return { routes: [{ id }], meta: { timings_s: { fetch: 0 } } }
     },
+    pointKey: (p) => p.join(),
     matchedRoute: () => null,
     planDetour: async () => null,
-    reverseRoute: () => null,
+    reverseRoute: () => ({ route: {}, cand: {} }),
   }
 })
 
@@ -80,5 +83,32 @@ describe('le fil du moteur', () => {
     const { result } = posted.find((m) => m.id === 1 && m.type === 'result')
     expect(result.meta.partial).toBeUndefined()
     expect(result.meta.sources).toEqual({ livrée: 4 })
+  })
+
+  it('garde les boucles de la dernière recherche, même finie la première', async () => {
+    // Les filtres changés pendant un calcul : la recherche remplacée peut
+    // finir après sa remplaçante. « Autre sens » doit encore trouver les
+    // boucles affichées, pas celles de la recherche abandonnée.
+    const pret = () => {
+      const zone = state.deferred()
+      zone.resolve({ partial: false })
+      return zone
+    }
+    state.zones.set(3, pret())
+    state.zones.set(4, pret())
+    const avant = state.deferred()
+    const apres = state.deferred()
+    state.gates.set(3, avant)
+    state.gates.set(4, apres)
+
+    const ancienne = send({ id: 3, type: 'plan', payload: { lat: 3 } })
+    const nouvelle = send({ id: 4, type: 'plan', payload: { lat: 4 } })
+    apres.resolve()
+    await nouvelle
+    avant.resolve()
+    await ancienne
+
+    await send({ id: 5, type: 'reverse', payload: { id: 'r4' } })
+    expect(posted.find((m) => m.id === 5).type).toBe('result')
   })
 })

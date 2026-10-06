@@ -248,6 +248,9 @@ export async function planLoops(input, deps) {
     // Ce qu'il faut pour retourner une boucle plus tard : le worker le garde,
     // les tests l'ignorent.
     onReversible = () => {},
+    // Les boucles déjà montrées depuis la dernière recherche ordinaire, chacune
+    // en ensemble de points (`pointKey`) — voir `freshFirst`.
+    shown = [],
     // Points d'observation des tests de parité : le graphe construit, et chaque
     // lot de candidats bruts. Sans effet quand ils sont absents.
     trace = {},
@@ -375,6 +378,7 @@ export async function planLoops(input, deps) {
     }
   }
 
+  if (shown.length) unique = freshFirst(unique, shown, req.limit)
   const shortlist = unique.slice(0, shortlistSize(req.limit))
 
   onProgress('elevation', 0)
@@ -509,6 +513,35 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace) 
     unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace))
   }
   return [unique, rejected, offTarget]
+}
+
+/** La clé d'un point de tracé : les sommets viennent du graphe, au bit près. */
+export const pointKey = ([lon, lat]) => `${lon},${lat}`
+
+/**
+ * « Régénérer » : ce qui n'a pas encore été montré passe devant.
+ *
+ * Tourner les polygones change les sommets visés, pas les meilleures rues : la
+ * recherche suivante retrouvait les mêmes boucles par d'autres sommets. Mesuré
+ * sur Beaune et Lyon, une régénération sur deux remontrait une boucle déjà vue
+ * à plus de 80 % — on appuyait, et rien ne changeait. Une boucle dont plus de
+ * la moitié des points a déjà été montrée compte comme déjà vue : assez de
+ * neuves, et aucune ne revient ; sinon, toutes les neuves, complétées par les
+ * meilleures des déjà vues.
+ */
+function freshFirst(unique, shown, limit) {
+  const fresh = []
+  const seen = []
+  for (const cand of unique) {
+    const points = cand.geometry
+    const again = shown.some((keys) => {
+      let hits = 0
+      for (const p of points) if (keys.has(pointKey(p))) hits += 1
+      return hits > points.length * DUPLICATE_THRESHOLD
+    })
+    ;(again ? seen : fresh).push(cand)
+  }
+  return fresh.length >= limit ? fresh : [...fresh, ...seen.slice(0, limit - fresh.length)]
 }
 
 function lapOptions(graph, start, req, profile, targetM, mode, needed, trace) {

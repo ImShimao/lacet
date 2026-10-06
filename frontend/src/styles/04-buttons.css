@@ -87,9 +87,6 @@
 .skeleton--line {
   height: 16px;
 }
-.skeleton--block {
-  height: 76px;
-}
 
 /* L'avancement d'une recherche calculée sur l'appareil. La barre suit les
    tuiles téléchargées ; pour les étapes dont on ne connaît pas la durée, un

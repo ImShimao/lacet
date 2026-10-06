@@ -155,7 +155,8 @@ function hasSidewalkTag(tags) {
 
 export const DEFAULT_SPEED_KMH = new Map([
   ['primary', 80], ['primary_link', 60], ['secondary', 80], ['secondary_link', 60],
-  ['tertiary', 80], ['tertiary_link', 50], ['unclassified', 80], ['residential', 50],
+  // Les voies communales à 60 et non 80 — voir `DEFAULT_SPEED_KMH` en Python.
+  ['tertiary', 80], ['tertiary_link', 50], ['unclassified', 60], ['residential', 50],
   ['living_street', 20], ['service', 30], ['track', 30], ['pedestrian', 10],
   ['footway', 10], ['path', 10], ['cycleway', 20], ['steps', 5], ['bridleway', 10],
   ['road', 50],
@@ -169,7 +170,10 @@ const CYCLEWAY_SIDES = ['cycleway:left', 'cycleway:right', 'cycleway:both']
 const SHOULDER_PRESENT = new Set(['yes', 'both', 'left', 'right'])
 const CYCLEWAY_PRESENT = new Set(['track', 'lane', 'opposite_track', 'opposite_lane', 'share_busway', 'yes'])
 const BIKE_DESIGNATED = new Set(['designated', 'yes'])
-const BIKE_PATHS = new Set(['path', 'footway', 'track'])
+// La zone piétonne ouverte aux vélos en est une aussi — voir `has_cycleway`.
+const BIKE_PATHS = new Set(['path', 'footway', 'track', 'pedestrian'])
+// Le motif de séparation d'une voie ouverte aux vélos : `weights.js` le lit.
+export const CYCLE_FACILITY = 'aménagement cyclable'
 const NO_TRAFFIC = new Set(['path', 'track', 'bridleway', 'living_street', 'pedestrian'])
 
 const PAVED_SURFACES = new Set([
@@ -229,7 +233,7 @@ export function hasCycleway(tags) {
 
 function separationBike(tags, inBuiltup) {
   const highway = tags.highway ?? ''
-  if (hasCycleway(tags)) return [2, false, 'aménagement cyclable']
+  if (hasCycleway(tags)) return [2, false, CYCLE_FACILITY]
   if (NO_TRAFFIC.has(highway)) return [2, false, 'voie sans trafic motorisé']
   if (has(SHOULDER_PRESENT, tags.shoulder)) return [1, false, 'accotement']
   if (speedOf(tags, { inBuiltup }) <= 30) return [1, false, 'rue apaisée']

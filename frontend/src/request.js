@@ -2,12 +2,15 @@
 // terminée à son entrée d'historique. Rien ici ne dépend de React : ce sont des
 // traductions, et elles se testent comme telles.
 
-import { estimateKm, formatKm, raceOf } from './FiltersSheet.jsx'
+import { estimateKm, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
 import { pace } from './format'
 import { slim } from './storage'
 
 // « Distance exacte » : l'écart toléré entre la boucle et la distance visée.
 const PRECISE_TOLERANCE = 0.025
+// Les allures que le moteur accepte (`normalizeRequest`), en secondes par km.
+const MIN_PACE = 150
+const MAX_PACE = 1200
 
 /**
  * Le point demandé. Après une recherche, le repère rejoint la rue, là où la
@@ -48,8 +51,12 @@ export function toRequest(p, start) {
   else body.duration_min = p.duration_min
   // Viser un semi à ±10 %, c'est viser à deux kilomètres près.
   if (p.mode === 'distance' && p.precise) body.tolerance = PRECISE_TOLERANCE
-  if (p.sport === 'bike' || p.speedUnit === 'speed') body.speed_kmh = p.speed_kmh
-  else body.pace_sec_per_km = p.pace_sec_per_km
+  // Le moteur lit la vitesse d'un cycliste, l'allure d'un coureur : un coureur
+  // qui compte en km/h envoie donc l'allure équivalente. Envoyée telle quelle,
+  // sa vitesse était ignorée — « 1 h à 12 km/h », annoncé ≈12 km dans les
+  // filtres, donnait des boucles de 9 km, comptées à 6:30 du kilomètre.
+  if (p.sport === 'bike') body.speed_kmh = p.speed_kmh
+  else body.pace_sec_per_km = Math.min(MAX_PACE, Math.max(MIN_PACE, Math.round(secondsPerKm(p))))
   return body
 }
 

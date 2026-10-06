@@ -58,3 +58,10 @@ jobs:
       - name: App (moteur JavaScript et interface)
         working-directory: frontend
         run: npm test
+
+      # Ce que les tests n'importent pas, seul le build le compile : `App.jsx`
+      # n'a pas de test, et une variable déclarée deux fois n'y aurait été vue
+      # que par la compilation de l'IPA, sur le Mac, dix minutes plus tard.
+      - name: Build de l'app
+        working-directory: frontend
+        run: npm run build

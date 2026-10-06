@@ -58,8 +58,10 @@ export default function App() {
   const { result, selected, busy, progress, error, snapped, scrub } = found
   const setSelected = found.setSelected
   const setScrub = found.setScrub
-  // Numéro de « Régénérer » depuis la dernière recherche ordinaire.
+  // Numéro de « Régénérer » depuis la dernière recherche ordinaire, et la
+  // demande de la dernière recherche — pour reconnaître qu'on la refait.
   const variation = useRef(0)
+  const lastAsked = useRef(null)
 
   // Le départ, et la position qui le pose — voir `useStart.js`.
   const geo = useGeolocation()
@@ -123,16 +125,24 @@ export default function App() {
   const search = useCallback(
     async (next, { regenerate = false } = {}) => {
       const active = next || params
-      // Une recherche ordinaire repart de zéro ; « Régénérer » tourne les polygones
-      // d'un cran de plus et s'écarte des directions qu'on vient de montrer.
-      variation.current = regenerate ? variation.current + 1 : 0
-      const avoid = regenerate ? (result?.routes ?? []).map((r) => r.bearing) : []
       if (next) {
         setParams(next)
         save({ params: next })
       }
       setFiltersOpen(false)
       if (!start) return
+
+      // Une recherche ordinaire repart de zéro ; « Régénérer » tourne les polygones
+      // d'un cran de plus et s'écarte des directions qu'on vient de montrer. La
+      // même demande relancée sur ses propres propositions — les filtres
+      // rouverts et validés sans rien changer — en est une aussi : refaite à
+      // l'identique, elle rendait exactement les mêmes boucles.
+      const request = toRequest(active, start)
+      const key = JSON.stringify(request)
+      const again = regenerate || (Boolean(result?.request && result.routes.length) && key === lastAsked.current)
+      lastAsked.current = key
+      variation.current = again ? variation.current + 1 : 0
+      const avoid = again ? (result?.routes ?? []).map((r) => r.bearing) : []
 
       setTab('explore')
       setSheet('peek')
@@ -146,7 +156,7 @@ export default function App() {
       const asked = askedOf(start)
       await found.run(
         {
-          ...toRequest(active, start),
+          ...request,
           variation: variation.current,
           avoid_bearings: avoid,
           blocked: blockedPoints(),

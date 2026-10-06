@@ -195,9 +195,6 @@
   font-size: 12px;
   color: var(--text-2);
 }
-.live__big--paused b {
-  opacity: 0.45;
-}
 
 /* La carte suivie a été déplacée à la main : ce bouton la reprend. En haut et
    au centre, là où le pouce le trouve sans chercher, loin du panneau. */

@@ -426,33 +426,3 @@
   opacity: 0.3;
   cursor: default;
 }
-
-.radios {
-  display: flex;
-  gap: 16px;
-}
-.radios button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-.radios button[aria-pressed='true'] {
-  color: var(--accent-text);
-}
-.radios span {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  display: grid;
-  place-items: center;
-}
-.radios button[aria-pressed='true'] span::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}

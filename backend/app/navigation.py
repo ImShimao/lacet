@@ -568,11 +568,3 @@ def _advance(coords: list[Coord], distance_m: float) -> Coord:
             return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
         travelled += step
     return coords[-1]
-
-
-def summarize(instructions: list[Instruction]) -> dict[str, int]:
-    """Compte les manœuvres par nature — pour l'affichage, et pour les tests."""
-    counts: dict[str, int] = {}
-    for step in instructions:
-        counts[step.turn] = counts.get(step.turn, 0) + 1
-    return counts

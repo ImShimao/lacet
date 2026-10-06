@@ -415,10 +415,17 @@ est normal, et une app qui imposerait un détour serait inutilisable.
 |---|---|---|
 | Rue à 30, ou trottoir | 0 | — |
 | Rue à 50 sans trottoir | 0,11 | normal |
+| Voie communale sans limite taguée (comptée à 60) | 0,44 | pénalisée |
 | Route à 70 sans trottoir | 1,00 | acceptable |
 | Route à 80 avec accotement | 0,89 | acceptable |
 | Route à 80 sans rien | 1,78 | **exposé** |
 | Voie rapide | — | exclue en L0 |
+
+Les voies communales (`unclassified`) sont limitées à 80, mais on n'y roule pas
+à 80 : étroites, sans marquage, elles desservent des hameaux et des vignes.
+Comptées à 80, elles valaient une départementale, et autour de Meursault la
+recherche à pied ne rendait que des tours de 2 km répétés quatre fois ; comptées
+à 60, cinq vraies boucles notées A ou B. Une limite taguée l'emporte toujours.
 
 La séparation dépend du sport : un trottoir protège un coureur, pas un cycliste —
 lui a besoin d'une bande ou d'une piste cyclable. Une piste cyclable, elle, protège
@@ -432,7 +439,10 @@ s'appliquent à vélo** (`oneway`, giratoires), sauf contresens cyclable
 les trente-deux boucles vélo candidates remontaient toutes un sens interdit — dix-sept
 kilomètres en tout ; après, aucune. À pied, rien ne change : un sens unique ne
 s'impose pas au piéton. Une boucle vélo qui emprunte un sens unique ne se propose
-pas « dans l'autre sens ».
+pas « dans l'autre sens ». Les voies piétonnes — trottoirs, rues piétonnes — se
+roulent au pas : elles coûtent quatre fois leur longueur à vélo, sauf ouvertes
+aux vélos (`bicycle=yes`). Les rues piétonnes y échappaient jusqu'ici, faute de
+voitures, et les boucles traversaient le centre piéton comme une piste.
 
 **Voies sans voitures d'abord** — une case des filtres, cochée par défaut, propre
 à l'app (`engine/weights.js`). La sécurité seule ne départage pas une piste d'une
@@ -441,7 +451,19 @@ Guebwiller plutôt que la piste cyclable d'à côté. Pistes, chemins et allées
 coûtent désormais 0,6 fois leur longueur ; la route ne sert que là où il n'y a
 pas d'autre passage, ou pour varier les boucles. Sur cet exemple : 890 m sur la
 piste au lieu de 197, pour 78 m de plus. Le trottoir dessiné à part ne compte
-pas — il longe la rue.
+pas — il longe la rue. Et le bonus ne va qu'aux surfaces que le terrain choisi
+accepte : un chemin de terre n'est pas une piste pour un vélo de route. Sans
+cette borne, une boucle vélo « Route » de 30 km autour de Meursault passait à
+31 % dans les vignes ; autour de Guebwiller, la part goudronnée des boucles
+« Route » passe de 50 à 60 % à pied, de 71 à 77 % à vélo.
+
+**Régénérer montre d'autres boucles.** Tourner les polygones change les sommets
+visés, pas les meilleures rues : une régénération sur deux remontrait une boucle
+déjà vue. Le moteur garde les boucles montrées depuis la dernière recherche
+ordinaire et fait passer les neuves devant ; sur Beaune et Lyon, les boucles
+régénérées déjà vues à plus de moitié passent de 67 sur 165 à 21 — celles qui
+restent, c'est que le coin n'en offre pas d'autres. Valider les filtres sans
+rien y changer régénère aussi.
 
 **L2 — la règle du doute** (`risk.py`). Le tag `sidewalk` manque sur la majorité
 des rues françaises. L'inférence est **asymétrique** : trottoir probable en zone
@@ -1271,4 +1293,5 @@ motivé chaque mesure :
 ---
 
 Données cartographiques © contributeurs OpenStreetMap (ODbL) ·
-Fonds de carte © CARTO · Altitudes IGN RGE ALTI et OpenTopoData
+Fonds de carte © CARTO · Altitudes IGN RGE ALTI, Valhalla (FOSSGIS) dans l'app,
+OpenTopoData dans le moteur de référence

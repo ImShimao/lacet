@@ -5,7 +5,7 @@ import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { haversineM } from './geo'
 import { RouteStats, runGate } from './safety'
-import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, reverseRoute } from './service'
+import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute } from './service'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -97,6 +97,28 @@ describe('la boucle', () => {
     const fin = apres.routes[0].geometry[apres.routes[0].geometry.length - 1]
     expect(fin).toEqual(apres.routes[0].geometry[0])
   }, 30_000)
+
+  it('« Régénérer » ne remontre pas une boucle déjà vue', async () => {
+    // Tourner les polygones ne suffisait pas : les meilleures rues restaient
+    // les meilleures, et une régénération sur deux remontrait une boucle déjà
+    // affichée. Ce que le worker garde des boucles montrées les fait passer
+    // après les neuves.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5 }
+    const vues = []
+    let gardees = null
+    const garder = (r) => {
+      gardees = r
+    }
+    await planLoops(demande, { ...deps, onReversible: garder })
+    for (const { cand } of gardees.routes) vues.push(new Set(cand.geometry.map(pointKey)))
+
+    await planLoops({ ...demande, variation: 1 }, { ...deps, onReversible: garder, shown: vues })
+    expect(gardees.routes).toHaveLength(5)
+    for (const { cand } of gardees.routes) {
+      const dejaVue = Math.max(...vues.map((cles) => cand.geometry.filter((p) => cles.has(pointKey(p))).length))
+      expect(dejaVue / cand.geometry.length).toBeLessThanOrEqual(0.55)
+    }
+  }, 30_000)
 })
 
 describe('le relief', () => {
@@ -140,12 +162,25 @@ describe('un village sans boucle', () => {
   )
   const graph = buildGraph(extract, { sport: 'run' })
   const bligny = { lat: 46.966, lon: 4.834 }
+  // À 7 km, toute boucle d'ici longe encore la départementale. À 5 km, plus
+  // depuis que les voies communales comptent à 60 et non à 80 — voir le test
+  // suivant.
+  const sansBoucle = { ...bligny, distance_km: 7, sport: 'run', limit: 5, with_elevation: false }
 
-  it('propose les moins mauvais plutôt que rien', async () => {
+  it('trouve désormais une vraie boucle par les routes des vignes', async () => {
+    // Les voies communales comptaient comme une départementale : à 5 km, il
+    // n'y avait que des trajets repêchés. Ce sont elles qui font la boucle.
     const result = await planLoops(
       { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false },
       { loadGraph: async () => graph, wind: async () => null },
     )
+    expect(result.routes.length).toBeGreaterThan(0)
+    expect(result.meta.salvaged).toBeUndefined()
+    expect(result.routes[0].safety.grade).toBe('A')
+  }, 30_000)
+
+  it('propose les moins mauvais plutôt que rien', async () => {
+    const result = await planLoops(sansBoucle, { loadGraph: async () => graph, wind: async () => null })
     expect(result.routes.length).toBeGreaterThan(0)
     expect(result.meta.salvaged).toBe('exposed_share')
     // Et le dit : l'avertissement est le même que pour un repli de mode.
@@ -172,10 +207,7 @@ describe('un village sans boucle', () => {
   })
 
   it('ne fait pas passer un repêchage pour une recommandation', async () => {
-    const result = await planLoops(
-      { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false },
-      { loadGraph: async () => graph, wind: async () => null },
-    )
+    const result = await planLoops(sansBoucle, { loadGraph: async () => graph, wind: async () => null })
     // La note de sécurité reste celle du trajet : on ne l'embellit pas.
     expect(['A', 'B', 'C']).toContain(result.routes[0].safety.grade)
     // Et les motifs d'écart restent visibles.

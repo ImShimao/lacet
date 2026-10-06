@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { simplify, trailLength, trailRecorder } from './trail'
+import { haversineM } from './engine/geo'
+import { simplify, trailRecorder } from './trail'
+
+const trailLength = (points) => points.slice(1).reduce((total, p, i) => total + haversineM(points[i], p), 0)
 
 /**
  * La trace d'une sortie : ce qu'on garde, et ce qu'on jette.

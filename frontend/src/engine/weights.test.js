@@ -23,6 +23,8 @@ function graphFor(sport) {
     { id: 2, tags: { highway: 'cycleway' } },
     { id: 3, tags: { highway: 'footway', footway: 'sidewalk' } },
     { id: 4, tags: { highway: 'pedestrian' } },
+    { id: 5, tags: { highway: 'pedestrian', bicycle: 'yes' } },
+    { id: 6, tags: { highway: 'track', surface: 'ground' } },
   ].map((w, k) => ({ ...w, nodes: [10 * k + 1, 10 * k + 2], flat: Float64Array.from([...at(0), ...at(100)]) }))
   const graph = buildGraph({ ...emptyExtract(), ways }, { sport })
   const edgeOf = (id) => [...graph.edgeWayId].indexOf(id)
@@ -50,6 +52,30 @@ describe('les voies sans voitures', () => {
     const on = buildProfile('mixed', 'safe', false, 'bike', { carfree: true }).precompute(graph)
     expect(on[edgeOf(4)]).toBeCloseTo(off[edgeOf(4)])
     expect(on[edgeOf(2)]).toBeLessThan(off[edgeOf(2)])
+  })
+
+  it('ne rendent pas la terre plus attirante que le terrain choisi', () => {
+    // Un chemin de terre sans voitures n'est pas une piste pour un vélo de
+    // route : à Meursault, le bonus envoyait 31 % d'une boucle « Route » dans
+    // les vignes.
+    const { graph, edgeOf } = graphFor('bike')
+    const off = buildProfile('road', 'standard', false, 'bike').precompute(graph)
+    const on = buildProfile('road', 'standard', false, 'bike', { carfree: true }).precompute(graph)
+    expect(on[edgeOf(6)]).toBeCloseTo(off[edgeOf(6)])
+    expect(on[edgeOf(2)]).toBeLessThan(off[edgeOf(2)])
+    // En « Mixte », le même chemin garde son bonus à pied.
+    const { graph: g, edgeOf: of } = graphFor('run')
+    const mixed = buildProfile('mixed', 'standard', false, 'run', { carfree: true }).precompute(g)
+    const plain = buildProfile('mixed', 'standard', false, 'run').precompute(g)
+    expect(mixed[of(6)]).toBeLessThan(plain[of(6)])
+  })
+
+  it('à vélo, une zone piétonne fermée aux vélos coûte comme un trottoir', () => {
+    // Sans voitures, elle a la séparation d'une piste : c'est ce qui la
+    // faisait échapper à la pénalité des voies piétonnes.
+    const { graph, edgeOf } = graphFor('bike')
+    const w = buildProfile('mixed', 'safe', false, 'bike').precompute(graph)
+    expect(w[edgeOf(4)]).toBeCloseTo(4 * w[edgeOf(5)])
   })
 
   it('gardent l’heuristique d’A* admissible', () => {

@@ -137,10 +137,3 @@ function distanceToSegment(p, a, b) {
   const t = length > 0 ? Math.max(0, Math.min(1, (px * bx + py * by) / length)) : 0
   return Math.hypot(px - bx * t, py - by * t)
 }
-
-/** La longueur d'une trace, en mètres. */
-export function trailLength(points) {
-  let total = 0
-  for (let i = 1; i < (points?.length ?? 0); i += 1) total += metres(points[i - 1], points[i])
-  return total
-}

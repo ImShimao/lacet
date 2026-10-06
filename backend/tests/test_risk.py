@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import pytest
 
+from app.models import SafetyMode, Sport, SurfacePref
+from app.osm.graph import Edge
+from app.routing.weights import build_profile
 from app.safety.exclusion import is_excluded, oneway_for
 from app.safety.risk import (
     EXPOSED_RISK,
@@ -148,6 +151,20 @@ class TestRegleDuDoute:
         ville = evaluate_edge({"highway": "residential"}, in_builtup=True)
         campagne = evaluate_edge({"highway": "residential"}, in_builtup=False)
         assert ville.risk < campagne.risk
+
+    def test_voie_communale_penalisee_sans_etre_exposee(self):
+        """Une route de vignes n'est pas une départementale.
+
+        À 80 par défaut, toutes les voies communales comptaient comme exposées,
+        et à Meursault la recherche à pied ne rendait que des tours répétés.
+        """
+        communale = evaluate_edge({"highway": "unclassified"}, in_builtup=False)
+        assert communale.level == "caution"
+        assert communale.risk < EXPOSED_RISK
+        assert evaluate_edge({"highway": "tertiary"}, in_builtup=False).level == "risk"
+        # Une limite taguée l'emporte toujours sur la valeur par défaut.
+        taguee = evaluate_edge({"highway": "unclassified", "maxspeed": "80"}, in_builtup=False)
+        assert taguee.level == "risk"
 
 
 class TestExclusion:
@@ -300,3 +317,21 @@ class TestVelo:
     def test_voie_verte_sans_revetement_tague_n_est_pas_un_sentier(self):
         assert classify_surface({"highway": "path", "bicycle": "designated"}) == "paved"
         assert classify_surface({"highway": "path"}) == "trail"
+
+    def test_zone_pietonne_fermee_aux_velos_se_roule_au_pas(self):
+        """Sûre, puisque sans voitures, mais pénalisée comme un trottoir — sauf ouverte aux vélos.
+
+        La séparation de 2 qu'elle reçoit la faisait échapper à la pénalité des
+        voies piétonnes, et les boucles traversaient le centre piéton à vélo.
+        """
+        profile = build_profile(SurfacePref.mixed, SafetyMode.safe, False, Sport.bike)
+
+        def weight(tags: dict[str, str]) -> float:
+            safety = evaluate_edge(tags, in_builtup=True, sport="bike")
+            edge = Edge(a=0, b=1, length_m=100.0, coords=[], safety=safety, way_id=1, name=None, tunnel=False)
+            return profile.weight(edge)
+
+        ouverte = weight({"highway": "pedestrian", "bicycle": "yes"})
+        assert weight({"highway": "pedestrian"}) == pytest.approx(4 * ouverte)
+        assert weight({"highway": "footway"}) == pytest.approx(4 * ouverte)
+        assert weight({"highway": "footway", "bicycle": "designated"}) == pytest.approx(ouverte)

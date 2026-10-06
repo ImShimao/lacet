@@ -3,7 +3,7 @@
 //     poids = longueur × (1 + λ · risque) × facteur_surface × facteur_nuit
 
 import { pyMin } from './py'
-import { EXPOSED_RISK, nightFactor } from './safety'
+import { CYCLE_FACILITY, EXPOSED_RISK, nightFactor } from './safety'
 
 const LAMBDA = { safe: 4, standard: 1.5 }
 
@@ -66,6 +66,11 @@ export const AVOID_KEYS = Object.keys(AVOIDS)
 // la route ne sert plus que là où il n'y a pas d'autre passage — ou pour
 // varier les boucles.
 const CAR_FREE_FACTOR = 0.6
+// Le bonus ne va qu'aux surfaces que le terrain choisi accepte : un chemin de
+// terre sans voitures n'est pas une piste pour un vélo de route. Sans cette
+// borne, il rendait la terre moins chère que l'asphalte — mesuré à Meursault,
+// 31 % de chemins sur une boucle vélo de 30 km réglée sur « Route ».
+const CAR_FREE_SURFACE_MAX = 1.2
 
 const FOOT_ONLY_FACTOR = 4
 const FOOT_ONLY_HIGHWAY = new Set(['footway', 'pedestrian'])
@@ -87,14 +92,16 @@ export class Profile {
   weight(graph, e) {
     const s = graph.edgeSafety[e]
     let w = graph.edgeLen[e] * (1 + this.lam * s.risk)
-    w *= this.factors.has(s.surface) ? this.factors.get(s.surface) : 1
+    const surface = this.factors.has(s.surface) ? this.factors.get(s.surface) : 1
+    w *= surface
     if (this.sport === 'bike') {
-      if (FOOT_ONLY_HIGHWAY.has(s.highway) && !(s.separation >= 2)) w *= FOOT_ONLY_FACTOR
+      // Seule une voie ouverte aux vélos y échappe — voir `FOOT_ONLY_FACTOR` en Python.
+      if (FOOT_ONLY_HIGHWAY.has(s.highway) && s.reason !== CYCLE_FACILITY) w *= FOOT_ONLY_FACTOR
     } else if (s.highway === 'steps') {
       w *= STEPS_FACTOR
     }
     if (this.night) w *= nightFactor(s)
-    if (this.carfree && s.carFree) w *= CAR_FREE_FACTOR
+    if (this.carfree && s.carFree && surface <= CAR_FREE_SURFACE_MAX) w *= CAR_FREE_FACTOR
     for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
     if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
     // Un portail fermé connu d'OpenStreetMap pèse comme un signalement : c'est
