@@ -82,17 +82,17 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
 
 ## Règles de travail
 
-- Ne lis pas README.md en entier (68 Ko). Cherche-y avec grep la section utile
-  (`grep -n '^##' README.md`, puis lis seulement la plage). Ses sections :
-  - Ce qu'il fait · L'installer · Comment c'est fait · Le détail, section par section
-  - Démarrer (première fois) · Lancer · Tester dans VS Code
-  - L'app iPhone : Récupérer l'IPA · L'installer avec AltStore · Ce que fait l'app, et qu'une page ne
-    ferait pas · En course, la carte suit comme un GPS · Hors parcours : un nouveau chemin · Les fonds de carte
-  - Apple Santé et Strava · Le moteur de sécurité · La note A, B, C · L'algorithme de génération
-  - Le choix des propositions · Quand la distance ne tient pas : les tours · Le vent
-  - La préférence de dénivelé (Le dénivelé annoncé, et celui qu'on monte) · Le guidage · Réglages · Interface
-  - La sortie (Les cartes hors ligne) · Performances (Sur l'appareil · Le moteur de référence (Python) ·
-    Robustesse des données) · Limites, dites franchement · Ensuite
+- `README.md` est la page d'accueil du dépôt (captures, installation, liens) : courte, elle renvoie
+  au détail. Celui-ci est dans `docs/`, un fichier par thème — lis seulement celui qu'il faut :
+  - `fonctionnalites.md` (ce que fait l'app) · `architecture.md` (comment c'est fait, données)
+  - `app-iphone.md` (IPA, AltStore, natif, carte en course, hors parcours, fonds de carte, Apple Santé)
+  - `securite.md` (moteur de sécurité, note A, B, C) · `generation.md` (algorithme, choix des
+    propositions, tours, vent, dénivelé)
+  - `guidage.md` (guidage, sortie, cartes hors ligne) · `interface.md` (interface, réglages)
+  - `performances.md` (appareil, moteur Python, robustesse) · `developper.md` (démarrer, lancer,
+    tester) · `limites.md` (limites, suite)
+- Les captures de `docs/images/` viennent de l'aperçu à taille d'iPhone (390 × 844, 3×), réduites à
+  780 px et ramenées à 256 couleurs : à refaire quand l'écran qu'elles montrent change.
 - Lance seulement les tests liés au fichier modifié, pas toute la suite, sauf avant un commit.
   Un changement du moteur ajoute toujours `parity.test.js`.
 - Avant d'écrire du nouveau code, vérifie si une fonction existante du projet fait déjà le travail.

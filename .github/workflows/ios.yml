@@ -89,7 +89,11 @@ jobs:
       # des archives en ligne, en une seconde.
       MARGIN_M: 1500
     steps:
+      # Tout l'historique, étiquettes comprises : les notes de la publication
+      # listent ce qui a changé depuis la précédente.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Semaine
         id: week
@@ -144,6 +148,15 @@ jobs:
       # La publication est créée ici, par le premier des deux travaux ; l'IPA
       # viendra s'y ajouter. `--clobber` parce qu'une compilation relancée
       # écrase la précédente plutôt que d'échouer.
+      #
+      # **En préversion, le temps de la compilation.** Le lien « Télécharger
+      # l'IPA » du README vise la dernière publication : pendant le quart d'heure
+      # où celle-ci n'a encore que les rues, il aurait mené à une page sans IPA.
+      # Elle devient la dernière une fois l'IPA posée — voir la fin de `ipa`.
+      #
+      # Ses notes disent ce qui change — les commits depuis la publication
+      # précédente — et comment l'installer : « Compilation 58 » ne disait rien,
+      # le téléphone en main, de ce qu'on s'apprêtait à installer.
       - name: Publication des rues de la région
         env:
           GH_TOKEN: ${{ github.token }}
@@ -152,10 +165,33 @@ jobs:
           set -euo pipefail
           tar -czf region.tar.gz -C region .
           ls -lh region.tar.gz
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # La dernière publication complète : une préversion restée en plan —
+            # une IPA qui n'a pas compilé — n'a rien livré.
+            PREV="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-pre-releases --limit 10 --json tagName --jq '.[].tagName' | grep -vx "$TAG" | head -n 1 || true)"
+            CHANGES=""
+            if [ -n "$PREV" ] && git rev-parse -q --verify "refs/tags/$PREV" >/dev/null; then
+              CHANGES="$(git log --no-merges --format='- %s' "$PREV..$GITHUB_SHA")"
+            fi
+            # Une compilation du lundi sans nouveau commit : seules les rues ont changé.
+            [ -n "$CHANGES" ] || CHANGES="- Les rues de la région, rafraîchies pour la semaine."
+            {
+              echo "### Ce qui change"
+              echo
+              echo "$CHANGES"
+              echo
+              echo "### Installer"
+              echo
+              echo "- **Par la source AltStore** : remplace \`Lacet.ipa\` à la racine du dépôt par celle-ci, lance \`python scripts/altstore_source.py\`, puis **AltStore → Lacet → Mettre à jour**."
+              echo "- **Par le fichier** : télécharge \`Lacet.ipa\` ci-dessous, puis **AltStore → Mes apps → +**."
+              echo
+              echo "Le pas-à-pas complet : [L'installer](https://github.com/$GITHUB_REPOSITORY#linstaller)."
+              echo
+              echo "<sub>Commit ${GITHUB_SHA::7}${PREV:+ · changements depuis $PREV}</sub>"
+            } > notes.md
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Lacet 1.0.${{ github.run_number }}" \
-              --notes "IPA à installer par AltStore, et les rues de la région qui l'accompagnent."
+              --title "Lacet 1.0.${{ github.run_number }}" --notes-file notes.md --prerelease
+          fi
           gh release upload "$TAG" region.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
 
   ipa:
@@ -317,6 +353,12 @@ jobs:
       # L'IPA rejoint la publication de la région. C'est ce fichier-là que le PC
       # télécharge, pose à la racine du dépôt, puis sert à AltStore depuis
       # `altstore/` (scripts/altstore_source.py).
+      #
+      # Puis la publication devient la dernière, et ne garde que l'IPA : les
+      # rues n'y étaient que pour passer d'un travail à l'autre — l'app les
+      # contient déjà —, et trente-huit mégaoctets nommés `region.tar.gz` à côté
+      # de `Lacet.ipa` faisaient chercher lequel installer. Seulement ici, une
+      # fois l'IPA posée : un travail relancé après un échec retrouve ses rues.
       - name: Publication de l'IPA
         env:
           GH_TOKEN: ${{ github.token }}
@@ -324,4 +366,6 @@ jobs:
         run: |
           set -euo pipefail
           gh release upload "$TAG" "$GITHUB_WORKSPACE/Lacet.ipa" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release delete-asset "$TAG" region.tar.gz --repo "$GITHUB_REPOSITORY" --yes || true
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
