@@ -162,16 +162,21 @@ describe('un village sans boucle', () => {
   )
   const graph = buildGraph(extract, { sport: 'run' })
   const bligny = { lat: 46.966, lon: 4.834 }
-  // À 7 km, toute boucle d'ici longe encore la départementale. À 5 km, plus
-  // depuis que les voies communales comptent à 60 et non à 80 — voir le test
-  // suivant.
-  const sansBoucle = { ...bligny, distance_km: 7, sport: 'run', limit: 5, with_elevation: false }
+  // À 7 km et de nuit, toute boucle d'ici longe encore la départementale. À
+  // 5 km, plus depuis que les voies communales comptent à 60 et non à 80 —
+  // voir le test suivant.
+  //
+  // **L'heure est fixée**, de jour comme de nuit : laissée à `auto`, elle était
+  // lue sur l'horloge. À midi, Bligny a ses boucles A et B à 7 km, rien à
+  // repêcher, et ces tests échouaient — la CI ne restait verte que parce que
+  // ses deux derniers passages tombaient avant l'aube.
+  const sansBoucle = { ...bligny, distance_km: 7, sport: 'run', limit: 5, with_elevation: false, time_of_day: 'night' }
 
   it('trouve désormais une vraie boucle par les routes des vignes', async () => {
     // Les voies communales comptaient comme une départementale : à 5 km, il
     // n'y avait que des trajets repêchés. Ce sont elles qui font la boucle.
     const result = await planLoops(
-      { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false },
+      { ...bligny, distance_km: 5, sport: 'run', limit: 5, with_elevation: false, time_of_day: 'day' },
       { loadGraph: async () => graph, wind: async () => null },
     )
     expect(result.routes.length).toBeGreaterThan(0)

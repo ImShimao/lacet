@@ -552,6 +552,13 @@ export default function App() {
                 // Les rues et altitudes gardées pour calculer hors ligne aussi.
                 await clearEngineData()
                 library.clear()
+                // Et les réglages que tient l'écran : laissés tels quels, le
+                // prochain `save` les aurait réécrits dans le magasin vidé.
+                setParams({ ...DEFAULTS })
+                setMapStyle(DEFAULT_STYLE)
+                setPoiPrefs({ water: false, toilets: false })
+                setRunView('heading')
+                run.dropPending()
               }}
               onRestored={() => {
                 library.reload()

@@ -271,11 +271,16 @@ est passée avant que l'app ne sache le dire elle-même.
 1. Installe AltServer sur le PC et AltStore sur l'iPhone (iTunes et iCloud
    doivent venir du site d'Apple, pas du Microsoft Store).
 2. Mets l'IPA sur le téléphone. Sans entrée « Sideload .ipa » dans AltServer, le
-   plus simple est de la servir sur le réseau local — `python -m http.server`
-   à la racine du dépôt — puis de l'ouvrir dans Safari : elle arrive dans
-   **Fichiers → Téléchargements**.
-3. **AltStore → Mes apps → +** → `Lacet.ipa`. AltServer doit tourner : c'est lui
-   qui signe.
+   plus simple est de la servir sur le réseau local :
+   `python scripts/altstore_source.py` prépare le dossier `altstore/`, et
+   `python -m http.server 8765 --directory altstore` le sert — ce dossier-là,
+   jamais la racine du dépôt, qui livrerait `.git` à tout le Wi-Fi. Ouvre
+   ensuite l'IPA dans Safari : elle arrive dans **Fichiers → Téléchargements**.
+   Mieux, une fois pour toutes : **AltStore → Sources → +** →
+   `http://<adresse du PC>:8765/source.json`, et chaque version s'installe
+   ensuite d'un « Mettre à jour ».
+3. **AltStore → Mes apps → +** → l'IPA téléchargée. AltServer doit tourner :
+   c'est lui qui signe.
 4. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
    identifiant → **Faire confiance** ; puis **Confidentialité et sécurité →
    Mode développeur** → activer et redémarrer.

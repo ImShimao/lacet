@@ -1,7 +1,7 @@
-// Persistance locale. En V1 tout tient dans le navigateur ; c'est ce que
-// remplacera Postgres quand il y aura des comptes. Chaque accès est protégé :
-// le stockage peut être refusé (navigation privée, réglages du navigateur) et
-// l'app doit continuer de fonctionner sans.
+// Persistance locale. Tout tient sur le téléphone, sans compte ni serveur :
+// le stockage de la WebView, doublé d'une copie sur fichier (plus bas). Chaque
+// accès est protégé : le stockage peut être refusé ou plein, et l'app doit
+// continuer de fonctionner sans.
 
 import { haversineM } from './engine/geo'
 
@@ -100,6 +100,28 @@ export function save(patch) {
 }
 
 let refusedAt = null
+
+/**
+ * Remet le magasin à neuf : favoris, sorties, départs nommés et récents,
+ * signalements, contact d'urgence, réglages — tout.
+ *
+ * « Tout effacer » ne vidait que les favoris et les sorties : « Chez moi »,
+ * avec ses coordonnées, et le numéro du contact d'urgence survivaient au
+ * bouton qui annonçait l'app « comme au premier jour ».
+ *
+ * Le magasin est **réécrit à vide, pas retiré** : absent, il serait restauré
+ * au lancement suivant depuis sa copie sur fichier (`restoreFrom`), et tout
+ * reviendrait.
+ */
+export function wipe() {
+  try {
+    const text = JSON.stringify(DEFAULTS)
+    localStorage.setItem(KEY, text)
+    mirrorSoon(text)
+  } catch {
+    /* stockage refusé : il n'y avait rien d'écrit */
+  }
+}
 
 // --- la copie sur fichier -------------------------------------------------------
 //
@@ -301,8 +323,13 @@ export function importAll(text) {
   } catch {
     throw new Error("Ce fichier n'est pas une sauvegarde Lacet.")
   }
-  const data = parsed?.app === 'lacet' ? parsed.data : null
-  if (!data || typeof data !== 'object') throw new Error("Ce fichier n'est pas une sauvegarde Lacet.")
+  const lu = parsed?.app === 'lacet' ? parsed.data : null
+  if (!lu || typeof lu !== 'object') throw new Error("Ce fichier n'est pas une sauvegarde Lacet.")
+  // Ce qui décrit l'appareil d'où vient la sauvegarde, et pas ses données : la
+  // liste des cartes hors ligne — dont les fichiers sont restés là-bas, et que
+  // l'app aurait annoncées « disponibles » sur un téléphone réinstallé —, une
+  // sortie en cours, la trace d'un élagage.
+  const { offlineMaps, run, trimmed, ...data } = lu
 
   const current = load()
   const merge = (mine, theirs, key) => {

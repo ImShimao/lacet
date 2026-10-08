@@ -314,8 +314,8 @@ function ClearData({ onClearData }) {
   return (
     <>
       <p className="muted small">
-        Favoris, sorties, réglages, cartes et rues gardées. Fais une sauvegarde avant si tu
-        veux pouvoir revenir en arrière.
+        Favoris, sorties, départs nommés, signalements, contact d'urgence, réglages, cartes
+        et rues gardées. Fais une sauvegarde avant si tu veux pouvoir revenir en arrière.
       </p>
       {confirm ? (
         <div className="row">

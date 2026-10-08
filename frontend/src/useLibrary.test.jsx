@@ -108,6 +108,29 @@ describe('ce que l’app garde', () => {
     expect(load().favorites).toHaveLength(0)
   })
 
+  it('efface aussi ce qui dit où l’on habite, et qui prévenir', () => {
+    // « Chez moi », les adresses cherchées et le contact d'urgence restaient
+    // après « Tout effacer », qui annonçait pourtant l'app comme neuve.
+    const chezMoi = { id: 'p1', name: 'Chez moi', lat: 47.9, lon: 7.2 }
+    save({
+      places: [chezMoi],
+      recentPlaces: [{ label: '3 rue des Vignes', lat: 47.9, lon: 7.2 }],
+      reports: [{ id: 'x', lat: 47.9, lon: 7.2, kind: 'closed' }],
+      emergencyContact: '0612345678',
+      params: { sport: 'bike' },
+    })
+    monter(load())
+    expect(api.places).toHaveLength(1)
+    act(() => api.clear())
+    expect(api.places).toHaveLength(0)
+    const disque = load()
+    expect(disque.places ?? []).toHaveLength(0)
+    expect(disque.recentPlaces).toHaveLength(0)
+    expect(disque.reports).toHaveLength(0)
+    expect(disque.emergencyContact).toBeUndefined()
+    expect(disque.params).toBeNull()
+  })
+
   it('ne réécrit pas ses vieilles listes par-dessus une sauvegarde restaurée', () => {
     // Une sauvegarde qui contient un favori, restaurée pendant que l'écran
     // tient une liste vide : sans relecture, le favori suivant effaçait le

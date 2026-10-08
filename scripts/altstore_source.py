@@ -9,15 +9,23 @@ version en deux touches — *Sources → Lacet → Mettre à jour* — là où i
 sinon ouvrir Safari, télécharger l'IPA, la retrouver dans Fichiers, et la poser
 dans AltStore.
 
-Le fichier est écrit à côté de `Lacet.ipa`, à la racine du dépôt, et se sert
-avec le même petit serveur (`python -m http.server 8765`). Rien n'est publié :
-l'adresse est celle du PC sur le réseau local, et elle ne vaut que chez soi.
+Le script lit `Lacet.ipa`, à la racine du dépôt, et prépare dans `altstore/`
+tout ce qu'AltStore télécharge : la source, une copie versionnée de l'IPA et
+l'icône. C'est ce dossier, et lui seul, qui se sert :
+
+    python -m http.server 8765 --directory altstore
+
+**Pas la racine du dépôt.** Servie telle quelle, elle livrait à tout le Wi-Fi
+le dossier `.git` — l'historique entier d'un dépôt privé — et le moindre `.env`
+qu'on y aurait posé. Rien n'est publié pour autant : l'adresse est celle du PC
+sur le réseau local, et elle ne vaut que chez soi.
 """
 
 from __future__ import annotations
 
 import json
 import plistlib
+import shutil
 import socket
 import sys
 import zipfile
@@ -26,7 +34,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 IPA = ROOT / "Lacet.ipa"
-OUT = ROOT / "source.json"
+ICON = ROOT / "frontend" / "resources" / "icon-192.png"
+SERVED = ROOT / "altstore"
+OUT = SERVED / "source.json"
 
 DESCRIPTION = (
     "Des boucles de course et de vélo depuis ta porte, qui évitent les routes "
@@ -151,13 +161,16 @@ def main() -> None:
     # celle d'aujourd'hui, et AltStore refuse : « the downloaded version does not
     # match the version specified by the source ». Le nom porte donc la version,
     # et les anciennes s'effacent.
-    copie = ROOT / f"Lacet-{version}.ipa"
+    SERVED.mkdir(exist_ok=True)
+    copie = SERVED / f"Lacet-{version}.ipa"
     if not copie.exists() or copie.stat().st_size != size:
         copie.write_bytes(IPA.read_bytes())
-    for vieille in ROOT.glob("Lacet-*.ipa"):
+    for vieille in SERVED.glob("Lacet-*.ipa"):
         if vieille != copie:
             vieille.unlink()
+    shutil.copyfile(ICON, SERVED / ICON.name)
     download = f"{base}/{copie.name}"
+    icon = f"{base}/{ICON.name}"
 
     entry = {
         "name": "Lacet",
@@ -165,7 +178,7 @@ def main() -> None:
         "developerName": "Shimao",
         "subtitle": "Des boucles de course depuis ta porte",
         "localizedDescription": DESCRIPTION,
-        "iconURL": f"{base}/frontend/resources/icon-192.png",
+        "iconURL": icon,
         "tintColor": "7C3AED",
         "screenshotURLs": [],
         "permissions": permissions,
@@ -194,7 +207,7 @@ def main() -> None:
         "name": "Lacet",
         "identifier": "fr.lacet.source",
         "subtitle": "Les compilations de Lacet, servies depuis le PC",
-        "iconURL": f"{base}/frontend/resources/icon-192.png",
+        "iconURL": icon,
         "tintColor": "7C3AED",
         "apps": [entry],
         "news": [],
@@ -202,6 +215,7 @@ def main() -> None:
 
     OUT.write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{OUT} écrit — version {version}, compilation {build}")
+    print(f"À servir : python -m http.server {port} --directory altstore")
     print(f"À ajouter dans AltStore : {base}/source.json")
 
 

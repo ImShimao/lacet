@@ -59,7 +59,8 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
 - Build iOS : seulement sur GitHub (macOS), à chaque push sur `main` qui touche `frontend/`, ou
   `gh workflow run ios.yml`. Suivi : `gh run list --workflow ios.yml`, `gh run view <id> --log-failed`.
   L'IPA est jointe à la publication `v1.0.<n>` : `gh release download v1.0.<n> --pattern Lacet.ipa`,
-  puis remplace `Lacet.ipa` à la racine (servie à AltStore, voir `scripts/altstore_source.py`).
+  puis remplace `Lacet.ipa` à la racine et lance `python scripts/altstore_source.py`, qui prépare
+  `altstore/` ; seul ce dossier se sert (aperçu `lacet-ipa`), jamais la racine, qui livrerait `.git`.
 
 ## Conventions
 
@@ -77,7 +78,7 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
 - iPhone portrait uniquement. Champs de saisie ≥ 16 px et `maximum-scale=1` dans `index.html`, sinon
   iOS zoome toute l'app au toucher.
 - Générés, à ne pas éditer à la main : `frontend/ios/`, `frontend/dist/`, `frontend/public/region/`,
-  `*.ipa`, `source.json`, `expected.json.gz` et `numbers.json` (refaits par leurs scripts).
+  `*.ipa`, `altstore/`, `expected.json.gz` et `numbers.json` (refaits par leurs scripts).
 
 ## Règles de travail
 

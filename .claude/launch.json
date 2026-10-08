@@ -17,7 +17,9 @@
       "runtimeArgs": [
         "-m",
         "http.server",
-        "8765"
+        "8765",
+        "--directory",
+        "altstore"
       ],
       "cwd": ".",
       "port": 8765

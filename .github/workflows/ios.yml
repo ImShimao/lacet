@@ -45,6 +45,14 @@ permissions:
   contents: write
 
 jobs:
+  # Les tests d'abord : une IPA construite sur un moteur qui ne calcule plus
+  # comme la référence serait pire qu'aucune IPA. Ce sont ceux de `tests.yml`,
+  # sur Linux — ils tournaient aussi sur le Mac, où chaque minute en coûte dix,
+  # et après la création de la publication : un test rouge laissait une
+  # version sans IPA. Rien ne part désormais avant qu'ils soient verts.
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   # La carte régionale livrée dans l'app : toutes les rues de la région, prêtes,
   # pour ne plus rien attendre d'Overpass quand on court chez soi. Voir
   # frontend/scripts/region_tiles.py. Calculée une fois par semaine : les
@@ -57,6 +65,7 @@ jobs:
   # sont donc coupés à une même emprise, fusionnés, et seules les tuiles qui y
   # tiennent entièrement sont livrées — le débord est aussi complet que le reste.
   region:
+    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -193,11 +202,6 @@ jobs:
           rm region.tar.gz
           du -sh public/region
 
-      # Les tests d'abord : une IPA construite sur un moteur qui ne calcule plus
-      # comme la référence serait pire qu'aucune IPA.
-      - name: Tests
-        run: npm test
-
       # Les fonds Mapbox n'apparaissent que si le secret VITE_MAPBOX_TOKEN est
       # défini dans le dépôt (Settings → Secrets and variables → Actions). Sans
       # lui, la variable est vide et l'app propose ses fonds gratuits.
@@ -311,7 +315,8 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/Lacet.ipa"
 
       # L'IPA rejoint la publication de la région. C'est ce fichier-là que le PC
-      # télécharge, pose à la racine du dépôt et sert à AltStore.
+      # télécharge, pose à la racine du dépôt, puis sert à AltStore depuis
+      # `altstore/` (scripts/altstore_source.py).
       - name: Publication de l'IPA
         env:
           GH_TOKEN: ${{ github.token }}

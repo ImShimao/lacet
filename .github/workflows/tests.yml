@@ -1,22 +1,28 @@
 # Les deux moteurs, à chaque envoi.
 #
-# `ios.yml` ne tourne que quand le front change, et ne lance que ses tests à
+# `ios.yml` ne tourne que quand le front change, et ne lançait que ses tests à
 # lui : une modification du moteur Python — la référence, celle où chaque seuil
 # est justifié — partait sans qu'aucun test ne la voie. Et rien ne vérifiait que
 # l'oracle de parité avait été refait : `parity.test.js` comparait alors le
 # JavaScript à l'ancienne réponse de Python, et restait vert.
 #
 # Sur Linux, pas sur le Mac : rien ici n'a besoin de Xcode, et une minute de
-# macOS en coûte dix.
+# macOS en coûte dix. `ios.yml` appelle donc ce workflow-ci avant de compiler,
+# au lieu de refaire les tests sur le Mac.
 
 name: Tests
 
 on:
   push:
   workflow_dispatch:
+  # Appelé aussi par `ios.yml`, avant toute compilation : voir là-bas.
+  workflow_call:
 
+# `github.workflow` dans le groupe : appelé depuis `ios.yml`, ce workflow porte
+# le nom de l'appelant. Sans lui, les tests de l'IPA et ceux du même envoi
+# tombaient dans le même groupe, et l'un annulait l'autre — l'IPA avec.
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

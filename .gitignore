@@ -24,9 +24,7 @@ frontend/android/
 # Carte régionale : produite par la compilation (scripts/region_tiles.py), jamais versionnée.
 frontend/public/region/
 
-# La source AltStore porte l’adresse du PC sur le réseau local : elle se
-# régénère (scripts/altstore_source.py) et n’a rien à faire dans le dépôt.
-source.json
-
-# Les copies versionnées servies à AltStore (voir scripts/altstore_source.py).
-Lacet-*.ipa
+# Le dossier servi à AltStore : la source, qui porte l’adresse du PC sur le
+# réseau local, l’icône et les copies versionnées de l’IPA. Il se régénère
+# (scripts/altstore_source.py) et n’a rien à faire dans le dépôt.
+altstore/

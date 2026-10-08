@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { exportAll, importAll, load, mirrorTo, recentPlaces, rememberPlace, restoreFrom, save, slim } from './storage'
+import { exportAll, importAll, load, mirrorTo, recentPlaces, rememberPlace, restoreFrom, save, slim, wipe } from './storage'
 
 /**
  * La persistance locale.
@@ -220,6 +220,15 @@ describe('la sauvegarde', () => {
     expect(load().places.map((p) => p.name).sort()).toEqual(['Chez moi', 'Le club'])
   })
 
+  it('ne reprend pas les cartes hors ligne d’un autre téléphone', () => {
+    // Leurs fichiers sont restés sur l'appareil d'où vient la sauvegarde.
+    save({ offlineMaps: { ailleurs: { bytes: 1, urls: ['https://tuiles/1.png'] } } })
+    const copie = exportAll()
+    save({ offlineMaps: { ici: { bytes: 2, urls: [] } } })
+    importAll(copie)
+    expect(Object.keys(load().offlineMaps)).toEqual(['ici'])
+  })
+
   it('refuse un fichier qui n’en est pas une', () => {
     expect(() => importAll('{"app":"autre"}')).toThrow(/sauvegarde Lacet/)
     expect(() => importAll('pas du json')).toThrow(/sauvegarde Lacet/)
@@ -262,6 +271,26 @@ describe('la copie sur fichier', () => {
     expect(await restoreFrom(read)).toBe(false)
     expect(read).not.toHaveBeenCalled()
     expect(load().history[0].name).toBe('Plus récente')
+  })
+
+  it('ne fait pas revenir par la copie ce qu’on a effacé', async () => {
+    vi.useFakeTimers()
+    try {
+      const write = vi.fn()
+      mirrorTo(write)
+      save({ history: [{ name: 'Boucle du dimanche' }] })
+      wipe()
+      vi.advanceTimersByTime(1000)
+      expect(JSON.parse(write.mock.calls.at(-1)[0]).history).toEqual([])
+    } finally {
+      mirrorTo(null)
+      vi.useRealTimers()
+    }
+    // Une copie plus ancienne, si elle traînait encore, ne remplace pas un
+    // magasin effacé : il est vide, pas absent.
+    const ancienne = JSON.stringify({ history: [{ name: 'Boucle du dimanche' }] })
+    expect(await restoreFrom(async () => ancienne)).toBe(false)
+    expect(load().history).toEqual([])
   })
 
   it('ignore une copie absente ou abîmée', async () => {

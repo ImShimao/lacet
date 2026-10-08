@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { keyOf } from './offlineMaps'
-import { load, save, slim } from './storage'
+import { load, save, slim, wipe } from './storage'
 
 /**
  * Ce que l'app garde de toi : les favoris, les sorties, les départs nommés.
@@ -115,11 +115,12 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       return put('places', places.filter((p) => p.id !== id), setPlaces)
     },
 
-    /** Tout effacer, quand « Mon compte » le demande. */
+    /** Tout effacer, quand « Mon compte » le demande — voir `wipe`. */
     clear() {
-      save({ favorites: [], history: [] })
+      wipe()
       setSaved([])
       setHistory([])
+      setPlaces([])
     },
 
     /**
