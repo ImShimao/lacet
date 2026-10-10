@@ -16,7 +16,7 @@ import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
-import { reliefMismatch } from './explain'
+import { reliefMismatch, surfaceMismatch } from './explain'
 import { km } from './format'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
@@ -172,6 +172,7 @@ export default function Explore({
 
   const terrain = TERRAINS[params.sport].find((t) => t.key === params.surface)
   const relief = reliefMismatch(params.elevation, routes)
+  const ground = surfaceMismatch(params.surface, routes)
 
   const exportGpx = async () => {
     setExporting(true)
@@ -230,6 +231,15 @@ export default function Explore({
           {relief.kind === 'hilly'
             ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
             : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
+        </div>
+      )}
+      {/* Le même aveu pour le terrain : ces boucles passent devant parce
+          qu'elles s'en approchent le plus, pas parce qu'elles le tiennent. */}
+      {ground && (
+        <div className="notice">
+          {ground.kind === 'trail'
+            ? `Peu de chemins à portée d'ici : la boucle la plus nature n'en compte que ${ground.share} %.`
+            : `Pas de boucle toute goudronnée d'ici : la plus roulante a encore ${ground.share} % de chemins.`}
         </div>
       )}
       {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher

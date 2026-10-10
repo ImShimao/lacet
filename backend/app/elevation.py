@@ -394,8 +394,10 @@ class ElevationCache:
                 value = self._load(self._tile(c)).get(f"{c[0]},{c[1]}")
                 if value is not None:
                     # Les caches d'avant ne rangeaient qu'un nombre : ils
-                    # venaient d'une époque à source unique, donc fine.
-                    out[c] = tuple(value) if isinstance(value, list) else (value, False)
+                    # venaient d'une époque à source unique, donc fine. Relu du
+                    # disque, le couple est une liste ; tout juste rangé, un
+                    # tuple — à n'emballer ni l'un ni l'autre.
+                    out[c] = tuple(value) if isinstance(value, (list, tuple)) else (value, False)
         return out
 
     def store(self, values: dict[Coord, tuple[float, bool]]) -> None:

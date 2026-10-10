@@ -264,16 +264,67 @@ tout ce que la variété peut rapporter :
 Ce n'est pas un rejet : s'il n'existe que des boucles hors fourchette, elles
 sont proposées — simplement jamais devant une boucle conforme.
 
-Le retrait grandit avec l'écart : 0,8, plus 0,8 par tranche de 5 m/km au-delà
+Le retrait grandit avec l'écart : 2, plus 0,8 par tranche de 5 m/km au-delà
 de la fourchette. Fixe, il frappait pareil 120 et 380 m de D+, et la variété
 les départageait : à Guebwiller, une demande de plat sur 9 km mettait 290 m en
 tête et 120 m en troisième, pour une question de direction. Elles sortent
 désormais dans l'ordre du dénivelé.
 
-**Le réglage passe avant la note.** Une boucle plate notée B passe devant une
-boucle de montagne notée A : « plat » est un réglage, et la B a passé le
-portail du mode choisi. Dans la fourchette, la note reprend la main — une A
-passe devant une B (`tests/test_ranking.py`).
+**Le réglage passe avant la note, de deux crans.** Une boucle plate notée C
+passe devant une boucle de montagne notée A : « plat » est un réglage, et la C
+a passé le portail du mode choisi — le mode Sûr, lui, ne la laisse jamais
+entrer. Le retrait valait 0,8, moins qu'un seul cran de note (0,9) : une B
+plate doublait tout juste une A vallonnée, une C jamais, et qui demandait du
+plat en mode Standard recevait des boucles de coteau mieux notées. Dans la
+fourchette, la note reprend la main — une A passe devant une B
+(`tests/test_ranking.py`).
+
+**Les boucles mesurées sont choisies sur les réglages.** Le dénivelé fin ne se
+demande que pour une réserve d'une douzaine de boucles, et elle se choisissait
+sans relief : une boucle plate écartée à ce stade ne pouvait plus sortir, quel
+que soit son dénivelé réel. La réserve se range désormais d'abord sur la
+fourchette, le D+ estimé sur le relief de la zone — la moitié de ce que la
+boucle monte et descend sur la grille de 220 m. L'estimation sous-évalue les
+côtes courtes, mais elle range dans le bon ordre, et c'est tout ce qu'on lui
+demande.
+
+## La préférence de terrain
+
+`backend/app/service.py` (`SURFACE_BAND`) · `frontend/src/engine/service.js`
+
+Route, Mixte, Sentier ne jouaient qu'au tracé, sur le coût de chaque rue, et
+pas du tout au classement : une demande de sentier sortait des boucles toutes
+goudronnées dès qu'elles étaient mieux notées, et « Mixte », réglé par défaut,
+ne se distinguait en rien de « Route ». Chaque terrain porte donc, comme le
+dénivelé, une fourchette — la part du tracé hors bitume, chemins stabilisés et
+sentiers :
+
+| Terrain | Part hors bitume acceptée |
+|---|---|
+| Route | 0 à 10 % |
+| Mixte | 15 à 85 % |
+| Sentier (VTT à vélo) | 50 % et au-delà |
+
+Même règle que pour le dénivelé : 2 de retrait hors fourchette, plus 0,8 par
+tranche de 15 points d'écart. En ville, où aucune boucle n'a de chemin, toutes
+paient le même retrait « Mixte », et la note décide comme avant : quelques
+allées de parc ne font pas passer une B devant une A.
+
+**Ce que ça change**, sur 40 propositions autour de Guebwiller et de Soultz
+(route, mixte et sentier, plat, vallonné et côtes, 9 km, mode Standard) : 23
+tiennent leurs deux fourchettes, contre 19 avant. En plaine, à Soultz, 16 sur
+20 au lieu de 12. Au pied des Vosges, le classement seul n'y pouvait rien :
+aucune boucle « vallonnée » tracée ne tombait dans la fourchette, toutes
+montaient de 21 à 37 m/km.
+
+**Essayé, et pas gardé : faire payer les raidillons en vallonné.** Seule la
+pente au-delà de 4 % se payait au tracé, comme toute pente en plat. Le
+dénivelé s'améliorait — 25 boucles « vallonnées » sur 30 dans leur fourchette
+au lieu de 19 —, mais les chemins sont dans les côtes : en Sentier, la part
+hors bitume passait sous la moitié, et les boucles tenant les **deux**
+réglages tombaient de 14 à 10 sur 30 (13 avec une franchise de 6 %). Le
+relief et le terrain se tiennent l'un l'autre au pied des collines ; les
+départager demande autre chose qu'un coût de pente.
 
 ### Le dénivelé annoncé, et celui qu'on monte
 

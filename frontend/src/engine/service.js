@@ -14,7 +14,7 @@ import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, simila
 import { blockedEdges } from './blocked'
 import { carryBlocked, openDoor } from './door'
 import { buildInstructions } from './navigation'
-import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py'
+import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, pySum, sortByKey } from './py'
 import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
@@ -31,7 +31,15 @@ export const SETTINGS = {
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
 const ELEVATION_TOLERANCE_PER_KM = 5
 const ELEVATION_BAND_PER_KM = { flat: [0, 10], rolling: [3, 20], hilly: [12, Infinity] }
-const OUT_OF_BAND_PENALTY = 0.8
+// Hors de sa fourchette, une boucle passe derrière toutes les autres, de deux
+// crans de note : les réglages avant la note — voir `OUT_OF_BAND_PENALTY` en
+// Python.
+const OUT_OF_BAND_PENALTY = 2
+const OUT_OF_BAND_STEP = 0.8
+// La part du tracé hors bitume que chaque terrain accepte — `SURFACE_BAND`.
+const SURFACE_BAND = { road: [0, 0.1], mixed: [0.15, 0.85], trail: [0.5, 1] }
+const SURFACE_STEP = 0.15
+const UNPAVED = new Set(['gravel', 'trail'])
 const DUPLICATE_THRESHOLD = 0.55
 const VARIETY_OVERLAP_WEIGHT = 0.45
 const VARIETY_BEARING_WEIGHT = 0.3
@@ -394,6 +402,9 @@ export async function planLoops(input, deps) {
     }
   }
 
+  // La réserve se choisit d'abord sur les réglages : seule elle reçoit son
+  // altitude — voir `shortlistKey`.
+  sortByKey(unique, (c) => -shortlistKey(c, targetM, req, terrain))
   if (shown.length) unique = freshFirst(unique, shown, req.limit)
   const shortlist = unique.slice(0, shortlistSize(req.limit))
 
@@ -700,18 +711,43 @@ async function within(task, ms) {
 
 const gradePenalty = (cand) => GRADE_PENALTY * GRADE_RANK[gradeRoute(cand.stats)[0]]
 
+/** Part du tracé hors bitume, ou `null` pour un tracé sans segments. */
+function unpavedShare(cand) {
+  const total = pySum(cand.segments.map((seg) => seg.lengthM))
+  if (total <= 0) return null
+  return pySum(cand.segments.filter((seg) => UNPAVED.has(seg.surface)).map((seg) => seg.lengthM)) / total
+}
+
+function bandPenalty(value, [low, high], step) {
+  const gap = Math.max(low - value, value - high, 0)
+  if (gap <= 0) return 0
+  return OUT_OF_BAND_PENALTY + (OUT_OF_BAND_STEP * gap) / step
+}
+
+/** Ce que coûte de ne pas tenir les réglages — voir `preference_penalty`. */
+function preferencePenalty(cand, req, perKm) {
+  let off = 0
+  if (perKm !== null) off += bandPenalty(perKm, ELEVATION_BAND_PER_KM[req.elevation], ELEVATION_TOLERANCE_PER_KM)
+  const share = unpavedShare(cand)
+  if (share !== null) off += bandPenalty(share, SURFACE_BAND[req.surface], SURFACE_STEP)
+  return off
+}
+
+/** Le score d'avant l'altitude, réglages compris — voir `_shortlist_key`. */
+function shortlistKey(cand, targetM, req, terrain) {
+  const perKm = terrain ? terrain.climb(cand.geometry) / 2 / Math.max(cand.stats.distanceM / 1000, 0.1) : null
+  return preliminaryScore(cand, targetM, req.tolerance) - preferencePenalty(cand, req, perKm)
+}
+
 export function finalScore(cand, targetM, req, ascentM, wind = null) {
   let quality = preliminaryScore(cand, targetM, req.tolerance)
-  let offBand = 0
+  let perKm = null
 
   if (ascentM !== null) {
-    const perKm = ascentM / Math.max(cand.stats.distanceM / 1000, 0.1)
+    perKm = ascentM / Math.max(cand.stats.distanceM / 1000, 0.1)
     const target = ELEVATION_TARGET_PER_KM[req.elevation]
     const elevation = 1 / (1 + Math.abs(perKm - target) / ELEVATION_TOLERANCE_PER_KM)
     quality = 0.72 * quality + 0.28 * elevation
-    const [low, high] = ELEVATION_BAND_PER_KM[req.elevation]
-    const gap = Math.max(low - perKm, perKm - high, 0)
-    if (gap > 0) offBand = OUT_OF_BAND_PENALTY * (1 + gap / ELEVATION_TOLERANCE_PER_KM)
   }
 
   if (wind !== null && wind.matters) {
@@ -719,7 +755,7 @@ export function finalScore(cand, targetM, req, ascentM, wind = null) {
     quality += WIND_WEIGHT * wind.strength * (tail - 0.5) * 2
   }
 
-  return quality - gradePenalty(cand) - offBand - LAP_PENALTY * (cand.laps - 1)
+  return quality - gradePenalty(cand) - preferencePenalty(cand, req, perKm) - LAP_PENALTY * (cand.laps - 1)
 }
 
 export function selectVaried(scored, limit, avoidBearings = []) {

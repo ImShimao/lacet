@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import ElevationPref, LoopRequest
+from app.models import ElevationPref, LoopRequest, SurfacePref
 from app.routing.loops import Candidate, SegmentRun
 from app.safety.gate import RouteStats, grade_route
 from app.service import (
@@ -25,11 +25,13 @@ from app.service import (
     GRADE_PENALTY,
     VARIETY_BEARING_WEIGHT,
     VARIETY_OVERLAP_WEIGHT,
+    _shortlist_key,
     final_score,
     grade_penalty,
     name_routes,
     preliminary_score,
     select_varied,
+    unpaved_share,
 )
 
 TARGET = 10_000.0
@@ -158,6 +160,17 @@ class TestPreferenceDeDenivele:
         )
         assert [c for _s, c, _i in select_varied(scored, 2)] == [flat_b, steep_a]
 
+    def test_en_plat_meme_une_c_plate_passe_devant_une_a_de_montagne(self):
+        """Le mode Standard laisse passer des C : qui demande du plat les veut
+        avant une boucle de coteau, même mieux notée. Le retrait valait moins
+        d'un cran, et une A vallonnée gardait la tête."""
+        req = request(elevation=ElevationPref.flat)
+        hilly_a = candidate(bearing=0.0, edges=[1, 2, 3])
+        flat_c = candidate(bearing=180.0, edges=[7, 8, 9], exposed_m=500.0, longest_exposed_m=300.0)
+        assert grade_route(flat_c.stats)[0] == "C"
+        # 13 m/km : à peine hors de la fourchette du plat.
+        assert final_score(flat_c, TARGET, req, 30.0) > final_score(hilly_a, TARGET, req, 130.0)
+
     def test_dans_la_fourchette_la_note_garde_la_main(self):
         """Deux boucles plates : la A passe devant la B, même un peu moins plate."""
         req = request(elevation=ElevationPref.flat)
@@ -185,6 +198,73 @@ class TestPreferenceDeDenivele:
         b = candidate(bearing=0.0)
         # cible 10 m/km, soit 100 m sur 10 km
         assert final_score(a, TARGET, req, 100.0) > final_score(b, TARGET, req, 160.0)
+
+
+def surfaced(paved: float, unpaved: float, **over) -> Candidate:
+    """Une boucle de 10 km, `unpaved` mètres de chemins et le reste goudronné."""
+    cand = candidate(**over)
+    cand.segments = [
+        SegmentRun(
+            coords=[], length_m=length, risk=0.0, level="safe", separation=2.0,
+            speed_kmh=10.0, surface=surface, lit=None, road=None, inferred=False,
+        )
+        for surface, length in (("paved", paved), ("trail", unpaved))
+        if length
+    ]
+    return cand
+
+
+class TestPreferenceDeTerrain:
+    """Route, Mixte, Sentier : le réglage ne jouait qu'au tracé, jamais au classement."""
+
+    def test_la_part_hors_bitume(self):
+        assert unpaved_share(surfaced(6000.0, 4000.0)) == pytest.approx(0.4)
+        assert unpaved_share(candidate()) is None
+
+    def test_en_sentier_une_b_de_chemins_passe_devant_une_a_goudronnee(self):
+        req = request(surface=SurfacePref.trail)
+        road_a = surfaced(10_000.0, 0.0, bearing=0.0, edges=[1, 2, 3])
+        trail_b = surfaced(3000.0, 7000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        assert final_score(trail_b, TARGET, req, None) > final_score(road_a, TARGET, req, None)
+
+    def test_en_route_les_chemins_passent_derriere(self):
+        req = request(surface=SurfacePref.road)
+        paved = surfaced(9500.0, 500.0)
+        dirt = surfaced(6000.0, 4000.0, roundness=0.60)
+        assert final_score(paved, TARGET, req, None) > final_score(dirt, TARGET, req, None)
+
+    def test_mixte_ecarte_le_tout_bitume_quand_il_y_a_des_chemins(self):
+        req = request(surface=SurfacePref.mixed)
+        assert final_score(surfaced(7000.0, 3000.0), TARGET, req, None) > final_score(
+            surfaced(10_000.0, 0.0, roundness=0.60), TARGET, req, None
+        )
+
+    def test_en_ville_sans_chemins_la_note_decide_comme_avant(self):
+        """Toutes hors fourchette « Mixte » : le retrait commun ne change rien, et
+        quelques allées de parc ne font pas passer une B devant une A."""
+        req = request(surface=SurfacePref.mixed)
+        street_a = surfaced(10_000.0, 0.0, bearing=0.0, edges=[1, 2, 3])
+        park_b = surfaced(9000.0, 1000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        assert final_score(street_a, TARGET, req, None) > final_score(park_b, TARGET, req, None)
+
+    def test_la_reserve_se_choisit_sur_les_reglages(self):
+        """Seule la réserve reçoit son altitude : une boucle plate écartée avant
+        ne pouvait plus jamais sortir. Le relief de la zone l'y fait entrer."""
+
+        class Slope:
+            """Un relief qui monte de 10 m par degré de longitude."""
+
+            def climb(self, coords):
+                return sum(abs(b[0] - a[0]) * 10.0 for a, b in zip(coords, coords[1:]))
+
+        req = request(elevation=ElevationPref.flat)
+        flat = candidate(roundness=0.30)
+        flat.geometry = [(0.0, 0.0), (0.0, 1.0), (0.0, 0.0)]
+        steep = candidate(roundness=0.60)
+        steep.geometry = [(0.0, 0.0), (30.0, 0.0), (0.0, 0.0)]  # 300 m de D+ sur 10 km
+        assert preliminary_score(steep, TARGET, 0.1) > preliminary_score(flat, TARGET, 0.1)
+        assert _shortlist_key(flat, TARGET, req, Slope()) > _shortlist_key(steep, TARGET, req, Slope())
+        assert _shortlist_key(steep, TARGET, req, None) > _shortlist_key(flat, TARGET, req, None)
 
 
 class TestVariete:

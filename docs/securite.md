@@ -148,9 +148,13 @@ En mode Sûr à pied, l'exposition est plafonnée à 3 % par le portail : **un B
 signale donc presque toujours une traversée**, pas une portion longée. Le détail
 sous la proposition dit lequel des deux.
 
-**Les propositions sont classées par note d'abord.** Une A passe toujours devant
-une B, même si la B est plus ronde, mieux calibrée ou dans une direction plus
-originale. Ce n'était pas le cas jusqu'ici : les traversées non protégées
-comptaient dans la note sans compter dans le score, et l'app pouvait afficher un
-B en tête suivi de A — se contredisant sous les yeux de l'utilisateur. À note
-égale, le score départage : distance, exposition fine, forme, variété, dénivelé.
+**Les propositions sont classées par réglages, puis par note.** D'abord celles
+qui tiennent le dénivelé et le terrain demandés — une demande de plat ou de
+sentier est un réglage, et toute proposition a passé le portail du mode choisi
+(voir [la génération](generation.md#la-préférence-de-terrain)). Puis, à
+réglages tenus, une A passe toujours devant une B, même si la B est plus ronde,
+mieux calibrée ou dans une direction plus originale. Ce n'était pas le cas à
+l'origine : les traversées non protégées comptaient dans la note sans compter
+dans le score, et l'app pouvait afficher un B en tête suivi de A — se
+contredisant sous les yeux de l'utilisateur. À note égale, le score départage :
+distance, exposition fine, forme, variété, dénivelé.

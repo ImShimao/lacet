@@ -15,17 +15,17 @@ const TERRAIN_RUN = {
     {
       icon: 'road',
       label: 'Route',
-      text: "Sols durs d'abord : trottoirs, bitume, pistes. Un chemin de terre n'est pris que s'il évite un vrai détour — un sentier compte plus du double de sa longueur.",
+      text: "Sols durs d'abord : trottoirs, bitume, pistes. Un chemin de terre n'est pris que s'il évite un vrai détour, et les boucles à plus de 10 % de chemins passent derrière les autres.",
     },
     {
       icon: 'forest',
       label: 'Mixte',
-      text: 'Bitume, chemins et sentiers se valent, avec une légère préférence pour les sols souples. Le bon choix par défaut, en ville comme autour.',
+      text: "Un mélange : entre 15 et 85 % de chemins et sentiers passent devant le tout-bitume. Le bon choix par défaut — en ville, sans chemins, rien ne change.",
     },
     {
       icon: 'mountain',
       label: 'Sentier',
-      text: "Chemins et sentiers d'abord, y compris ceux des bois et des champs, que la recherche va chercher en plus. Le bitume ne sert qu'à les relier.",
+      text: "Chemins et sentiers d'abord, y compris ceux des bois et des champs, que la recherche va chercher en plus. Au moins la moitié de la boucle hors bitume passe devant ; le bitume ne sert qu'à relier.",
     },
   ],
 }
@@ -54,7 +54,7 @@ const TERRAIN_BIKE = {
 const RELIEF = {
   title: 'Dénivelé',
   intro:
-    "Le dénivelé positif (D+) est le total des montées sur la boucle. Les boucles sont choisies pour s'approcher de la cible, pas forcées : en plaine, « Côtes » ne peut pas inventer de colline.",
+    "Le dénivelé positif (D+) est le total des montées sur la boucle. Celles qui tiennent le réglage passent devant les autres, même mieux notées en sécurité ; mais en plaine, « Côtes » ne peut pas inventer de colline.",
   items: [
     {
       icon: 'flat',
@@ -99,6 +99,27 @@ export function reliefMismatch(elevation, routes) {
   }
   const best = measured.reduce((a, b) => (perKm(b) < perKm(a) ? b : a))
   return perKm(best) > band[1] ? { kind: 'flat', ascent: Math.round(best.ascent_m) } : null
+}
+
+// Les fourchettes de `SURFACE_BAND`, dans `engine/service.js` : la part du
+// tracé hors bitume. « Mixte » n'y est pas : réglé par défaut, il se dirait en
+// permanence en ville, où il n'y a simplement pas de chemins.
+const SURFACE_BAND = { road: [0, 0.1], trail: [0.5, 1] }
+
+/**
+ * Le terrain demandé que le coin n'a pas : « Sentier » en ville, « Route »
+ * entre les vignes. Rend `{ kind, share }` — la part hors bitume, en pour cent,
+ * de la boucle qui s'en approche le plus — ou `null` dès qu'une boucle tient la
+ * fourchette.
+ */
+export function surfaceMismatch(surface, routes) {
+  const band = SURFACE_BAND[surface]
+  const measured = (routes ?? []).filter((r) => r.surfaces && r.distance_m > 0)
+  if (!band || !measured.length) return null
+  const share = (r) => (r.surfaces.gravel_m + r.surfaces.trail_m) / r.distance_m
+  const gap = (r) => Math.max(band[0] - share(r), share(r) - band[1], 0)
+  const best = measured.reduce((a, b) => (gap(b) < gap(a) ? b : a))
+  return gap(best) > 0 ? { kind: surface, share: Math.round(share(best) * 100) } : null
 }
 
 // Les plafonds de `THRESHOLDS`, dans `engine/safety.js` : un vélo roule sur la

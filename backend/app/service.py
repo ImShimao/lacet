@@ -80,17 +80,40 @@ ELEVATION_BAND_PER_KM = {
 # des boucles hors fourchette, elles sont proposées — dans l'ordre, et sans
 # qu'aucune boucle conforme ne leur passe derrière.
 #
-# Le retrait grandit avec l'écart : 0,8 de plus par tranche de
+# Le retrait grandit avec l'écart : `OUT_OF_BAND_STEP` de plus par tranche de
 # `ELEVATION_TOLERANCE_PER_KM` au-delà de la fourchette. Fixe, il frappait
 # pareil 120 et 380 m de D+ sur 9 km, et la variété les départageait : à
 # Guebwiller, une demande de plat proposait 290 m en tête, devant 120 m, au seul
 # motif d'une autre direction.
 #
-# Face à la note de sécurité, la fourchette passe d'abord : une B plate passe
-# devant une A de montagne, parce que « je veux du plat » est un réglage, et
-# que la B a passé le portail du mode choisi. Dans la fourchette, la note
-# reprend la main (0,9 par cran).
-OUT_OF_BAND_PENALTY = 0.8
+# Face à la note de sécurité, la fourchette passe d'abord, **de deux crans** :
+# une C plate passe devant une A de montagne. Le retrait valait 0,8, moins qu'un
+# seul cran (0,9) : une B plate doublait tout juste une A vallonnée, une C
+# jamais, et qui demandait du plat en mode Standard recevait des boucles de
+# coteau mieux notées. « Je veux du plat » est un réglage, et la C a passé le
+# portail du mode choisi — le mode Sûr, lui, ne la laisse jamais entrer. Dans
+# la fourchette, la note reprend la main (0,9 par cran). Hors fourchette aussi,
+# à peu de chose près : une tranche d'écart (0,8) pèse un peu moins qu'un cran.
+OUT_OF_BAND_PENALTY = 2.0
+OUT_OF_BAND_STEP = 0.8
+
+# La même règle pour le terrain : la part du tracé hors bitume — chemins
+# stabilisés et sentiers. Le réglage Route / Mixte / Sentier ne jouait que sur
+# le coût des rues au tracé, et pas du tout au classement : une demande de
+# sentier sortait des boucles toutes goudronnées dès qu'elles étaient mieux
+# notées, et « Mixte » réglé par défaut ne se distinguait en rien de « Route ».
+#
+# « Mixte » veut un mélange : une boucle entièrement goudronnée n'en est pas
+# un. En ville, où aucune n'a de chemin, toutes paient le même retrait, et la
+# note décide comme avant.
+SURFACE_BAND = {
+    SurfacePref.road: (0.0, 0.10),
+    SurfacePref.mixed: (0.15, 0.85),
+    SurfacePref.trail: (0.50, 1.0),
+}
+# Une tranche d'écart à la fourchette de terrain : quinze points de part.
+SURFACE_STEP = 0.15
+UNPAVED = ("gravel", "trail")
 
 
 def _climb_fit(pref: ElevationPref):
@@ -351,6 +374,12 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     # On garde une réserve au-delà du nombre demandé : la note finale intègre le
     # dénivelé, inconnu à ce stade, et le choix diversifié a besoin de matière
     # pour écarter les quasi-doublons sans finir à court de propositions.
+    #
+    # La réserve se choisit d'abord sur les réglages : seule elle reçoit son
+    # altitude, et une boucle plate écartée ici ne pouvait plus jamais sortir,
+    # quel que soit son dénivelé réel. Le relief de la zone en donne une
+    # estimation — voir `_shortlist_key`.
+    unique.sort(key=lambda c: -_shortlist_key(c, target_m, req, terrain))
     shortlist = unique[: shortlist_size(req.limit)]
 
     # --- altitude ---------------------------------------------------------
@@ -655,6 +684,53 @@ def grade_penalty(cand: Candidate) -> float:
     return GRADE_PENALTY * GRADE_RANK[grade_route(cand.stats)[0]]
 
 
+def unpaved_share(cand: Candidate) -> float | None:
+    """Part du tracé hors bitume, ou `None` pour un tracé sans segments."""
+    total = sum(seg.length_m for seg in cand.segments)
+    if total <= 0.0:
+        return None
+    return sum(seg.length_m for seg in cand.segments if seg.surface in UNPAVED) / total
+
+
+def _band_penalty(value: float, band: tuple[float, float], step: float) -> float:
+    """Le retrait d'une mesure hors de sa fourchette — voir `OUT_OF_BAND_PENALTY`."""
+    low, high = band
+    gap = max(low - value, value - high, 0.0)
+    if gap <= 0.0:
+        return 0.0
+    return OUT_OF_BAND_PENALTY + OUT_OF_BAND_STEP * gap / step
+
+
+def preference_penalty(cand: Candidate, req: LoopRequest, per_km: float | None) -> float:
+    """Ce que coûte de ne pas tenir les réglages : dénivelé, puis terrain.
+
+    `per_km` : le D+ par kilomètre, mesuré ou estimé ; `None` quand on ne le
+    connaît pas, et le dénivelé ne pénalise alors rien.
+    """
+    off = 0.0
+    if per_km is not None:
+        off += _band_penalty(per_km, ELEVATION_BAND_PER_KM[req.elevation], ELEVATION_TOLERANCE_PER_KM)
+    share = unpaved_share(cand)
+    if share is not None:
+        off += _band_penalty(share, SURFACE_BAND[req.surface], SURFACE_STEP)
+    return off
+
+
+def _shortlist_key(cand: Candidate, target_m: float, req: LoopRequest, terrain: Terrain | None) -> float:
+    """Le score d'avant l'altitude, réglages compris.
+
+    Le D+ s'estime sur le relief de la zone, la moitié de ce que la boucle
+    monte et descend. La grille d'environ 220 m arrondit les côtes courtes :
+    l'estimation sous-évalue, mais elle range les boucles dans le bon ordre, et
+    c'est tout ce qu'on lui demande — la note finale se fait sur l'altitude fine.
+    """
+    assert cand.stats is not None
+    per_km = None
+    if terrain is not None:
+        per_km = terrain.climb(cand.geometry) / 2.0 / max(cand.stats.distance_m / 1000.0, 0.1)
+    return preliminary_score(cand, target_m, req.tolerance) - preference_penalty(cand, req, per_km)
+
+
 def final_score(
     cand: Candidate,
     target_m: float,
@@ -662,16 +738,17 @@ def final_score(
     ascent_m: float | None,
     wind: Wind | None = None,
 ) -> float:
-    """Note définitive : agrément d'abord, puis les deux retraits qui priment.
+    """Note définitive : agrément d'abord, puis les retraits qui priment.
 
     L'agrément — distance, sécurité fine, variété, forme, dénivelé — vit entre 0
-    et 1. Les deux retraits, eux, sont dimensionnés pour dépasser tout ce que le
-    tri diversifié peut accorder : ils ne se négocient pas contre une jolie
-    direction. C'est ce qui garantit qu'une boucle notée A passe toujours devant
-    une B, et qu'une boucle de montagne ne ressorte pas d'une demande de plat.
+    et 1. Les retraits, eux, sont dimensionnés pour dépasser tout ce que le tri
+    diversifié peut accorder : ils ne se négocient pas contre une jolie
+    direction. Les réglages passent d'abord — une boucle de montagne ne ressort
+    pas d'une demande de plat, ni une boucle goudronnée d'une demande de
+    sentier —, puis la note : à réglages tenus, une A passe devant une B.
     """
     quality = preliminary_score(cand, target_m, req.tolerance)
-    off_band = 0.0
+    per_km: float | None = None
 
     if ascent_m is not None:
         s = cand.stats
@@ -681,18 +758,16 @@ def final_score(
         elevation = 1.0 / (1.0 + abs(per_km - target) / ELEVATION_TOLERANCE_PER_KM)
         quality = 0.72 * quality + 0.28 * elevation
 
-        low, high = ELEVATION_BAND_PER_KM[req.elevation]
-        gap = max(low - per_km, per_km - high, 0.0)
-        if gap > 0.0:
-            off_band = OUT_OF_BAND_PENALTY * (1.0 + gap / ELEVATION_TOLERANCE_PER_KM)
-
     if wind is not None and wind.matters:
         # Centré sur 0,5 : un retour vent de dos ajoute, un retour vent de face
         # retranche, et un vent de travers ne change rien.
         tail = tailwind_finish(cand.geometry, wind)
         quality += WIND_WEIGHT * wind.strength * (tail - 0.5) * 2.0
 
-    return quality - grade_penalty(cand) - off_band - LAP_PENALTY * (cand.laps - 1)
+    return (
+        quality - grade_penalty(cand) - preference_penalty(cand, req, per_km)
+        - LAP_PENALTY * (cand.laps - 1)
+    )
 
 
 def select_varied(

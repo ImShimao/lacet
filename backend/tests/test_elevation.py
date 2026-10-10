@@ -249,6 +249,23 @@ class TestCouverture:
         mêlé = asyncio.run(fetch_many([[(7.1, 47.6), (7.3, 47.6)]]))[0]
         assert mêlé.coarse is True
 
+    def test_un_point_relu_juste_apres_sa_mise_en_cache_reste_un_nombre(self, monkeypatch, tmp_path):
+        """En mémoire, le cache garde le couple (altitude, finesse) tel quel, et
+        sa relecture l'emballait une seconde fois : la recherche suivante au
+        même endroit recevait des couples en guise d'altitudes, et le relief de
+        la zone plantait."""
+
+        def ign(coords):
+            return [200.0 + c[0] for c in coords]
+
+        self._fournisseurs(monkeypatch, ign, ign)
+        monkeypatch.setattr("app.elevation._cache", ElevationCache(tmp_path))
+        route = [[(7.1, 47.5), (7.15, 47.5)]]
+        premier = asyncio.run(fetch_many(route))[0]
+        second = asyncio.run(fetch_many(route))[0]
+        assert second == premier
+        assert all(isinstance(z, float) for z in second.values)
+
     def test_sans_profil_plutot_qu_un_faux(self, monkeypatch, tmp_path):
         def ign(coords):
             return [None] * len(coords)

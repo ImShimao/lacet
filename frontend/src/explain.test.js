@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reliefMismatch } from './explain'
+import { reliefMismatch, surfaceMismatch } from './explain'
 
 /**
  * Le relief demandé que le terrain ne donne pas. À Colmar, « Côtes » rendait
@@ -25,5 +25,30 @@ describe('reliefMismatch', () => {
   it('ne juge ni « Vallonné », ni des boucles sans altitude', () => {
     expect(reliefMismatch('rolling', [boucle(8)])).toBeNull()
     expect(reliefMismatch('hilly', [boucle(null)])).toBeNull()
+  })
+})
+
+/** Le terrain demandé que le coin n'a pas : « Sentier » en plein centre-ville. */
+describe('surfaceMismatch', () => {
+  const terrain = (chemins_m, distance_m = 10_000) => ({
+    distance_m,
+    surfaces: { paved_m: distance_m - chemins_m, gravel_m: chemins_m / 2, trail_m: chemins_m / 2, unknown_m: 0 },
+  })
+
+  it('dit qu’il n’y a pas de sentiers en ville', () => {
+    expect(surfaceMismatch('trail', [terrain(500), terrain(2100), terrain(0)])).toEqual({ kind: 'trail', share: 21 })
+  })
+
+  it('se tait dès qu’une boucle tient la fourchette', () => {
+    expect(surfaceMismatch('trail', [terrain(500), terrain(6000)])).toBeNull()
+    expect(surfaceMismatch('road', [terrain(3000), terrain(400)])).toBeNull()
+  })
+
+  it('dit qu’il n’y a pas de boucle goudronnée entre les vignes', () => {
+    expect(surfaceMismatch('road', [terrain(3000), terrain(1800)])).toEqual({ kind: 'road', share: 18 })
+  })
+
+  it('ne juge pas « Mixte », réglé par défaut', () => {
+    expect(surfaceMismatch('mixed', [terrain(0)])).toBeNull()
   })
 })
