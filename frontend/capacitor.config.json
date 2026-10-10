@@ -6,7 +6,7 @@
   "ios": {
     "contentInset": "never",
     "backgroundColor": "#0A0910",
-    "appendUserAgent": "Lacet/1.0",
+    "overrideUserAgent": "Lacet/1.0 (iPhone; +https://github.com/ImShimao/Lacet)",
     "scrollEnabled": false
   },
   "plugins": {
