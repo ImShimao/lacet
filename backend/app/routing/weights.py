@@ -7,15 +7,17 @@ départementale nue — coûte 11,2 fois sa longueur réelle : le routeur fera u
 détour de 11 km plutôt que d'y passer 1 km. À 1,5 (mode Standard), le même
 tronçon coûte 4,8 fois sa longueur.
 
-Le dénivelé n'entre pas ici : on ne connaît l'altitude qu'après avoir tracé
-l'itinéraire (elle vient d'une API externe). La préférence de dénivelé est donc
-appliquée plus tard, au moment de choisir parmi les candidats générés.
+Quand on demande du plat et que le relief de la zone est connu (voir
+`elevation.Terrain`), chaque arête coûte en plus ce qu'elle monte et descend :
+
+    poids × (1 + CLIMB_WEIGHT · dénivelé de l'arête / longueur)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..elevation import Terrain
 from ..models import SafetyMode, Sport, SurfacePref
 from ..osm.graph import Edge, Graph
 from ..safety.night import night_factor
@@ -60,6 +62,14 @@ STEPS_FACTOR = 3.0
 # sinon l'heuristique d'A* cesse d'être admissible.
 NIGHT_MIN_FACTOR = 0.70 * 0.90
 
+# En plat, une pente de 4 % coûte deux fois sa longueur. Orienter les polygones
+# vers la plaine ne suffit pas : entre deux points de passage au même niveau,
+# le chemin le moins cher coupait encore par le coteau. Mesuré à Guebwiller
+# sur quatre départs et trois recherches chacun : 22 boucles plates sur 60 sans
+# ce terme, 30 avec 25. À 50, à peine plus (34) pour un calcul deux fois plus
+# lent. Le facteur ne descend jamais sous 1 : l'heuristique d'A* reste admissible.
+CLIMB_WEIGHT = 25.0
+
 
 @dataclass
 class Profile:
@@ -67,6 +77,8 @@ class Profile:
     surface: str
     night: bool
     sport: str = "run"
+    # Le relief de la zone, seulement quand on demande du plat.
+    terrain: Terrain | None = None
 
     @property
     def _factors(self) -> dict[str, float]:
@@ -84,6 +96,8 @@ class Profile:
             w *= STEPS_FACTOR
         if self.night:
             w *= night_factor(s)
+        if self.terrain is not None:
+            w *= 1.0 + CLIMB_WEIGHT * self.terrain.climb(edge.coords) / max(edge.length_m, 1.0)
         return w
 
     def precompute(self, graph: Graph) -> list[float]:
@@ -114,10 +128,12 @@ def build_profile(
     safety: SafetyMode,
     night: bool,
     sport: Sport = Sport.run,
+    terrain: Terrain | None = None,
 ) -> Profile:
     return Profile(
         lam=LAMBDA[safety],
         surface=surface.value,
         night=night,
         sport=sport.value,
+        terrain=terrain,
     )

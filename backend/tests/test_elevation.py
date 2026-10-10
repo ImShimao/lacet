@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 
 import pytest
 
@@ -10,6 +11,7 @@ from app.elevation import (
     COARSE_THRESHOLD_M,
     ElevationCache,
     Relief,
+    Terrain,
     _fetch_with_fallback,
     _ign_values,
     _opentopo_values,
@@ -20,6 +22,47 @@ from app.elevation import (
 )
 from app.geo import bearing_deg, haversine_m, point_in_ring, resample
 from app.solar import is_night
+
+
+class TestTerrain:
+    """La grille du relief de la zone, lue avant de tracer."""
+
+    @staticmethod
+    def plane(lon: float, lat: float) -> float:
+        return 200.0 + 3000.0 * (lon - 2.3) - 5000.0 * (lat - 48.8)
+
+    def test_la_grille_couvre_le_rayon(self):
+        t = Terrain(48.8, 2.3, 2000.0)
+        lons = [p[0] for p in t.points()]
+        lats = [p[1] for p in t.points()]
+        assert len(lons) == t.n_lat * t.n_lon
+        assert min(lats) <= 48.8 - 2000.0 / 111_320.0 and max(lats) >= 48.8 + 2000.0 / 111_320.0
+        half_lon = 2000.0 / (111_320.0 * math.cos(math.radians(48.8)))
+        assert min(lons) <= 2.3 - half_lon and max(lons) >= 2.3 + half_lon
+
+    def test_un_plan_est_rendu_exactement(self):
+        """L'interpolation bilinéaire reproduit une pente régulière."""
+        t = Terrain(48.8, 2.3, 2000.0)
+        t.values = [self.plane(lon, lat) for lon, lat in t.points()]
+        assert t.at(2.3123, 48.8077) == pytest.approx(self.plane(2.3123, 48.8077))
+
+    def test_au_dela_du_bord_la_valeur_du_bord(self):
+        t = Terrain(48.8, 2.3, 2000.0)
+        t.values = [self.plane(lon, lat) for lon, lat in t.points()]
+        edge = t.at(2.3, (t.i0 + t.n_lat - 1) * t.step_lat)
+        assert t.at(2.3, 49.5) == pytest.approx(edge)
+
+    def test_la_grille_garde_la_meme_taille_quand_la_boucle_grandit(self):
+        """Une seule requête à l'IGN, du 5 au 100 km."""
+        for radius in (1500.0, 5000.0, 12_000.0, 55_000.0):
+            t = Terrain(47.9, 7.2, radius)
+            assert t.n_lat * t.n_lon < 3000, radius
+
+    def test_la_montee_compte_aussi_la_descente(self):
+        t = Terrain(48.8, 2.3, 2000.0)
+        t.values = [self.plane(lon, lat) for lon, lat in t.points()]
+        aller = [(2.30, 48.8), (2.31, 48.8)]
+        assert t.climb(aller + [(2.30, 48.8)]) == pytest.approx(2 * 3000.0 * 0.01)
 
 
 class TestDenivele:

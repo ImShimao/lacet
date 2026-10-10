@@ -76,9 +76,12 @@ const FOOT_ONLY_FACTOR = 4
 const FOOT_ONLY_HIGHWAY = new Set(['footway', 'pedestrian'])
 const STEPS_FACTOR = 3
 const NIGHT_MIN_FACTOR = 0.7 * 0.9
+// En plat, une pente de 4 % coûte deux fois sa longueur — voir `CLIMB_WEIGHT`
+// en Python. Jamais sous 1 : l'heuristique d'A* reste admissible.
+const CLIMB_WEIGHT = 25
 
 export class Profile {
-  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null, carfree = false }) {
+  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null, carfree = false, terrain = null }) {
     this.lam = lam
     this.surface = surface
     this.night = night
@@ -87,6 +90,8 @@ export class Profile {
     this.factors = (sport === 'bike' ? SURFACE_FACTOR_BIKE : SURFACE_FACTOR)[surface]
     this.avoid = avoid.filter((key) => key in AVOIDS).map((key) => AVOIDS[key])
     this.blocked = blocked
+    // Le relief de la zone, seulement quand on demande du plat.
+    this.terrain = terrain
   }
 
   weight(graph, e) {
@@ -101,6 +106,9 @@ export class Profile {
       w *= STEPS_FACTOR
     }
     if (this.night) w *= nightFactor(s)
+    if (this.terrain !== null) {
+      w *= 1 + (CLIMB_WEIGHT * this.terrain.climb(graph.coordsFrom(e, graph.edgeA[e]))) / Math.max(graph.edgeLen[e], 1)
+    }
     if (this.carfree && s.carFree && surface <= CAR_FREE_SURFACE_MAX) w *= CAR_FREE_FACTOR
     for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
     if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
@@ -127,6 +135,12 @@ export class Profile {
   }
 }
 
-export function buildProfile(surface, safety, night, sport = 'run', { avoid = [], blocked = null, carfree = false } = {}) {
-  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree })
+export function buildProfile(
+  surface,
+  safety,
+  night,
+  sport = 'run',
+  { avoid = [], blocked = null, carfree = false, terrain = null } = {},
+) {
+  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree, terrain })
 }

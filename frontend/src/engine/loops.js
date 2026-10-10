@@ -13,6 +13,8 @@ import { EXPOSED_RISK, RouteStats, unlitLength } from './safety'
 const RETURN_PENALTY = 6
 const SHAPES = [3, 4, 5, 6]
 const ORIENTATIONS = 8
+// Orientations essayées quand le relief est connu — voir `TERRAIN_DENSITY` en Python.
+const TERRAIN_DENSITY = 3
 const MAX_ATTEMPTS = 3
 const ENOUGH_IN_RANGE = 8
 const CORE_CLEARANCE = 0.75
@@ -169,9 +171,18 @@ const GOLDEN = 0.6180339887498949
  * les polygones tournent d'un cran fractionnaire : les sommets visés changent,
  * donc les boucles aussi. C'est ce que demande « Régénérer d'autres boucles »,
  * qui relançait jusque-là exactement le même calcul.
+ *
+ * `terrain`, `climbFit` : le relief de la zone, et ce que vaut un polygone selon
+ * ce qu'il monte au moins — voir `generate_loops` en Python.
  */
 // Boucles brutes, non filtrées : le tri se fait ailleurs.
-export function generateLoops(graph, start, targetM, profile, { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0 } = {}) {
+export function generateLoops(
+  graph,
+  start,
+  targetM,
+  profile,
+  { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null } = {},
+) {
   const phase = variation ? (variation * GOLDEN) % 1 : 0
   const collected = []
   let scale = 1
@@ -183,7 +194,9 @@ export function generateLoops(graph, start, targetM, profile, { sectors = 12, ma
   const tree = new OutboundTree(graph, start, weights)
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-    const batch = generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase)
+    const batch = generateOnce(
+      graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit,
+    )
     collected.push(...batch)
 
     let usable = 0
@@ -229,7 +242,9 @@ class OutboundTree {
   }
 }
 
-function generateOnce(graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0) {
+function generateOnce(
+  graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0, terrain = null, climbFit = null,
+) {
   const plans = new Map(SHAPES.map((m) => [m, waypointPlan(m, targetM * scale)]))
   const allDistances = []
   for (const plan of plans.values()) for (const [, d] of plan) allDistances.push(d)
@@ -253,26 +268,35 @@ function generateOnce(graph, start, targetM, profile, weights, tree, scale, orie
   const signatures = new Set()
   const nodeSector = tree.sectors()
 
-  for (const m of SHAPES) {
+  // Tous les polygones d'abord, rangés ; on ne trace qu'ensuite — voir
+  // `_generate_once` en Python.
+  const density = terrain !== null && climbFit !== null ? TERRAIN_DENSITY : 1
+  const zStart = density > 1 ? terrain.at(graph.nodeLon[start], graph.nodeLat[start]) : 0
+  const polygons = []
+  SHAPES.forEach((m, shapeRank) => {
     const plan = plans.get(m)
     const maxDev = (180 / m) * ANGLE_TOLERANCE
-
-    for (let k = 0; k < orientations; k += 1) {
-      if (candidates.length >= maxCandidates) break
-      const theta = ((k + phase) * 360) / orientations
-
+    for (let k = 0; k < orientations * density; k += 1) {
+      const theta = ((k / density + phase) * 360) / orientations
       const vertices = pickVertices(index, plan, theta, maxDev)
       if (vertices === null) continue
+      const fit = density > 1 ? climbFit(leastClimb(graph, terrain, zStart, vertices) / (targetM / 1000)) : 0
+      polygons.push({ fit, extra: k % density !== 0 ? 1 : 0, shapeRank, k, vertices })
+    }
+  })
+  polygons.sort((a, b) => a.fit - b.fit || a.extra - b.extra || a.shapeRank - b.shapeRank || a.k - b.k)
 
-      const signature = vertices.map((v) => v[0]).join(',')
-      if (signatures.has(signature)) continue
-      signatures.add(signature)
+  for (const { shapeRank, vertices } of polygons) {
+    if (candidates.length >= maxCandidates) break
 
-      const cand = buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo)
-      if (cand !== null) {
-        cand.shape = m
-        candidates.push(cand)
-      }
+    const signature = vertices.map((v) => v[0]).join(',')
+    if (signatures.has(signature)) continue
+    signatures.add(signature)
+
+    const cand = buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo)
+    if (cand !== null) {
+      cand.shape = SHAPES[shapeRank]
+      candidates.push(cand)
     }
   }
 
@@ -280,6 +304,18 @@ function generateOnce(graph, start, targetM, profile, weights, tree, scale, orie
     candidates = fallbackOutAndBack(graph, start, outbound, weights, profile, targetM, scale, maxCandidates)
   }
   return candidates
+}
+
+/** Ce qu'un polygone fera monter au moins — voir `_least_climb` en Python. */
+function leastClimb(graph, terrain, zStart, vertices) {
+  let total = 0
+  let prev = zStart
+  for (const [node] of vertices) {
+    const z = terrain.at(graph.nodeLon[node], graph.nodeLat[node])
+    total += Math.max(0, z - prev)
+    prev = z
+  }
+  return total + Math.max(0, zStart - prev)
 }
 
 function pickVertices(index, plan, theta, maxDev) {

@@ -204,12 +204,53 @@ Trois garde-fous, parce qu'un agrément ne doit jamais devenir un critère :
 
 ## La préférence de dénivelé
 
-Elle ne pouvait pas être un simple bonus. Le dénivelé n'est connu qu'**après**
-avoir tracé l'itinéraire — il vient d'une API externe — donc il n'entre pas dans
-le routage, seulement dans le choix final. Or le tri diversifié y accorde
-jusqu'à 0,75 point pour une direction originale : une boucle de montagne était
-repêchée en mode Plat au seul motif qu'elle partait d'un côté encore inutilisé.
-Annecy proposait ainsi 304 m de D+ à qui demandait du plat.
+Elle joue à deux moments : en traçant, pour aller chercher le bon terrain, et en
+choisissant, pour que les boucles conformes passent devant.
+
+### En traçant : le relief de la zone
+
+`backend/app/elevation.py` (`Terrain`) · `routing/loops.py` · `routing/weights.py`
+
+Le moteur traçait d'abord sans rien savoir du relief, puis mesurait. Au pied
+des Vosges, à Guebwiller, deux polygones sur trois montaient dans les vignes :
+une demande de plat sur 9 km sortait 73, 290, 120, 323 et 377 m de D+, et dès
+la deuxième régénération il ne restait que des boucles de 270 à 320 m. Les
+boucles plates existaient, vers la plaine ; le moteur n'en traçait que deux ou
+trois.
+
+Il lit donc d'abord le relief de la zone : une grille d'environ 220 m, calée
+sur un quadrillage fixe pour que le cache serve d'une recherche à l'autre —
+deux mille points, une seule requête à l'IGN. Le pas grandit avec la distance
+pour que la grille garde cette taille. Elle sert à deux choses :
+
+- **Orienter les polygones.** On essaie trois fois plus d'orientations, et
+  l'on trace d'abord celles dont les points de passage vont au terrain demandé :
+  en plat, ce qu'ils imposent de monter au moins ; sinon, l'écart à la cible,
+  par tranches de 5 m/km. En terrain plat, toutes les orientations tombent dans
+  la même tranche : la recherche par défaut rend à Colmar exactement les mêmes
+  boucles qu'avant.
+- **En plat, faire payer la pente.** Une rue coûte en plus ce qu'elle monte et
+  descend : une pente de 4 % compte double. Sans ce terme, entre deux points
+  de passage au même niveau, le chemin le moins cher coupait encore par le
+  coteau.
+
+Mesuré sur quatre départs autour de Guebwiller, trois recherches chacun :
+
+| | Avant | Polygones orientés | Et pente payée |
+|---|---|---|---|
+| Plat : boucles dans la fourchette | 7 / 60 | 22 / 60 | 30 / 60 |
+| Vallonné : boucles dans la fourchette | 18 / 60 | 29 / 60 | — |
+
+Le relief part en même temps que les rues ; une fois celles-ci arrivées, on
+l'attend encore cinq secondes au plus. Sans réponse, on trace comme avant.
+
+### En choisissant : la fourchette
+
+Le relief de la zone ne suffit pas : le dénivelé exact n'est connu qu'une fois
+la boucle tracée. Or le tri diversifié accorde jusqu'à 0,75 point pour une
+direction originale : une boucle de montagne était repêchée en mode Plat au
+seul motif qu'elle partait d'un côté encore inutilisé. Annecy proposait ainsi
+304 m de D+ à qui demandait du plat.
 
 Chaque préférence porte donc une **fourchette**, et en sortir coûte plus que
 tout ce que la variété peut rapporter :
@@ -222,6 +263,17 @@ tout ce que la variété peut rapporter :
 
 Ce n'est pas un rejet : s'il n'existe que des boucles hors fourchette, elles
 sont proposées — simplement jamais devant une boucle conforme.
+
+Le retrait grandit avec l'écart : 0,8, plus 0,8 par tranche de 5 m/km au-delà
+de la fourchette. Fixe, il frappait pareil 120 et 380 m de D+, et la variété
+les départageait : à Guebwiller, une demande de plat sur 9 km mettait 290 m en
+tête et 120 m en troisième, pour une question de direction. Elles sortent
+désormais dans l'ordre du dénivelé.
+
+**Le réglage passe avant la note.** Une boucle plate notée B passe devant une
+boucle de montagne notée A : « plat » est un réglage, et la B a passé le
+portail du mode choisi. Dans la fourchette, la note reprend la main — une A
+passe devant une B (`tests/test_ranking.py`).
 
 ### Le dénivelé annoncé, et celui qu'on monte
 

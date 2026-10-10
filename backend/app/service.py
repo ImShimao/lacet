@@ -2,11 +2,13 @@
 
 Enchaînement complet :
 
-    Overpass → graphe (L0/L1/L2) → génération → filtre distance →
-    portail L3 → dédoublonnage → altitude → notation → réponse
+    Overpass → graphe (L0/L1/L2) → relief de la zone → génération →
+    filtre distance → portail L3 → dédoublonnage → altitude → notation → réponse
 
-L'altitude n'est demandée qu'aux candidats survivants : c'est un appel réseau
-externe, on ne le paie pas pour des tracés qu'on va jeter.
+Le relief de la zone est une grille grossière, en une requête : il oriente la
+génération. L'altitude fine, tous les 50 m, n'est demandée qu'aux candidats
+survivants : c'est un appel réseau externe, on ne le paie pas pour des tracés
+qu'on va jeter.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from datetime import datetime, timezone
 import asyncio
 
 from .config import settings
-from .elevation import ascent_descent, fetch_many, shape_relief
+from .elevation import Terrain, ascent_descent, fetch_many, shape_relief
 from .geo import haversine_m, resample
 from .navigation import build_instructions
 from .models import (
@@ -77,7 +79,33 @@ ELEVATION_BAND_PER_KM = {
 # plat » est une demande. Ce n'est pas un rejet pour autant : s'il ne reste que
 # des boucles hors fourchette, elles sont proposées — dans l'ordre, et sans
 # qu'aucune boucle conforme ne leur passe derrière.
+#
+# Le retrait grandit avec l'écart : 0,8 de plus par tranche de
+# `ELEVATION_TOLERANCE_PER_KM` au-delà de la fourchette. Fixe, il frappait
+# pareil 120 et 380 m de D+ sur 9 km, et la variété les départageait : à
+# Guebwiller, une demande de plat proposait 290 m en tête, devant 120 m, au seul
+# motif d'une autre direction.
+#
+# Face à la note de sécurité, la fourchette passe d'abord : une B plate passe
+# devant une A de montagne, parce que « je veux du plat » est un réglage, et
+# que la B a passé le portail du mode choisi. Dans la fourchette, la note
+# reprend la main (0,9 par cran).
 OUT_OF_BAND_PENALTY = 0.8
+
+
+def _climb_fit(pref: ElevationPref):
+    """Ce que vaut un polygone selon ce qu'il montera au moins, en m/km —
+    plus bas, mieux c'est. Voir `generate_loops`.
+
+    En plat, le moins possible. Sinon, l'écart à la cible, par tranches de
+    `ELEVATION_TOLERANCE_PER_KM` : en terrain plat tous les polygones tombent
+    dans la même tranche, et la génération reste celle d'avant — vérifié à
+    Colmar, où la recherche par défaut rend exactement les mêmes boucles.
+    """
+    if pref is ElevationPref.flat:
+        return lambda per_km: per_km
+    target = ELEVATION_TARGET_PER_KM[pref]
+    return lambda per_km: float(math.floor(abs(per_km - target) / ELEVATION_TOLERANCE_PER_KM))
 
 # Au-delà de ce taux d'arêtes communes, deux candidats sont le même itinéraire.
 DUPLICATE_THRESHOLD = 0.55
@@ -237,7 +265,21 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     else:
         night = req.time_of_day is TimeOfDay.night
 
-    profile = build_profile(req.surface, req.safety, night, req.sport)
+    # Le relief de la zone, pour tracer vers le terrain demandé — voir
+    # `elevation.Terrain`. Sans réponse, on trace comme avant, sans lui.
+    terrain: Terrain | None = None
+    if req.with_elevation:
+        grid = Terrain(req.lat, req.lon, radius_m)
+        relief = (await fetch_many([grid.points()]))[0]
+        if relief is not None:
+            grid.values = relief.values
+            terrain = grid
+    climb_fit = _climb_fit(req.elevation)
+
+    profile = build_profile(
+        req.surface, req.safety, night, req.sport,
+        terrain=terrain if req.elevation is ElevationPref.flat else None,
+    )
 
     # Le vent est demandé maintenant pour que l'appel réseau se déroule pendant
     # la génération, qui ne l'attend pas. Son absence est sans conséquence.
@@ -252,6 +294,8 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         sectors=settings.sectors,
         max_candidates=settings.max_candidates,
         tolerance=req.tolerance,
+        terrain=terrain,
+        climb_fit=climb_fit,
     )
     log.info("%d candidats bruts", len(raw))
     lap("routing")
@@ -270,7 +314,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     # mieux qu'une boucle entière qui ne le tient pas — et l'inverse afficherait
     # « rien ne tient les seuils » au-dessus d'un itinéraire noté A.
     unique, rejected, off_target, spurned = _collect(
-        raw, lo, hi, req.safety.value, req, graph, start, profile, target_m
+        raw, lo, hi, req.safety.value, req, graph, start, profile, target_m, terrain
     )
 
     relaxed = False
@@ -279,7 +323,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         # Ni boucle entière ni tour répété : là, et seulement là, on montre ce
         # qui existe en le disant.
         unique, _rejected, _off, _spurned = _collect(
-            raw, lo, hi, SafetyMode.standard.value, req, graph, start, profile, target_m
+            raw, lo, hi, SafetyMode.standard.value, req, graph, start, profile, target_m, terrain
         )
         relaxed = bool(unique)
         if relaxed:
@@ -403,6 +447,7 @@ def _collect(
     start: int,
     profile,
     target_m: float,
+    terrain: Terrain | None = None,
 ) -> tuple[list[Candidate], list[Rejected], int, list[Candidate]]:
     """Tout ce qu'on peut proposer sous un mode de sécurité donné.
 
@@ -421,7 +466,7 @@ def _collect(
 
     if len(unique) < req.limit:
         looped = _lap_options(
-            graph, start, req, profile, target_m, mode, req.limit - len(unique)
+            graph, start, req, profile, target_m, mode, req.limit - len(unique), terrain
         )
         if looped:
             log.info("boucles répétées proposées : %s tours", sorted({c.laps for c in looped}))
@@ -438,6 +483,7 @@ def _lap_options(
     target_m: float,
     mode: str,
     needed: int,
+    terrain: Terrain | None = None,
 ) -> list[Candidate]:
     """Boucles plus courtes, à parcourir plusieurs fois pour faire la distance.
 
@@ -464,6 +510,8 @@ def _lap_options(
             sectors=settings.sectors,
             max_candidates=settings.max_candidates,
             tolerance=req.tolerance,
+            terrain=terrain,
+            climb_fit=_climb_fit(req.elevation),
         )
         lo = lap_target * (1 - req.tolerance)
         hi = lap_target * (1 + req.tolerance)
@@ -634,8 +682,9 @@ def final_score(
         quality = 0.72 * quality + 0.28 * elevation
 
         low, high = ELEVATION_BAND_PER_KM[req.elevation]
-        if not (low <= per_km <= high):
-            off_band = OUT_OF_BAND_PENALTY
+        gap = max(low - per_km, per_km - high, 0.0)
+        if gap > 0.0:
+            off_band = OUT_OF_BAND_PENALTY * (1.0 + gap / ELEVATION_TOLERANCE_PER_KM)
 
     if wind is not None and wind.matters:
         # Centré sur 0,5 : un retour vent de dos ajoute, un retour vent de face

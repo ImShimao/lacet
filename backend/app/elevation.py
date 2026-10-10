@@ -96,6 +96,77 @@ class Relief(NamedTuple):
     coarse: bool
 
 
+# --- le relief de la zone, avant de tracer --------------------------------
+
+# Pas de la grille, en degrés (longitude, latitude) : environ 220 m sous nos
+# latitudes. Assez fin pour voir un coteau de vignes ; la rue elle-même est
+# mesurée plus tard, tous les 50 m, sur le tracé retenu.
+TERRAIN_STEP_DEG = (0.003, 0.002)
+
+# Au-delà de ce rayon, le pas double, triple… : la grille garde toujours
+# environ deux mille points, soit une seule requête à l'IGN, et une boucle de
+# 100 km n'a pas besoin du relief à 220 m près.
+TERRAIN_RADIUS_PER_STEP_M = 5000.0
+
+
+class Terrain:
+    """L'altitude en tout point de la zone, interpolée sur une grille.
+
+    La préférence de dénivelé ne jouait qu'au moment de choisir : le moteur
+    traçait sans rien savoir du relief, puis mesurait. Au pied des Vosges, à
+    Guebwiller, deux boucles sur trois montaient dans les vignes, et une demande
+    de plat finissait avec 290 m de D+ en tête. Connaître le relief **avant** de
+    tracer permet de viser le bon terrain (voir `generate_loops`).
+
+    La grille est calée sur un quadrillage fixe et non sur le départ : deux
+    recherches voisines demandent les mêmes points, et le cache les sert.
+    """
+
+    def __init__(self, lat: float, lon: float, radius_m: float) -> None:
+        mult = max(1, math.ceil(radius_m / TERRAIN_RADIUS_PER_STEP_M))
+        self.step_lon = TERRAIN_STEP_DEG[0] * mult
+        self.step_lat = TERRAIN_STEP_DEG[1] * mult
+        half_lat = radius_m / 111_320.0
+        half_lon = radius_m / (111_320.0 * math.cos(lat * math.pi / 180.0))
+        self.i0 = math.floor((lat - half_lat) / self.step_lat)
+        self.j0 = math.floor((lon - half_lon) / self.step_lon)
+        self.n_lat = math.ceil((lat + half_lat) / self.step_lat) - self.i0 + 1
+        self.n_lon = math.ceil((lon + half_lon) / self.step_lon) - self.j0 + 1
+        self.values: list[float] = []
+
+    def points(self) -> list[Coord]:
+        """Les nœuds de la grille, ligne de latitude après ligne de latitude."""
+        return [
+            ((self.j0 + j) * self.step_lon, (self.i0 + i) * self.step_lat)
+            for i in range(self.n_lat)
+            for j in range(self.n_lon)
+        ]
+
+    def at(self, lon: float, lat: float) -> float:
+        """Interpolation bilinéaire ; au-delà du bord, la valeur du bord."""
+        fi = lat / self.step_lat - self.i0
+        fj = lon / self.step_lon - self.j0
+        a = min(self.n_lat - 2, max(0, math.floor(fi)))
+        b = min(self.n_lon - 2, max(0, math.floor(fj)))
+        u = min(1.0, max(0.0, fi - a))
+        v = min(1.0, max(0.0, fj - b))
+        z = self.values
+        row, nxt = a * self.n_lon, (a + 1) * self.n_lon
+        return (1.0 - u) * ((1.0 - v) * z[row + b] + v * z[row + b + 1]) + u * (
+            (1.0 - v) * z[nxt + b] + v * z[nxt + b + 1]
+        )
+
+    def climb(self, coords: list[Coord]) -> float:
+        """Somme des montées et des descentes le long d'une ligne."""
+        total = 0.0
+        prev = self.at(*coords[0])
+        for c in coords[1:]:
+            z = self.at(*c)
+            total += abs(z - prev)
+            prev = z
+        return total
+
+
 async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
     """Altitudes de plusieurs tracés d'un coup.
 

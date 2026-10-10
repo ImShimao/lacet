@@ -241,6 +241,61 @@ let heightQueue = Promise.resolve()
  */
 const missing = (z) => z === null || z === undefined || z === -99999 || z === -32768
 
+// Le relief de la zone, avant de tracer — voir `Terrain` dans `elevation.py`.
+const TERRAIN_STEP_DEG = [0.003, 0.002]
+const TERRAIN_RADIUS_PER_STEP_M = 5000
+
+/** L'altitude en tout point de la zone, interpolée sur une grille — `Terrain`. */
+export class Terrain {
+  constructor(lat, lon, radiusM) {
+    const mult = Math.max(1, Math.ceil(radiusM / TERRAIN_RADIUS_PER_STEP_M))
+    this.stepLon = TERRAIN_STEP_DEG[0] * mult
+    this.stepLat = TERRAIN_STEP_DEG[1] * mult
+    const halfLat = radiusM / 111_320
+    const halfLon = radiusM / (111_320 * Math.cos((lat * Math.PI) / 180))
+    this.i0 = Math.floor((lat - halfLat) / this.stepLat)
+    this.j0 = Math.floor((lon - halfLon) / this.stepLon)
+    this.nLat = Math.ceil((lat + halfLat) / this.stepLat) - this.i0 + 1
+    this.nLon = Math.ceil((lon + halfLon) / this.stepLon) - this.j0 + 1
+    this.values = []
+  }
+
+  /** Les nœuds de la grille, ligne de latitude après ligne de latitude. */
+  points() {
+    const out = []
+    for (let i = 0; i < this.nLat; i += 1) {
+      for (let j = 0; j < this.nLon; j += 1) out.push([(this.j0 + j) * this.stepLon, (this.i0 + i) * this.stepLat])
+    }
+    return out
+  }
+
+  /** Interpolation bilinéaire ; au-delà du bord, la valeur du bord. */
+  at(lon, lat) {
+    const fi = lat / this.stepLat - this.i0
+    const fj = lon / this.stepLon - this.j0
+    const a = Math.min(this.nLat - 2, Math.max(0, Math.floor(fi)))
+    const b = Math.min(this.nLon - 2, Math.max(0, Math.floor(fj)))
+    const u = Math.min(1, Math.max(0, fi - a))
+    const v = Math.min(1, Math.max(0, fj - b))
+    const z = this.values
+    const row = a * this.nLon
+    const next = (a + 1) * this.nLon
+    return (1 - u) * ((1 - v) * z[row + b] + v * z[row + b + 1]) + u * ((1 - v) * z[next + b] + v * z[next + b + 1])
+  }
+
+  /** Somme des montées et des descentes le long d'une ligne. */
+  climb(coords) {
+    let total = 0
+    let prev = this.at(coords[0][0], coords[0][1])
+    for (let k = 1; k < coords.length; k += 1) {
+      const z = this.at(coords[k][0], coords[k][1])
+      total += Math.abs(z - prev)
+      prev = z
+    }
+    return total
+  }
+}
+
 /** Altitudes de plusieurs tracés en une fois — `fetch_many`. */
 export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign', 'valhalla'] } = {}) {
   if (!routes.length) return []

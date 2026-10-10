@@ -128,6 +128,43 @@ class TestPreferenceDeDenivele:
 
         assert final_score(steep, TARGET, req, 300.0) < final_score(flat, TARGET, req, 20.0)
 
+    def test_hors_fourchette_le_moins_eloigne_passe_devant(self):
+        """Le cas de Guebwiller : 290 m en tête d'une demande de plat, 120 m en
+        troisième, parce que la plus raide partait dans une autre direction."""
+        req = request(elevation=ElevationPref.flat)
+        first = candidate(bearing=0.0, edges=[1, 2, 3])
+        milder = candidate(bearing=10.0, edges=[1, 2, 4])
+        steeper = candidate(bearing=180.0, roundness=0.60, edges=[7, 8, 9])
+        scored = sorted(
+            (
+                (final_score(c, TARGET, req, gain), c, i)
+                for i, (c, gain) in enumerate(((first, 50.0), (milder, 140.0), (steeper, 320.0)))
+            ),
+            key=lambda t: -t[0],
+        )
+        order = [c for _s, c, _i in select_varied(scored, 3)]
+        assert order == [first, milder, steeper]
+
+    def test_en_plat_une_b_plate_passe_devant_une_a_de_montagne(self):
+        """« Je veux du plat » est un réglage : la B a passé le portail du mode
+        choisi, la A monte quatre fois trop."""
+        req = request(elevation=ElevationPref.flat)
+        steep_a = candidate(bearing=0.0, edges=[1, 2, 3])
+        flat_b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        scored = sorted(
+            ((final_score(steep_a, TARGET, req, 400.0), steep_a, 0),
+             (final_score(flat_b, TARGET, req, 30.0), flat_b, 1)),
+            key=lambda t: -t[0],
+        )
+        assert [c for _s, c, _i in select_varied(scored, 2)] == [flat_b, steep_a]
+
+    def test_dans_la_fourchette_la_note_garde_la_main(self):
+        """Deux boucles plates : la A passe devant la B, même un peu moins plate."""
+        req = request(elevation=ElevationPref.flat)
+        a = candidate(bearing=0.0, edges=[1, 2, 3])
+        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        assert final_score(a, TARGET, req, 90.0) > final_score(b, TARGET, req, 30.0)
+
     def test_les_cotes_ecartent_le_plat(self):
         req = request(elevation=ElevationPref.hilly)
         hilly = candidate(bearing=0.0)

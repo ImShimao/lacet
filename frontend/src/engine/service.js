@@ -18,9 +18,15 @@ import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, sortByKey } from './py
 import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
-import { ELEVATION_STEP_M, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
+import { ELEVATION_STEP_M, Terrain, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
 
-export const SETTINGS = { sectors: 16, maxCandidates: 32, elevationSampleM: ELEVATION_STEP_M, elevationBudgetMs: null }
+export const SETTINGS = {
+  sectors: 16,
+  maxCandidates: 32,
+  elevationSampleM: ELEVATION_STEP_M,
+  elevationBudgetMs: null,
+  terrainWaitMs: null,
+}
 
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
 const ELEVATION_TOLERANCE_PER_KM = 5
@@ -51,6 +57,10 @@ const MAX_ELEVATION_SAMPLES = 600
 // reste de la recherche. Passé ce délai, on rend les boucles sans profil ; les
 // altitudes continuent d'arriver et seront gardées pour la prochaine fois.
 const ELEVATION_BUDGET_MS = 15_000
+// Le relief de la zone part avec les rues ; une fois les rues là, on l'attend
+// encore au plus ce délai, puis on trace sans lui, comme avant. Il reste en
+// cache pour la recherche suivante.
+const TERRAIN_WAIT_MS = 5000
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
 
 const shortlistSize = (limit) => limit + Math.max(6, limit)
@@ -267,6 +277,8 @@ export async function planLoops(input, deps) {
   const args = graphArgs(req)
   const { targetM } = args
   onProgress('data', 0)
+  // Le relief de la zone, pour tracer vers le terrain demandé — voir `Terrain`.
+  const terrainTask = req.with_elevation ? fetchTerrain(req.lat, req.lon, args.radiusM, fetchElevations) : null
   const area = await loadGraph(args)
   let graph = area
   trace.graph?.(graph)
@@ -324,10 +336,12 @@ export async function planLoops(input, deps) {
   }
 
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
+  const terrain = terrainTask ? await within(terrainTask, settings.terrainWaitMs ?? TERRAIN_WAIT_MS) : null
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
     avoid: req.avoid,
     blocked,
     carfree: req.carfree,
+    terrain: req.elevation === 'flat' ? terrain : null,
   })
 
   const windTask = windOf(req.lat, req.lon)
@@ -338,6 +352,8 @@ export async function planLoops(input, deps) {
     maxCandidates: settings.maxCandidates,
     tolerance: req.tolerance,
     variation: req.variation,
+    terrain,
+    climbFit: climbFit(req.elevation),
   })
   trace.raw?.(start, targetM, raw)
   lap('routing')
@@ -345,12 +361,12 @@ export async function planLoops(input, deps) {
   const lo = targetM * (1 - req.tolerance)
   const hi = targetM * (1 + req.tolerance)
 
-  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace)
+  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain)
 
   let relaxed = false
   let salvaged = null
   if (!unique.length && req.safety === 'safe') {
-    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace)
+    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain)
     relaxed = unique.length > 0
   }
 
@@ -499,7 +515,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
-function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace) {
+function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null) {
   const [passed, rejected, offTarget] = applyGate(raw, lo, hi, mode, req.sport)
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
 
@@ -510,7 +526,7 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace) 
   }
 
   if (unique.length < req.limit) {
-    unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace))
+    unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace, terrain))
   }
   return [unique, rejected, offTarget]
 }
@@ -544,7 +560,7 @@ function freshFirst(unique, shown, limit) {
   return fresh.length >= limit ? fresh : [...fresh, ...seen.slice(0, limit - fresh.length)]
 }
 
-function lapOptions(graph, start, req, profile, targetM, mode, needed, trace) {
+function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, terrain = null) {
   const out = []
   for (const laps of LAP_DIVISORS) {
     if (out.length >= needed) break
@@ -556,6 +572,8 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace) {
       maxCandidates: SETTINGS.maxCandidates,
       tolerance: req.tolerance,
       variation: req.variation,
+      terrain,
+      climbFit: climbFit(req.elevation),
     })
     trace.raw?.(start, lapTarget, raw)
     const lo = lapTarget * (1 - req.tolerance)
@@ -644,6 +662,42 @@ export function preliminaryScore(cand, targetM, tolerance) {
   return 0.32 * distance + 0.4 * safety + 0.1 * variety + 0.18 * shape - BACKTRACK_WEIGHT * cand.backtrack
 }
 
+/**
+ * Ce que vaut un polygone selon ce qu'il montera au moins, en m/km — plus bas,
+ * mieux c'est. Voir `_climb_fit` en Python.
+ */
+function climbFit(pref) {
+  if (pref === 'flat') return (perKm) => perKm
+  const target = ELEVATION_TARGET_PER_KM[pref]
+  return (perKm) => Math.floor(Math.abs(perKm - target) / ELEVATION_TOLERANCE_PER_KM)
+}
+
+/** Le relief de la zone, ou `null` : sans lui, on trace comme avant. */
+async function fetchTerrain(lat, lon, radiusM, fetchElevations) {
+  const grid = new Terrain(lat, lon, radiusM)
+  try {
+    const [relief] = await fetchElevations([grid.points()])
+    if (!relief?.values?.length) return null
+    grid.values = relief.values
+    return grid
+  } catch {
+    return null
+  }
+}
+
+/** La valeur de `task` si elle arrive à temps, `null` sinon. */
+async function within(task, ms) {
+  let timer = null
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), ms)
+  })
+  try {
+    return await Promise.race([task, late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 const gradePenalty = (cand) => GRADE_PENALTY * GRADE_RANK[gradeRoute(cand.stats)[0]]
 
 export function finalScore(cand, targetM, req, ascentM, wind = null) {
@@ -656,7 +710,8 @@ export function finalScore(cand, targetM, req, ascentM, wind = null) {
     const elevation = 1 / (1 + Math.abs(perKm - target) / ELEVATION_TOLERANCE_PER_KM)
     quality = 0.72 * quality + 0.28 * elevation
     const [low, high] = ELEVATION_BAND_PER_KM[req.elevation]
-    if (!(low <= perKm && perKm <= high)) offBand = OUT_OF_BAND_PENALTY
+    const gap = Math.max(low - perKm, perKm - high, 0)
+    if (gap > 0) offBand = OUT_OF_BAND_PENALTY * (1 + gap / ELEVATION_TOLERANCE_PER_KM)
   }
 
   if (wind !== null && wind.matters) {

@@ -53,8 +53,10 @@ from __future__ import annotations
 import logging
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from ..elevation import Terrain
 from ..geo import Coord, backtrack_share, bearing_deg, haversine_m, roundness
 from ..osm.graph import Graph
 from ..safety.gate import RouteStats
@@ -77,6 +79,13 @@ SHAPES = (3, 4, 5, 6)
 # polygone autour de lui donne à chaque fois une boucle réellement différente :
 # l'intervalle à balayer est le tour complet, pas une fraction.
 ORIENTATIONS = 8
+
+# Quand le relief est connu, on essaie trois fois plus d'orientations, et l'on
+# trace d'abord celles dont les points de passage vont au terrain demandé. Le
+# nombre de boucles tracées, lui, ne change pas : c'est le choix qui s'affine.
+# Mesuré à Guebwiller, en plat : 7 boucles plates sur 60 sans relief, 22 ainsi
+# (30 avec la pénalité de pente, voir `weights.CLIMB_WEIGHT`).
+TERRAIN_DENSITY = 3
 
 # Passes d'ajustement du rayon — voir `generate_loops`.
 MAX_ATTEMPTS = 3
@@ -353,6 +362,8 @@ def generate_loops(
     sectors: int = 12,
     max_candidates: int = 24,
     tolerance: float = 0.10,
+    terrain: Terrain | None = None,
+    climb_fit: Callable[[float], float] | None = None,
 ) -> list[Candidate]:
     """Rend des boucles brutes, non filtrées. Le tri se fait ailleurs.
 
@@ -361,6 +372,10 @@ def generate_loops(
     contraint — presqu'île, vallée, lotissement en raquettes — allonge les
     liaisons entre sommets plus que le rayon. D'où la boucle d'ajustement : on
     génère, on mesure l'écart médian, on corrige le rayon, on recommence.
+
+    `terrain` et `climb_fit` : le relief de la zone, et ce que vaut un polygone
+    selon ce qu'il monte au moins, en m/km — plus bas, mieux c'est. Sans eux, la
+    génération est celle d'avant, à l'identique.
     """
     collected: list[Candidate] = []
     scale = 1.0
@@ -377,7 +392,7 @@ def generate_loops(
     for attempt in range(MAX_ATTEMPTS):
         batch = _generate_once(
             graph, start, target_m, profile, weights, tree, scale,
-            orientations, max_candidates,
+            orientations, max_candidates, terrain, climb_fit,
         )
         collected.extend(batch)
 
@@ -460,6 +475,8 @@ def _generate_once(
     scale: float,
     orientations: int,
     max_candidates: int,
+    terrain: Terrain | None = None,
+    climb_fit: Callable[[float], float] | None = None,
 ) -> list[Candidate]:
     plans = {m: waypoint_plan(m, target_m * scale) for m in SHAPES}
 
@@ -489,33 +506,45 @@ def _generate_once(
     signatures: set[tuple[int, ...]] = set()
     node_sector = tree.sectors()
 
-    for m in SHAPES:
+    # Tous les polygones d'abord, rangés ; on ne trace qu'ensuite. Sans relief,
+    # l'ordre est celui des formes puis des orientations — celui d'avant. Avec,
+    # les orientations intermédiaires s'ajoutent, et chaque polygone passe selon
+    # ce que ses points de passage imposent de monter.
+    density = TERRAIN_DENSITY if terrain is not None and climb_fit is not None else 1
+    z_start = terrain.at(*graph.nodes[start]) if density > 1 else 0.0
+    polygons: list[tuple[float, bool, int, int, list[tuple[int, float, float]]]] = []
+    for shape_rank, m in enumerate(SHAPES):
         plan = plans[m]
         max_dev = (180.0 / m) * ANGLE_TOLERANCE
-
-        for k in range(orientations):
-            if len(candidates) >= max_candidates:
-                break
-            theta = k * 360.0 / orientations
-
+        for k in range(orientations * density):
+            theta = (k / density) * 360.0 / orientations
             vertices = _pick_vertices(index, plan, theta, max_dev)
             if vertices is None:
                 continue
+            fit = 0.0
+            if density > 1:
+                fit = climb_fit(_least_climb(graph, terrain, z_start, vertices) / (target_m / 1000.0))
+            polygons.append((fit, k % density != 0, shape_rank, k, vertices))
+    polygons.sort(key=lambda p: p[:4])
 
-            # Deux orientations voisines retombent parfois sur les mêmes points :
-            # inutile de router deux fois la même boucle.
-            signature = tuple(v[0] for v in vertices)
-            if signature in signatures:
-                continue
-            signatures.add(signature)
+    for _fit, _extra, shape_rank, _k, vertices in polygons:
+        if len(candidates) >= max_candidates:
+            break
 
-            cand = _build_polygon(
-                graph, start, vertices, outbound, weights, profile,
-                target_m, node_sector, core_memo,
-            )
-            if cand is not None:
-                cand.shape = m
-                candidates.append(cand)
+        # Deux orientations voisines retombent parfois sur les mêmes points :
+        # inutile de router deux fois la même boucle.
+        signature = tuple(v[0] for v in vertices)
+        if signature in signatures:
+            continue
+        signatures.add(signature)
+
+        cand = _build_polygon(
+            graph, start, vertices, outbound, weights, profile,
+            target_m, node_sector, core_memo,
+        )
+        if cand is not None:
+            cand.shape = SHAPES[shape_rank]
+            candidates.append(cand)
 
     # Repli : sur un réseau pauvre (village, littoral, impasse), aucun polygone
     # ne se referme. Un aller-retour reste préférable à ne rien proposer — le
@@ -527,6 +556,24 @@ def _generate_once(
         )
 
     return candidates
+
+
+def _least_climb(
+    graph: Graph,
+    terrain: Terrain,
+    z_start: float,
+    vertices: list[tuple[int, float, float]],
+) -> float:
+    """Ce qu'un polygone fera monter au moins : du départ à chaque point de
+    passage, et retour. Le chemin réel montera davantage — mais un polygone
+    dont les sommets sont dans les vignes ne fera jamais une boucle plate."""
+    total = 0.0
+    prev = z_start
+    for node, _d, _b in vertices:
+        z = terrain.at(*graph.nodes[node])
+        total += max(0.0, z - prev)
+        prev = z
+    return total + max(0.0, z_start - prev)
 
 
 def _pick_vertices(

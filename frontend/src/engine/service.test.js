@@ -130,7 +130,8 @@ describe('le relief', () => {
     // L'IGN répond en deux à quatre secondes ; mais quand il refuse, le repli
     // part en dizaines de petites requêtes, puis chez un fournisseur qui met les
     // siennes en file. Le dénivelé est un complément : il ne doit pas coûter la
-    // recherche.
+    // recherche — ni le profil des boucles, ni le relief de la zone, qu'on
+    // n'attend qu'un temps avant de tracer sans lui.
     const jamais = () => new Promise(() => {})
     const result = await planLoops(
       { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3 },
@@ -138,13 +139,13 @@ describe('le relief', () => {
         loadGraph: async () => graph,
         fetchElevations: jamais,
         wind: async () => null,
-        settings: { ...SETTINGS, elevationBudgetMs: 50 },
+        settings: { ...SETTINGS, elevationBudgetMs: 50, terrainWaitMs: 50 },
       },
     )
     expect(result.routes.length).toBeGreaterThan(0)
     expect(result.meta.elevation_skipped).toBe(true)
     expect(result.routes[0].elevation_profile).toBeNull()
-  }, 20_000)
+  }, 2_000)
 })
 
 describe('un village sans boucle', () => {

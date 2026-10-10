@@ -69,7 +69,7 @@ CASES = [
              "time_of_day": "night", "elevation": "hilly", "limit": 8}},
     {"name": "beaune-duree-standard", "extract": "beaune",
      "req": {"lat": 47.0245, "lon": 4.8395, "duration_min": 25, "safety": "standard",
-             "pace_sec_per_km": 360, "elevation": "flat"}},
+             "pace_sec_per_km": 360, "elevation": "flat", "with_elevation": True}},
     {"name": "lyon-douze", "extract": "lyon-centre",
      "req": {"lat": 45.7640, "lon": 4.8357, "distance_km": 3.0, "limit": 12}, "wind": True},
     {"name": "lyon-velo", "extract": "lyon-centre",
