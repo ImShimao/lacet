@@ -17,8 +17,11 @@ const SURFACE_COLORS = {
   unknown: '#6B747D',
 }
 const LEVEL_COLORS = { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', unknown: '#9B7BF0' }
+// Le vert couvre aussi les rues calmes, à 30 ou à 50 avec un trottoir probable :
+// « voie protégée » contredisait le pourcentage de la carte de parcours, qui ne
+// compte que les trottoirs et chemins connus d'OpenStreetMap.
 const LEVEL_LABELS = {
-  safe: 'voie protégée',
+  safe: 'voie calme ou protégée',
   caution: 'vigilance',
   risk: 'exposé au trafic',
   unknown: 'non évalué',

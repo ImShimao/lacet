@@ -15,7 +15,13 @@ export default function SafetyPanel({ safety, surfaces, distance, sport = 'run' 
       // Un parcours à 46 % de voie dédiée mais zéro mètre d'exposition est un
       // bon parcours ; le peindre en rouge donnerait une fausse alerte.
       tone: null,
-      hint: 'part du parcours séparée du trafic',
+      // Ce qui n'y est pas n'est pas pour autant exposé : une rue calme dont le
+      // trottoir manque sur la carte en est absente, et se lisait comme le reste
+      // du parcours livré aux voitures.
+      hint:
+        sport === 'bike'
+          ? 'piste, bande ou voie sans voitures, connue de la carte'
+          : 'trottoir ou chemin connus de la carte — une rue calme au trottoir non noté n’y compte pas',
     },
     {
       label: 'Exposé au trafic rapide',

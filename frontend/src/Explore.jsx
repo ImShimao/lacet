@@ -196,6 +196,7 @@ export default function Explore({
         selected={selected}
         onSelect={onSelect}
         onOpenDetail={onOpenDetail}
+        sport={params.sport}
       />
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
@@ -469,7 +470,7 @@ function AlreadyRun({ found }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail, known }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -590,7 +591,10 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known }) {
                 <span>
                   {r.safety ? (
                     <>
-                      <b>{Math.round(r.safety.protected_share * 100)} %</b> protégé
+                      {/* « protégé » se lisait comme un verdict sur le reste : une
+                          rue calme dont le trottoir n'est pas noté sur la carte
+                          n'y compte pas, et paraissait livrée aux voitures. */}
+                      <b>{Math.round(r.safety.protected_share * 100)} %</b> {sport === 'bike' ? 'aménagé' : 'hors chaussée'}
                     </>
                   ) : (
                     <>
