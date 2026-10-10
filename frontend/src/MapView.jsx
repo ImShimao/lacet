@@ -4,6 +4,7 @@ import Icon from './Icon.jsx'
 import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
+import { isNative } from './platform'
 
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
@@ -280,6 +281,51 @@ export default function MapView({
 
   // --- position en direct + cercle de précision -------------------------------
   const liveMarker = useRef(null)
+  // Où pointe le téléphone d'après sa boussole, ou `null`. Tenu hors de React :
+  // il change vingt fois par seconde quand on tourne sur soi, et seul le repère
+  // doit suivre — un rendu relancerait la caméra à chaque degré.
+  const compass = useRef(null)
+  const orient = useRef(() => {})
+  orient.current = () => {
+    const marker = liveMarker.current
+    if (!marker) return
+    // Avec la boussole, un faisceau montre où pointe le téléphone, en course
+    // comme au repos : c'est lui qui dit, au carrefour, si l'on part du bon
+    // côté. Sans elle, en course, une flèche suit le tracé. Couchés sur la
+    // carte tous les deux, ils tournent avec elle.
+    const beam = compass.current != null
+    const arrow = !beam && Boolean(navigate) && heading != null
+    const el = marker.getElement()
+    el.classList.toggle('me--beam', beam)
+    const dot = el.querySelector('.dot-live')
+    dot.classList.toggle('dot-live--nav', Boolean(navigate))
+    dot.classList.toggle('dot-live--arrow', arrow)
+    const alignment = beam || arrow ? 'map' : 'viewport'
+    marker.setRotationAlignment(alignment)
+    marker.setPitchAlignment(alignment)
+    marker.setRotation(beam ? compass.current : arrow ? heading : 0)
+  }
+
+  const located = Boolean(position)
+  useEffect(() => {
+    // La boussole ne tourne que tant que le point est affiché.
+    if (!located || !isNative()) return undefined
+    let stop = null
+    let cancelled = false
+    import('./native').then((n) => {
+      if (cancelled) return
+      stop = n.watchCompass((degrees) => {
+        compass.current = degrees
+        orient.current()
+      })
+    })
+    return () => {
+      cancelled = true
+      stop?.()
+      compass.current = null
+    }
+  }, [located])
+
   useEffect(() => {
     const m = map.current
     if (!m || !revision) return
@@ -293,20 +339,14 @@ export default function MapView({
 
     if (!liveMarker.current) {
       const el = document.createElement('div')
-      el.className = 'dot-live'
+      el.className = 'me'
+      el.innerHTML = '<div class="me__beam"></div><div class="dot-live"></div>'
       liveMarker.current = new maplibregl.Marker({ element: el })
       liveMarker.current.setLngLat(position).addTo(m)
     } else {
       liveMarker.current.setLngLat(position)
     }
-
-    // En course, le repère devient une flèche couchée sur la carte, pointée
-    // dans le sens de la course ; au repos, un point droit face à l'écran.
-    const pointed = navigate && heading != null
-    liveMarker.current.getElement().classList.toggle('dot-live--nav', pointed)
-    liveMarker.current.setRotationAlignment(pointed ? 'map' : 'viewport')
-    liveMarker.current.setPitchAlignment(pointed ? 'map' : 'viewport')
-    liveMarker.current.setRotation(pointed ? heading : 0)
+    orient.current()
 
     // Le cercle de précision dit la vérité sur la fiabilité du point : à 300 m
     // près, afficher un point net serait un mensonge.

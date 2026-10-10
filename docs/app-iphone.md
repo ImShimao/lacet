@@ -106,6 +106,21 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   vue porte son propre fond (`containerBackground`, exigé depuis iOS 17), et
   rien n'y peut échouer à l'affichage — un `Text(timerInterval:)` sur une
   arrivée déjà dépassée suffisait à laisser une carte noire, sans trace.
+- **Le point de position montre où pointe le téléphone**, par un faisceau
+  bleu comme dans Google Maps, en course comme au repos : au premier
+  carrefour, on voit tout de suite si l'on part du bon côté. C'est la boussole
+  de l'iPhone (`CompassPlugin.swift`), sans autorisation de plus que la
+  position ; elle ne tourne que tant que le point est affiché. Sans
+  magnétomètre — ou sur une installation d'avant —, le point de course garde
+  sa flèche dans le sens du tracé.
+- **L'app se présente sous son nom.** Les serveurs Overpass, qui donnent les
+  points d'eau, les toilettes et les rues hors des archives, refusent depuis
+  l'automne 2026 tout ce qui se présente comme un navigateur : 406 chez
+  `overpass-api.de`, 403 chez `overpass.openstreetmap.fr`. L'app s'annonçait
+  « Safari iPhone … Lacet/1.0 » (`appendUserAgent`), et les points d'eau ne
+  s'affichaient jamais, sans un message. Elle s'annonce désormais « Lacet/1.0 »
+  seul (`overrideUserAgent` dans `capacitor.config.json`) ; vérifié le 10
+  octobre 2026 sur les douze services qu'elle appelle, qui l'acceptent tous.
 
 ## En course, la carte suit comme un GPS
 
@@ -125,7 +140,12 @@ n'apparaît qu'en pause, pour qu'un doigt qui glisse n'arrête pas la sortie.
 
 ## Hors parcours : un nouveau chemin
 
-Trois relevés GPS de suite à plus de 45 m du tracé : l'app le dit. Si l'on ne
+Trois relevés GPS de suite à plus de 45 m du tracé : l'app le dit. Et quand
+on est parti du mauvais côté — sur la fin de la boucle, à rebours —, elle dit
+« Tu pars à contresens du parcours. Fais demi-tour. » plutôt qu'un simple
+écart, qui ne disait pas de quel côté repartir (`wrongWay` dans
+`routeTracker.js`). Le demi-tour en pleine course, lui, était déjà vu : « Tu
+reviens sur tes pas ». Si l'on ne
 l'a pas retrouvé vingt secondes plus tard — le temps de contourner des travaux
 sans qu'on nous impose un itinéraire — elle en calcule un nouveau, sur
 l'appareil, avec les rues déjà chargées (`frontend/src/engine/reroute.js`).

@@ -27,7 +27,12 @@
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
 }
+/* Le repère de position : le point, et derrière lui le faisceau de la boussole.
+   `.me` est l'élément du marqueur, que MapLibre place lui-même : ne pas lui
+   donner de `position`, elle écraserait la sienne. */
 .dot-live {
+  /* Positionné pour passer devant le faisceau, qui l'est aussi. */
+  position: relative;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -35,10 +40,29 @@
   border: 3px solid #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
-/* En course, le point porte une pointe dans le sens de la course : c'est elle
-   qu'on cherche du regard pour savoir où tourner, comme la flèche d'un GPS.
-   Et il grossit : on le lit à bout de bras, en mouvement, l'écran à moitié
-   éclairé par le soleil — dix-huit pixels de bureau ne suffisaient pas. */
+/* Le faisceau : où pointe le téléphone, comme dans Google Maps. Un quartier de
+   soixante degrés qui s'efface en s'éloignant du point — assez large pour
+   qu'un faisceau tenu à la main ne frémisse pas d'une rue à l'autre. */
+.me__beam {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 132px;
+  height: 132px;
+  margin: -66px 0 0 -66px;
+  border-radius: 50%;
+  background: conic-gradient(from -30deg, rgba(74, 158, 255, 0.75) 0deg 60deg, transparent 60deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent);
+  mask-image: radial-gradient(closest-side, #000 35%, transparent);
+  pointer-events: none;
+}
+.me--beam .me__beam {
+  display: block;
+}
+/* En course, le point grossit : on le lit à bout de bras, en mouvement,
+   l'écran à moitié éclairé par le soleil — dix-huit pixels de bureau ne
+   suffisaient pas. */
 .dot-live--nav {
   width: 28px;
   height: 28px;
@@ -47,7 +71,9 @@
     0 0 0 6px rgba(88, 166, 255, 0.18),
     0 3px 12px rgba(0, 0, 0, 0.6);
 }
-.dot-live--nav::before {
+/* Sans boussole, il porte une pointe dans le sens du tracé : c'est elle qu'on
+   cherche du regard pour savoir où tourner, comme la flèche d'un GPS. */
+.dot-live--arrow::before {
   content: '';
   position: absolute;
   left: 50%;

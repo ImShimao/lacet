@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTrack, locate, nextInstruction, OFF_ROUTE_M } from './routeTracker'
+import { buildTrack, locate, nextInstruction, OFF_ROUTE_M, wrongWay } from './routeTracker'
 
 /**
  * Le suivi de parcours.
@@ -168,5 +168,40 @@ describe('nextInstruction', () => {
 
   it('rend null sur une liste vide', () => {
     expect(nextInstruction([], 0, new Set())).toBeNull()
+  })
+})
+
+describe('wrongWay', () => {
+  // Un carré de 300 m de côté, parcouru nord, est, sud, puis ouest jusqu'au
+  // départ : en partant vers l'est, on court sur le dernier côté, à rebours.
+  const EST = 0.00137 // ~100 m de longitude à cette latitude
+  const DEPART = [2.35, LAT]
+  const carre = buildTrack([
+    DEPART,
+    [2.35, LAT + 3 * PAS],
+    [2.35 + 3 * EST, LAT + 3 * PAS],
+    [2.35 + 3 * EST, LAT],
+    DEPART,
+  ])
+
+  it('voit le départ pris du mauvais côté', () => {
+    expect(wrongWay(carre, DEPART, [2.35 + EST, LAT], 0)).toBe(true)
+  })
+
+  it('se tait dans le bon sens', () => {
+    expect(wrongWay(carre, DEPART, [2.35, LAT + PAS], 0)).toBe(false)
+  })
+
+  it('se tait sur un raccourci pris dans le sens du tracé', () => {
+    expect(wrongWay(carre, [2.35 + 3 * EST, LAT], [2.35 + 2 * EST, LAT], 0)).toBe(false)
+  })
+
+  it('attend un vrai déplacement, pas le tremblement du GPS', () => {
+    expect(wrongWay(carre, DEPART, [2.35 + 0.00005, LAT], 0)).toBe(false)
+  })
+
+  it('laisse le demi-tour en pleine course à « Tu reviens sur tes pas »', () => {
+    // Déjà au bout du deuxième côté : revenir sur le premier n'est pas devant.
+    expect(wrongWay(carre, [2.35, LAT + 3 * PAS], [2.35, LAT + 2 * PAS], 600)).toBe(false)
   })
 })

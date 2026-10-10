@@ -7,7 +7,7 @@ import { ReportButton, RunControls, RunStats } from './RunPanel.jsx'
 import { NextStops } from './Stops.jsx'
 import useLiveActivity from './useLiveActivity'
 import { haversine } from './format'
-import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt } from './routeTracker'
+import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, wrongWay } from './routeTracker'
 import { lockScreenState } from './lockScreen'
 import { actAt, announcement, chains, followingStep, previewAt, speedOr, thenLabel } from './guidance'
 import { motionTracker } from './autoPause'
@@ -135,6 +135,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const [turnBack, setTurnBack] = useState(null)
   const dueAt = useRef(null)
   const lastOnAlong = useRef(0)
+  // Le dernier point sur le tracé : d'où l'on est parti quand on s'en écarte —
+  // voir `wrongWay`.
+  const lastOnPoint = useRef(null)
 
   const last = useRef(null)
   // L'heure du relevé `last` : c'est elle qui dit si un saut est plausible.
@@ -570,12 +573,21 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       strayCount.current += 1
       if (strayCount.current === OFF_ROUTE_FIXES) {
         setOffRoute(true)
+        // Parti du mauvais côté : on est sur la fin de la boucle, à rebours.
+        // « Écarté » ne dit pas quoi faire ; « demi-tour », si.
+        const backwards = wrongWay(track, lastOnPoint.current, point, farthest.current)
         if (canDetour) {
           dueAt.current = Date.now() + REROUTE_AFTER_MS
           setRerouteDue(dueAt.current)
-          voice.speak("Tu t'es écarté du parcours. Si tu ne le retrouves pas, je t'en propose un nouveau.")
+          voice.speak(
+            backwards
+              ? 'Tu pars à contresens du parcours. Fais demi-tour.'
+              : "Tu t'es écarté du parcours. Si tu ne le retrouves pas, je t'en propose un nouveau.",
+          )
         } else {
-          voice.speak("Tu t'es écarté du parcours. Reviens sur le tracé.")
+          voice.speak(
+            backwards ? 'Tu pars à contresens du parcours. Fais demi-tour.' : "Tu t'es écarté du parcours. Reviens sur le tracé.",
+          )
         }
       }
       if (strayCount.current >= OFF_ROUTE_FIXES && canDetour && dueAt.current && Date.now() >= dueAt.current) {
@@ -583,6 +595,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       }
     } else {
       lastOnAlong.current = found.along
+      lastOnPoint.current = point
       if (strayCount.current >= OFF_ROUTE_FIXES) voice.speak('Te revoilà sur le parcours.')
       strayCount.current = 0
       dueAt.current = null
@@ -816,6 +829,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     fix.current = null
     strayCount.current = 0
     lastOnAlong.current = 0
+    lastOnPoint.current = null
     announced.current = new Set()
     previewed.current = new Set()
     acted.current = new Set()

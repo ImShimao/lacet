@@ -197,4 +197,31 @@ export function headingAt(track, along, ahead = 25) {
   return bearing(from, to)
 }
 
+// Contresens : un écart de cap au-delà de ce seuil, mesuré sur au moins tant
+// de mètres — en dessous, c'est le tremblement du GPS qui donne la direction.
+const WRONG_WAY_DEG = 120
+const WRONG_WAY_MOVE_M = 15
+
+/**
+ * Parti à contresens du tracé.
+ *
+ * Revenir sur ses pas après avoir avancé, `LiveRun` le voit déjà : l'avancée
+ * recule (« Tu reviens sur tes pas »). Mais partir du mauvais côté au départ ne
+ * fait rien reculer — on est à zéro : on court sur la **fin** de la boucle, à
+ * rebours. La recherche bornée autour du départ ne la voit pas, et l'app ne
+ * disait que « Tu t'es écarté du parcours », sans dire de quel côté repartir.
+ *
+ * Contresens : sur le tracé, bien au-delà de l'avancée la plus lointaine
+ * (`farthest`), et dans le sens inverse du tracé à cet endroit. `from` : le
+ * dernier point sur le parcours ; `to` : la position.
+ */
+export function wrongWay(track, from, to, farthest) {
+  if (!from || haversine(from, to) < WRONG_WAY_MOVE_M) return false
+  const hit = locate(track, to, null)
+  if (!hit || hit.offRoute || hit.along - farthest < WINDOW_M) return false
+  const route = headingAt(track, hit.along)
+  if (route == null) return false
+  return Math.abs(((bearing(from, to) - route + 540) % 360) - 180) > WRONG_WAY_DEG
+}
+
 export { OFF_ROUTE_M }

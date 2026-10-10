@@ -30,10 +30,11 @@ const BackgroundGeolocation = registerPlugin('BackgroundGeolocation')
 
 // Ceux-ci sont écrits pour Lacet, dans l'app elle-même
 // (`ios-overlay/live-activity/App/` : `LiveActivityPlugin.swift`,
-// `AltimeterPlugin.swift`, `VoicePlugin.swift`).
+// `AltimeterPlugin.swift`, `VoicePlugin.swift`, `CompassPlugin.swift`).
 const LiveActivity = registerPlugin('LiveActivity')
 const Altimeter = registerPlugin('Altimeter')
 const Voice = registerPlugin('Voice')
+const Compass = registerPlugin('Compass')
 
 // --- démarrage ----------------------------------------------------------------
 
@@ -114,6 +115,35 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
   return () => {
     stopped = true
     if (id !== null) BackgroundGeolocation.removeWatcher({ id }).catch(() => {})
+  }
+}
+
+// --- boussole -----------------------------------------------------------------
+
+/**
+ * Où pointe le téléphone, en degrés depuis le nord : `onHeading(cap)` à chaque
+ * changement de plus de trois degrés. Rend une fonction d'arrêt.
+ *
+ * Une installation d'avant la boussole, ou un appareil sans magnétomètre, ne
+ * rappelle jamais : le point reste un point.
+ */
+export function watchCompass(onHeading) {
+  let stopped = false
+  let listener = null
+  Compass.addListener('heading', ({ heading }) => {
+    if (!stopped) onHeading(heading)
+  }).then(
+    (handle) => {
+      listener = handle
+      if (stopped) handle.remove()
+    },
+    () => {},
+  )
+  Compass.start().catch(() => {})
+  return () => {
+    stopped = true
+    listener?.remove()
+    Compass.stop().catch(() => {})
   }
 }
 

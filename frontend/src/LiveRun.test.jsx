@@ -251,6 +251,36 @@ describe('la sortie guidée', () => {
     expect(dit.some((d) => d.startsWith('Maintenant, tourne à gauche sur Rue Haute'))).toBe(true)
   })
 
+  it('dit « demi-tour » à qui part du mauvais côté', async () => {
+    // On sort de chez soi vers le nord, alors que la boucle part vers l'est et
+    // revient par le nord : on court sa fin à rebours. L'app ne disait que
+    // « Tu t'es écarté du parcours », sans dire de quel côté repartir.
+    const voice = await import('./voice')
+    voice.speak.mockClear()
+    const grand = carre(7.2, 47.9, 300)
+    const stage = document.createElement('div')
+    document.body.appendChild(stage)
+    render(
+      <LiveRun
+        route={{ ...boucle, geometry: grand, distance_m: 1200 }}
+        request={null}
+        sport="run"
+        stage={stage}
+        onPosition={() => {}}
+        onStop={vi.fn()}
+      />,
+    )
+
+    let t = Date.now()
+    for (let m = 0; m <= 120; m += 20) {
+      t += 6000
+      await relever([grand[0][0], grand[0][1] + m / 110_540], t)
+    }
+    const dit = voice.speak.mock.calls.map(([d]) => d)
+    expect(dit).toContain('Tu pars à contresens du parcours. Fais demi-tour.')
+    expect(dit.some((d) => d.startsWith("Tu t'es écarté"))).toBe(false)
+  })
+
   it('propose de signaler un passage fermé quand on rebrousse chemin', async () => {
     // Le portail fermé au bout de soixante mètres : on fait demi-tour sur le
     // tracé lui-même. Ce n'était pas « hors parcours », et l'app ne disait rien.

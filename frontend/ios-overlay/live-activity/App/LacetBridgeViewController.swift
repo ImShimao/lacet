@@ -12,5 +12,6 @@ class LacetBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(LiveActivityPlugin())
         bridge?.registerPluginInstance(AltimeterPlugin())
         bridge?.registerPluginInstance(VoicePlugin())
+        bridge?.registerPluginInstance(CompassPlugin())
     }
 }
