@@ -7,7 +7,7 @@ import pytest
 from app.elevation import Terrain
 from app.models import SafetyMode, SurfacePref
 from app.osm.graph import build_graph
-from app.routing.loops import generate_loops, similarity
+from app.routing.loops import Candidate, detect_crossings, generate_loops, similarity
 from app.routing.weights import build_profile
 from app.safety.gate import run_gate
 from tests.conftest import grid_payload
@@ -172,3 +172,44 @@ class TestSimilarite:
             for b in loops[i + 1 :]
         ]
         assert min(pairs) < 0.6
+
+
+class TestTraversees:
+    """Une traversée en décalé : on rejoint la route, on la longe quelques
+    mètres, on la quitte par le chemin d'en face. Relevé au pied des Vosges :
+    le moteur la comptait deux fois — en arrivant, puis en repartant —, et une
+    seule départementale épuisait les deux traversées que tolère le mode Sûr."""
+
+    @staticmethod
+    def crossed(offset_deg: float) -> list:
+        lat, lon = 48.80, 2.301
+        road = [{"lon": 2.300, "lat": lat}, {"lon": lon, "lat": lat}, {"lon": lon + offset_deg, "lat": lat}, {"lon": 2.304, "lat": lat}]
+        payload = {
+            "elements": [
+                {"type": "way", "id": 1, "tags": {"highway": "secondary", "maxspeed": "80"},
+                 "nodes": [1, 2, 3, 4], "geometry": road},
+                {"type": "way", "id": 2, "tags": {"highway": "track"},
+                 "nodes": [10, 2], "geometry": [{"lon": lon, "lat": lat - 0.002}, road[1]]},
+                {"type": "way", "id": 3, "tags": {"highway": "track"},
+                 "nodes": [3, 11], "geometry": [road[2], {"lon": lon + offset_deg, "lat": lat + 0.002}]},
+            ]
+        }
+        graph = build_graph(payload)
+        south = graph.nearest_node(lon, lat - 0.002)
+        here = graph.nearest_node(lon, lat)
+        there = graph.nearest_node(lon + offset_deg, lat)
+        north = graph.nearest_node(lon + offset_deg, lat + 0.002)
+        nodes = [south, here, there, north]
+        edges = [
+            next(e for e in graph.adj[a] if graph.edges[e].other(a) == b)
+            for a, b in zip(nodes, nodes[1:])
+        ]
+        return detect_crossings(graph, Candidate(edges=edges, nodes=nodes))
+
+    def test_une_traversee_en_decale_compte_une_fois(self):
+        hits = self.crossed(0.00007)  # environ 5 m
+        assert len(hits) == 1
+        assert hits[0].speed_kmh == 80.0
+
+    def test_deux_traversees_eloignees_comptent_deux_fois(self):
+        assert len(self.crossed(0.0014)) == 2  # environ 100 m

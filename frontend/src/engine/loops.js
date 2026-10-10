@@ -572,6 +572,11 @@ export function reverseCandidate(graph, start, cand, options) {
   return flipped
 }
 
+// Deux traversées à moins de tant de mètres le long du parcours n'en font
+// qu'une : la route rejointe puis quittée par le chemin d'en face — voir
+// `CROSSING_MERGE_M` en Python.
+const CROSSING_MERGE_M = 25
+
 export function detectCrossings(graph, cand) {
   const used = cand.edgeSet
   const hits = []
@@ -579,7 +584,10 @@ export function detectCrossings(graph, cand) {
   // rejoint la rue, on ne la traverse pas — pas plus qu'au départ, qu'on ne
   // compte pas non plus.
   const threshold = graph.door?.node ?? -1
+  let along = 0
+  let lastAlong = 0
   for (let i = 1; i < cand.nodes.length - 1; i += 1) {
+    along += graph.edgeLen[cand.edges[i - 1]]
     const node = cand.nodes[i]
     if (node === threshold) continue
     let fastest = 0
@@ -591,13 +599,22 @@ export function detectCrossings(graph, cand) {
     if (fastest < 70) continue
 
     const crossing = graph.crossings.get(node)
-    hits.push({
+    const hit = {
       lon: graph.nodeLon[node],
       lat: graph.nodeLat[node],
       protected: crossing ? crossing.protected : false,
       speedKmh: fastest,
       kind: crossing ? crossing.kind : 'untagged',
-    })
+    }
+    if (hits.length && along - lastAlong <= CROSSING_MERGE_M) {
+      // Une seule traversée, protégée si l'un des deux bouts l'est.
+      const previous = hits[hits.length - 1]
+      const keep = hit.protected && !previous.protected ? hit : previous
+      hits[hits.length - 1] = { ...keep, speedKmh: Math.max(previous.speedKmh, fastest) }
+    } else {
+      hits.push(hit)
+    }
+    lastAlong = along
   }
   return hits
 }

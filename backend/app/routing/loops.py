@@ -940,6 +940,17 @@ def _loop_bearing(start: Coord, geometry: list[Coord]) -> float:
     return bearing_deg(start, centroid)
 
 
+# Deux traversées à moins de tant de mètres l'une de l'autre, le long du
+# parcours, n'en font qu'une : le chemin d'en face ne tombe pas toujours pile en
+# face, et l'on longe la route quatre ou cinq mètres. Le moteur comptait alors
+# une traversée en la rejoignant et une autre en la quittant — mesuré autour de
+# Guebwiller et de Soultz, toutes les traversées de départementale par les
+# vignes étaient comptées double, à cinq mètres d'écart. Assez court pour ne
+# jamais réunir deux routes vraiment distinctes, ni les tours d'une boucle
+# répétée, qui repassent au même endroit des kilomètres plus loin.
+CROSSING_MERGE_M = 25.0
+
+
 def detect_crossings(graph: Graph, cand: Candidate) -> list[CrossingHit]:
     """Repère les nœuds où le parcours coupe une voie rapide.
 
@@ -949,8 +960,13 @@ def detect_crossings(graph: Graph, cand: Candidate) -> list[CrossingHit]:
     """
     used = set(cand.edges)
     hits: list[CrossingHit] = []
+    # Où l'on en est sur le parcours, et où était la traversée précédente.
+    along = 0.0
+    last_along = 0.0
 
-    for node in cand.nodes[1:-1]:
+    for i in range(1, len(cand.nodes) - 1):
+        along += graph.edges[cand.edges[i - 1]].length_m
+        node = cand.nodes[i]
         fastest = 0.0
         for eidx in graph.adj[node]:
             if eidx in used:
@@ -963,15 +979,28 @@ def detect_crossings(graph: Graph, cand: Candidate) -> list[CrossingHit]:
 
         crossing = graph.crossings.get(node)
         lon, lat = graph.nodes[node]
-        hits.append(
-            CrossingHit(
-                lon=lon,
-                lat=lat,
-                protected=crossing.protected if crossing else False,
-                speed_kmh=fastest,
-                kind=crossing.kind if crossing else "untagged",
-            )
+        hit = CrossingHit(
+            lon=lon,
+            lat=lat,
+            protected=crossing.protected if crossing else False,
+            speed_kmh=fastest,
+            kind=crossing.kind if crossing else "untagged",
         )
+        if hits and along - last_along <= CROSSING_MERGE_M:
+            # La même route, rejointe puis quittée quelques mètres plus loin :
+            # une seule traversée, protégée si l'un des deux bouts l'est.
+            previous = hits[-1]
+            keep = hit if hit.protected and not previous.protected else previous
+            hits[-1] = CrossingHit(
+                lon=keep.lon,
+                lat=keep.lat,
+                protected=keep.protected,
+                speed_kmh=max(previous.speed_kmh, fastest),
+                kind=keep.kind,
+            )
+        else:
+            hits.append(hit)
+        last_along = along
 
     return hits
 

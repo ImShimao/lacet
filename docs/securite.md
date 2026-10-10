@@ -121,6 +121,16 @@ qu'au-delà de 10 km — une sortie urbaine garde exactement les seuils d'avant 
 l'écart entre candidats reste discriminant : sur 80 km à vélo ils s'étalent de 35
 à 98 traversées, et le portail continue d'écarter la moitié la moins bonne.
 
+**Une traversée en décalé compte une fois.** Le chemin d'en face ne tombe pas
+toujours pile en face : on rejoint la départementale, on la longe quatre ou
+cinq mètres, on la quitte. Le moteur comptait une traversée en la rejoignant
+et une autre en la quittant — autour de Guebwiller et de Soultz, toutes les
+traversées par les vignes l'étaient, à cinq mètres d'écart, et une seule
+départementale épuisait les deux que tolère le mode Sûr. Deux traversées à
+moins de 25 m l'une de l'autre le long du parcours n'en font plus qu'une
+(`CROSSING_MERGE_M`, `routing/loops.py`) ; les tours d'une boucle répétée, qui
+repassent au même endroit des kilomètres plus loin, comptent toujours chacun.
+
 **L4 — la nuit** (`night.py`). Un modèle distinct, qui inverse le premier. De
 jour on s'éloigne du trafic ; de nuit, un sentier isolé devient le pire choix.
 
@@ -146,7 +156,17 @@ ne dirait plus rien.
 
 En mode Sûr à pied, l'exposition est plafonnée à 3 % par le portail : **un B y
 signale donc presque toujours une traversée**, pas une portion longée. Le détail
-sous la proposition dit lequel des deux.
+sous la proposition dit lequel des deux. Une boucle entièrement sur trottoirs
+qui coupe une seule fois une départementale sans passage piéton est notée B —
+c'est voulu : ces quelques secondes sont le vrai risque d'une sortie à la
+campagne, et l'app prévient 120 m avant.
+
+**Ce que dit le pourcentage de la carte de parcours.** « 64 % hors chaussée »
+compte les trottoirs et les chemins **connus d'OpenStreetMap**, et rien d'autre :
+une rue calme dont le trottoir n'est pas noté n'y figure pas. Il s'affichait
+« protégé », et la bande, toute verte, appelait son vert « voie protégée » : on
+lisait que la moitié d'une boucle courue sur trottoirs était livrée aux
+voitures. Le vert de la bande se nomme désormais « voie calme ou protégée ».
 
 **Les propositions sont classées par réglages, puis par note.** D'abord celles
 qui tiennent le dénivelé et le terrain demandés — une demande de plat ou de
