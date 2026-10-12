@@ -187,6 +187,22 @@ elles s'ouvrent désormais sur les quatre boucles entières que le coin offre,
 et les tours suivent. Le retrait par tour ne départage plus que les tours entre
 eux (`select_varied`).
 
+**Et l'app cherche d'autres boucles entières avant d'en proposer.** Le
+générateur s'arrête dès qu'il tient huit tracés à la bonne distance : les
+quasi-doublons retirés, il en restait quatre à six, et dès huit propositions la
+liste se complétait de tours. Quand il en manque, l'app relance jusqu'à deux
+tirages, polygones tournés d'une fraction de cran — jamais l'angle d'un
+« Régénérer » (`WIDEN_ROUNDS`, `engine/service.js` ; propre à l'app, la parité
+le coupe). Mesuré depuis la rue des Primevères, 9 km :
+
+| Départ, propositions | Tours avant | Tours après | Calcul après |
+|---|---|---|---|
+| Soultz, 5 | 1 | 0 | 0,1 s |
+| Soultz, 8 | 4 | 0 | 1,1 s |
+| Soultz, 12 | 8 | 4 | 0,3 s |
+| Guebwiller, 8 | 2 | 0 | 1,1 s |
+| Guebwiller, 12 | 6 | 0 | 1,8 s |
+
 ## Le vent
 
 Finir dix kilomètres face au vent est la façon la plus sûre de gâcher les deux

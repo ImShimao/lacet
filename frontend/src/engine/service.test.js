@@ -99,6 +99,16 @@ describe('la boucle', () => {
     expect(fin).toEqual(apres.routes[0].geometry[0])
   }, 30_000)
 
+  it('cherche d’autres boucles entières avant de proposer des tours', async () => {
+    // Douze propositions : le premier tirage n'en tient qu'une poignée de
+    // distinctes, et la liste se complétait de tours.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 12 }
+    const entieres = (r) => r.routes.filter((route) => route.laps === 1).length
+    const sans = await planLoops({ ...demande, widen: false }, deps)
+    const avec = await planLoops(demande, deps)
+    expect(entieres(avec)).toBeGreaterThan(entieres(sans))
+  }, 60_000)
+
   it('« Régénérer » ne remontre pas une boucle déjà vue', async () => {
     // Tourner les polygones ne suffisait pas : les meilleures rues restaient
     // les meilleures, et une régénération sur deux remontrait une boucle déjà

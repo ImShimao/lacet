@@ -46,6 +46,14 @@ const VARIETY_BEARING_WEIGHT = 0.3
 const BEARING_SPREAD_DEG = 90
 const WIND_WEIGHT = 0.1
 const LAP_DIVISORS = [2, 3, 4]
+// Tirages supplémentaires, polygones tournés, quand il manque des boucles
+// entières. Le générateur s'arrête dès qu'il tient huit tracés à la bonne
+// distance (`ENOUGH_IN_RANGE`) : les quasi-doublons retirés, il en restait
+// quatre à six, et dès huit propositions demandées la liste se complétait de
+// « 2 × 4,5 km ». Depuis la rue des Primevères, à Soultz, douze propositions de
+// 9 km en comptaient huit en tours. Propre à l'app : Python ne tourne pas ses
+// polygones.
+const WIDEN_ROUNDS = 2
 const MIN_LAP_M = 1500
 const LAP_PENALTY = 0.12
 const MIN_ROUNDNESS = 0.12
@@ -151,6 +159,10 @@ export function normalizeRequest(input) {
     //                              chemins et allées coûtent moins qu'une rue —
     //                              voir `weights.js`. Actif par défaut, comme
     //                              `doorstep` ; la parité le coupe.
+    //   widen                      Avant de proposer des tours, chercher d'autres
+    //                              boucles entières, polygones tournés — voir
+    //                              `WIDEN_ROUNDS`. Actif par défaut ; la parité
+    //                              le coupe.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -161,6 +173,7 @@ export function normalizeRequest(input) {
     doorstep: input.doorstep ?? true,
     street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
     carfree: input.carfree !== false,
+    widen: input.widen !== false,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -531,9 +544,29 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
 
   const unique = []
-  for (const cand of passed) {
-    if (unique.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) continue
-    unique.push(cand)
+  const keep = (cands) => {
+    for (const cand of cands) {
+      if (unique.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) continue
+      unique.push(cand)
+    }
+  }
+  keep(passed)
+
+  // D'autres boucles entières avant des tours : voir `WIDEN_ROUNDS`.
+  for (let round = 1; req.widen && round <= WIDEN_ROUNDS && unique.length < req.limit; round += 1) {
+    const more = generateLoops(graph, start, targetM, profile, {
+      sectors: SETTINGS.sectors,
+      maxCandidates: SETTINGS.maxCandidates,
+      tolerance: req.tolerance,
+      // Une rotation fractionnaire : jamais celle d'un « Régénérer », qui
+      // tourne d'un cran entier à chaque fois.
+      variation: req.variation + round / (WIDEN_ROUNDS + 1),
+      terrain,
+      climbFit: climbFit(req.elevation),
+    })
+    const [extra] = applyGate(more, lo, hi, mode, req.sport)
+    sortByKey(extra, (c) => -preliminaryScore(c, targetM, req.tolerance))
+    keep(extra)
   }
 
   if (unique.length < req.limit) {

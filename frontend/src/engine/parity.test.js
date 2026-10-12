@@ -78,7 +78,7 @@ async function runCase(entry) {
   // du carrefour, et c'est ce départ-là qu'on compare. La préférence pour les
   // voies sans voitures aussi (`weights.js`) : Python n'en a pas.
   const response = await planLoops(
-    { with_elevation: false, time_of_day: 'day', doorstep: false, carfree: false, ...c.req },
+    { with_elevation: false, time_of_day: 'day', doorstep: false, carfree: false, widen: false, ...c.req },
     {
       loadGraph: async ({ sport, allowTrail }) => buildGraph(extract, { sport, allowTrail }),
       fetchElevations: fakeFetchMany,
