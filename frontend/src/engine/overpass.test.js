@@ -631,9 +631,10 @@ describe('le téléchargement d’une zone', () => {
     expect(extract.ways.length).toBe(inReach(BEAUNE, 7000))
     expect(ensemble).toBeGreaterThanOrEqual(2)
     expect(Math.max(...peak.values())).toBeLessThanOrEqual(2)
-    // Le premier serveur ne voit qu'une requête à la fois : le second lot est
-    // parti ailleurs.
-    expect(peak.get(MIRRORS[0])).toBe(1)
+    // Les deux serveurs travaillent. Depuis qu'il n'en reste que deux, chaque
+    // lot fait la course sur les deux : chacun voit deux requêtes à la fois,
+    // sa limite par adresse, jamais trois.
+    expect([...peak.keys()].sort()).toEqual([...MIRRORS].sort())
   })
 
   it('préfère une copie périmée à un échec quand tout est muet', async () => {

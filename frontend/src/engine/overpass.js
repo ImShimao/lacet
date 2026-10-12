@@ -141,14 +141,13 @@ const EMPTY_CONFIRMATIONS = 2
 // d'Espagne et d'Allemagne : l'instance principale répondait en 1,6 s… ou en
 // « 504 » au bout de 14 s, ou « 429 » faute de créneau, selon la minute ; celle
 // d'OpenStreetMap France, mondiale elle aussi et aux données identiques, en 1,5
-// à 5,4 s à chaque fois. Kumi et private.coffee, les anciens secours, restaient
-// muets quarante secondes : ils passent en dernier recours.
-export const MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-]
+// à 5,4 s à chaque fois.
+//
+// Kumi et private.coffee, les anciens secours, ont été retirés : « 500 » à
+// toute requête le 10 octobre 2026, plus aucune réponse en trente secondes le
+// 12. Gardés en dernier recours, ils ne faisaient qu'allonger l'attente quand
+// les deux autres saturaient.
+export const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.openstreetmap.fr/api/interpreter']
 
 // Combien de miroirs partent ensemble sur chaque lot. Le premier qui répond
 // l'emporte, l'autre est annulé : on paie une requête de plus pour ne plus

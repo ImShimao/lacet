@@ -26,11 +26,13 @@ class Settings(BaseSettings):
     # ne correspond plus à son nom de domaine, chaque appel échouait sur une
     # erreur TLS. overpass.osm.ch aussi : il ne contient que la Suisse et
     # répondait « HTTP 200, aucune rue » en deux dixièmes de seconde pour
-    # l'Alsace — une réponse vite crue, et fausse, ce qui est pire qu'une panne.)
+    # l'Alsace — une réponse vite crue, et fausse, ce qui est pire qu'une panne.
+    # Kumi et private.coffee aussi : « 500 » à toute requête le 10 octobre 2026,
+    # plus aucune réponse le 12. Celle d'OpenStreetMap France les remplace ; elle
+    # refuse les navigateurs, pas l'identifiant ci-dessous.)
     overpass_urls: list[str] = [
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://overpass.private.coffee/api/interpreter",
+        "https://overpass.openstreetmap.fr/api/interpreter",
     ]
     overpass_timeout_s: int = 90
 
