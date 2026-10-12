@@ -5,7 +5,8 @@ import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { haversineM } from './geo'
 import { RouteStats, runGate } from './safety'
-import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute } from './service'
+import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute, selectVaried } from './service'
+import { Candidate } from './loops'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -301,4 +302,29 @@ describe('parcourir à l’envers', () => {
     expect(endroit.geometry).toEqual(route.geometry)
     expect(endroit.reversed).toBe(false)
   }, 20_000)
+})
+
+/**
+ * Les tours complètent la liste, ils ne la mènent pas. Depuis la rue des
+ * Primevères, à Soultz, douze propositions de 9 km en mettaient cinq en tours
+ * en tête : notés A, ils passaient devant des boucles entières notées B.
+ */
+describe('les tours', () => {
+  const boucle = (edges, bearing, laps = 1) => {
+    const cand = new Candidate(edges, [])
+    cand.bearing = bearing
+    cand.laps = laps
+    return cand
+  }
+
+  it('passent après toutes les boucles entières, même mieux notés', () => {
+    const tours = boucle([1, 2, 3], 0, 2)
+    const entiere = boucle([7, 8, 9], 180)
+    const choisis = selectVaried([[0.6, tours, 0], [-1.5, entiere, 1]], 2)
+    expect(choisis.map(([, cand]) => cand)).toEqual([entiere, tours])
+  })
+
+  it('complètent une liste trop courte', () => {
+    expect(selectVaried([[0.6, boucle([1, 2, 3], 0, 2), 0]], 5)).toHaveLength(1)
+  })
 })

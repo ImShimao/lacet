@@ -267,6 +267,51 @@ class TestPreferenceDeTerrain:
         assert _shortlist_key(steep, TARGET, req, None) > _shortlist_key(flat, TARGET, req, None)
 
 
+class TestTours:
+    """Les tours complètent la liste ; ils ne passent pas devant une boucle entière.
+
+    Depuis la rue des Primevères, à Soultz, douze propositions de 9 km en
+    mettaient huit en tours, et cinq en tête : notés A, et restés en plaine,
+    ils passaient devant des boucles entières notées B ou à peine trop
+    vallonnées. « 2 × 4,5 km » n'est pas une variante de la boucle demandée,
+    c'est ce qu'on propose faute de mieux.
+    """
+
+    @staticmethod
+    def lapped(**over) -> Candidate:
+        cand = candidate(**over)
+        cand.laps = 2
+        return cand
+
+    def test_une_boucle_entiere_notee_b_passe_devant_des_tours_notes_a(self):
+        req = request()
+        tours = self.lapped(bearing=0.0, edges=[1, 2, 3])
+        entiere = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        scored = sorted(
+            ((final_score(c, TARGET, req, None), c, i) for i, c in enumerate((tours, entiere))),
+            key=lambda t: -t[0],
+        )
+        assert [c for _s, c, _i in select_varied(scored, 2)] == [entiere, tours]
+
+    def test_meme_hors_fourchette_la_boucle_entiere_passe_devant(self):
+        req = request(elevation=ElevationPref.rolling)
+        tours = self.lapped(bearing=0.0, edges=[1, 2, 3])
+        entiere = candidate(bearing=180.0, edges=[7, 8, 9])
+        scored = sorted(
+            (
+                (final_score(tours, TARGET, req, 100.0), tours, 0),
+                (final_score(entiere, TARGET, req, 230.0), entiere, 1),
+            ),
+            key=lambda t: -t[0],
+        )
+        assert select_varied(scored, 2)[0][1] is entiere
+
+    def test_les_tours_completent_la_liste(self):
+        req = request()
+        scored = [(final_score(self.lapped(), TARGET, req, None), self.lapped(), 0)]
+        assert len(select_varied(scored, 5)) == 1
+
+
 class TestVariete:
     def test_le_premier_choisi_est_le_mieux_note(self):
         req = request()

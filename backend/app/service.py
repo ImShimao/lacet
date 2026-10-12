@@ -163,10 +163,13 @@ LAP_DIVISORS = (2, 3, 4)
 # une sortie mais une séance de piste, et personne n'est venu chercher ça.
 MIN_LAP_M = 1500.0
 
-# Retrait par tour supplémentaire. Une boucle entière reste préférable : on ne
-# propose la répétition que faute de mieux, et deux tours valent mieux que
-# quatre. Le retrait reste petit devant celui d'un cran de note (0,9), pour ne
-# jamais faire passer un tracé moins sûr devant.
+# Retrait par tour supplémentaire : deux tours valent mieux que quatre. Il ne
+# départage plus que les tours entre eux. Une boucle entière passe toujours
+# devant (`select_varied`) : petit devant un cran de note (0,9) et devant le
+# retrait des réglages, il laissait un « 2 × 4,5 km » noté A doubler des
+# boucles entières notées B ou à peine trop vallonnées — depuis la rue des
+# Primevères, à Soultz, douze propositions de 9 km en mettaient cinq en tours
+# en tête de liste. Les tours ne se proposent que faute de mieux.
 LAP_PENALTY = 0.12
 
 # Candidats gardés en réserve au-delà du nombre demandé. Proportionnelle : à
@@ -792,11 +795,13 @@ def select_varied(
 
     while remaining and len(chosen) < limit:
         best_index = 0
-        best_value = float("-inf")
+        best_key: tuple[bool, float] = (False, float("-inf"))
         for i, (score, cand, _idx) in enumerate(remaining):
-            value = score - _variety_penalty(cand, chosen)
-            if value > best_value:
-                best_value, best_index = value, i
+            # Les boucles entières d'abord, toutes : les tours ne font que
+            # compléter la liste — voir `LAP_PENALTY`.
+            key = (cand.laps == 1, score - _variety_penalty(cand, chosen))
+            if key > best_key:
+                best_key, best_index = key, i
         chosen.append(remaining.pop(best_index))
 
     return chosen

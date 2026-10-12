@@ -178,6 +178,15 @@ précisément au moment où l'on hésite.
 Et là où les boucles entières existent — Paris, Nice, Lyon — rien ne change :
 les tours ne sont proposés que pour compléter une liste trop courte.
 
+**Et ils passent après toutes les boucles entières.** Un tour de plus ne
+retirait que 0,12 point, moins qu'un cran de note et que le retrait des
+réglages : un « 2 × 4,5 km » noté A, resté en plaine, doublait des boucles
+entières notées B ou à peine trop vallonnées. Depuis la rue des Primevères, à
+Soultz, douze propositions de 9 km en mettaient cinq en tours en tête de liste ;
+elles s'ouvrent désormais sur les quatre boucles entières que le coin offre,
+et les tours suivent. Le retrait par tour ne départage plus que les tours entre
+eux (`select_varied`).
+
 ## Le vent
 
 Finir dix kilomètres face au vent est la façon la plus sûre de gâcher les deux

@@ -763,10 +763,15 @@ export function selectVaried(scored, limit, avoidBearings = []) {
   const chosen = []
   while (remaining.length && chosen.length < limit) {
     let bestIndex = 0
+    let bestWhole = false
     let bestValue = -Infinity
     remaining.forEach(([score, cand], i) => {
+      // Les boucles entières d'abord, toutes : les tours ne font que compléter
+      // la liste — voir `LAP_PENALTY` en Python.
+      const whole = cand.laps === 1
       const value = score - varietyPenalty(cand, chosen, avoidBearings)
-      if (value > bestValue) {
+      if ((whole && !bestWhole) || (whole === bestWhole && value > bestValue)) {
+        bestWhole = whole
         bestValue = value
         bestIndex = i
       }
