@@ -4,7 +4,16 @@ import { percent } from './format'
  * Le détail de la note. C'est l'écran qui porte la promesse du produit :
  * il ne suffit pas d'afficher « A », il faut montrer sur quoi elle repose.
  */
-export default function SafetyPanel({ safety, surfaces, distance, sport = 'run' }) {
+export default function SafetyPanel({ safety, surfaces, segments = [], distance, sport = 'run' }) {
+  // Les rues calmes dont le trottoir manque sur la carte mais est probable : en
+  // ville, à 50 km/h ou moins (`separation` dans `engine/safety.js`). Sans
+  // elles, une boucle courue entièrement sur trottoir affichait « 51 % »
+  // et rien d'autre, comme si l'autre moitié était sur la chaussée.
+  const probable =
+    sport === 'bike' || !distance
+      ? 0
+      : segments.filter((s) => s.inferred && s.separation === 1.5).reduce((m, s) => m + s.length_m, 0) / distance
+
   const rows = [
     {
       // Ce qui protège un cycliste n'est pas ce qui protège un coureur : le
@@ -23,6 +32,16 @@ export default function SafetyPanel({ safety, surfaces, distance, sport = 'run' 
           ? 'piste, bande ou voie sans voitures, connue de la carte'
           : 'trottoir ou chemin connus de la carte — une rue calme au trottoir non noté n’y compte pas',
     },
+    ...(probable >= 0.01
+      ? [
+          {
+            label: 'Rue calme, trottoir probable',
+            value: percent(probable),
+            tone: null,
+            hint: 'en ville, à 50 km/h ou moins : non noté sur la carte, mais presque toujours là',
+          },
+        ]
+      : []),
     {
       label: 'Exposé au trafic rapide',
       hint:

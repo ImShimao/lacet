@@ -292,6 +292,7 @@ export default function Explore({
             <SafetyPanel
               safety={selected.safety}
               surfaces={selected.surfaces}
+              segments={selected.segments}
               distance={selected.distance_m}
               sport={params.sport}
             />
