@@ -61,7 +61,7 @@ export function longestGap(stops, distance) {
 }
 
 /** Dans le détail d'un parcours : ce qu'on croise, et à quel kilomètre. */
-export function StopsList({ stops, loading, complete, prefs, distance = 0 }) {
+export function StopsList({ stops, loading, complete, offline = false, prefs, distance = 0 }) {
   const kinds = Object.keys(KINDS).filter((k) => prefs?.[k])
   if (!kinds.length) return null
   if (loading) return <p className="muted small stops">Recherche des points d'eau et toilettes…</p>
@@ -81,7 +81,9 @@ export function StopsList({ stops, loading, complete, prefs, distance = 0 }) {
                   ? kind === 'water'
                     ? "Aucun point d'eau connu le long du tracé."
                     : 'Pas de toilettes connues le long du tracé.'
-                  : 'Pas de réseau : rien à montrer pour l’instant.'}
+                  : offline
+                    ? 'Pas de réseau : rien à montrer pour l’instant.'
+                    : 'Le service d’OpenStreetMap ne répond pas pour l’instant.'}
               </span>
             ) : here.length <= LIST_MAX ? (
               <span>

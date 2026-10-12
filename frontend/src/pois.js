@@ -100,10 +100,15 @@ async function overpass(body, fetchImpl) {
 
 /**
  * Les points d'intérêt d'une emprise, carreau par carreau : ce qui est sur
- * l'appareil d'abord, le reste en une requête. Sans réseau, ce qu'on a — et
- * `complete` à faux pour le dire.
+ * l'appareil d'abord, le reste en une requête. Sans réponse, ce qu'on a — et
+ * `complete` à faux pour le dire, avec `offline` : le téléphone n'a pas de
+ * réseau, ou bien c'est le service qui refuse, sature ou tarde.
+ *
+ * Le type d'erreur ne fait pas la différence : un refus servi sans en-têtes
+ * CORS arrive dans WebKit comme une panne réseau. Et tout dire « pas de
+ * réseau » envoyait chercher, en plein wifi, une panne qui n'existait pas.
  */
-export async function poisIn(bbox, { fetchImpl = fetch, now = Date.now() } = {}) {
+export async function poisIn(bbox, { fetchImpl = fetch, now = Date.now(), online = () => navigator.onLine !== false } = {}) {
   const tiles = tilesOver(bbox)
   const found = []
   const missing = []
@@ -127,7 +132,7 @@ export async function poisIn(bbox, { fetchImpl = fetch, now = Date.now() } = {})
   } catch {
     // Hors ligne ou miroirs saturés : les carreaux périmés valent mieux que rien.
     for (const m of missing) if (m.kept) found.push(...m.kept.pois)
-    return { pois: found, complete: false }
+    return { pois: found, complete: false, offline: !online() }
   }
   const pois = elements.map(toPoi).filter(Boolean)
   for (const { tile } of missing) {

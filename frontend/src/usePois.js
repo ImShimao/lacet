@@ -10,7 +10,7 @@ import { alongRoute, poisIn, routeBox } from './pois'
  * quitté entre-temps est jetée.
  */
 export default function usePois(route, prefs) {
-  const [found, setFound] = useState({ key: null, stops: [], complete: true })
+  const [found, setFound] = useState({ key: null, stops: [], complete: true, offline: false })
   const kinds = Object.keys(prefs || {}).filter((k) => prefs[k])
   const geometry = route?.geometry
   const key = geometry?.length > 1 && kinds.length ? `${route.id}|${geometry.length}|${kinds.join(',')}` : null
@@ -19,12 +19,12 @@ export default function usePois(route, prefs) {
     if (!key) return undefined
     let current = true
     poisIn(routeBox(geometry)).then(
-      ({ pois, complete }) => {
+      ({ pois, complete, offline = false }) => {
         if (!current) return
         const wanted = pois.filter((p) => kinds.includes(p.kind))
-        setFound({ key, stops: alongRoute(geometry, wanted), complete })
+        setFound({ key, stops: alongRoute(geometry, wanted), complete, offline })
       },
-      () => current && setFound({ key, stops: [], complete: false }),
+      () => current && setFound({ key, stops: [], complete: false, offline: false }),
     )
     return () => {
       current = false
@@ -32,7 +32,7 @@ export default function usePois(route, prefs) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  if (!key) return { stops: [], loading: false, complete: true }
-  if (found.key !== key) return { stops: [], loading: true, complete: true }
-  return { stops: found.stops, loading: false, complete: found.complete }
+  if (!key) return { stops: [], loading: false, complete: true, offline: false }
+  if (found.key !== key) return { stops: [], loading: true, complete: true, offline: false }
+  return { stops: found.stops, loading: false, complete: found.complete, offline: found.offline }
 }

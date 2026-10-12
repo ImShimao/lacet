@@ -92,6 +92,23 @@ describe('le carnet sur l’appareil', () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Load failed')
     })
-    await expect(poisIn(ailleurs, { fetchImpl })).resolves.toEqual({ pois: [], complete: false })
+    await expect(poisIn(ailleurs, { fetchImpl, online: () => false })).resolves.toEqual({
+      pois: [],
+      complete: false,
+      offline: true,
+    })
+  })
+
+  it('en ligne, un service qui refuse n’est pas une panne de réseau', async () => {
+    // Le cas de l'automne 2026 : Overpass refusait l'app, sans en-têtes CORS,
+    // et WebKit le rapportait comme une coupure — « Pas de réseau », en wifi.
+    const ailleurs = [11.1, 6.1, 11.11, 6.11]
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('Load failed')
+    })
+    await expect(poisIn(ailleurs, { fetchImpl, online: () => true })).resolves.toMatchObject({
+      complete: false,
+      offline: false,
+    })
   })
 })
