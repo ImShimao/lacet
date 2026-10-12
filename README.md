@@ -103,7 +103,12 @@ un identifiant Apple — un compte gratuit suffit.
    ```
 
    Sur l'iPhone : **AltStore → Sources → +** → l'adresse que le script affiche
-   (`http://<adresse du PC>:8765/source.json`) → **Lacet → Installer**.
+   (`http://<adresse du PC>:8765/source.json`) → **Lacet → Installer**. Pour que
+   le PC la serve tout seul à chaque démarrage :
+
+   ```bash
+   python scripts/altstore_source.py --autostart
+   ```
 5. **Faire confiance au profil.** **Réglages → Général → VPN et gestion de
    l'appareil** → ton identifiant → **Faire confiance**, puis **Confidentialité et
    sécurité → Mode développeur** → activer, et redémarrer.

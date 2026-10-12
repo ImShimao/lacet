@@ -2,6 +2,7 @@
 
     python scripts/altstore_source.py            # découvre l'IP du PC
     python scripts/altstore_source.py 192.168.1.96 8765
+    python scripts/altstore_source.py --autostart  # servi à chaque ouverture de session
 
 AltStore sait suivre une « source » : un fichier JSON qui décrit une app et où
 la télécharger. Ajoutée une fois dans AltStore, elle transforme chaque nouvelle
@@ -24,6 +25,7 @@ sur le réseau local, et elle ne vaut que chez soi.
 from __future__ import annotations
 
 import json
+import os
 import plistlib
 import shutil
 import socket
@@ -131,7 +133,45 @@ def changelog(build: str) -> str:
     return f"Compilation {build}."
 
 
+# Le lanceur posé dans le dossier Démarrage de Windows par `--autostart`.
+#
+# Servi depuis une session de Claude Code, le dossier mourait avec elle : la
+# mise à jour d'AltStore échouait dès que la session était fermée, sans rien
+# dire de plus qu'une erreur réseau. Lancé à l'ouverture de session, il sert
+# tant que le PC est allumé.
+#
+# `python.exe` et non `pythonw.exe` : le pare-feu de Windows n'autorise que le
+# premier à répondre au réseau local, et le second ferait surgir une alerte de
+# sécurité à chaque démarrage. `CREATE_NO_WINDOW` lui retire sa console.
+STARTUP = Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs/Startup/lacet-altstore.pyw"
+LAUNCHER = '''"""Sert la source AltStore de Lacet à l'ouverture de session Windows.
+
+Posé par `python scripts/altstore_source.py --autostart`. Pour l'arrêter pour
+de bon, supprimer ce fichier.
+"""
+
+import subprocess
+
+subprocess.Popen(
+    [{python!r}, "-m", "http.server", "{port}", "--directory", {served!r}],
+    creationflags=subprocess.CREATE_NO_WINDOW,
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+'''
+
+
+def autostart(port: str = "8765") -> None:
+    """Pose le lanceur dans le dossier Démarrage, et dit où."""
+    STARTUP.write_text(LAUNCHER.format(python=sys.executable, port=port, served=str(SERVED)), encoding="utf-8")
+    print(f"{STARTUP} écrit : le dossier altstore/ sera servi sur le port {port} à chaque ouverture de session.")
+
+
 def main() -> None:
+    if "--autostart" in sys.argv:
+        autostart()
+        return
     host = sys.argv[1] if len(sys.argv) > 1 else lan_address()
     port = sys.argv[2] if len(sys.argv) > 2 else "8765"
     base = f"http://{host}:{port}"

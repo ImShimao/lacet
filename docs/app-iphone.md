@@ -53,7 +53,12 @@ est passée avant que l'app ne sache le dire elle-même.
    ensuite l'IPA dans Safari : elle arrive dans **Fichiers → Téléchargements**.
    Mieux, une fois pour toutes : **AltStore → Sources → +** →
    `http://<adresse du PC>:8765/source.json`, et chaque version s'installe
-   ensuite d'un « Mettre à jour ».
+   ensuite d'un « Mettre à jour ». Pour que le dossier soit servi sans y
+   penser, `python scripts/altstore_source.py --autostart` pose un lanceur dans
+   le dossier Démarrage de Windows : à chaque ouverture de session, le serveur
+   repart, sans fenêtre. Servi depuis une session de Claude Code, il mourait
+   avec elle, et « Mettre à jour » échouait sans autre explication qu'une
+   erreur réseau.
 3. **AltStore → Mes apps → +** → l'IPA téléchargée. AltServer doit tourner :
    c'est lui qui signe.
 4. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
