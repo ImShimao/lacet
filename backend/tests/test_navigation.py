@@ -194,6 +194,42 @@ class TestRedites:
         assert NAME_CHANGE_MIN_M >= 100.0
 
 
+def _pas(dist: float, angle: float, before: float, turn: str | None = None, road: str | None = None):
+    """Une manœuvre brute : on arrive au cap `before`, on repart à `before + angle`."""
+    from app.navigation import Instruction, _classify
+
+    return Instruction(
+        dist_m=dist, turn=turn or _classify(angle), angle=angle, road=road, text="",
+        lon=0.0, lat=0.0, caution=False, before=before, after=(before + angle) % 360.0,
+    )
+
+
+class TestFusion:
+    """Deux manœuvres à moins de 25 m n'en font qu'une : laquelle ?"""
+
+    def test_l_angle_est_celui_du_chemin_pas_la_somme_des_annonces(self):
+        # Montée du Lieutenant Allouche, à Lyon : −80° puis −93°, et entre les
+        # deux, tues, les inflexions (+80°) d'un trottoir d'un mètre. La somme
+        # disait « fais demi-tour » (−173°) ; le chemin tourne à gauche.
+        from app.navigation import _merge_all
+
+        (pas,) = _merge_all([_pas(0.0, -80.5, 0.0), _pas(8.0, -92.6, 359.1)])
+        assert pas.turn == "left"
+        assert pas.angle == pytest.approx(-93.5)
+
+    def test_un_tout_droit_juste_apres_un_virage_le_nomme(self):
+        # « Tourne à droite », puis vingt mètres plus loin « Continue tout droit
+        # sur Passerelle du Collège » : un seul virage, dit une fois.
+        from app.navigation import _merge_all
+
+        steps = [
+            _pas(0.0, 83.7, 0.0),
+            _pas(19.8, 2.8, 86.4, turn="straight", road="Passerelle du Collège"),
+        ]
+        (pas,) = _merge_all(steps)
+        assert pas.text == "Tourne à droite sur Passerelle du Collège"
+
+
 class TestResume:
     def test_compte_les_manoeuvres(self, scene, profile):
         graph, start, loops = _loops(scene, profile)

@@ -203,12 +203,16 @@ function rawSteps(graph, start, cand, quiet = null) {
         const [lon, lat] = coords[0]
         const rlon = pyRound(lon, 6)
         const rlat = pyRound(lat, 6)
-        steps.push(
-          instruction(
+        steps.push({
+          ...instruction(
             pyRound(travelled, 1), turn, pyRound(angle, 1), name, phrase(turn, name),
             rlon, rlat, unprotected.has(pointKey(rlon, rlat)),
           ),
-        )
+          // Les caps d'arrivée et de départ : de quoi mesurer l'angle net
+          // d'une fusion (voir `mergeClose`).
+          before: outBearing,
+          after: inBearing,
+        })
       }
     }
 
@@ -251,7 +255,8 @@ function mergeAll(steps) {
   let out = steps
   for (;;) {
     const suivant = mergeClose(out)
-    if (suivant.length === out.length) return suivant
+    // Les caps ne servaient qu'à la fusion : ils ne sortent pas du moteur.
+    if (suivant.length === out.length) return suivant.map(({ before, after, ...step }) => step)
     out = suivant
   }
 }
@@ -273,6 +278,10 @@ function mergeAll(steps) {
  *
  * **C'est vraiment une chicane.** Deux manœuvres opposées qui ne se compensent
  * pas — un décrochement, une place à traverser — gardent leurs deux temps.
+ *
+ * Un « tout droit » proche d'un virage n'est pas une seconde manœuvre : il
+ * nomme la voie où le virage mène. « Tourne à droite », puis vingt mètres plus
+ * loin « Continue tout droit sur Passerelle du Collège », se dit en une fois.
  */
 function mergeClose(steps) {
   if (steps.length < 2) return steps
@@ -281,45 +290,51 @@ function mergeClose(steps) {
   while (i < steps.length) {
     let current = steps[i]
     const following = i + 1 < steps.length ? steps[i + 1] : null
-    const proches =
-      following !== null &&
-      following.dist_m - current.dist_m <= MERGE_DISTANCE_M &&
-      current.turn !== 'straight' &&
-      following.turn !== 'straight'
+    const proches = following !== null && following.dist_m - current.dist_m <= MERGE_DISTANCE_M
     if (proches) {
-      const somme = current.angle + following.angle
+      // **L'angle net : du cap d'arrivée au premier point au cap de départ du
+      // second.** La somme des deux angles annoncés oubliait les inflexions
+      // tues entre les deux — les bouts de trottoir d'un mètre qui encadrent
+      // une traversée — et ne repassait pas dans ±180°. Montée du Lieutenant
+      // Allouche, à Lyon, un virage à gauche (−93°) sortait en « fais
+      // demi-tour » (−173°) ; passage Ménestrier, trois écarts du même côté
+      // faisaient −359,5° : un « demi-tour » sur une ligne qui continue (−1°).
+      const somme = pymod(following.after - current.before + 180, 360) - 180
+      const tourne = current.turn !== 'straight' && following.turn !== 'straight'
       const oppose = current.angle > 0 !== following.angle > 0
-      if (oppose && Math.abs(somme) < SLIGHT_DEG) {
+      const merged = (step) => ({ ...step, before: current.before, after: following.after })
+      if (tourne && Math.abs(somme) < SLIGHT_DEG) {
         // La rue ondule : les deux écarts disparaissent ensemble. La prudence,
         // elle, ne disparaît pas — une traversée non protégée signalée sur l'un
         // des deux points reste dite.
         if (current.caution || following.caution) {
-          out.push(
+          out.push(merged(
             instruction(
               current.dist_m, 'straight', pyRound(somme, 1), following.road,
               phrase('straight', following.road), current.lon, current.lat, true,
             ),
-          )
+          ))
         }
         i += 2
         continue
       }
-      if (!oppose) {
-        // Un seul virage, coupé en deux par un point de forme.
+      if (!tourne || !oppose) {
+        // Un seul virage, coupé en deux par un point de forme — ou nommé par
+        // le « tout droit » qui le suit.
         const turn = classify(somme)
         const road = following.road || current.road
-        current = instruction(
+        current = merged(instruction(
           current.dist_m, turn, pyRound(somme, 1), road, phrase(turn, road),
           current.lon, current.lat, current.caution || following.caution,
-        )
+        ))
       } else {
         // L'angle net, et non celui du premier temps : la passe suivante doit
         // pouvoir juger l'effet de l'ensemble.
-        current = instruction(
+        current = merged(instruction(
           current.dist_m, current.turn, pyRound(somme, 1), following.road,
           `${PHRASES.get(current.turn) ?? 'Continue'} puis tout de suite ${SHORT.get(following.turn) ?? 'tout droit'}${on(following.road)}`,
           current.lon, current.lat, current.caution || following.caution,
-        )
+        ))
       }
       i += 2
     } else {

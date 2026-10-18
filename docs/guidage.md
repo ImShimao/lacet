@@ -24,7 +24,12 @@ cinq minutes.
   boucles de Beaune et de Lyon : 2 % de consignes en plus, toutes à des
   fourches qui étaient muettes.
 - **Deux manœuvres à moins de 25 m** deviennent une phrase : « tourne à droite
-  puis tout de suite à gauche ».
+  puis tout de suite à gauche ». L'angle retenu est celui du chemin, du cap
+  d'arrivée au cap de départ, et non la somme des deux angles annoncés : sur
+  les pentes de la Croix-Rousse, les bouts de trottoir d'un mètre d'une
+  traversée faisaient dire « fais demi-tour » pour un virage à gauche. Un
+  « tout droit » qui suit un virage de près nomme la voie où il mène :
+  « tourne à droite sur Passerelle du Collège », une seule fois.
 - **La voie se nomme comme on la dit** : « dans la rue Pasteur », « sur
   l'avenue Foch », « sur le chemin de Halage ». OpenStreetMap écrit « Rue
   Pasteur », sans article ; l'app disait « sur Rue Pasteur ».
