@@ -158,3 +158,65 @@ describe('le recalcul en course', () => {
     expect(1000 + next.plan_offset_m).toBeCloseTo(1500, -1)
   })
 })
+
+/**
+ * Rentrer au départ : une blessure, un orage, la nuit. La distance ne compte
+ * plus — le plus court chemin sûr jusqu'à la porte, qui est au milieu d'une rue.
+ */
+describe('le retour au départ', () => {
+  // La porte, au milieu de la rue 0, entre les avenues 2 et 3.
+  const porte = at(2.5, 0)
+  // Le segment d'un raccord passe-t-il par ce point (le milieu d'une arête du damier) ?
+  const passesBy = (coords, p) => coords.slice(1).some((c, i) => near([(c[0] + coords[i][0]) / 2, (c[1] + coords[i][1]) / 2], p))
+
+  it('va jusqu’à la porte, sans passer devant pour aller au coin', () => {
+    const retour = planRejoin(graph, weights, {
+      position: at(4, 3), heading: 0, geometry: loop, fromAlong: 900, travelledM: 900, plannedM: 2400, home: porte,
+    })
+    expect(near(retour.coords.at(-1), porte)).toBe(true)
+    // Quatre rues et demie : ni le coin d'après, ni la fin de la boucle.
+    expect(retour.connectM).toBeCloseTo(450, -1)
+    expect(retour.joinIndex).toBe(loop.length - 1)
+    expect(retour.steps[0].text).toMatch(/pour rentrer\.$/)
+  })
+
+  it('contourne les rues signalées, même plus longues', () => {
+    // Les avenues 2 et 3 barrées juste avant la rue 0 : le plus court (300 m)
+    // y passait.
+    const barrages = [at(2, 0.5), at(3, 0.5)]
+    const prudent = buildProfile('road', 'standard', false, 'run', { blocked: blockedEdges(graph, barrages) }).precompute(graph)
+    const retour = planRejoin(graph, prudent, {
+      position: at(2.5, 2), heading: 180, geometry: loop, fromAlong: 900, travelledM: 900, plannedM: 2400, home: porte, blocked: barrages,
+    })
+    expect(near(retour.coords.at(-1), porte)).toBe(true)
+    for (const b of barrages) expect(passesBy(retour.coords, b)).toBe(false)
+    expect(retour.connectM).toBeCloseTo(500, -1)
+  })
+
+  it('remplace la fin de la boucle — et des tours — par l’arrivée à la porte', () => {
+    const tours = {
+      name: 'Deux tours du damier',
+      distance_m: 4800,
+      laps: 2,
+      lap_distance_m: 2400,
+      geometry: [...loop, ...loop.slice(1)],
+      instructions: [
+        { dist_m: 0, turn: 'start', text: 'Départ' },
+        { dist_m: 4800, turn: 'finish', text: 'Dernier tour bouclé. Les 2 tours sont terminés.' },
+      ],
+      segments: [],
+      crossings: [],
+    }
+    const retour = planRejoin(graph, weights, {
+      position: at(6, 3), heading: 0, geometry: tours.geometry, fromAlong: 900, travelledM: 900, plannedM: 4800, home: loop[0],
+    })
+    const next = spliceRoute(tours, retour, buildTrack(tours.geometry).cumulative[retour.joinIndex], { home: true })
+    // Rien de la boucle après la porte : neuf rues jusqu'au coin (0, 0), pas
+    // le tour et demi qui restait.
+    expect(next.distance_m).toBeCloseTo(900, -1)
+    expect(near(next.geometry.at(-1), loop[0])).toBe(true)
+    expect(next.instructions.at(-1)).toMatchObject({ turn: 'finish', text: 'Te voilà rentré au départ.' })
+    expect(next.instructions.some((s) => s.text.includes('tours'))).toBe(false)
+    expect(next.home).toBe(true)
+  })
+})

@@ -60,6 +60,11 @@ const OFF_ROUTE_FIXES = 3
 const REROUTE_AFTER_MS = 20_000
 const REROUTE_RETRY_MS = 30_000
 
+// Plus près du départ, « Rentrer » n'a rien à calculer : on le voit. C'est
+// aussi la distance où l'arrivée s'arme (`arrival.js`) — plus près, elle ne
+// se déclencherait jamais sur le chemin du retour.
+const HOME_NEAR_M = 70
+
 // Hors du tracé, le cap se lit sur le déplacement — à condition qu'il soit assez
 // long pour dépasser l'imprécision du GPS, sinon la carte tourne sur du bruit.
 const MOVE_FOR_HEADING_M = 8
@@ -125,8 +130,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // dans un rappel créé une fois pour toutes, qui doit lire le tracé du moment.
   const [guide, setGuide] = useState(() => guideOf(route))
   const guideRef = useRef(guide)
+  // `true` pendant un recalcul ; `'home'` quand il cherche le chemin du départ.
   const [rerouting, setRerouting] = useState(false)
   const [rerouteDue, setRerouteDue] = useState(null)
+  // Ce que « Rentrer au départ » a à dire sans rien changer : déjà là, ou pas de chemin.
+  const [homeNote, setHomeNote] = useState(null)
   const detouring = useRef(false)
   // Le plus loin atteint sur le tracé, et le demi-tour quand on revient sur ses
   // pas : voir `watchTurnBack`.
@@ -439,6 +447,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     pausedKind.current = null
     resumedAt.current = Date.now()
     setPaused(null)
+    setHomeNote(null)
     if (spoken) voice.speak('Reprise.', { priority: false })
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
@@ -727,7 +736,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       toFinish: haversine(point, fin),
       remaining: Math.max(0, (guided.distance_m || 0) - found.along),
       covered: covered.current,
-      planned: plannedM || null,
+      // Rentré plus tôt, on n'a pas couru la moitié prévue : l'arrivée compte quand même.
+      planned: guided.home ? null : plannedM || null,
       now: Date.now(),
     })
     if (verdict !== 'arrived') return
@@ -760,13 +770,18 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    * Un nouveau chemin, depuis là où l'on est, pour finir la boucle — voir
    * `engine/reroute.js`. Calculé sur l'appareil, avec les rues de la
    * recherche : hors réseau aussi.
+   *
+   * `home` : le chemin du départ, demandé au bouton — voir `goHome`.
    */
-  async function detour(point = here.current, { forced = false } = {}) {
+  async function detour(point = here.current, { forced = false, home = false } = {}) {
     if (!canDetour || detouring.current || !point) return
     detouring.current = true
     dueAt.current = null
-    setRerouting(true)
     const { route: guided, track } = guideRef.current
+    // Sur le chemin du retour, un écart se rattrape vers la porte, pas vers la
+    // boucle qu'on a quittée.
+    const homeward = home || Boolean(guided.home)
+    setRerouting(homeward ? 'home' : true)
     try {
       const found = await detourOnDevice({
         // Les signalements sont relus ici, et non gardés avec la demande : le
@@ -781,13 +796,15 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         fromAlong: lastOnAlong.current,
         travelledM: covered.current,
         plannedM,
+        // Le départ du parcours choisi : la porte, même après un recalcul.
+        home: homeward ? route.geometry[0] : null,
       })
       if (!found) throw new Error('Aucun chemin')
       // Revenu sur le tracé pendant le calcul : rien à changer. Sauf quand
       // c'est nous qui avons demandé le détour — là, le tracé n'est pas en
       // cause, c'est la rue devant qui est barrée.
       if (!forced && strayCount.current < OFF_ROUTE_FIXES) return
-      const next = spliceRoute(guided, found, track.cumulative[found.joinIndex] ?? 0)
+      const next = spliceRoute(guided, found, track.cumulative[found.joinIndex] ?? 0, { home: homeward })
       adopt(next)
       // La consigne s'affiche tout de suite, sans attendre le relevé suivant.
       const first = nextInstruction(next.instructions, 0, announced.current)
@@ -798,11 +815,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // répète pas au relevé suivant.
       acted.current.add(0)
       previewed.current.add(0)
-      voice.speak(`Nouvel itinéraire. ${next.instructions[0]?.text ?? ''}`)
+      voice.speak(`${homeward ? 'Retour au départ.' : 'Nouvel itinéraire.'} ${next.instructions[0]?.text ?? ''}`)
       haptic('pulseHaptic')
       onReroute?.(next)
+      // Rentrer, c'est repartir : en pause, le chrono resterait figé et la voix
+      // se tairait — voir `followRoute`.
+      if (home && pausedKind.current) togglePause()
     } catch {
-      if (forced) {
+      if (home) {
+        setHomeNote("Pas de chemin sûr d'ici : la boucle reste ton parcours.")
+        voice.speak("Je n'ai pas trouvé de chemin sûr pour rentrer d'ici. Je garde la boucle.")
+      } else if (forced) {
         voice.speak("Je n'ai pas trouvé d'autre chemin d'ici. Le signalement est gardé pour les prochaines sorties.")
       } else if (strayCount.current >= OFF_ROUTE_FIXES) {
         dueAt.current = Date.now() + REROUTE_RETRY_MS
@@ -813,6 +836,23 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       detouring.current = false
       setRerouting(false)
     }
+  }
+
+  /**
+   * Rentrer au départ, tout de suite : une blessure, un orage, la nuit qui
+   * tombe. La distance prévue ne compte plus ; le plus court chemin sûr jusqu'à
+   * la porte remplace la fin de la boucle, et se guide comme un recalcul.
+   */
+  function goHome() {
+    const point = here.current
+    if (!point) return
+    if (haversine(point, route.geometry[0]) <= HOME_NEAR_M) {
+      setHomeNote('Tu es déjà au départ : termine quand tu veux.')
+      voice.speak('Tu es déjà au départ.')
+      return
+    }
+    setHomeNote(null)
+    detour(point, { forced: true, home: true })
   }
 
   /** Suit désormais `next` : le guidage repart de son début. */
@@ -897,6 +937,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const hasProfile = Boolean(route?.elevation_profile?.length > 1)
   const hasGuidance = Boolean(guide.route?.instructions?.length)
   const rerouteIn = rerouteDue ? Math.max(0, Math.ceil((rerouteDue - Date.now()) / 1000)) : null
+  // En rentrant, plus de tour à compter : on ne finit pas le troisième.
+  const goingHome = Boolean(guide.route?.home)
 
   // Le temps qu'il reste : à l'allure tenue depuis le départ tant qu'elle est
   // mesurée, à celle demandée au moteur avant. Sans l'une ni l'autre, rien —
@@ -935,8 +977,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         left={left}
         remaining={remaining}
         paused={paused}
-        laps={laps}
+        laps={goingHome ? 1 : laps}
         lap={Math.min(laps, Math.floor(Math.max(0, planAlong) / lapLength) + 1)}
+        onHome={canDetour && !goingHome ? goHome : null}
+        homeBusy={Boolean(rerouting)}
+        homeNote={homeNote}
       />
 
       {route && stops.length > 0 && <NextStops stops={stops} along={along} />}

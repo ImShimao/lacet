@@ -13,16 +13,20 @@ import { haversine } from './format'
  * @param route     le parcours suivi jusqu'ici
  * @param detour    le raccord : `{ coords, connectM, joinIndex, steps }`
  * @param joinAlong où tombe la jonction sur `route`, en mètres depuis son début
+ * @param home      le raccord rentre au départ : il n'y a plus de boucle après
+ *   lui, et l'arrivée se dit au départ — pas « les trois tours sont terminés »
  */
-export function spliceRoute(route, detour, joinAlong) {
+export function spliceRoute(route, detour, joinAlong, { home = false } = {}) {
   const tail = route.geometry.slice(detour.joinIndex + 1)
   const geometry = [...detour.coords, ...tail]
   // Ce qui était à `d` mètres sur l'ancien tracé est désormais à `d + shift`.
   const shift = detour.connectM - joinAlong
 
-  const kept = (route.instructions || [])
-    .filter((s) => s.turn !== 'start' && s.dist_m > joinAlong + 5)
-    .map((s) => ({ ...s, dist_m: Math.round((s.dist_m + shift) * 10) / 10 }))
+  const kept = home
+    ? [{ dist_m: Math.round(detour.connectM * 10) / 10, turn: 'finish', angle: 0, road: null, text: 'Te voilà rentré au départ.', lon: geometry.at(-1)[0], lat: geometry.at(-1)[1], caution: false }]
+    : (route.instructions || [])
+        .filter((s) => s.turn !== 'start' && s.dist_m > joinAlong + 5)
+        .map((s) => ({ ...s, dist_m: Math.round((s.dist_m + shift) * 10) / 10 }))
 
   const connector = {
     coords: detour.coords,
@@ -36,6 +40,7 @@ export function spliceRoute(route, detour, joinAlong) {
     ...route,
     geometry,
     instructions: [...detour.steps, ...kept],
+    home: home || Boolean(route.home),
     // Sans coordonnées de tronçons — un favori, qui ne les garde pas — le tracé
     // se dessine d'un seul tenant, comme avant le détour.
     segments: rest ? [connector, ...rest] : [],

@@ -14,8 +14,10 @@ import { clock, clockTime, minutes, speed } from './runFormat'
  *
  * `left` : les secondes qu'il reste, ou `null` quand on ne peut pas le dire.
  * `remaining` : les mètres qu'il reste, ou `null` en course libre.
+ * `onHome` : « Rentrer au départ », proposé en pause — c'est là qu'on décide
+ * d'abandonner, pas en courant ; `homeNote` dit pourquoi rien n'a changé.
  */
-export function RunStats({ bike, state, moving, left, remaining, paused, laps, lap }) {
+export function RunStats({ bike, state, moving, left, remaining, paused, laps, lap, onHome, homeBusy, homeNote }) {
   return (
     <>
       {/* « Combien il reste » se lit en kilomètres dans les chiffres ; en
@@ -35,11 +37,17 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
           <div>
             <b>{paused === 'auto' ? 'Pause automatique' : 'En pause'}</b>
             <span>
-              {paused === 'auto'
-                ? 'Le chrono reprend tout seul dès que tu repars.'
-                : 'Reprends quand tu veux, ou termine la sortie.'}
+              {homeNote ??
+                (paused === 'auto'
+                  ? 'Le chrono reprend tout seul dès que tu repars.'
+                  : 'Reprends quand tu veux, ou termine la sortie.')}
             </span>
           </div>
+          {onHome && (
+            <button className="live__home" onClick={onHome} disabled={homeBusy}>
+              {homeBusy ? 'Calcul…' : 'Rentrer au départ'}
+            </button>
+          )}
         </div>
       )}
 

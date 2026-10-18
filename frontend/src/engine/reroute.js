@@ -21,10 +21,15 @@
 //
 // Le chemin suit les mêmes préférences que la boucle — trottoirs, pistes,
 // rues calmes — puisqu'il est calculé avec le même profil.
+//
+// **Rentrer au départ** (`home`) est l'autre geste : une blessure, un orage, la
+// nuit qui tombe — on abandonne la distance, on veut sa porte. Le même Dijkstra
+// depuis la position, mais vers le seuil de la porte seul, au moins coûteux
+// pour le profil : le plus court chemin *sûr*, pas le plus court tout court.
 
 import { BLOCK_RADIUS_M } from './blocked'
 import { INF, dijkstra, nodeSequence, reconstruct } from './dijkstra'
-import { carryWeights, openDoor } from './door'
+import { carryWeights, nearestSpot, openDoor } from './door'
 import { bearingDeg, haversineM } from './geo'
 import { headings, pathSteps, turnOf } from './navigation'
 import { pymod } from './py'
@@ -59,14 +64,17 @@ const CARDINALS = ['le nord', 'le nord-est', "l'est", 'le sud-est', 'le sud', 'l
  * @param blocked  les signalements `[lon, lat]` à contourner — dont celui qu'on
  *   vient de faire, qui a souvent déclenché ce recalcul
  * @param sport    pour qualifier le raccord jusqu'à la rue
+ * @param home     [lon, lat] du départ pour y rentrer au plus court sûr, la
+ *   distance prévue oubliée ; ou null pour finir la boucle
  * @returns `{ coords, connectM, joinIndex, steps }` ou `null` s'il n'y a pas de chemin.
- *   `coords` va de la position au point de jonction, `geometry[joinIndex]` ;
+ *   `coords` va de la position au point de jonction, `geometry[joinIndex]` —
+ *   avec `home`, au départ, et `joinIndex` est la fin du tracé : rien ne suit ;
  *   `steps` sont les consignes du raccord, distances comptées depuis la position.
  */
 export function planRejoin(
   area,
   areaWeights,
-  { position, heading = null, geometry, fromAlong = 0, travelledM = 0, plannedM = null, blocked = [], sport = 'run' },
+  { position, heading = null, geometry, fromAlong = 0, travelledM = 0, plannedM = null, blocked = [], sport = 'run', home = null },
 ) {
   if (!geometry || geometry.length < 2 || !position) return null
 
@@ -82,6 +90,7 @@ export function planRejoin(
   const source = door.start
   const lead = haversineM(position, graph.node(source))
   if (lead > MAX_LEAD_M) return null
+  if (home) return towardHome(area, graph, weights, source, home, { position, heading, geometry, lead })
   const threshold = graph.door?.node ?? source
 
   const cumulative = new Float64Array(geometry.length)
@@ -141,6 +150,50 @@ export function planRejoin(
 
 // Au-delà, on n'est plus sur un chemin qu'on a quitté : on est ailleurs.
 const MAX_LEAD_M = 400
+
+/**
+ * Rentrer au départ : le chemin le moins coûteux pour le profil jusqu'au seuil
+ * de la porte — un raccord par la rue signalée pèse quatre cents fois sa
+ * longueur, une départementale à 80 bien plus qu'une rue calme.
+ *
+ * Le seuil est rarement un carrefour : la boucle part du trottoir, au milieu de
+ * la rue (`door.js`). Viser le carrefour le plus proche, c'était passer devant
+ * la porte pour aller au coin, puis revenir. On vise le point de la rue
+ * lui-même, par celui de ses deux bouts qui coûte le moins.
+ */
+function towardHome(area, graph, weights, source, home, { position, heading, geometry, lead }) {
+  const spot = nearestSpot(area, home[0], home[1])
+  if (!spot) return null
+  // La position a pu couper la même rue : la porte tombe alors sur l'une des
+  // deux moitiés, et sa distance se compte depuis le bout de celle-ci.
+  let e = spot.edge
+  let offset = area.edgeLen[e] * spot.share
+  const split = graph.door?.split
+  if (split && split[0] === e && offset > graph.edgeLen[e]) {
+    offset -= graph.edgeLen[e]
+    e = split[1]
+  }
+  const tree = dijkstra(graph, source, weights)
+  const length = graph.edgeLen[e]
+  const share = length > 0 ? Math.min(1, offset / length) : 0
+  const [a, b] = [graph.edgeA[e], graph.edgeB[e]]
+  // Les sens uniques, comme dans `dijkstra` : 1 se prend depuis A, -1 depuis B.
+  const sens = graph.edgeOneway[e]
+  const viaA = sens < 0 ? INF : tree.cost[a] + weights[e] * share
+  const viaB = sens > 0 ? INF : tree.cost[b] + weights[e] * (1 - share)
+  if (viaA === INF && viaB === INF) return null
+  const end = viaA <= viaB ? a : b
+  const edges = reconstruct(tree, end)
+  if (!edges) return null
+  // La porte sur un carrefour : sa rue n'est pas à prendre, on y est.
+  const lastM = end === a ? share * length : (1 - share) * length
+  const onStreet = lastM > 1
+  if (onStreet) edges.push(e)
+  const best = { index: geometry.length - 1, connectM: tree.dist[end] + (onStreet ? lastM : 0) }
+  return connection(graph, source, edges, best, {
+    position, heading, geometry, lead, home: true, lastM: onStreet ? lastM : null,
+  })
+}
 
 // Ce que coûte un demi-tour dans le choix de la jonction, en mètres : à
 // distance à peu près égale, on continue devant soi plutôt que de faire volte-
@@ -203,17 +256,24 @@ const OBSTACLE_AHEAD_M = 600
 // deçà de lui.
 const OBSTACLE_BEHIND_M = 150
 
-/** Le raccord : sa géométrie, sa longueur et ses consignes. */
-function connection(graph, source, edges, best, { position, heading, geometry, lead }) {
+/**
+ * Le raccord : sa géométrie, sa longueur et ses consignes.
+ *
+ * `lastM` : la dernière arête ne se prend que sur ce nombre de mètres — la rue
+ * de la porte, jusqu'au seuil.
+ */
+function connection(graph, source, edges, best, { position, heading, geometry, lead, home = false, lastM = null }) {
   const coords = [position]
   const sourceCoord = graph.node(source)
   if (lead > 1) coords.push(sourceCoord)
   let cursor = source
-  for (const e of edges) {
-    const c = graph.coordsFrom(e, cursor)
-    for (let k = 1; k < c.length; k += 1) coords.push(c[k])
+  edges.forEach((e, k) => {
+    let c = graph.coordsFrom(e, cursor)
+    if (lastM !== null && k === edges.length - 1) c = upTo(c, lastM)
+    for (let i = 1; i < c.length; i += 1) coords.push(c[i])
     cursor = graph.other(e, cursor)
-  }
+  })
+  const goal = home ? 'rentrer' : 'rejoindre le parcours'
   const connectM = lead + best.connectM
   // L'allée jusqu'à la rue n'a pas de nom : c'est la rue qu'on nomme.
   const connector = graph.door?.connector
@@ -228,10 +288,10 @@ function connection(graph, source, edges, best, { position, heading, geometry, l
     if (heading != null) {
       const angle = pymod(departure - heading + 180, 360) - 180
       const { turn, text } = turnOf(angle, firstRoad)
-      steps.push(step(0, turn, `${text} pour rejoindre le parcours.`, coords[0], firstRoad))
+      steps.push(step(0, turn, `${text} pour ${goal}.`, coords[0], firstRoad))
     } else {
       const words = CARDINALS[Math.trunc(pymod(departure + 22.5, 360) / 45)]
-      steps.push(step(0, 'start', `Pars vers ${words}${firstRoad ? ` sur ${firstRoad}` : ''} pour rejoindre le parcours.`, coords[0], firstRoad))
+      steps.push(step(0, 'start', `Pars vers ${words}${firstRoad ? ` sur ${firstRoad}` : ''} pour ${goal}.`, coords[0], firstRoad))
     }
     // Le virage sur la rue, au bout de l'allée, est celui que la première
     // consigne vient de dire : pas de seconde annonce trois mètres plus loin.
@@ -266,16 +326,22 @@ const step = (distM, turn, text, [lon, lat], road) => ({
 })
 
 /** Le point situé `metres` plus loin sur la géométrie, depuis le sommet `index`. */
-function advanceAlong(geometry, index, metres) {
+const advanceAlong = (geometry, index, metres) => upTo(geometry.slice(index), metres).at(-1)
+
+/** Le début d'une ligne, sur `metres`, coupé au point exact ; toute la ligne si elle est plus courte. */
+function upTo(line, metres) {
+  const out = [line[0]]
   let left = metres
-  for (let i = index; i < geometry.length - 1; i += 1) {
-    const d = haversineM(geometry[i], geometry[i + 1])
+  for (let i = 1; i < line.length; i += 1) {
+    const [a, b] = [line[i - 1], line[i]]
+    const d = haversineM(a, b)
     if (d >= left && d > 0) {
       const t = left / d
-      const [a, b] = [geometry[i], geometry[i + 1]]
-      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+      return out
     }
+    out.push(b)
     left -= d
   }
-  return geometry[geometry.length - 1]
+  return out
 }

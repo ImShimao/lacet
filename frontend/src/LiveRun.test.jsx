@@ -336,6 +336,95 @@ describe('la sortie guidée', () => {
   })
 })
 
+/**
+ * « Rentrer au départ », en pause : une blessure, un orage, la nuit. Le moteur
+ * est simulé — `engine/reroute.test.js` vérifie le chemin lui-même ; ici, ce
+ * que l'app en fait.
+ */
+describe('rentrer au départ', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    fixes = null
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  // Le coin opposé du carré, à 140 m du départ.
+  const loin = geometry[10]
+
+  /** Une sortie guidée, un relevé à `point`, puis la pause. */
+  async function enPause(point) {
+    const onReroute = vi.fn()
+    render(
+      <LiveRun route={boucle} request={{ lat: 47.9, lon: 7.2 }} sport="run" stage={null} onPosition={() => {}} onReroute={onReroute} onStop={vi.fn()} />,
+    )
+    await relever(point, Date.now())
+    await act(async () => {
+      screen.getByLabelText('Mettre en pause').click()
+    })
+    return onReroute
+  }
+
+  async function rentrer() {
+    await act(async () => {
+      screen.getByText('Rentrer au départ').click()
+      await new Promise((r) => setTimeout(r, 0))
+    })
+  }
+
+  it('remplace la fin de la boucle par le chemin de la porte, et repart guidé', async () => {
+    const { detourOnDevice } = await import('./engine/client')
+    const voice = await import('./voice')
+    detourOnDevice.mockClear()
+    voice.speak.mockClear()
+    detourOnDevice.mockResolvedValueOnce({
+      coords: [loin, geometry[15], geometry[0]],
+      connectM: 200,
+      joinIndex: geometry.length - 1,
+      steps: [{ dist_m: 0, turn: 'left', angle: 0, road: null, text: 'Tourne à gauche pour rentrer.', lon: loin[0], lat: loin[1], caution: false }],
+    })
+    const onReroute = await enPause(loin)
+    await rentrer()
+
+    // Le moteur vise le départ du parcours, la distance prévue oubliée.
+    expect(detourOnDevice.mock.calls[0][0].home).toEqual(geometry[0])
+    const next = onReroute.mock.calls[0][0]
+    expect(next.home).toBe(true)
+    expect(next.instructions.at(-1).text).toBe('Te voilà rentré au départ.')
+    expect(voice.speak).toHaveBeenCalledWith('Retour au départ. Tourne à gauche pour rentrer.')
+    // La pause est levée — en pause, la voix se tairait — et le bouton s'efface.
+    expect(screen.getByLabelText('Mettre en pause')).toBeTruthy()
+    expect(screen.queryByText('Rentrer au départ')).toBeNull()
+  })
+
+  it('le dit et garde la boucle quand il n’y a pas de chemin sûr', async () => {
+    const { detourOnDevice } = await import('./engine/client')
+    const voice = await import('./voice')
+    detourOnDevice.mockClear()
+    voice.speak.mockClear()
+    detourOnDevice.mockResolvedValueOnce(null)
+    const onReroute = await enPause(loin)
+    await rentrer()
+
+    expect(screen.getByText("Pas de chemin sûr d'ici : la boucle reste ton parcours.")).toBeTruthy()
+    expect(voice.speak).toHaveBeenCalledWith("Je n'ai pas trouvé de chemin sûr pour rentrer d'ici. Je garde la boucle.")
+    expect(onReroute).not.toHaveBeenCalled()
+    // Toujours en pause, sur la boucle : on peut réessayer plus loin.
+    expect(screen.getByText('Rentrer au départ')).toBeTruthy()
+  })
+
+  it('ne calcule rien à deux pas de la porte', async () => {
+    const { detourOnDevice } = await import('./engine/client')
+    detourOnDevice.mockClear()
+    await enPause(geometry[1]) // vingt mètres
+    await rentrer()
+
+    expect(detourOnDevice).not.toHaveBeenCalled()
+    expect(screen.getByText('Tu es déjà au départ : termine quand tu veux.')).toBeTruthy()
+  })
+})
+
 describe('la distance et les kilomètres', () => {
   beforeEach(() => {
     localStorage.clear()

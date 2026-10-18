@@ -12,8 +12,8 @@ export default function RunBanner({ step, offRoute, turnBack, onBlocked, rerouti
       <div className="runbar runbar--stray" role="status">
         <span className="runbar__spin" aria-hidden="true" />
         <div className="runbar__text">
-          <b>Nouvel itinéraire…</b>
-          <em>Recherche d'un chemin pour finir la boucle</em>
+          <b>{rerouting === 'home' ? 'Retour au départ…' : 'Nouvel itinéraire…'}</b>
+          <em>{rerouting === 'home' ? 'Recherche du plus court chemin sûr jusqu’à la porte' : "Recherche d'un chemin pour finir la boucle"}</em>
         </div>
       </div>
     )
