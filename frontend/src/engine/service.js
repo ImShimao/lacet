@@ -10,7 +10,7 @@
 // l'extrait figé que Python a lui aussi reçu.
 
 import { resample, haversineM } from './geo'
-import { Candidate, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
+import { Candidate, GOLDEN, figureEight, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
 import { blockedEdges } from './blocked'
 import { carryBlocked, openDoor } from './door'
 import { buildInstructions } from './navigation'
@@ -26,6 +26,7 @@ export const SETTINGS = {
   elevationSampleM: ELEVATION_STEP_M,
   elevationBudgetMs: null,
   terrainWaitMs: null,
+  widenBudgetMs: null,
 }
 
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
@@ -50,11 +51,29 @@ const LAP_DIVISORS = [2, 3, 4]
 // entières. Le générateur s'arrête dès qu'il tient huit tracés à la bonne
 // distance (`ENOUGH_IN_RANGE`) : les quasi-doublons retirés, il en restait
 // quatre à six, et dès huit propositions demandées la liste se complétait de
-// « 2 × 4,5 km ». Depuis la rue des Primevères, à Soultz, douze propositions de
-// 9 km en comptaient huit en tours. Propre à l'app : Python ne tourne pas ses
-// polygones.
-const WIDEN_ROUNDS = 2
+// « 2 × 4,5 km ». On relance donc, tant qu'il manque des boucles distinctes :
+// deux tirages toujours, puis jusqu'à huit tant que le tracé n'a pas dépassé
+// `WIDEN_BUDGET_MS`. Propre à l'app : Python ne tourne pas ses polygones.
+//
+// Mesuré sur 96 recherches autour de Soultz et de Guebwiller
+// (`scripts/measure_loops.mjs`) : deux tirages rendaient 797 boucles entières
+// sur 960 demandées ; huit sans limite, 868, mais la plus lente passait de 1,2 à
+// 2,5 s sur un PC — plus de cinq secondes sur un iPhone ; seize, 894 pour 4,6 s.
+// Les tirages retraçaient surtout des boucles déjà trouvées. En sautant les
+// polygones déjà tracés (`reuse`), huit tirages arrêtés au temps en rendent
+// 896, et la plus lente redescend à 1,0 s — d'où ce réglage.
+const WIDEN_ROUNDS = 8
+// La rotation de chaque tirage, en part du pas entre deux orientations : la
+// moitié, puis les quarts, puis les huitièmes. Les deux premiers sont donc
+// toujours les plus éloignés de ce qu'on a déjà tracé.
+const WIDEN_PHASES = [1 / 2, 1 / 4, 3 / 4, 1 / 8, 5 / 8, 3 / 8, 7 / 8, 1 / 16]
+const WIDEN_MIN_ROUNDS = 2
+// Compté depuis le début du tracé, sur l'appareil : avec le dernier tirage
+// entamé, la recherche tient dans deux secondes.
+export const WIDEN_BUDGET_MS = 1500
 const MIN_LAP_M = 1500
+// Écart de cap minimal entre les deux boucles d'un « 8 » — `EIGHT_MIN_GAP_DEG`.
+const EIGHT_MIN_GAP_DEG = 90
 const LAP_PENALTY = 0.12
 const MIN_ROUNDNESS = 0.12
 const GRADE_PENALTY = 0.9
@@ -374,8 +393,12 @@ export async function planLoops(input, deps) {
   const windTask = windOf(req.lat, req.lon)
 
   onProgress('routing', 0)
+  const deadline = performance.now() + (settings.widenBudgetMs ?? WIDEN_BUDGET_MS)
+  // Ce que le premier tirage laisse aux suivants — voir `reuse` (`loops.js`).
+  let reuse = {}
   const generate = () =>
     generateLoops(graph, start, targetM, profile, {
+      reuse: (reuse = {}),
       sectors: settings.sectors,
       maxCandidates: settings.maxCandidates,
       tolerance: req.tolerance,
@@ -391,7 +414,7 @@ export async function planLoops(input, deps) {
   const lo = targetM * (1 - req.tolerance)
   const hi = targetM * (1 + req.tolerance)
 
-  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain)
+  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
 
   // **Rien de ce côté.** Une rivière sans pont, une voie ferrée, une frontière :
   // la direction demandée n'offre aucune boucle qui tienne les seuils. On le dit,
@@ -402,13 +425,13 @@ export async function planLoops(input, deps) {
     missedHeading = req.heading
     req = { ...req, heading: null }
     raw = generate()
-    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain)
+    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
   }
 
   let relaxed = false
   let salvaged = null
   if (!unique.length && req.safety === 'safe') {
-    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain)
+    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
     relaxed = unique.length > 0
   }
 
@@ -479,7 +502,7 @@ export async function planLoops(input, deps) {
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
-    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank]),
+    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank], graph),
   )
   // De quoi retourner une boucle sans tout recalculer : le graphe, le nœud de
   // départ, et ce qui a servi à décrire chaque proposition. Passé par un rappel
@@ -566,32 +589,43 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
-function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null) {
+function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null, { deadline = Infinity, reuse = {} } = {}) {
   const [passed, rejected, offTarget] = applyGate(raw, lo, hi, mode, req.sport)
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
 
   const unique = []
   const keep = (cands) => {
     for (const cand of cands) {
-      if (unique.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) continue
+      if (unique.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) {
+        trace.duplicate?.(cand)
+        continue
+      }
       unique.push(cand)
     }
   }
   keep(passed)
 
-  // D'autres boucles entières avant des tours : voir `WIDEN_ROUNDS`.
+  // D'autres boucles entières avant des tours : voir `WIDEN_ROUNDS`. Chaque
+  // appel repart de ce qu'a laissé le premier tirage : relâché en Standard, un
+  // polygone écarté en Sûr mérite d'être retracé.
+  const shared = { scale: reuse.scale, seen: new Set(reuse.seen) }
   for (let round = 1; req.widen && round <= WIDEN_ROUNDS && unique.length < req.limit; round += 1) {
+    if (round > WIDEN_MIN_ROUNDS && performance.now() > deadline) break
     const more = generateLoops(graph, start, targetM, profile, {
       sectors: SETTINGS.sectors,
       maxCandidates: SETTINGS.maxCandidates,
       tolerance: req.tolerance,
       // Une rotation fractionnaire : jamais celle d'un « Régénérer », qui
-      // tourne d'un cran entier à chaque fois.
-      variation: req.variation + round / (WIDEN_ROUNDS + 1),
+      // tourne d'un cran entier à chaque fois. Divisée par le nombre d'or, que
+      // `generateLoops` remultiplie : chaque tirage tombe au milieu du plus
+      // grand écart laissé par les précédents — voir `WIDEN_PHASES`.
+      variation: req.variation + WIDEN_PHASES[round - 1] / GOLDEN,
+      reuse: shared,
       terrain,
       climbFit: climbFit(req.elevation),
       heading: req.heading,
     })
+    trace.raw?.(start, targetM, more)
     const [extra] = applyGate(more, lo, hi, mode, req.sport)
     sortByKey(extra, (c) => -preliminaryScore(c, targetM, req.tolerance))
     keep(extra)
@@ -655,12 +689,39 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
     const [passed] = applyGate(raw, lo, hi, mode, req.sport)
     sortByKey(passed, (c) => -preliminaryScore(c, lapTarget, req.tolerance))
 
+    if (laps === 2) out.push(...figureEights(graph, start, passed, mode, req, needed - out.length))
+
     for (const cand of passed) {
       if (out.length >= needed) break
       if (out.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) continue
       const repeated = repeatLoop(graph, start, cand, laps)
       if (!runGate(repeated.stats, mode, req.sport).passed) continue
       out.push(repeated)
+    }
+  }
+  return out
+}
+
+/**
+ * Des « 8 » plutôt que deux fois la même boucle — voir `_figure_eights`. Une
+ * boucle ne sert qu'à un seul 8, ni elle ni ses quasi-doublons.
+ */
+function figureEights(graph, start, passed, mode, req, needed) {
+  const out = []
+  const lobes = []
+  const fresh = (cand) => lobes.every((lobe) => similarity(cand, lobe) <= DUPLICATE_THRESHOLD)
+  for (const first of passed) {
+    if (out.length >= needed) break
+    if (!fresh(first)) continue
+    for (const second of passed) {
+      if (second === first || !fresh(second)) continue
+      const gap = Math.abs(pymod(first.bearing - second.bearing + 180, 360) - 180)
+      if (gap < EIGHT_MIN_GAP_DEG || similarity(first, second) > DUPLICATE_THRESHOLD) continue
+      const eight = figureEight(graph, start, first, second)
+      if (!runGate(eight.stats, mode, req.sport).passed) continue
+      lobes.push(first, second)
+      out.push(eight)
+      break
     }
   }
   return out
@@ -890,7 +951,7 @@ function profilePoints(cand, elevations, step) {
 
 const round6 = ([lon, lat]) => [pyRound(lon, 6), pyRound(lat, 6)]
 
-function toModel(cand, score, req, elev, rank, steps, name) {
+function toModel(cand, score, req, elev, rank, steps, name, graph) {
   const s = cand.stats
   const [grade, notes] = gradeRoute(s)
   let ascent = null
@@ -952,8 +1013,17 @@ function toModel(cand, score, req, elev, rank, steps, name) {
     shape: cand.shape,
     laps: cand.laps,
     lap_distance_m: pyRound(s.distanceM / cand.laps, 1),
+    lap_distances_m: lapDistances(graph, cand),
+    figure_eight: Boolean(cand.lapBreaks?.length),
     score: pyRound(score, 4),
   }
+}
+
+/** La longueur de chaque tour — `_lap_distances`. */
+function lapDistances(graph, cand) {
+  if (!cand.lapBreaks?.length) return new Array(cand.laps).fill(pyRound(cand.stats.distanceM / cand.laps, 1))
+  const bounds = [0, ...cand.lapBreaks, cand.edges.length]
+  return bounds.slice(1).map((b, k) => pyRound(pySum(cand.edges.slice(bounds[k], b).map((e) => graph.edgeLen[e])), 1))
 }
 
 const directionOf = (bearing) => CARDINALS[Math.trunc(pyfloordiv(pymod(bearing + 22.5, 360), 45))]
@@ -975,7 +1045,7 @@ export function matchedRoute(graph, start, matched, { req, name, elev = null, ni
   // seulement ici qu'on a la géométrie définitive. Sans ce calcul, le dénivelé
   // s'affichait bien et la courbe restait vide.
   const relief = elev && !elev[1] ? [elev[0], profilePoints(cand, elev[0], elev[3]), elev[2], elev[3]] : elev
-  const route = toModel(cand, 0, req, relief, 0, buildInstructions(graph, start, cand), name)
+  const route = toModel(cand, 0, req, relief, 0, buildInstructions(graph, start, cand), name, graph)
   return { ...route, imported: true, matched: true }
 }
 
@@ -992,7 +1062,7 @@ export function reverseRoute(graph, start, cand, { req, elev, score, rank, night
     ? [[...elev[0]].reverse(), profilePoints(flipped, [...elev[0]].reverse(), elev[3]), elev[2], elev[3]]
     : null
   const [name] = nameRoutes([flipped])
-  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name)
+  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name, graph)
   // Le nom ne dit pas le sens — le cap moyen d'une boucle est le même dans les
   // deux — et la carte le montre par ses chevrons. L'écran, lui, a besoin de le
   // savoir : c'est ce drapeau qui fait du bouton une bascule.

@@ -210,7 +210,29 @@ describe('un village sans boucle', () => {
   // lue sur l'horloge. À midi, Bligny a ses boucles A et B à 7 km, rien à
   // repêcher, et ces tests échouaient — la CI ne restait verte que parce que
   // ses deux derniers passages tombaient avant l'aube.
-  const sansBoucle = { ...bligny, distance_km: 7, sport: 'run', limit: 5, with_elevation: false, time_of_day: 'night' }
+  //
+  // **Les tirages en plus sont coupés** (`widen`) : poussés jusqu'à huit, ils
+  // trouvent désormais à 7 km la boucle qui manquait — voir le test suivant. Le
+  // repêchage, lui, reste ce qu'on montre quand ils n'en trouvent pas.
+  const sansBoucle = {
+    ...bligny, distance_km: 7, sport: 'run', limit: 5, with_elevation: false, time_of_day: 'night', widen: false,
+  }
+
+  it("cherche assez loin pour trouver la boucle qui manquait", async () => {
+    // Deux tirages tournés ne rendaient que des trajets le long de la
+    // départementale ; les suivants tracent une boucle de 6,7 km, sans un mètre
+    // exposé — et la recherche n'en est pas plus longue, 0,16 s sur un PC.
+    // Sans limite de temps : sur une machine lente, l'arrêt au temps couperait
+    // les tirages avant elle, et le test dépendrait de la CI.
+    const result = await planLoops(
+      { ...sansBoucle, widen: true },
+      { loadGraph: async () => graph, wind: async () => null, settings: { ...SETTINGS, widenBudgetMs: Infinity } },
+    )
+    expect(result.meta.salvaged).toBeUndefined()
+    expect(result.meta.relaxed).toBe(false)
+    expect(result.routes[0].laps).toBe(1)
+    expect(result.routes[0].safety.grade).toBe('A')
+  }, 30_000)
 
   it('trouve désormais une vraie boucle par les routes des vignes', async () => {
     // Les voies communales comptaient comme une départementale : à 5 km, il
@@ -364,5 +386,54 @@ describe('les tours', () => {
 
   it('complètent une liste trop courte', () => {
     expect(selectVaried([[0.6, boucle([1, 2, 3], 0, 2), 0]], 5)).toHaveLength(1)
+  })
+})
+
+/**
+ * Le « 8 » : deux boucles différentes enchaînées au départ, plutôt que deux fois
+ * la même. Sur le damier de la parité, à 6 km, deux « 2 × 2,9 km » devenaient
+ * un seul 8 — la parité vérifie ses consignes et ses longueurs. Le retourner,
+ * lui, n'existe que dans l'app.
+ */
+describe('le huit', () => {
+  const dir = new URL('./__fixtures__/parity/', import.meta.url)
+  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL('extract-grid9.json.gz', dir))).toString('utf8')))
+  const graph = buildGraph(extract, { sport: 'run' })
+
+  async function huit() {
+    let gardé = null
+    // Les réglages de la parité : c'est ce cas-là qu'elle vérifie.
+    const req = { lat: 48.806, lon: 2.306, distance_km: 6, limit: 6, with_elevation: false, time_of_day: 'day' }
+    const result = await planLoops(
+      { ...req, doorstep: false, carfree: false, widen: false },
+      {
+        loadGraph: async () => graph,
+        wind: async () => null,
+        onReversible: (r) => {
+          gardé = r
+        },
+      },
+    )
+    const rank = result.routes.findIndex((r) => r.figure_eight)
+    return { route: result.routes[rank], kept: gardé.routes[rank], gardé }
+  }
+
+  it('dit où finit la première boucle, et de quel côté repart la seconde', async () => {
+    const { route } = await huit()
+    expect(route.laps).toBe(2)
+    const [premiere, seconde] = route.lap_distances_m
+    expect(premiere + seconde).toBeCloseTo(route.distance_m, 0)
+    const repere = route.instructions.find((step) => step.turn === 'lap')
+    expect(repere.dist_m).toBe(premiere)
+  })
+
+  it('se retourne en commençant par sa seconde boucle', async () => {
+    const { route, kept, gardé } = await huit()
+    const { route: envers } = reverseRoute(gardé.graph, gardé.start, kept.cand, {
+      req: gardé.req, elev: kept.elev, score: kept.score, rank: kept.rank, night: gardé.night,
+    })
+    expect(envers.figure_eight).toBe(true)
+    expect(envers.lap_distances_m).toEqual([...route.lap_distances_m].reverse())
+    expect(envers.instructions.find((step) => step.turn === 'lap').dist_m).toBe(envers.lap_distances_m[0])
   })
 })

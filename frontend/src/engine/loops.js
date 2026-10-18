@@ -91,6 +91,9 @@ export class Candidate {
     this.backtrack = 0
     this.shape = 0
     this.laps = 1
+    // Où commence chaque tour après le premier, en rang d'arête — seulement
+    // pour un « 8 » (`figureEight`) ; vide pour une boucle répétée.
+    this.lapBreaks = []
     this._edgeSet = null
   }
 
@@ -173,9 +176,15 @@ class VertexIndex {
 // Rotation des polygones d'un essai à l'autre, en fraction du pas entre deux
 // orientations. Le nombre d'or étale les rotations successives sans jamais
 // retomber sur un angle déjà essayé — un pas fixe reviendrait au départ.
-const GOLDEN = 0.6180339887498949
+export const GOLDEN = 0.6180339887498949
 
 /**
+ * `reuse` : ce qu'un tirage laisse au suivant, propre à l'app — l'échelle à
+ * laquelle il a fini, et les polygones déjà tracés (leurs sommets). Les mêmes
+ * sommets donnent la même boucle : un tirage tourné qui retombe dessus ne la
+ * retrace pas, et garde sa place pour une boucle neuve. Rempli à la fin de
+ * l'appel seulement : le premier tirage reste celui du moteur Python.
+ *
  * `variation` : 0 pour la recherche ordinaire — identique au moteur Python. Au-delà,
  * les polygones tournent d'un cran fractionnaire : les sommets visés changent,
  * donc les boucles aussi. C'est ce que demande « Régénérer d'autres boucles »,
@@ -197,11 +206,15 @@ export function generateLoops(
   start,
   targetM,
   profile,
-  { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null, heading = null } = {},
+  {
+    sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null, heading = null,
+    reuse = null,
+  } = {},
 ) {
   const phase = variation ? (variation * GOLDEN) % 1 : 0
   const collected = []
-  let scale = 1
+  let scale = reuse?.scale ?? 1
+  const traced = new Set()
   const lo = targetM * (1 - tolerance)
   const hi = targetM * (1 + tolerance)
 
@@ -212,6 +225,7 @@ export function generateLoops(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const batch = generateOnce(
       graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit, heading,
+      reuse?.seen ?? null, traced,
     )
     if (heading === null) collected.push(...batch)
     else collected.push(...batch.filter((c) => bearingGap(c.bearing, heading) <= HEADING_WINDOW_DEG))
@@ -230,6 +244,11 @@ export function generateLoops(
     const median = distances[Math.trunc(distances.length / 2)]
     if (median <= 0) break
     scale *= Math.max(0.6, Math.min(1.7, targetM / median))
+  }
+  if (reuse) {
+    reuse.scale = scale
+    reuse.seen ??= new Set()
+    for (const signature of traced) reuse.seen.add(signature)
   }
   return collected
 }
@@ -261,7 +280,7 @@ class OutboundTree {
 
 function generateOnce(
   graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0, terrain = null, climbFit = null,
-  heading = null,
+  heading = null, seen = null, traced = null,
 ) {
   const plans = new Map(SHAPES.map((m) => [m, waypointPlan(m, targetM * scale)]))
   const allDistances = []
@@ -311,8 +330,9 @@ function generateOnce(
     if (candidates.length >= maxCandidates) break
 
     const signature = vertices.map((v) => v[0]).join(',')
-    if (signatures.has(signature)) continue
+    if (signatures.has(signature) || seen?.has(signature)) continue
     signatures.add(signature)
+    traced?.add(signature)
 
     const cand = buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo)
     if (cand !== null) {
@@ -598,6 +618,8 @@ function loopBearing(start, geometry) {
 export function reverseCandidate(graph, start, cand, options) {
   const flipped = new Candidate([...cand.edges].reverse(), [...cand.nodes].reverse())
   flipped.laps = cand.laps
+  // Un « 8 » retourné commence par sa seconde boucle, parcourue à l'envers.
+  flipped.lapBreaks = (cand.lapBreaks ?? []).map((b) => cand.edges.length - b).reverse()
   // Retourner deux fois ramène au sens d'origine : le drapeau suit, pour que
   // le bouton soit une bascule et non un aller simple.
   flipped.reversed = !cand.reversed
@@ -667,6 +689,21 @@ export function repeatLoop(graph, start, cand, laps) {
   repeated.shape = cand.shape
   repeated.laps = laps
   return repeated
+}
+
+/** Deux boucles différentes de même longueur, enchaînées au départ — `figure_eight`. */
+export function figureEight(graph, start, first, second) {
+  const edges = [...first.edges, ...second.edges]
+  const eight = new Candidate(edges, nodeSequence(graph, start, edges))
+  measure(graph, start, eight, { night: first.stats.unlitM !== null })
+
+  eight.roundness = Math.min(first.roundness, second.roundness)
+  eight.backtrack = Math.max(first.backtrack, second.backtrack)
+  eight.bearing = first.bearing
+  eight.shape = first.shape
+  eight.laps = 2
+  eight.lapBreaks = [first.edges.length]
+  return eight
 }
 
 /** Part d'arêtes communes, rapportée au plus petit des deux tracés. */

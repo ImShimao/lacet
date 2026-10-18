@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clock, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenSpeed, turnIcon } from './runFormat'
+import { clock, lapAt, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenSpeed, turnIcon } from './runFormat'
 
 describe('ce que l’écran de course écrit', () => {
   it('écrit une durée en heures et minutes, jamais comme un chrono', () => {
@@ -75,5 +75,23 @@ describe('le rang d’un kilomètre, dit à voix haute', () => {
     expect(ordinal(100)).toBe('centième')
     expect(ordinal(200)).toBe('deux centième')
     expect(ordinal(201)).toBe('deux cent unième')
+  })
+})
+
+describe('le tour en cours', () => {
+  it('change à parts égales sur une boucle répétée', () => {
+    const tours = { laps: 3, lap_distance_m: 2000, distance_m: 6000 }
+    expect([0, 1999, 2000, 4100, 6000].map((along) => lapAt(tours, along))).toEqual([1, 1, 2, 3, 3])
+  })
+
+  it('change à la fin de la première boucle d’un « 8 »', () => {
+    // 5,1 puis 4,8 km : à 5 km, on est encore dans la première.
+    const huit = { laps: 2, lap_distance_m: 4950, lap_distances_m: [5100, 4800], figure_eight: true }
+    expect([5000, 5100, 9900].map((along) => lapAt(huit, along))).toEqual([1, 2, 2])
+  })
+
+  it('compte une sortie gardée avant les « 8 » comme avant', () => {
+    expect(lapAt({ laps: 2, lap_distance_m: 4950 }, 5000)).toBe(2)
+    expect(lapAt({ distance_m: 9000 }, 8000)).toBe(1)
   })
 })

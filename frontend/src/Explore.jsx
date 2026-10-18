@@ -264,8 +264,17 @@ export default function Explore({
         <div className="laps">
           <Icon name="refresh" size={15} />
           <span>
-            Un tour de <b>{km(selected.lap_distance_m, 2)} km</b>, à parcourir{' '}
-            <b>{selected.laps} fois</b>
+            {selected.figure_eight ? (
+              <>
+                Deux boucles différentes, de <b>{km(selected.lap_distances_m[0], 2)}</b> puis{' '}
+                <b>{km(selected.lap_distances_m[1], 2)} km</b>, enchaînées au départ
+              </>
+            ) : (
+              <>
+                Un tour de <b>{km(selected.lap_distance_m, 2)} km</b>, à parcourir{' '}
+                <b>{selected.laps} fois</b>
+              </>
+            )}
             {/* Ne l'affirmer que quand c'est vrai : la liste peut mêler des
                 boucles entières et des parcours à tours, et prétendre alors
                 qu'aucune boucle entière n'existe serait démenti par la
@@ -554,9 +563,14 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                 {routes.length > 1 && <span className="rcard__n">{i + 1}</span>}
                 {/* La direction est ce qui distingue vraiment deux propositions :
                     à distance égale, c'est elle qu'on choisit. Sauf pour un
-                    parcours à tours, où c'est le fait même d'en faire plusieurs. */}
+                    parcours à tours, où c'est le fait même d'en faire plusieurs —
+                    et pour un « 8 », ses deux boucles. */}
                 <span className="rcard__dir">
-                  {r.laps > 1 ? `${km(r.lap_distance_m, 1)} km × ${r.laps}` : r.direction}
+                  {r.figure_eight
+                    ? `${km(r.lap_distances_m[0], 1)} + ${km(r.lap_distances_m[1], 1)} km`
+                    : r.laps > 1
+                      ? `${km(r.lap_distance_m, 1)} km × ${r.laps}`
+                      : r.direction}
                 </span>
                 {/* Sans analyse — un tracé de secours —, pas de note : un tiret
                     dit « on ne sait pas », là où un « A » mentirait. */}
