@@ -104,6 +104,34 @@ La direction affichée est celle du **centre de gravité** de la boucle, pas cel
 des cent premiers mètres. Deux boucles qui partent par la même rue puis
 divergent complètement s'annonçaient auparavant à l'identique.
 
+**Choisir le côté où partir.** Les filtres ont une ligne « Direction » : Auto,
+N, NE, E, SE, S, SO, O, NO. Vers la forêt plutôt que vers la zone commerciale,
+du côté où l'on n'est pas allé hier. Une boucle part « vers le nord » quand son
+centre de gravité — la direction qu'affichent les cartes — tombe à moins de 45°
+du nord.
+
+Filtrer les boucles ordinaires après coup ne suffit pas : leurs polygones font
+le tour du départ, et un sur quatre seulement vise un quart de cercle donné —
+deux ou trois boucles là où on en demande cinq. Avec une direction, les huit
+orientations de chaque forme se serrent donc dans les ±45° du cap. L'axe d'un
+polygone, du départ au centre du cercle où tombe son centre de gravité, est à
+`θ + 90 − 180/m` de son premier sommet : c'est lui qu'on oriente, puis seules
+restent les boucles dont le centre de gravité mesuré tombe dans la fenêtre. Les
+tirages supplémentaires et les tours suivent le même cap. Sur l'extrait de
+Beaune, à 5 km, chacune des huit directions rend ses cinq boucles, toutes
+notées A.
+
+**Quand un côté n'a rien.** Une rivière sans pont, une voie ferrée, une
+frontière : si aucune boucle ne tient les seuils dans la direction demandée,
+l'app le dit — « Aucune boucle sûre ne part vers le nord d'ici » — et cherche
+de tous les côtés, comme en Auto. Ce repli passe **avant** celui du mode Sûr :
+la sécurité compte davantage que la direction.
+
+« Auto » n'envoie aucun cap, et la recherche est exactement celle d'avant :
+la parité avec Python n'en voit rien (voir `heading` dans `service.js`).
+Python ne connaît pas de direction imposée ; le calculateur de secours
+(`remote.js`) non plus.
+
 **Les noms sont choisis ensemble.** Nommer chaque boucle par sa voie la plus
 longue paraît naturel, mais échoue précisément quand on en propose beaucoup :
 les boucles d'un même quartier partagent leur artère principale, et l'écran

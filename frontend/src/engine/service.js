@@ -163,6 +163,10 @@ export function normalizeRequest(input) {
     //                              boucles entières, polygones tournés — voir
     //                              `WIDEN_ROUNDS`. Actif par défaut ; la parité
     //                              le coupe.
+    //   heading                    La direction des filtres, en degrés : les
+    //                              boucles partent de ce côté — voir
+    //                              `HEADING_WINDOW_DEG`. `null` (« Auto ») par
+    //                              défaut, et la recherche reste celle d'avant.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -174,6 +178,7 @@ export function normalizeRequest(input) {
     street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
     carfree: input.carfree !== false,
     widen: input.widen !== false,
+    heading: input.heading ?? null,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -191,6 +196,7 @@ export function normalizeRequest(input) {
     throw new PlanningError('Paramètre avoid_bearings invalide.')
   }
   req.avoid_bearings = req.avoid_bearings.map((b) => bounded(b, 'avoid_bearings', { min: 0, max: 360 }))
+  if (req.heading !== null) req.heading = bounded(req.heading, 'heading', { min: 0, max: 360 })
   if (!Array.isArray(req.avoid)) throw new PlanningError('Paramètre avoid invalide.')
   // Un évitement inconnu est ignoré, pas refusé : une version plus récente de
   // l'app peut en avoir ajouté un, et une sauvegarde rouverte ici ne doit pas
@@ -294,7 +300,7 @@ export async function planLoops(input, deps) {
     timings[name] = pyRound((performance.now() - started) / 1000 - previous, 2)
   }
 
-  const req = normalizeRequest(input)
+  let req = normalizeRequest(input)
   const args = graphArgs(req)
   const { targetM } = args
   onProgress('data', 0)
@@ -368,14 +374,17 @@ export async function planLoops(input, deps) {
   const windTask = windOf(req.lat, req.lon)
 
   onProgress('routing', 0)
-  const raw = generateLoops(graph, start, targetM, profile, {
-    sectors: settings.sectors,
-    maxCandidates: settings.maxCandidates,
-    tolerance: req.tolerance,
-    variation: req.variation,
-    terrain,
-    climbFit: climbFit(req.elevation),
-  })
+  const generate = () =>
+    generateLoops(graph, start, targetM, profile, {
+      sectors: settings.sectors,
+      maxCandidates: settings.maxCandidates,
+      tolerance: req.tolerance,
+      variation: req.variation,
+      terrain,
+      climbFit: climbFit(req.elevation),
+      heading: req.heading,
+    })
+  let raw = generate()
   trace.raw?.(start, targetM, raw)
   lap('routing')
 
@@ -383,6 +392,18 @@ export async function planLoops(input, deps) {
   const hi = targetM * (1 + req.tolerance)
 
   let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain)
+
+  // **Rien de ce côté.** Une rivière sans pont, une voie ferrée, une frontière :
+  // la direction demandée n'offre aucune boucle qui tienne les seuils. On le dit,
+  // et on cherche de tous les côtés, comme en « Auto » — avant de relâcher la
+  // sécurité, qui compte davantage que la direction.
+  let missedHeading = null
+  if (!unique.length && req.heading !== null) {
+    missedHeading = req.heading
+    req = { ...req, heading: null }
+    raw = generate()
+    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain)
+  }
 
   let relaxed = false
   let salvaged = null
@@ -509,6 +530,12 @@ export async function planLoops(input, deps) {
   } else if (!routes.length) {
     meta.message = noResultMessage(req, rejected, offTarget)
   }
+  if (missedHeading !== null) {
+    meta.heading_missed = directionOf(missedHeading)
+    meta.message = [missedHeadingMessage(meta.heading_missed, req, routes.length > 0), meta.message]
+      .filter(Boolean)
+      .join(' ')
+  }
 
   // Le candidat attaché à chaque rejet ne sort pas d'ici : c'est un objet
   // lourd, qui n'a rien à faire dans la réponse ni dans le passage d'un fil à
@@ -563,6 +590,7 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
       variation: req.variation + round / (WIDEN_ROUNDS + 1),
       terrain,
       climbFit: climbFit(req.elevation),
+      heading: req.heading,
     })
     const [extra] = applyGate(more, lo, hi, mode, req.sport)
     sortByKey(extra, (c) => -preliminaryScore(c, targetM, req.tolerance))
@@ -618,6 +646,8 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
       variation: req.variation,
       terrain,
       climbFit: climbFit(req.elevation),
+      // Un tour garde le cap de sa boucle : lui aussi part du côté demandé.
+      heading: req.heading,
     })
     trace.raw?.(start, lapTarget, raw)
     const lo = lapTarget * (1 - req.tolerance)
@@ -1015,6 +1045,14 @@ function mostDistinctive(lengths, total, used) {
     }
   }
   return best
+}
+
+/** « Aucune boucle sûre ne part vers l'est d'ici… » — voir `missedHeading`. */
+function missedHeadingMessage(direction, req, found) {
+  const toward = /^[eo]/.test(direction) ? `vers l'${direction}` : `vers le ${direction}`
+  const safe = req.safety === 'safe' ? ' sûre' : ''
+  const others = found ? ' Voici celles des autres directions.' : ''
+  return `Aucune boucle${safe} ne part ${toward} d'ici : une rivière, une voie ferrée ou une frontière ferme peut-être ce côté.${others}`
 }
 
 function noResultMessage(req, rejected, offTarget) {

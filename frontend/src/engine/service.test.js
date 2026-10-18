@@ -6,7 +6,7 @@ import { buildGraph } from './graph'
 import { haversineM } from './geo'
 import { RouteStats, runGate } from './safety'
 import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute, selectVaried } from './service'
-import { Candidate } from './loops'
+import { Candidate, bearingGap } from './loops'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -108,6 +108,34 @@ describe('la boucle', () => {
     const avec = await planLoops(demande, deps)
     expect(entieres(avec)).toBeGreaterThan(entieres(sans))
   }, 60_000)
+
+  it('part du côté demandé', async () => {
+    // La direction des filtres : le centre de gravité de chaque boucle — la
+    // direction qu'affichent les cartes — tombe à moins de 45° du cap, et il
+    // en reste autant qu'en « Auto ». Filtrer les polygones ordinaires n'en
+    // laissait qu'un sur quatre de ce côté.
+    for (const heading of [0, 90, 180, 270]) {
+      const result = await planLoops(
+        { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 5, heading },
+        deps,
+      )
+      expect(result.routes).toHaveLength(5)
+      for (const route of result.routes) expect(bearingGap(route.bearing, heading)).toBeLessThanOrEqual(45)
+      expect(result.meta.heading_missed).toBeUndefined()
+    }
+  }, 30_000)
+
+  it('dit quand rien ne part du côté demandé, et propose les autres', async () => {
+    // Au bord nord de l'extrait, plus une rue au-delà : comme une rivière sans
+    // pont ou une frontière. Un écran vide ne dirait pas pourquoi.
+    const result = await planLoops(
+      { lat: 47.055, lon: 4.84, distance_km: 5, sport: 'run', limit: 5, heading: 0 },
+      deps,
+    )
+    expect(result.meta.heading_missed).toBe('nord')
+    expect(result.meta.message).toMatch(/Aucune boucle sûre ne part vers le nord.*autres directions/)
+    expect(result.routes.length).toBeGreaterThan(0)
+  }, 30_000)
 
   it('« Régénérer » ne remontre pas une boucle déjà vue', async () => {
     // Tourner les polygones ne suffisait pas : les meilleures rues restaient

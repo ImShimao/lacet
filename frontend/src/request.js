@@ -2,7 +2,7 @@
 // terminée à son entrée d'historique. Rien ici ne dépend de React : ce sont des
 // traductions, et elles se testent comme telles.
 
-import { estimateKm, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
+import { directionOf, estimateKm, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
 import { pace } from './format'
 import { slim } from './storage'
 
@@ -46,6 +46,9 @@ export function toRequest(p, start) {
   if (avoid.length) body.avoid = avoid
   // Actif par défaut dans le moteur : seul le refus se dit.
   if (p.carfree === false) body.carfree = false
+  // « Auto » ne se dit pas : sans cap, la recherche est celle d'avant.
+  const direction = directionOf(p.direction)
+  if (direction) body.heading = direction.deg
   if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min

@@ -24,6 +24,14 @@ describe('la demande au moteur', () => {
     expect(toRequest({ ...DEFAULTS, safety: 'safe', avoid: ['busy', 'steps'] }, start).avoid).toEqual(['steps', 'busy'])
   })
 
+  it('envoie le cap de la direction choisie, et rien en « Auto »', () => {
+    // Sans cap, le moteur fait la recherche d'avant, à l'identique.
+    expect(toRequest(DEFAULTS, start)).not.toHaveProperty('heading')
+    expect(toRequest({ ...DEFAULTS, direction: 'SO' }, start).heading).toBe(225)
+    // Une valeur inconnue — une sauvegarde d'une autre version — vaut « Auto ».
+    expect(toRequest({ ...DEFAULTS, direction: 'ailleurs' }, start)).not.toHaveProperty('heading')
+  })
+
   it('traduit en allure la vitesse d’un coureur qui compte en km/h', () => {
     // Le moteur ne lit la vitesse qu'à vélo : envoyée seule, elle était
     // ignorée, et une heure à 12 km/h se calculait à 6:30 du kilomètre.

@@ -39,6 +39,28 @@ export const MOMENTS = [
   { key: 'night', label: 'Nuit' },
 ]
 
+/**
+ * Le côté où partir : vers la forêt plutôt que vers la zone commerciale, dos au
+ * vent du retour, du côté où l'on n'est pas allé hier. Une boucle part « vers le
+ * nord » quand son centre de gravité tombe à moins de 45° du nord — la direction
+ * que disent les cartes. « Auto » les répartit tout autour du départ, comme
+ * avant ; `deg` est le cap envoyé au moteur (`heading`).
+ */
+export const DIRECTIONS = [
+  { key: 'auto', label: 'Auto' },
+  { key: 'N', label: 'N', title: 'Nord', toward: 'vers le nord', deg: 0 },
+  { key: 'NE', label: 'NE', title: 'Nord-est', toward: 'vers le nord-est', deg: 45 },
+  { key: 'E', label: 'E', title: 'Est', toward: "vers l'est", deg: 90 },
+  { key: 'SE', label: 'SE', title: 'Sud-est', toward: 'vers le sud-est', deg: 135 },
+  { key: 'S', label: 'S', title: 'Sud', toward: 'vers le sud', deg: 180 },
+  { key: 'SO', label: 'SO', title: 'Sud-ouest', toward: 'vers le sud-ouest', deg: 225 },
+  { key: 'O', label: 'O', title: 'Ouest', toward: "vers l'ouest", deg: 270 },
+  { key: 'NO', label: 'NO', title: 'Nord-ouest', toward: 'vers le nord-ouest', deg: 315 },
+]
+
+/** La direction choisie, ou `null` pour « Auto » et une valeur inconnue. */
+export const directionOf = (key) => DIRECTIONS.find((d) => d.key === key && d.deg !== undefined) ?? null
+
 // Nombre d'itinéraires proposés. Trois, c'était trop peu pour choisir : on
 // prend le premier faute d'alternative. Au-delà de huit, la liste cesse d'être
 // un choix et devient un catalogue qu'on ne lit plus.
@@ -127,6 +149,9 @@ export const DEFAULTS = {
   // Distance exacte : ±2,5 % au lieu de ±10 %. Réservé à qui vise une distance
   // précise — plus c'est serré, moins il y a de boucles qui conviennent.
   precise: false,
+  // Tout autour du départ : imposer un côté, c'est renoncer aux meilleures
+  // boucles des trois autres.
+  direction: 'auto',
   // Sert seulement à estimer les calories d'une sortie (onglet compte).
   weight_kg: 70,
 }
@@ -421,6 +446,22 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </div>
           </Field>
 
+          <Field label="Direction">
+            {/* Neuf choix sur une ligne : serrés, ils tiennent à 390 px. */}
+            <div className="directions">
+              <Segmented
+                options={DIRECTIONS}
+                value={directionOf(draft.direction)?.key ?? 'auto'}
+                onChange={(direction) => set({ direction })}
+              />
+            </div>
+            <p className="field__hint">
+              {directionOf(draft.direction)
+                ? `Les boucles partent ${directionOf(draft.direction).toward} : leur centre tombe à moins de 45° de ce cap. S'il n'y en a aucune de sûre de ce côté, Lacet le dit et propose les autres.`
+                : 'Les boucles se répartissent tout autour du départ.'}
+            </p>
+          </Field>
+
           <Field label="Sécurité" info="safety" sport={draft.sport}>
             <Segmented
               options={SAFETY}
@@ -511,7 +552,13 @@ export function Segmented({ options, value, onChange }) {
   return (
     <div className="seg">
       {options.map((o) => (
-        <button key={String(o.key)} aria-pressed={value === o.key} onClick={() => onChange(o.key)}>
+        <button
+          key={String(o.key)}
+          aria-pressed={value === o.key}
+          aria-label={o.title}
+          title={o.title}
+          onClick={() => onChange(o.key)}
+        >
           {o.label}
         </button>
       ))}

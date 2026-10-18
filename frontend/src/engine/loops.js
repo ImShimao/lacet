@@ -33,6 +33,15 @@ const SPAN_MAX = 1.3
 const SWEEP_MARGIN_DEG = 30
 const RADIUS_TOLERANCE = 0.35
 const CORE_RADIUS_BUCKET_M = 50
+// La direction demandée dans les filtres : une boucle part « vers le nord »
+// quand son centre de gravité tombe à moins de 45° du nord. Un huitième de tour
+// de chaque côté : deux directions voisines se recouvrent de moitié, et aucune
+// boucle ne tombe entre deux. Propre à l'app : Python ne connaît pas de
+// direction imposée.
+export const HEADING_WINDOW_DEG = 45
+
+/** Écart entre deux caps, en degrés, de 0 à 180. */
+export const bearingGap = (a, b) => Math.abs(pymod(a - b + 180, 360) - 180)
 
 /** `int(a // b)` */
 const floorInt = (a, b) => Math.trunc(pyfloordiv(a, b))
@@ -174,6 +183,13 @@ const GOLDEN = 0.6180339887498949
  *
  * `terrain`, `climbFit` : le relief de la zone, et ce que vaut un polygone selon
  * ce qu'il monte au moins — voir `generate_loops` en Python.
+ *
+ * `heading` : `null` pour la recherche ordinaire. Un cap, et tous les polygones
+ * se serrent dans les ±45° autour de lui au lieu de faire le tour du départ ;
+ * seules restent les boucles dont le centre de gravité y tombe — la direction
+ * qu'affichent les cartes. Un sur quatre seulement des polygones ordinaires
+ * visait ce côté-là : les filtrer après coup aurait laissé deux ou trois
+ * boucles là où on en demande cinq.
  */
 // Boucles brutes, non filtrées : le tri se fait ailleurs.
 export function generateLoops(
@@ -181,7 +197,7 @@ export function generateLoops(
   start,
   targetM,
   profile,
-  { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null } = {},
+  { sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null, heading = null } = {},
 ) {
   const phase = variation ? (variation * GOLDEN) % 1 : 0
   const collected = []
@@ -195,9 +211,10 @@ export function generateLoops(
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const batch = generateOnce(
-      graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit,
+      graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit, heading,
     )
-    collected.push(...batch)
+    if (heading === null) collected.push(...batch)
+    else collected.push(...batch.filter((c) => bearingGap(c.bearing, heading) <= HEADING_WINDOW_DEG))
 
     let usable = 0
     for (const c of collected) if (c.stats && lo <= c.stats.distanceM && c.stats.distanceM <= hi) usable += 1
@@ -244,6 +261,7 @@ class OutboundTree {
 
 function generateOnce(
   graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0, terrain = null, climbFit = null,
+  heading = null,
 ) {
   const plans = new Map(SHAPES.map((m) => [m, waypointPlan(m, targetM * scale)]))
   const allDistances = []
@@ -277,7 +295,10 @@ function generateOnce(
     const plan = plans.get(m)
     const maxDev = (180 / m) * ANGLE_TOLERANCE
     for (let k = 0; k < orientations * density; k += 1) {
-      const theta = ((k / density + phase) * 360) / orientations
+      const theta =
+        heading === null
+          ? ((k / density + phase) * 360) / orientations
+          : facingTheta(heading, m, (k / density + phase + 0.5) / orientations)
       const vertices = pickVertices(index, plan, theta, maxDev)
       if (vertices === null) continue
       const fit = density > 1 ? climbFit(leastClimb(graph, terrain, zStart, vertices) / (targetM / 1000)) : 0
@@ -304,6 +325,18 @@ function generateOnce(
     candidates = fallbackOutAndBack(graph, start, outbound, weights, profile, targetM, scale, maxCandidates)
   }
   return candidates
+}
+
+/**
+ * L'orientation d'un polygone tourné vers `heading`, `share` (de 0 à 1) le
+ * plaçant d'un bord à l'autre de la fenêtre de ±45°.
+ *
+ * `theta` est le cap du premier sommet ; le dernier est à `theta + 180 − 360/m`
+ * (voir `waypointPlan`). L'axe du polygone — du départ au centre du cercle, là
+ * où tombe son centre de gravité — est au milieu : `theta + 90 − 180/m`.
+ */
+function facingTheta(heading, m, share) {
+  return heading - 90 + 180 / m + (pymod(share, 1) * 2 - 1) * HEADING_WINDOW_DEG
 }
 
 /** Ce qu'un polygone fera monter au moins — voir `_least_climb` en Python. */

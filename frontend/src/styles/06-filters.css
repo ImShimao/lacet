@@ -104,6 +104,13 @@
   border-top: 1px solid var(--line-soft);
 }
 
+/* La direction : neuf boutons sur 358 px, soit 36 px chacun. Avec les 8 px de
+   marge de chaque côté des autres choix, « Auto » débordait. */
+.directions .seg button {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .field__hint {
   margin: 0;
   font-size: 12px;
