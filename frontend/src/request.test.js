@@ -32,6 +32,13 @@ describe('la demande au moteur', () => {
     expect(toRequest({ ...DEFAULTS, direction: 'ailleurs' }, start)).not.toHaveProperty('heading')
   })
 
+  it('envoie le D+ précis, et rien sans lui', () => {
+    expect(toRequest(DEFAULTS, start)).not.toHaveProperty('climb_m')
+    expect(toRequest({ ...DEFAULTS, climb_m: 150 }, start).climb_m).toBe(150)
+    // Zéro est une demande : « le moins possible ».
+    expect(toRequest({ ...DEFAULTS, climb_m: 0 }, start).climb_m).toBe(0)
+  })
+
   it('traduit en allure la vitesse d’un coureur qui compte en km/h', () => {
     // Le moteur ne lit la vitesse qu'à vélo : envoyée seule, elle était
     // ignorée, et une heure à 12 km/h se calculait à 6:30 du kilomètre.

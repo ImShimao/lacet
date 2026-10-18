@@ -32,6 +32,10 @@ export const SETTINGS = {
 const ELEVATION_TARGET_PER_KM = { flat: 3, rolling: 10, hilly: 22 }
 const ELEVATION_TOLERANCE_PER_KM = 5
 const ELEVATION_BAND_PER_KM = { flat: [0, 10], rolling: [3, 20], hilly: [12, Infinity] }
+// Le D+ visé : la fourchette à 20 % près, jamais moins de 2 m/km de part et
+// d'autre — voir `CLIMB_BAND_SHARE` en Python.
+const CLIMB_BAND_SHARE = 0.2
+const CLIMB_BAND_MIN_PER_KM = 2
 // Hors de sa fourchette, une boucle passe derrière toutes les autres, de deux
 // crans de note : les réglages avant la note — voir `OUT_OF_BAND_PENALTY` en
 // Python.
@@ -137,6 +141,7 @@ export function normalizeRequest(input) {
     tolerance: input.tolerance ?? 0.1,
     surface: input.surface ?? 'mixed',
     elevation: input.elevation ?? 'rolling',
+    climb_m: input.climb_m ?? null,
     safety: input.safety ?? 'safe',
     time_of_day: input.time_of_day ?? 'auto',
     pace_sec_per_km: input.pace_sec_per_km ?? 390,
@@ -202,6 +207,7 @@ export function normalizeRequest(input) {
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
   }
+  if (req.climb_m !== null) req.climb_m = bounded(req.climb_m, 'climb_m', { min: 0, max: 5000 })
   if (req.distance_km !== null) req.distance_km = bounded(req.distance_km, 'distance_km', { gt: 0.3, max: 250 })
   if (req.duration_min !== null) {
     req.duration_min = bounded(req.duration_min, 'duration_min', { min: 5, max: 900, integer: true })
@@ -387,7 +393,7 @@ export async function planLoops(input, deps) {
     avoid: req.avoid,
     blocked,
     carfree: req.carfree,
-    terrain: req.elevation === 'flat' ? terrain : null,
+    terrain: wantsFlat(req) ? terrain : null,
   })
 
   const windTask = windOf(req.lat, req.lon)
@@ -404,7 +410,7 @@ export async function planLoops(input, deps) {
       tolerance: req.tolerance,
       variation: req.variation,
       terrain,
-      climbFit: climbFit(req.elevation),
+      climbFit: climbFit(req),
       heading: req.heading,
     })
   let raw = generate()
@@ -622,7 +628,7 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
       variation: req.variation + WIDEN_PHASES[round - 1] / GOLDEN,
       reuse: shared,
       terrain,
-      climbFit: climbFit(req.elevation),
+      climbFit: climbFit(req),
       heading: req.heading,
     })
     trace.raw?.(start, targetM, more)
@@ -679,7 +685,7 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
       tolerance: req.tolerance,
       variation: req.variation,
       terrain,
-      climbFit: climbFit(req.elevation),
+      climbFit: climbFit(req),
       // Un tour garde le cap de sa boucle : lui aussi part du côté demandé.
       heading: req.heading,
     })
@@ -798,12 +804,26 @@ export function preliminaryScore(cand, targetM, tolerance) {
 }
 
 /**
+ * Le D+ par kilomètre visé, et sa fourchette : ceux de la préférence, ou ceux du
+ * D+ visé rapporté à la distance — voir `elevation_goal` en Python.
+ */
+function elevationGoal(req) {
+  if (req.climb_m === null) return [ELEVATION_TARGET_PER_KM[req.elevation], ELEVATION_BAND_PER_KM[req.elevation]]
+  const target = req.climb_m / req.distance_km
+  const half = Math.max(CLIMB_BAND_SHARE * target, CLIMB_BAND_MIN_PER_KM)
+  return [target, [Math.max(0, target - half), target + half]]
+}
+
+/** « Plat », et seulement lui, fait payer la pente — `wants_flat`. */
+const wantsFlat = (req) => req.climb_m === null && req.elevation === 'flat'
+
+/**
  * Ce que vaut un polygone selon ce qu'il montera au moins, en m/km — plus bas,
  * mieux c'est. Voir `_climb_fit` en Python.
  */
-function climbFit(pref) {
-  if (pref === 'flat') return (perKm) => perKm
-  const target = ELEVATION_TARGET_PER_KM[pref]
+function climbFit(req) {
+  if (wantsFlat(req)) return (perKm) => perKm
+  const [target] = elevationGoal(req)
   return (perKm) => Math.floor(Math.abs(perKm - target) / ELEVATION_TOLERANCE_PER_KM)
 }
 
@@ -851,7 +871,7 @@ function bandPenalty(value, [low, high], step) {
 /** Ce que coûte de ne pas tenir les réglages — voir `preference_penalty`. */
 function preferencePenalty(cand, req, perKm) {
   let off = 0
-  if (perKm !== null) off += bandPenalty(perKm, ELEVATION_BAND_PER_KM[req.elevation], ELEVATION_TOLERANCE_PER_KM)
+  if (perKm !== null) off += bandPenalty(perKm, elevationGoal(req)[1], ELEVATION_TOLERANCE_PER_KM)
   const share = unpavedShare(cand)
   if (share !== null) off += bandPenalty(share, SURFACE_BAND[req.surface], SURFACE_STEP)
   return off
@@ -869,7 +889,7 @@ export function finalScore(cand, targetM, req, ascentM, wind = null) {
 
   if (ascentM !== null) {
     perKm = ascentM / Math.max(cand.stats.distanceM / 1000, 0.1)
-    const target = ELEVATION_TARGET_PER_KM[req.elevation]
+    const [target] = elevationGoal(req)
     const elevation = 1 / (1 + Math.abs(perKm - target) / ELEVATION_TOLERANCE_PER_KM)
     quality = 0.72 * quality + 0.28 * elevation
   }

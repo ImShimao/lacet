@@ -15,9 +15,14 @@ l'utilisateur voyait à l'écran :
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
+from app import service
+from app.elevation import Relief
 from app.models import ElevationPref, LoopRequest, SurfacePref
+from app.osm.extract import read as read_extract, to_cache
 from app.routing.loops import Candidate, SegmentRun
 from app.safety.gate import RouteStats, grade_route
 from app.service import (
@@ -26,13 +31,17 @@ from app.service import (
     VARIETY_BEARING_WEIGHT,
     VARIETY_OVERLAP_WEIGHT,
     _shortlist_key,
+    elevation_goal,
     final_score,
     grade_penalty,
     name_routes,
     preliminary_score,
     select_varied,
     unpaved_share,
+    wants_flat,
 )
+
+from tests.conftest import ORIGIN_LAT, ORIGIN_LON, STEP, grid_payload
 
 TARGET = 10_000.0
 
@@ -265,6 +274,89 @@ class TestPreferenceDeTerrain:
         assert preliminary_score(steep, TARGET, 0.1) > preliminary_score(flat, TARGET, 0.1)
         assert _shortlist_key(flat, TARGET, req, Slope()) > _shortlist_key(steep, TARGET, req, Slope())
         assert _shortlist_key(steep, TARGET, req, None) > _shortlist_key(flat, TARGET, req, None)
+
+
+class TestDeniveleVise:
+    """« Environ 150 m » : RunnrZ ne permet pas de demander un D+, et 150 m sur
+    10 km tombaient entre Vallonné (100 m) et Côtes (220 m). Même règle que les
+    préférences : hors fourchette derrière, jamais rejetée ; dedans, la note."""
+
+    def test_la_fourchette_se_centre_sur_le_d_plus_vise(self):
+        def goal(climb: float) -> list[float]:
+            target, (low, high) = elevation_goal(request(climb_m=climb))
+            return [target, low, high]
+
+        assert goal(150.0) == pytest.approx([15.0, 12.0, 18.0])
+        # 20 % de 30 m, c'est 6 m : la fourchette garde 2 m/km de part et d'autre.
+        assert goal(30.0) == pytest.approx([3.0, 1.0, 5.0])
+        assert goal(0.0) == pytest.approx([0.0, 0.0, 2.0])
+
+    def test_sans_d_plus_vise_la_preference_reste(self):
+        req = request(elevation=ElevationPref.hilly)
+        assert elevation_goal(req) == (22.0, ELEVATION_BAND_PER_KM[ElevationPref.hilly])
+
+    def test_le_d_plus_vise_remplace_la_preference(self):
+        """Un D+ visé avec « Plat » resté choisi : c'est le D+ qui compte, et la
+        pente ne se paie plus au tracé."""
+        req = request(elevation=ElevationPref.flat, climb_m=300.0)
+        assert not wants_flat(req)
+        assert final_score(candidate(), TARGET, req, 300.0) > final_score(candidate(), TARGET, req, 30.0)
+
+    def test_hors_fourchette_meme_une_a_passe_derriere(self):
+        req = request(climb_m=150.0)
+        steep_a = candidate(bearing=0.0, edges=[1, 2, 3])
+        near_c = candidate(bearing=180.0, edges=[7, 8, 9], exposed_m=500.0, longest_exposed_m=300.0)
+        assert grade_route(near_c.stats)[0] == "C"
+        assert final_score(near_c, TARGET, req, 150.0) > final_score(steep_a, TARGET, req, 230.0)
+
+    def test_dans_la_fourchette_la_note_reprend_la_main(self):
+        req = request(climb_m=150.0)
+        a = candidate(bearing=0.0, edges=[1, 2, 3])
+        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        assert final_score(a, TARGET, req, 125.0) > final_score(b, TARGET, req, 150.0)
+
+    def test_un_d_plus_negatif_est_refuse(self):
+        with pytest.raises(ValueError):
+            request(climb_m=-10.0)
+
+    def test_sur_le_damier_le_d_plus_vise_choisit_le_coteau(self, monkeypatch):
+        """Un damier dont la moitié est monte de 5 % : 0 m visé reste à
+        l'ouest, 60 m vont chercher le coteau — en traçant comme en classant."""
+        payload = grid_payload(15)
+        extract = read_extract(to_cache(read_extract(payload)))
+        foot = ORIGIN_LON + 7 * STEP
+
+        def height(lon: float) -> float:
+            return 100.0 + max(0.0, lon - foot) * 111_000.0 * 0.05
+
+        async def fake_area(lat, lon, radius_m, *, target_m=0.0):
+            return extract
+
+        async def fake_many(routes):
+            return [Relief([height(lon) for lon, _lat in coords], False) for coords in routes]
+
+        async def calm(lat, lon):
+            return None
+
+        monkeypatch.setattr(service, "fetch_area", fake_area)
+        monkeypatch.setattr(service, "fetch_many", fake_many)
+        monkeypatch.setattr(service, "current_wind", calm)
+
+        def ascents(climb: float) -> list[float]:
+            service.graph_cache.clear()
+            req = LoopRequest(
+                lat=ORIGIN_LAT + 7 * STEP, lon=foot, distance_km=4.0, climb_m=climb,
+                time_of_day="day", limit=4,
+            )
+            return [r.ascent_m for r in asyncio.run(service.plan_loops(req)).routes]
+
+        try:
+            flat, hilly = ascents(0.0), ascents(60.0)
+        finally:
+            service.graph_cache.clear()
+        assert flat and hilly
+        assert abs(hilly[0] - 60.0) < abs(flat[0] - 60.0)
+        assert sum(hilly) / len(hilly) > sum(flat) / len(flat) + 20.0, (flat, hilly)
 
 
 class TestTours:

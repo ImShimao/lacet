@@ -70,6 +70,12 @@ CASES = [
     {"name": "beaune-duree-standard", "extract": "beaune",
      "req": {"lat": 47.0245, "lon": 4.8395, "duration_min": 25, "safety": "standard",
              "pace_sec_per_km": 360, "elevation": "flat", "with_elevation": True}},
+    # Le D+ visé remplace « Plat » : la pente ne se paie plus. Le faux relief
+    # monte de 215 à 245 m/km ; 760 m sur 4 km en visent 190, et la fourchette
+    # (152 à 228) en laisse dehors une partie.
+    {"name": "beaune-d-plus-vise", "extract": "beaune",
+     "req": {"lat": 47.0245, "lon": 4.8395, "distance_km": 4.0, "elevation": "flat",
+             "climb_m": 760.0, "with_elevation": True, "limit": 8}},
     {"name": "lyon-douze", "extract": "lyon-centre",
      "req": {"lat": 45.7640, "lon": 4.8357, "distance_km": 3.0, "limit": 12}, "wind": True},
     {"name": "lyon-velo", "extract": "lyon-centre",

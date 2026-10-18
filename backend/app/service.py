@@ -72,6 +72,16 @@ ELEVATION_BAND_PER_KM = {
     ElevationPref.hilly: (12.0, float("inf")),
 }
 
+# Le D+ visé — « environ 150 m » : la cible est ce D+ rapporté à la distance, et
+# la fourchette se centre dessus, à 20 % près. Les trois préférences ne
+# laissaient pas le choix : 150 m sur 10 km tombaient entre Vallonné, qui vise
+# 100 m, et Côtes, qui en vise 220. La fourchette ne descend pas sous 2 m/km de
+# part et d'autre, soit 20 m sur 10 km : en dessous, quelques mètres de plus ou
+# de moins — deux petites rampes — feraient passer une C devant une A, alors que
+# personne ne les sent en courant.
+CLIMB_BAND_SHARE = 0.20
+CLIMB_BAND_MIN_PER_KM = 2.0
+
 # Retrait appliqué à une boucle hors de cette fourchette. Il doit dépasser tout
 # ce que le tri diversifié peut accorder (0,45 + 0,30), sans quoi une boucle à
 # 300 m de D+ était **repêchée en mode Plat** au seul motif qu'elle partait dans
@@ -116,7 +126,29 @@ SURFACE_STEP = 0.15
 UNPAVED = ("gravel", "trail")
 
 
-def _climb_fit(pref: ElevationPref):
+def elevation_goal(req: LoopRequest) -> tuple[float, tuple[float, float]]:
+    """Le D+ par kilomètre visé, et sa fourchette.
+
+    Ceux de la préférence — Plat, Vallonné, Côtes —, ou, quand la demande donne
+    un D+ visé, ce D+ rapporté à la distance demandée, la fourchette centrée
+    dessus (`CLIMB_BAND_SHARE`). Rapporté au kilomètre, il vaut aussi pour un
+    tour : deux tours de 5 km visent chacun la moitié du D+.
+    """
+    if req.climb_m is None:
+        return ELEVATION_TARGET_PER_KM[req.elevation], ELEVATION_BAND_PER_KM[req.elevation]
+    assert req.distance_km is not None
+    target = req.climb_m / req.distance_km
+    half = max(CLIMB_BAND_SHARE * target, CLIMB_BAND_MIN_PER_KM)
+    return target, (max(0.0, target - half), target + half)
+
+
+def wants_flat(req: LoopRequest) -> bool:
+    """« Plat », et seulement lui, fait payer la pente au tracé : un D+ visé,
+    même faible, remplace la préférence."""
+    return req.climb_m is None and req.elevation is ElevationPref.flat
+
+
+def _climb_fit(req: LoopRequest):
     """Ce que vaut un polygone selon ce qu'il montera au moins, en m/km —
     plus bas, mieux c'est. Voir `generate_loops`.
 
@@ -125,9 +157,9 @@ def _climb_fit(pref: ElevationPref):
     dans la même tranche, et la génération reste celle d'avant — vérifié à
     Colmar, où la recherche par défaut rend exactement les mêmes boucles.
     """
-    if pref is ElevationPref.flat:
+    if wants_flat(req):
         return lambda per_km: per_km
-    target = ELEVATION_TARGET_PER_KM[pref]
+    target = elevation_goal(req)[0]
     return lambda per_km: float(math.floor(abs(per_km - target) / ELEVATION_TOLERANCE_PER_KM))
 
 # Au-delà de ce taux d'arêtes communes, deux candidats sont le même itinéraire.
@@ -307,11 +339,11 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         if relief is not None:
             grid.values = relief.values
             terrain = grid
-    climb_fit = _climb_fit(req.elevation)
+    climb_fit = _climb_fit(req)
 
     profile = build_profile(
         req.surface, req.safety, night, req.sport,
-        terrain=terrain if req.elevation is ElevationPref.flat else None,
+        terrain=terrain if wants_flat(req) else None,
     )
 
     # Le vent est demandé maintenant pour que l'appel réseau se déroule pendant
@@ -550,7 +582,7 @@ def _lap_options(
             max_candidates=settings.max_candidates,
             tolerance=req.tolerance,
             terrain=terrain,
-            climb_fit=_climb_fit(req.elevation),
+            climb_fit=_climb_fit(req),
         )
         lo = lap_target * (1 - req.tolerance)
         hi = lap_target * (1 + req.tolerance)
@@ -761,7 +793,7 @@ def preference_penalty(cand: Candidate, req: LoopRequest, per_km: float | None) 
     """
     off = 0.0
     if per_km is not None:
-        off += _band_penalty(per_km, ELEVATION_BAND_PER_KM[req.elevation], ELEVATION_TOLERANCE_PER_KM)
+        off += _band_penalty(per_km, elevation_goal(req)[1], ELEVATION_TOLERANCE_PER_KM)
     share = unpaved_share(cand)
     if share is not None:
         off += _band_penalty(share, SURFACE_BAND[req.surface], SURFACE_STEP)
@@ -806,7 +838,7 @@ def final_score(
         s = cand.stats
         assert s is not None
         per_km = ascent_m / max(s.distance_m / 1000.0, 0.1)
-        target = ELEVATION_TARGET_PER_KM[req.elevation]
+        target = elevation_goal(req)[0]
         elevation = 1.0 / (1.0 + abs(per_km - target) / ELEVATION_TOLERANCE_PER_KM)
         quality = 0.72 * quality + 0.28 * elevation
 

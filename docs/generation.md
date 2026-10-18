@@ -385,6 +385,7 @@ tout ce que la variété peut rapporter :
 | Plat | 3 m/km | 0 à 10 m/km |
 | Vallonné | 10 m/km | 3 à 20 m/km |
 | Côtes | 22 m/km | 12 m/km et au-delà |
+| Un D+ précis | le D+ ÷ la distance | ±20 %, au moins ±2 m/km |
 
 Ce n'est pas un rejet : s'il n'existe que des boucles hors fourchette, elles
 sont proposées — simplement jamais devant une boucle conforme.
@@ -412,6 +413,62 @@ fourchette, le D+ estimé sur le relief de la zone — la moitié de ce que la
 boucle monte et descend sur la grille de 220 m. L'estimation sous-évalue les
 côtes courtes, mais elle range dans le bon ordre, et c'est tout ce qu'on lui
 demande.
+
+### Un D+ précis
+
+`backend/app/service.py` (`elevation_goal`) · `frontend/src/engine/service.js` ·
+`frontend/src/FiltersSheet.jsx`
+
+« On ne peut pas demander un D+ en particulier » : la plainte revient dans les
+avis de RunnrZ, et 150 m sur 10 km tombaient entre Vallonné, qui en vise 100,
+et Côtes, qui en vise 220. Sous les trois tuiles, la case **Un D+ précis**
+ouvre un compteur — de 10 en 10 m, puis de 25 et de 50 en montagne, ou au
+clavier — qui part de 10 m par kilomètre. Choisir une tuile l'efface.
+
+Le D+ visé devient une cible par kilomètre, rapportée à la distance demandée,
+et la fourchette se centre dessus, **à 20 % près** — jamais moins de 2 m/km
+de part et d'autre, 20 m sur 10 km : en dessous, deux petites rampes de plus
+feraient passer une C devant une A, et personne ne les sent en courant. La
+règle est celle des trois préférences : hors fourchette, la boucle passe
+derrière, de 2 plus 0,8 par tranche de 5 m/km, sans jamais être rejetée ;
+dedans, la note décide. Le relief de la zone oriente les polygones vers la
+cible, par tranches de 5 m/km. La pente payée de « Plat », elle, ne joue pas :
+un D+ visé, même faible, remplace la préférence. Par kilomètre, la cible vaut
+aussi pour les tours — deux tours de 5 km visent chacun la moitié. Et quand
+aucune boucle ne tombe dans la fourchette, l'app le dit : « Rien autour de
+400 m d'ici : la boucle la plus proche monte de 210 m. »
+
+Mesuré autour de Soultz et de Guebwiller (`scripts/measure_loops.mjs --climb`) :
+quatre départs, de la plaine d'Issenheim à la vallée de Buhl, à 5, 9 et
+15 km, dix-sept D+ ronds de 25 à 500 m, huit propositions, mode Sûr, le D+ sur
+l'altitude IGN fine, celui que l'app annonce. **Avant**, la préférence la plus
+proche de la cible ; **après**, le D+ lui-même :
+
+| D+ demandé (préférence la plus proche) | Boucles à ±20 %, avant | Après | 1ʳᵉ proposition à ±20 % | Notées A |
+|---|---|---|---|---|
+| Faible : 25 à 60 m (Plat) | 19 / 96 | 14 / 96 | 2 → 5 / 12 | 61 → 62 |
+| Moyen : 50 à 180 m (Vallonné) | 20 / 192 | 18 / 192 | 6 → 13 / 24 | 132 → 134 |
+| Fort : 100 à 500 m (Côtes) | 82 / 256 | 93 / 256 | 11 → 19 / 32 | 209 → 187 |
+| Soultz, rue des Primevères | 47 / 136 | 50 / 136 | 7 → 14 / 17 | 105 → 102 |
+| Guebwiller | 30 / 136 | 31 / 136 | 6 → 10 / 17 | 110 → 108 |
+| Buhl | 16 / 136 | 14 / 136 | 2 → 3 / 17 | 116 → 114 |
+| Issenheim | 28 / 136 | 30 / 136 | 4 → 10 / 17 | 71 → 59 |
+| **Total** | **121 / 544** | **125 / 544** | **19 → 37 / 68** | **402 → 383** |
+
+- **La première proposition tient le D+ deux fois plus souvent**, 37 fois sur
+  68 au lieu de 19 : c'est là que le classement travaille.
+- **Le nombre de boucles à ±20 % bouge à peine** : le terrain décide de ce qui
+  existe. À 15 km de Soultz, la plus douce des huit propositions monte de
+  184 m : qui en demande 120 reçoit la plus proche, et l'app le dit.
+- **Moins de A (−5 %)**, presque toutes vers les grands D+ : une A trop plate
+  passe derrière une B qui tient la fourchette — c'est la règle, comme pour
+  Plat et Côtes.
+- **Pour un petit D+, « Plat » trace mieux** : à 9 km, 40 m demandés en
+  donnent 12 sur 32 à ±20 % avec Plat, 6 avec le D+ précis, faute de pente
+  payée. Essayé, et pas gardé : tracer comme Plat sous 6,5 m/km rend 131
+  boucles à ±20 % au lieu de 125, mais 35 premières propositions justes au
+  lieu de 37 — un seuil de plus pour un écart dans le bruit. Payer la pente
+  sans le reste : 120.
 
 ## La préférence de terrain
 

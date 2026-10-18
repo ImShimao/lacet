@@ -61,6 +61,10 @@ class LoopRequest(BaseModel):
     tolerance: float = Field(default=0.10, ge=0.02, le=0.35)
     surface: SurfacePref = SurfacePref.mixed
     elevation: ElevationPref = ElevationPref.rolling
+    # Un D+ visé, en mètres — « environ 150 m ». Donné, il remplace `elevation` :
+    # voir `service.elevation_goal`. Cinq mille mètres, c'est une grosse journée
+    # de cols à vélo.
+    climb_m: float | None = Field(default=None, ge=0.0, le=5000.0)
     safety: SafetyMode = SafetyMode.safe
     time_of_day: TimeOfDay = TimeOfDay.auto
 

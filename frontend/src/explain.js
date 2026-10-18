@@ -71,6 +71,11 @@ const RELIEF = {
       label: 'Côtes',
       text: 'Les montées sont recherchées : 20 m par kilomètre et plus, 200 m et au-delà pour 10 km. Pour travailler la force et le souffle.',
     },
+    {
+      icon: 'mountain',
+      label: 'D+ précis',
+      text: "« Environ 150 m » plutôt qu'un des trois réglages. Les boucles à 20 % près passent devant — jamais moins de 20 m de marge pour 10 km —, et entre elles, la sécurité décide.",
+    },
   ],
 }
 
@@ -99,6 +104,28 @@ export function reliefMismatch(elevation, routes) {
   }
   const best = measured.reduce((a, b) => (perKm(b) < perKm(a) ? b : a))
   return perKm(best) > band[1] ? { kind: 'flat', ascent: Math.round(best.ascent_m) } : null
+}
+
+/**
+ * La fourchette d'un D+ visé, en mètres — celle de `elevationGoal`, dans
+ * `engine/service.js` : 20 % de part et d'autre, jamais moins de 2 m/km.
+ */
+export function climbBand(climb, km) {
+  const half = Math.max(0.2 * climb, 2 * km)
+  return [Math.max(0, climb - half), climb + half]
+}
+
+/**
+ * Le D+ visé qu'aucune boucle ne tient : 400 m demandés en plaine. Rend
+ * `{ kind: 'climb', ascent }` — la boucle la plus proche, et son D+ — ou `null`
+ * dès qu'une boucle tombe dans la fourchette.
+ */
+export function climbMismatch(climb, routes) {
+  const measured = (routes ?? []).filter((r) => r.ascent_m != null && r.distance_m > 0)
+  if (climb == null || !measured.length) return null
+  const best = measured.reduce((a, b) => (Math.abs(b.ascent_m - climb) < Math.abs(a.ascent_m - climb) ? b : a))
+  const [low, high] = climbBand(climb, best.distance_m / 1000)
+  return best.ascent_m < low || best.ascent_m > high ? { kind: 'climb', ascent: Math.round(best.ascent_m) } : null
 }
 
 // Les fourchettes de `SURFACE_BAND`, dans `engine/service.js` : la part du
