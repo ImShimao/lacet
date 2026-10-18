@@ -282,6 +282,9 @@ export function slim(route) {
     // la carte. Deux nombres suffisent à le restituer.
     laps: route.laps ?? 1,
     lap_distance_m: route.lap_distance_m ?? route.distance_m,
+    // Un « 8 » : ses deux boucles, chacune de sa longueur — voir `figure_eight`.
+    lap_distances_m: route.lap_distances_m,
+    figure_eight: route.figure_eight ?? false,
     segments: (route.segments || []).map((s) => ({
       length_m: s.length_m,
       level: s.level,

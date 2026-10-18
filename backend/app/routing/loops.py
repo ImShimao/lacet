@@ -246,6 +246,10 @@ class Candidate:
     backtrack: float = 0.0  # part en crochet en U — voir `geo.backtrack_share`
     shape: int = 0  # nombre de sommets visés — 0 pour un repli aller-retour
     laps: int = 1  # nombre de tours à parcourir — voir `repeat_loop`
+    # Où commence chaque tour après le premier, en rang d'arête — seulement pour
+    # un « 8 », dont les tours diffèrent (voir `figure_eight`). Vide pour une
+    # boucle répétée : ses tours se coupent à parts égales.
+    lap_breaks: list[int] = field(default_factory=list)
 
     @property
     def distance_m(self) -> float:
@@ -1045,6 +1049,35 @@ def repeat_loop(graph: Graph, start: int, cand: Candidate, laps: int) -> Candida
     repeated.shape = cand.shape
     repeated.laps = laps
     return repeated
+
+
+def figure_eight(graph: Graph, start: int, first: Candidate, second: Candidate) -> Candidate:
+    """Deux boucles différentes de même longueur, enchaînées au départ : un « 8 ».
+
+    Là où aucune boucle entière ne tient la distance, « 2 × 4,5 km » faisait
+    courir deux fois les mêmes rues. Deux boucles de 4,5 km qui partent de deux
+    côtés différents — le nord, puis le sud — font la même distance, passent
+    une seule fois au départ, et ne répètent rien.
+
+    Mesuré comme un tout, comme une boucle répétée (`repeat_loop`) : les
+    traversées sont comptées sur la sortie entière, le profil aussi, et une
+    portion exposée qui finirait la première boucle pour ouvrir la seconde
+    est vue bout à bout. La rondeur est celle de la moins
+    ronde des deux — l'aire d'un 8 parcouru d'un trait ne dit rien de ses
+    boucles —, et le recouvrement, mesuré sur le tout, compte les rues que les
+    deux partagent.
+    """
+    eight = Candidate(edges=first.edges + second.edges, nodes=[])
+    eight.nodes = node_sequence(graph, start, eight.edges)
+    measure(graph, start, eight, night=first.stats.unlit_m is not None)
+
+    eight.roundness = min(first.roundness, second.roundness)
+    eight.backtrack = max(first.backtrack, second.backtrack)
+    eight.bearing = first.bearing
+    eight.shape = first.shape
+    eight.laps = 2
+    eight.lap_breaks = [len(first.edges)]
+    return eight
 
 
 def similarity(a: Candidate, b: Candidate) -> float:

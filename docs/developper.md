@@ -87,3 +87,18 @@ libres : `scripts/smoke.py 47.2184 -1.5536 12`.
 Le script affiche les itinéraires retenus, leur note, **et** ceux qui ont été
 écartés avec le motif. Le premier appel télécharge les données (10 à 30 s selon
 la ville) ; les suivants sortent du cache disque et sont quasi instantanés.
+
+**Compter les boucles distinctes** — combien de vraies boucles entières une
+recherche rend, combien de tours, de quasi-doublons, en combien de temps — sur
+les rues livrées avec l'app, sans réseau une fois le relief gardé :
+
+```powershell
+cd frontend; npx vite-node scripts/measure_loops.mjs -- --heading
+```
+
+96 recherches autour de Soultz et de Guebwiller, plus seize avec une direction
+(`--heading`). `--region` désigne le dossier des tuiles quand il n'est pas dans
+`frontend/public/region/` (un worktree n'en a pas), `--only soultz` restreint
+les départs, `--out` garde le détail en JSON. Le relief vient de l'IGN la
+première fois, puis de `frontend/scripts/.cache/`. C'est ce script qui a mesuré
+les tableaux de [la génération](generation.md#quand-la-distance-ne-tient-pas--les-tours).

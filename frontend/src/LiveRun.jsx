@@ -21,7 +21,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
-import { capitalize, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
+import { capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
@@ -227,7 +227,6 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const plannedM = route?.distance_m || 0
   const canDetour = Boolean(route && request && route.geometry?.length > 1)
   const laps = route?.laps || 1
-  const lapLength = route?.lap_distance_m || route?.distance_m || 1
 
   useEffect(() => {
     voice.setEnabled(speaking)
@@ -978,7 +977,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         remaining={remaining}
         paused={paused}
         laps={goingHome ? 1 : laps}
-        lap={Math.min(laps, Math.floor(Math.max(0, planAlong) / lapLength) + 1)}
+        lap={lapAt(route, planAlong)}
         onHome={canDetour && !goingHome ? goHome : null}
         homeBusy={Boolean(rerouting)}
         homeNote={homeNote}

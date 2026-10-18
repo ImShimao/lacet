@@ -191,6 +191,11 @@ class RouteCandidate(BaseModel):
     # longueur — c'est elle qu'on lit sur la carte, pas la distance totale.
     laps: int
     lap_distance_m: float
+    # La longueur de chacun des tours, dans l'ordre : égales pour une boucle
+    # répétée. Un « 8 » (`figure_eight`) enchaîne au départ deux boucles
+    # différentes, chacune de sa longueur — c'est elles qu'on affiche.
+    lap_distances_m: list[float]
+    figure_eight: bool
     score: float
 
 

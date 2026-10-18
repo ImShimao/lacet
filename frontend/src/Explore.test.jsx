@@ -115,3 +115,22 @@ describe('les avertissements de l’écran', () => {
     expect(screen.getByText(message)).toBeInTheDocument()
   })
 })
+
+describe('un « 8 »', () => {
+  it('montre ses deux boucles, pas « × 2 »', () => {
+    // Deux boucles différentes enchaînées au départ : « 4,6 km × 2 » laisserait
+    // croire qu'on refait deux fois les mêmes rues.
+    const huit = boucle({ laps: 2, lap_distance_m: 4950, lap_distances_m: [5120.4, 4779.6], figure_eight: true })
+    const { container } = afficher({ routes: [huit] })
+    expect(container.querySelector('.rcard__dir')).toHaveTextContent('5,1 + 4,8 km')
+    expect(screen.getByText(/Deux boucles différentes/)).toBeInTheDocument()
+    expect(screen.queryByText(/à parcourir/)).not.toBeInTheDocument()
+  })
+
+  it('laisse une boucle répétée dire combien de fois', () => {
+    const tours = boucle({ laps: 2, lap_distance_m: 4950, lap_distances_m: [4950, 4950], figure_eight: false })
+    const { container } = afficher({ routes: [tours] })
+    expect(container.querySelector('.rcard__dir')).toHaveTextContent('5,0 km × 2')
+    expect(screen.getByText(/à parcourir/)).toBeInTheDocument()
+  })
+})

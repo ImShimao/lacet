@@ -111,3 +111,25 @@ export function spokenSpeed(kmh) {
 }
 
 export const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/**
+ * Le tour en cours, à `along` mètres du départ sur le parcours prévu.
+ *
+ * À parts égales pour une boucle répétée ; à la fin de sa première boucle pour
+ * un « 8 », dont les deux boucles diffèrent (`lap_distances_m`). Une sortie
+ * gardée avant les « 8 » n'a que la longueur moyenne, et se compte comme avant.
+ */
+export function lapAt(route, along) {
+  const laps = route?.laps || 1
+  const lengths =
+    route?.lap_distances_m?.length === laps
+      ? route.lap_distances_m
+      : Array(laps).fill(route?.lap_distance_m || route?.distance_m || 1)
+  let lap = 1
+  let end = 0
+  for (let k = 0; k < laps - 1; k += 1) {
+    end += lengths[k]
+    if (along >= end) lap += 1
+  }
+  return lap
+}

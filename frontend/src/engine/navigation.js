@@ -1,7 +1,7 @@
 // Consignes de navigation — portage fidèle de `backend/app/navigation.py`.
 
 import { bearingDeg, haversineM } from './geo'
-import { pyfloordiv, pymod, pyRound, sortByKey } from './py'
+import { pyfloordiv, pymod, pyRound, pySum, sortByKey } from './py'
 
 // **Sur quelle longueur on lit la direction d'une voie.**
 //
@@ -70,7 +70,7 @@ export function buildInstructions(graph, start, cand) {
   const door = doorway(graph, start, heading, firstRoad)
 
   const out = [instruction(0, 'start', 0, firstRoad, door ?? startText(heading, firstRoad), lon, lat, false)]
-  const markers = lapMarkers(cand, total, { lon, lat }, heading)
+  const markers = lapMarkers(graph, start, cand, total, { lon, lat }, heading)
   if (markers.length) {
     const bounds = markers.map((m) => m.dist_m)
     steps = steps.filter((step) => bounds.every((b) => Math.abs(step.dist_m - b) > LAP_ABSORB_M))
@@ -81,10 +81,24 @@ export function buildInstructions(graph, start, cand) {
   return sortByKey(out, (step) => step.dist_m)
 }
 
-/** Les fins de tour, au départ : c'est là que chaque tour se referme. */
-function lapMarkers(cand, total, at, heading) {
+/**
+ * Les fins de tour, au départ : c'est là que chaque tour se referme. Celle d'un
+ * « 8 » tombe à la fin de sa première boucle, pas à mi-parcours, et donne la
+ * direction de la seconde — voir `_lap_markers`.
+ */
+function lapMarkers(graph, start, cand, total, at, heading) {
   if (cand.laps < 2) return []
   const lap = total / cand.laps
+  let ends = []
+  let headings = []
+  for (let k = 1; k < cand.laps; k += 1) {
+    ends.push(lap * k)
+    headings.push(heading)
+  }
+  if (cand.lapBreaks?.length) {
+    ends = cand.lapBreaks.map((b) => pySum(cand.edges.slice(0, b).map((e) => graph.edgeLen[e])))
+    headings = cand.lapBreaks.map((b) => bearingFromStart(graph.coordsFrom(cand.edges[b], start)))
+  }
   const out = []
   for (let k = 1; k < cand.laps; k += 1) {
     const restants = cand.laps - k
@@ -92,8 +106,8 @@ function lapMarkers(cand, total, at, heading) {
     const reste = restants === 1 ? 'Dernier tour.' : `Encore ${restants} tours.`
     out.push(
       instruction(
-        pyRound(lap * k, 1), 'lap', 0, null,
-        `Fin du ${fait} tour. ${reste} Repars vers ${headingWords(heading)}.`,
+        pyRound(ends[k - 1], 1), 'lap', 0, null,
+        `Fin du ${fait} tour. ${reste} Repars vers ${headingWords(headings[k - 1])}.`,
         at.lon, at.lat, false,
       ),
     )

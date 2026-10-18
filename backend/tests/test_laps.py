@@ -19,12 +19,21 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import SafetyMode, SurfacePref
+from app.models import LoopRequest, SafetyMode, SurfacePref
+from app.navigation import build_instructions
 from app.osm.graph import build_graph
-from app.routing.loops import generate_loops, repeat_loop
+from app.routing.loops import Candidate, figure_eight, generate_loops, repeat_loop, similarity
 from app.routing.weights import build_profile
 from app.safety.gate import run_gate
-from app.service import LAP_DIVISORS, LAP_PENALTY, MIN_LAP_M
+from app.service import (
+    DUPLICATE_THRESHOLD,
+    EIGHT_MIN_GAP_DEG,
+    LAP_DIVISORS,
+    LAP_PENALTY,
+    MIN_LAP_M,
+    _figure_eights,
+    _lap_distances,
+)
 
 
 @pytest.fixture
@@ -161,3 +170,77 @@ class TestSecurite:
         for cand in loops:
             repete = repeat_loop(graph, start, cand, 2)
             assert repete.stats.longest_exposed_m >= cand.stats.longest_exposed_m
+
+
+class TestHuit:
+    """Deux boucles différentes enchaînées au départ plutôt que deux fois la même.
+
+    « 2 × 4,5 km » faisait courir deux fois les mêmes rues. Un « 8 » fait la
+    même distance avec deux boucles qui partent de deux côtés du départ, et
+    reste validé comme une boucle répétée : le portail voit la sortie entière.
+    """
+
+    @pytest.fixture
+    def paire(self, scene, profile):
+        graph, start = scene
+        loops = generate_loops(graph, start, 2000.0, profile, sectors=8)
+        for a in loops:
+            for b in loops:
+                gap = abs((a.bearing - b.bearing + 180.0) % 360.0 - 180.0)
+                if gap >= EIGHT_MIN_GAP_DEG and similarity(a, b) <= DUPLICATE_THRESHOLD:
+                    return graph, start, a, b
+        pytest.fail("le damier doit offrir deux boucles de côtés opposés")
+
+    def test_enchaine_les_deux_boucles(self, paire):
+        graph, start, a, b = paire
+        huit = figure_eight(graph, start, a, b)
+        assert huit.edges == a.edges + b.edges
+        assert huit.laps == 2
+        assert huit.lap_breaks == [len(a.edges)]
+        assert huit.stats.distance_m == pytest.approx(a.stats.distance_m + b.stats.distance_m)
+        assert huit.nodes[0] == start and huit.nodes[-1] == start
+        # Le passage au départ, entre les deux boucles.
+        assert huit.nodes[len(a.edges)] == start
+
+    def test_la_rondeur_est_celle_de_la_moins_ronde(self, paire):
+        graph, start, a, b = paire
+        assert figure_eight(graph, start, a, b).roundness == min(a.roundness, b.roundness)
+
+    def test_la_longueur_de_chaque_boucle_est_rendue(self, paire):
+        graph, start, a, b = paire
+        huit = figure_eight(graph, start, a, b)
+        assert _lap_distances(graph, huit) == [round(a.stats.distance_m, 1), round(b.stats.distance_m, 1)]
+        # Une boucle répétée, elle, se coupe à parts égales.
+        repete = repeat_loop(graph, start, a, 2)
+        assert _lap_distances(graph, repete) == [round(repete.stats.distance_m / 2, 1)] * 2
+
+    def test_le_repere_tombe_a_la_fin_de_la_premiere_boucle(self, paire):
+        """Pas à mi-parcours : les deux boucles n'ont pas la même longueur, et
+        le guidage dit de quel côté repart la seconde."""
+        from app.navigation import _bearing_from_start, _heading_words
+
+        graph, start, a, b = paire
+        huit = figure_eight(graph, start, a, b)
+        repere = next(s for s in build_instructions(graph, start, huit) if s.turn == "lap")
+        assert repere.dist_m == round(a.stats.distance_m, 1)
+        cap = _bearing_from_start(graph.edges[b.edges[0]].coords_from(start))
+        assert repere.text.endswith(f"Repars vers {_heading_words(cap)}.")
+
+    def test_une_boucle_ne_sert_qu_a_un_seul_huit(self, scene, profile):
+        """Deux 8 qui partagent une boucle — ou deux boucles presque pareilles —
+        partageraient la moitié de la sortie. Sur le damier, trois 8 sortaient à
+        l'identique."""
+        graph, start = scene
+        loops = generate_loops(graph, start, 2000.0, profile, sectors=8)
+        huits = _figure_eights(graph, start, loops, "safe", LoopRequest(lat=0, lon=0, distance_km=4), 6)
+        assert huits
+        boucles = []
+        for h in huits:
+            cut = h.lap_breaks[0]
+            for edges in (h.edges[:cut], h.edges[cut:]):
+                boucles.append(Candidate(edges=edges, nodes=[]))
+        for i, a in enumerate(boucles):
+            for b in boucles[i + 1:]:
+                assert similarity(a, b) <= DUPLICATE_THRESHOLD
+        for h in huits:
+            assert run_gate(h.stats, "safe", "run").passed

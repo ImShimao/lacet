@@ -218,18 +218,90 @@ eux (`select_varied`).
 **Et l'app cherche d'autres boucles entières avant d'en proposer.** Le
 générateur s'arrête dès qu'il tient huit tracés à la bonne distance : les
 quasi-doublons retirés, il en restait quatre à six, et dès huit propositions la
-liste se complétait de tours. Quand il en manque, l'app relance jusqu'à deux
-tirages, polygones tournés d'une fraction de cran — jamais l'angle d'un
-« Régénérer » (`WIDEN_ROUNDS`, `engine/service.js` ; propre à l'app, la parité
-le coupe). Mesuré depuis la rue des Primevères, 9 km :
+liste se complétait de tours. Quand il en manque, l'app relance des tirages,
+polygones tournés d'une fraction de cran — jamais l'angle d'un « Régénérer » :
+deux toujours, puis jusqu'à huit tant que le tracé n'a pas pris une seconde et
+demie sur l'iPhone (`WIDEN_ROUNDS`, `WIDEN_BUDGET_MS`, `engine/service.js` ;
+propre à l'app, la parité le coupe).
 
-| Départ, propositions | Tours avant | Tours après | Calcul après |
-|---|---|---|---|
-| Soultz, 5 | 1 | 0 | 0,1 s |
-| Soultz, 8 | 4 | 0 | 1,1 s |
-| Soultz, 12 | 8 | 4 | 0,3 s |
-| Guebwiller, 8 | 2 | 0 | 1,1 s |
-| Guebwiller, 12 | 6 | 0 | 1,8 s |
+Pousser les tirages ne suffisait pas. Tournés, les polygones retombent souvent
+sur les mêmes sommets, donc sur la même boucle, retracée pour rien puis écartée
+comme doublon : huit tirages sans limite rendaient 868 boucles entières au lieu
+de 797, mais la recherche la plus lente passait de 1,2 à 2,5 s sur un PC — plus
+de cinq secondes sur l'iPhone ; seize, 894 pour 4,6 s. Chaque tirage saute donc
+les polygones déjà tracés — mêmes sommets, même boucle — et repart de l'échelle
+à laquelle le précédent a fini, au lieu de la réajuster depuis le début ; ses
+rotations tombent au milieu du plus grand écart laissé, la moitié du pas, puis
+les quarts, puis les huitièmes (`reuse`, `engine/loops.js`). Le premier tirage,
+lui, reste celui du moteur Python.
+
+Mesuré sur 96 recherches (`frontend/scripts/measure_loops.mjs`) : quatre
+départs — Soultz, rue des Primevères ; Guebwiller ; Buhl, dans la vallée de la
+Lauch ; Issenheim, en plaine —, 5, 9 et 15 km, 8 et 12 propositions, Plat et
+Vallonné, Sûr et Standard, sur les rues livrées avec l'app et le relief de
+l'IGN. Temps de calcul sur un PC de bureau, l'arrêt au temps ramené à ce qu'il
+serait sur l'iPhone, un peu plus de deux fois plus lent :
+
+| | Avant | Après |
+|---|---|---|
+| Boucles entières rendues | 797 / 960 | **896 / 960** |
+| … dont notées A | 476 (60 %) | **554 (62 %)** |
+| … notées C | 2 | 2 |
+| Recherches remplies de boucles entières | 51 / 96 | **79 / 96** |
+| Tours proposés | 160 | **61, dont 20 en « 8 »** |
+| Quasi-doublons écartés | 1 725 | 2 951 |
+| Temps médian | 0,22 s | 0,22 s |
+| Neuf recherches sur dix sous | 0,56 s | 0,70 s |
+| Recherche la plus lente | 1,21 s | **1,01 s** |
+
+Par départ, sur 240 : Soultz 204 → 228, Guebwiller 224 → 239, Buhl 203 → 238,
+Issenheim 166 → 191. La plaine d'Issenheim reste la plus pauvre : à 15 km en
+plat, les boucles tracées y font de 10 à 25 km, et un quart seulement tombe
+dans la fourchette — il y manque des boucles de la bonne longueur, pas des
+formes. La recherche la plus lente l'est moins qu'avant : un tirage qui ne
+retrace pas ce qu'il connaît finit plus tôt. Et l'arrêt au temps rend le compte
+un peu variable sur les recherches de 15 km en plat, qui l'atteignent : de 896
+à 900 d'une mesure à l'autre.
+
+**« Partir vers… » en profite le plus.** Sur seize directions — les quatre
+départs, vers le nord, l'est, le sud et l'ouest, 9 km, Plat, Sûr, huit
+propositions —, 99 boucles entières au lieu de 67 et 16 tours au lieu de 40 ;
+aucune ne sort de sa fenêtre de ±45°. Depuis Soultz, l'est n'offrait qu'une
+boucle : il en donne trois.
+
+Et à Bligny-lès-Beaune, de nuit, la recherche de 7 km qui ne pouvait que
+repêcher des trajets le long de la départementale trouve désormais une boucle
+de 6,7 km notée A, sans un mètre exposé.
+
+**Essayé, et pas gardé : des boucles allongées.** En vallée, un polygone
+régulier semblait ne pas tenir. On a donc ajouté des formes étirées — un carré
+et un hexagone inscrits dans une ellipse de rapport 1:2, le départ au bout du
+grand axe —, tournées comme les autres pour que le réseau et le relief
+choisissent leur orientation. Buhl gagnait deux boucles, 240 sur 240 ; mais en
+plaine, elles prenaient la place de boucles régulières mieux notées : 895
+boucles entières au lieu de 900, et 60 % de A au lieu de 62. Tracées en
+dernier recours seulement, après toutes les formes régulières : 897. Le carré
+étiré seul : 886. La vallée n'en manquait plus — Buhl rendait déjà 238 boucles
+sur 240 avec les tirages en plus —, et ces formes n'ont été ni gardées, ni
+portées en Python.
+
+**Un « 8 » plutôt que deux fois la même boucle.** Là où il faut des tours,
+« 2 × 4,5 km » faisait courir deux fois les mêmes rues. L'app enchaîne
+désormais, quand elle les trouve, deux boucles **différentes** de la longueur
+d'un tour, parties de deux côtés du départ, à 90° au moins l'une de l'autre :
+le nord, puis le sud (`figure_eight`, `routing/loops.py` ;
+`EIGHT_MIN_GAP_DEG`, `service.py`). Chaque boucle est validée comme un tour, et
+le 8 l'est en entier, comme une boucle répétée : traversées et portions
+exposées sont comptées sur la sortie entière, et le profil aussi. Une boucle ne sert
+qu'à un seul 8, ni elle ni ses quasi-doublons : sans cette règle, le damier de
+la parité sortait trois 8 identiques.
+
+Le guidage marque la fin de la première boucle à sa vraie place — les deux
+n'ont pas la même longueur — et dit de quel côté repart la seconde : « Fin du
+premier tour. Dernier tour. Repars vers le sud. » La carte affiche
+« 4,6 + 4,4 km » au lieu de « 4,5 km × 2 », et le compteur « Tour 2 sur 2 »
+change au bon endroit. Sur les 96 recherches, 20 des 61 tours sont des 8, qui
+restent derrière toutes les boucles entières.
 
 ## Le vent
 

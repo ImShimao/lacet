@@ -135,7 +135,7 @@ def build_instructions(graph: Graph, start: int, cand: Candidate) -> list[Instru
             caution=False,
         )
     ]
-    markers = _lap_markers(cand, total, lon, lat, heading)
+    markers = _lap_markers(graph, start, cand, total, lon, lat, heading)
     # Une manœuvre qui tombe sur un passage au départ est absorbée par le repère
     # de tour. Sans ça, le guidage annonçait « fais demi-tour » à l'endroit même
     # où l'on repart pour un tour de plus : géométriquement l'angle est bien de
@@ -180,7 +180,7 @@ LAP_ABSORB_M = 25.0
 
 
 def _lap_markers(
-    cand: Candidate, total: float, lon: float, lat: float, heading: float
+    graph: Graph, start: int, cand: Candidate, total: float, lon: float, lat: float, heading: float
 ) -> list[Instruction]:
     """Un repère à chaque passage au départ, sur un parcours à tours.
 
@@ -188,11 +188,23 @@ def _lap_markers(
     « où j'en suis ». Sans ces repères, les trois tours sont indiscernables :
     on entend les mêmes consignes dans le même ordre, sans savoir si c'est la
     première ou la dernière fois.
+
+    Un « 8 » (`figure_eight`) passe au départ là où finit sa première boucle,
+    pas à mi-parcours, et repart d'un autre côté : le repère tombe à sa vraie
+    place et donne la direction de la seconde boucle.
     """
     if cand.laps < 2:
         return []
 
     lap = total / cand.laps
+    ends = [lap * k for k in range(1, cand.laps)]
+    headings = [heading] * (cand.laps - 1)
+    if cand.lap_breaks:
+        ends = [sum(graph.edges[e].length_m for e in cand.edges[:b]) for b in cand.lap_breaks]
+        headings = [
+            _bearing_from_start(graph.edges[cand.edges[b]].coords_from(start))
+            for b in cand.lap_breaks
+        ]
     out: list[Instruction] = []
     for k in range(1, cand.laps):
         restants = cand.laps - k
@@ -204,14 +216,14 @@ def _lap_markers(
         )
         out.append(
             Instruction(
-                dist_m=round(lap * k, 1),
+                dist_m=round(ends[k - 1], 1),
                 turn="lap",
                 angle=0.0,
                 road=None,
                 # La direction est reprise : on revient au point de départ, et
                 # c'est le seul endroit du parcours où l'on peut repartir dans
                 # le mauvais sens sans s'en apercevoir.
-                text=f"Fin du {fait} tour. {reste} Repars vers {_heading_words(heading)}.",
+                text=f"Fin du {fait} tour. {reste} Repars vers {_heading_words(headings[k - 1])}.",
                 lon=lon,
                 lat=lat,
                 caution=False,

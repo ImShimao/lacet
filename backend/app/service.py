@@ -44,7 +44,7 @@ from .models import (
 from .osm.cache import graph_cache
 from .osm.graph import build_graph
 from .osm.overpass import area_key, fetch_area
-from .routing.loops import Candidate, generate_loops, repeat_loop, similarity
+from .routing.loops import Candidate, figure_eight, generate_loops, repeat_loop, similarity
 from .routing.weights import build_profile
 from .safety.gate import grade_route, run_gate
 from .solar import is_night
@@ -162,6 +162,13 @@ LAP_DIVISORS = (2, 3, 4)
 # Longueur minimale d'un tour. En dessous, « cinq tours de 800 m » n'est plus
 # une sortie mais une séance de piste, et personne n'est venu chercher ça.
 MIN_LAP_M = 1500.0
+
+# Écart de cap minimal entre les deux boucles d'un « 8 » (`figure_eight`) : de
+# deux côtés vraiment différents du départ, le nord puis le sud, pas deux
+# variantes du même quartier. Mesuré sur 96 recherches autour de Soultz et de
+# Guebwiller : 22 des 59 « 2 × la même boucle » trouvaient ainsi leur
+# partenaire, sans une note de moins.
+EIGHT_MIN_GAP_DEG = 90.0
 
 # Retrait par tour supplémentaire : deux tours valent mieux que quatre. Il ne
 # départage plus que les tours entre eux. Une boucle entière passe toujours
@@ -427,7 +434,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     routes = [
         _to_model(
             cand, score, req, profiles.get(idx), rank,
-            build_instructions(graph, start, cand), names[rank],
+            build_instructions(graph, start, cand), names[rank], graph,
         )
         for rank, (score, cand, idx) in enumerate(chosen)
     ]
@@ -550,6 +557,9 @@ def _lap_options(
         passed, _rejected, _off, _spurned = _apply_gate(raw, lo, hi, mode, req.sport.value)
         passed.sort(key=lambda c: -preliminary_score(c, lap_target, req.tolerance))
 
+        if laps == 2:
+            out.extend(_figure_eights(graph, start, passed, mode, req, needed - len(out)))
+
         for cand in passed:
             if len(out) >= needed:
                 break
@@ -563,6 +573,45 @@ def _lap_options(
                 continue
             out.append(repeated)
 
+    return out
+
+
+def _figure_eights(
+    graph, start: int, passed: list[Candidate], mode: str, req: LoopRequest, needed: int
+) -> list[Candidate]:
+    """Des « 8 » plutôt que deux fois la même boucle — voir `figure_eight`.
+
+    Chaque boucle, dans l'ordre de la note, cherche sa partenaire parmi les
+    autres : assez différente pour ne pas être un quasi-doublon, partie d'un
+    autre côté (`EIGHT_MIN_GAP_DEG`). Une boucle ne sert qu'à un seul 8, ni
+    elle ni ses quasi-doublons : deux 8 qui partagent une boucle partageraient
+    la moitié de la sortie. Sur le damier de la parité, trois 8 sortaient à
+    l'identique — même longueur, même direction — faute de cette règle. Et le
+    8 passe le portail en entier, comme une boucle répétée.
+    """
+    out: list[Candidate] = []
+    lobes: list[Candidate] = []
+
+    def fresh(cand: Candidate) -> bool:
+        return all(similarity(cand, lobe) <= DUPLICATE_THRESHOLD for lobe in lobes)
+
+    for first in passed:
+        if len(out) >= needed:
+            break
+        if not fresh(first):
+            continue
+        for second in passed:
+            if second is first or not fresh(second):
+                continue
+            gap = abs((first.bearing - second.bearing + 180.0) % 360.0 - 180.0)
+            if gap < EIGHT_MIN_GAP_DEG or similarity(first, second) > DUPLICATE_THRESHOLD:
+                continue
+            eight = figure_eight(graph, start, first, second)
+            if not run_gate(eight.stats, mode, req.sport.value).passed:
+                continue
+            lobes.extend((first, second))
+            out.append(eight)
+            break
     return out
 
 
@@ -851,6 +900,7 @@ def _to_model(
     rank: int,
     steps: list,
     name: str,
+    graph,
 ) -> RouteCandidate:
     s = cand.stats
     assert s is not None
@@ -934,8 +984,22 @@ def _to_model(
         shape=cand.shape,
         laps=cand.laps,
         lap_distance_m=round(s.distance_m / cand.laps, 1),
+        lap_distances_m=_lap_distances(graph, cand),
+        figure_eight=bool(cand.lap_breaks),
         score=round(score, 4),
     )
+
+
+def _lap_distances(graph, cand: Candidate) -> list[float]:
+    """La longueur de chaque tour : égales pour une boucle répétée, chacune la
+    sienne pour un « 8 »."""
+    if not cand.lap_breaks:
+        return [round(cand.stats.distance_m / cand.laps, 1)] * cand.laps
+    bounds = [0, *cand.lap_breaks, len(cand.edges)]
+    return [
+        round(sum(graph.edges[e].length_m for e in cand.edges[a:b]), 1)
+        for a, b in zip(bounds, bounds[1:])
+    ]
 
 
 def _direction_of(bearing: float) -> str:
