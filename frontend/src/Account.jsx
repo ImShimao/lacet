@@ -18,7 +18,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, SPORTS, Segmented } from './FiltersSheet.jsx'
+import { COUNTS, MOMENTS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
@@ -96,7 +96,13 @@ function Summary({ onPage, params, geo, history = [], poiPrefs }) {
           <div>
             <b>Profil local</b>
             <em>
-              {[sport?.label, surfaceLabel(params.surface), params.safety === 'safe' ? 'Sûr' : 'Standard']
+              {[
+                sport?.label,
+                surfaceLabel(params.surface),
+                params.safety === 'safe' ? 'Sûr' : 'Standard',
+                // Seulement quand elle est imposée : « Auto » est l'absence de choix.
+                directionOf(params.direction)?.toward.replace(/^v/, 'V'),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </em>

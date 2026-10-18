@@ -71,6 +71,27 @@ describe('le panneau des filtres', () => {
     expect(onApply).not.toHaveBeenCalled()
   })
 
+  it('choisit le côté où partir, « Auto » par défaut', () => {
+    const { onApply } = ouvrir()
+    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(/tout autour du départ/)).toBeInTheDocument()
+
+    // « NE » se lit « Nord-est » : deux lettres ne disent rien à une voix.
+    fireEvent.click(screen.getByRole('button', { name: 'Nord-est' }))
+    expect(screen.getByRole('button', { name: 'Nord-est' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(/partent vers le nord-est/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0]).toMatchObject({ direction: 'NE' })
+  })
+
+  it('remet la direction sur « Auto » en réinitialisant', () => {
+    ouvrir({ ...DEFAULTS, direction: 'O' })
+    expect(screen.getByRole('button', { name: 'Ouest' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
+    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('montre la vitesse et non l’allure à vélo', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', speed_kmh: 20 })
     expect(screen.getByText('Vitesse')).toBeInTheDocument()
