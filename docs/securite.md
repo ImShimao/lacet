@@ -10,6 +10,23 @@ C'est le cœur du produit. Six couches, dans `backend/app/safety/`.
 trottoir, chemins interdits aux piétons : retirés du graphe. Pas pénalisés,
 **absents**. Aucune pondération ne peut les faire revenir.
 
+**Les chemins disparus** aussi — la première plainte contre les apps de boucles :
+un sentier sur la carte, des ronces sur le terrain. OpenStreetMap le dit souvent.
+Abandonnés (`abandoned=yes`, `disused=yes`, ou `abandoned:highway` égal au
+`highway` de la voie) ou sans trace visible (`trail_visibility=horrible|no`) :
+exclus dans tous les modes. Mal tracés (`trail_visibility=bad`, `informal=yes`,
+`smoothness=impassable`) : exclus hors mode Sentier, qui les cherche — sauf
+`impassable` à vélo, où aucune roue ne passe. Une ancienne piste devenue sentier
+(`highway=path` + `disused:highway=track`) reste : c'est la piste qui est
+désaffectée. Mesuré autour de Guebwiller, Soultz, Buhl, Wuenheim et Lautenbach,
+boucles de 10 km : en Mixte, 6 boucles sur 25 empruntaient ces chemins, jusqu'à
+1,9 km ; aucune après, toujours 25 boucles à la bonne distance, 18 notées A au
+lieu de 20. Une pénalité ×5 en gardait 19, mais laissait une boucle Sentier sur
+64 m de chemin abandonné. Le réseau ne perd que ces voies — 3 à 8 km sur 1 100 —,
+sans morceau isolé avec elles. Les voies qui ne portent
+plus de `highway` du tout (`abandoned:highway=*` seul) ne sont jamais
+téléchargées.
+
 **L1 — le risque** (`risk.py`) :
 
 ```

@@ -208,6 +208,39 @@ class TestExclusion:
         assert is_excluded(tags) is not None
         assert is_excluded(tags, allow_trail=True) is None
 
+    @pytest.mark.parametrize(
+        "tags",
+        [
+            {"highway": "track", "abandoned": "yes"},
+            {"highway": "path", "disused": "yes"},
+            {"highway": "track", "abandoned:highway": "track"},
+            {"highway": "path", "trail_visibility": "horrible"},
+            {"highway": "path", "trail_visibility": "no"},
+        ],
+    )
+    def test_chemin_disparu_exclu_meme_en_mode_trail(self, tags):
+        assert is_excluded(tags, allow_trail=True) is not None
+
+    def test_ancienne_piste_devenue_sentier_admise(self):
+        """Mesuré à Guebwiller : c'est la piste qui est désaffectée, pas le sentier."""
+        assert is_excluded({"highway": "path", "disused:highway": "track"}) is None
+
+    @pytest.mark.parametrize(
+        "tags",
+        [
+            {"highway": "path", "trail_visibility": "bad"},
+            {"highway": "path", "informal": "yes"},
+            {"highway": "track", "smoothness": "impassable"},
+        ],
+    )
+    def test_chemin_mal_trace_reserve_au_mode_trail(self, tags):
+        assert is_excluded(tags) is not None
+        assert is_excluded(tags, allow_trail=True) is None
+
+    def test_aucune_roue_ne_passe_meme_en_vtt(self):
+        tags = {"highway": "track", "smoothness": "impassable"}
+        assert is_excluded(tags, allow_trail=True, sport="bike") is not None
+
 
 class TestSurface:
     @pytest.mark.parametrize(

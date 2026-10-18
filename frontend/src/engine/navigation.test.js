@@ -20,15 +20,24 @@ import { planLoops } from './service'
  */
 
 const dir = new URL('./__fixtures__/parity/', import.meta.url)
-const charger = (nom) => {
-  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL(nom, dir))).toString('utf8')))
-  return buildGraph(extract, { sport: 'run' })
+
+// Le départ, fixé en coordonnées et non par un indice de nœud : écarter du
+// graphe les chemins disparus décalait les indices, et le test partait alors
+// près du pont de Lattre de Tassigny, trois kilomètres plus loin — d'autres
+// boucles, d'autres consignes, sans que le guidage ait changé.
+const DEPARTS = {
+  'extract-beaune.json.gz': [47.0043406, 4.8380759],
+  'extract-lyon-centre.json.gz': [45.7502885, 4.8579479],
 }
 
-async function boucles(graph, km = 5, limit = 5) {
-  const i = Math.floor(graph.nodeCount / 2)
+const charger = (nom) => {
+  const extract = fromCompact(JSON.parse(gunzipSync(readFileSync(new URL(nom, dir))).toString('utf8')))
+  return { graph: buildGraph(extract, { sport: 'run' }), depart: DEPARTS[nom] }
+}
+
+async function boucles({ graph, depart: [lat, lon] }, km = 5, limit = 5) {
   const r = await planLoops(
-    { lat: graph.nodeLat[i], lon: graph.nodeLon[i], distance_km: km, sport: 'run', limit },
+    { lat, lon, distance_km: km, sport: 'run', limit },
     { loadGraph: async () => graph, fetchElevations: async () => [], wind: async () => null },
   )
   return r.routes

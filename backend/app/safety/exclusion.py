@@ -41,7 +41,8 @@ def is_excluded(
 ) -> str | None:
     """Rend le motif d'exclusion, ou None si l'arête est admissible.
 
-    `allow_trail` détend la contrainte `sac_scale` pour le mode sentier.
+    `allow_trail` détend la contrainte `sac_scale` pour le mode sentier, et y
+    garde les chemins mal tracés.
     """
     highway = tags.get("highway", "")
 
@@ -81,6 +82,34 @@ def is_excluded(
 
     if not allow_trail and tags.get("sac_scale") in _SAC_FORBIDDEN:
         return f"sac_scale={tags['sac_scale']}"
+
+    # Les chemins qu'OpenStreetMap connaît mais que le terrain a perdus : la
+    # plainte la plus fréquente contre les apps de boucles. Autour de Guebwiller,
+    # 6 boucles « Mixte » sur 25 en empruntaient, jusqu'à 1,9 km.
+    #
+    # Disparus — abandonnés, ou sans trace visible — : aucun mode n'y court. Une
+    # pénalité ne suffit pas : multipliée par cinq, une boucle « Sentier » passait
+    # encore 64 m sur un chemin abandonné à Buhl. `disused:highway=track` sur un
+    # `highway=path` n'en est pas : c'est l'ancienne piste devenue sentier, et elle
+    # se court — seul l'usage même de la voie déclaré abandonné l'écarte.
+    for state in ("abandoned", "disused"):
+        if tags.get(state) == "yes" or tags.get(f"{state}:highway") == highway:
+            return state
+    if tags.get("trail_visibility") in {"horrible", "no"}:
+        return f"trail_visibility={tags['trail_visibility']}"
+
+    # Mal tracés — à peine visibles, informels, défoncés — : ce que cherche le
+    # mode Sentier, pas les autres. Les exclure plutôt que les pénaliser ne coûte
+    # presque rien de plus : mêmes 25 boucles, une note A de moins (18 contre 19),
+    # et le réseau principal ne perd que ces voies, sans morceau isolé avec elles.
+    # Un vélo, lui, ne passe pas là où aucune roue ne passe.
+    if tags.get("smoothness") == "impassable" and (sport == "bike" or not allow_trail):
+        return "smoothness=impassable"
+    if not allow_trail:
+        if tags.get("trail_visibility") == "bad":
+            return "trail_visibility=bad"
+        if tags.get("informal") == "yes":
+            return "informal=yes"
 
     # Voie en construction déclarée autrement.
     if tags.get("highway") == "road" and tags.get("area") == "yes":

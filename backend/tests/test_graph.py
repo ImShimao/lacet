@@ -34,6 +34,17 @@ class TestConstruction:
         assert len(graph.edges) == 127
         assert len(graph.nodes) == 72
 
+    def test_chemin_disparu_absent_meme_en_mode_sentier(self):
+        payload = grid_payload(
+            dangerous_row=4, dangerous_tags={"highway": "path", "trail_visibility": "no"}
+        )
+        assert len(build_graph(payload, allow_trail=True).edges) == 127
+
+    def test_sentier_informel_garde_en_mode_sentier_seulement(self):
+        payload = grid_payload(dangerous_row=4, dangerous_tags={"highway": "path", "informal": "yes"})
+        assert len(build_graph(payload).edges) == 127
+        assert len(build_graph(payload, allow_trail=True).edges) == 144
+
     def test_snapping(self, grid, grid_center):
         graph = build_graph(grid)
         node = graph.nearest_node(*grid_center)
