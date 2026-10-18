@@ -108,6 +108,10 @@ class Instruction:
     lon: float
     lat: float
     caution: bool  # traversée non protégée au même endroit
+    # Les caps d'arrivée et de départ : de quoi mesurer l'angle net d'une
+    # fusion (voir `_merge_close`). Ils ne sortent pas du moteur.
+    before: float = 0.0
+    after: float = 0.0
 
 
 def build_instructions(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
@@ -304,6 +308,8 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
                         lon=round(lon, 6),
                         lat=round(lat, 6),
                         caution=(round(lon, 6), round(lat, 6)) in unprotected,
+                        before=out_bearing,
+                        after=in_bearing,
                     )
                 )
 
@@ -389,6 +395,10 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
     **C'est vraiment une chicane.** Deux manœuvres opposées qui ne se
     compensent pas — un décrochement, une place à traverser — gardent leurs
     deux temps : « tourne à gauche puis tout de suite à droite ».
+
+    Un « tout droit » proche d'un virage n'est pas une seconde manœuvre : il
+    nomme la voie où le virage mène. « Tourne à droite », puis vingt mètres plus
+    loin « Continue tout droit sur Passerelle du Collège », se dit en une fois.
     """
     if len(steps) < 2:
         return steps
@@ -401,13 +411,21 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
         proches = (
             following is not None
             and following.dist_m - current.dist_m <= MERGE_DISTANCE_M
-            and current.turn not in {"straight"}
-            and following.turn not in {"straight"}
         )
         if proches:
-            somme = current.angle + following.angle
+            # **L'angle net : du cap d'arrivée au premier point au cap de départ
+            # du second.** La somme des deux angles annoncés oubliait les
+            # inflexions tues entre les deux — les bouts de trottoir d'un mètre
+            # qui encadrent une traversée — et ne repassait pas dans ±180°.
+            # Montée du Lieutenant Allouche, à Lyon, un virage à gauche (−93°)
+            # sortait en « fais demi-tour » (−173°) ; passage Ménestrier, trois
+            # écarts du même côté faisaient −359,5° : un « demi-tour » sur une
+            # ligne qui continue (−1°).
+            somme = (following.after - current.before + 180.0) % 360.0 - 180.0
+            tourne = current.turn != "straight" and following.turn != "straight"
             oppose = (current.angle > 0) != (following.angle > 0)
-            if oppose and abs(somme) < SLIGHT_DEG:
+            caps = {"before": current.before, "after": following.after}
+            if tourne and abs(somme) < SLIGHT_DEG:
                 # La rue ondule : les deux écarts disparaissent ensemble. La
                 # prudence, elle, ne disparaît pas — une traversée non protégée
                 # signalée sur l'un des deux points reste dite.
@@ -422,12 +440,14 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
                             lon=current.lon,
                             lat=current.lat,
                             caution=True,
+                            **caps,
                         )
                     )
                 i += 2
                 continue
-            if not oppose:
-                # Un seul virage, coupé en deux par un point de forme.
+            if not tourne or not oppose:
+                # Un seul virage, coupé en deux par un point de forme — ou nommé
+                # par le « tout droit » qui le suit.
                 turn = _classify(somme)
                 current = Instruction(
                     dist_m=current.dist_m,
@@ -438,6 +458,7 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
                     lon=current.lon,
                     lat=current.lat,
                     caution=current.caution or following.caution,
+                    **caps,
                 )
             else:
                 current = Instruction(
@@ -452,6 +473,7 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
                     lon=current.lon,
                     lat=current.lat,
                     caution=current.caution or following.caution,
+                    **caps,
                 )
             i += 2
         else:
