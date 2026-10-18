@@ -221,6 +221,21 @@
   font-size: 12px;
   color: var(--text-2);
 }
+/* « Rentrer au départ » : dans le bandeau de pause, à droite — on abandonne à
+   l'arrêt, jamais d'un appui de travers en courant. */
+.live__home {
+  flex: none;
+  margin-left: auto;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.live__home:disabled {
+  opacity: 0.6;
+}
 
 /* La carte suivie a été déplacée à la main : ce bouton la reprend. En haut et
    au centre, là où le pouce le trouve sans chercher, loin du panneau. */

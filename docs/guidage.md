@@ -64,6 +64,13 @@ plus : à Paris, il y a une fontaine tous les deux cents mètres.
 du tracé. Un point aberrant est banal entre deux immeubles ; trois de suite,
 non. Le retour sur le tracé est annoncé aussi.
 
+**Rentrer au départ** se propose en pause, à côté de « Terminer » : une
+blessure, un orage, la nuit qui tombe, et la distance prévue ne compte plus. La
+fin de la boucle est remplacée par le plus court chemin *sûr* jusqu'à la porte —
+calculé sur le téléphone, avec les rues déjà chargées et le profil de la boucle,
+rues signalées évitées (`engine/reroute.js`) —, puis guidée à la voix comme un
+recalcul. Sans chemin, l'app le dit et garde la boucle.
+
 **L'alerte de traversée** prévient 120 m avant chaque passage non protégé, avec
 vibration.
 
