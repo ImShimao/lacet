@@ -77,6 +77,21 @@ export function isExcluded(tags, { allowTrail = false, sport = 'run' } = {}) {
   if (tags.route === 'ferry') return 'route=ferry'
   if (tunnelIsUnprotected(tags)) return 'tunnel sans trottoir'
   if (!allowTrail && has(SAC_FORBIDDEN, tags.sac_scale)) return `sac_scale=${tags.sac_scale}`
+
+  // Chemins disparus, dans tous les modes ; mal tracés, hors mode Sentier.
+  // Exclus plutôt que pénalisés : voir la mesure dans `exclusion.py`.
+  for (const state of ['abandoned', 'disused']) {
+    if (tags[state] === 'yes' || tags[`${state}:highway`] === highway) return state
+  }
+  if (tags.trail_visibility === 'horrible' || tags.trail_visibility === 'no') {
+    return `trail_visibility=${tags.trail_visibility}`
+  }
+  if (tags.smoothness === 'impassable' && (sport === 'bike' || !allowTrail)) return 'smoothness=impassable'
+  if (!allowTrail) {
+    if (tags.trail_visibility === 'bad') return 'trail_visibility=bad'
+    if (tags.informal === 'yes') return 'informal=yes'
+  }
+
   if (tags.highway === 'road' && tags.area === 'yes') return 'surface indéfinie'
   return null
 }
