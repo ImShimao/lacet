@@ -1,0 +1,52 @@
+feature,area,priority,original,clone,notes
+Boucle depuis la position à une distance donnée,génération,must,yes,yes,tous les générateurs
+Distance ou durée avec allure,génération,must,yes,yes,RunnrZ et Roovr ; Lacet Distance/Durée + min/km
+Plusieurs propositions par recherche,génération,must,yes,yes,RunnrZ 5 (50 payant) ; Strava 3 ; Lacet 3 à 12
+Régénérer d'autres boucles,génération,must,yes,yes,Roovr RunGen Routeshuffle ; Lacet tourne les polygones au nombre d'or
+Terrain route / mixte / sentier,génération,must,yes,yes,Roovr RunnrZ Komoot
+Préférence plat / vallonné / côtes,génération,must,yes,yes,Roovr Strava ; absent chez RunnrZ (3 avis le réclament)
+Départ depuis une adresse ou un point posé,génération,must,yes,yes,RunnrZ Roovr Strava
+Vraie boucle contrôlée par sa forme (pas d'aller-retour),génération,must,yes,yes,les autres ne contrôlent pas la rondeur ; avis Footpath et Komoot sur les allers-retours
+Choisir la direction de départ,génération,should,yes,no,Roovr N…NO + Auto ; Garmin direction de départ
+Passer par un point (parc ou fontaine),génération,should,yes,no,RunnrZ 2.3 Apple Plans Komoot Footpath ; avis Trail Router et Footpath
+D+ visé chiffré,génération,should,no,no,demandé chez RunnrZ (« on ne peut pas demander un D+ ») ; Lacet a trois fourchettes
+Écarter les chemins fantômes (trail_visibility abandoned),génération,should,no,partial,20 avis sur 5 apps ; Lacet exclut déjà access=private et portails fermés
+Distance exacte (semi au mètre),génération,should,no,yes,avis Trail Router : distances fausses et pas de décimales
+Départ devant la porte et côté de rue,génération,could,no,yes,propre à Lacet (door.js)
+Tours répétés quand la boucle est impossible,génération,could,no,yes,propre à Lacet
+Retour vent dans le dos,génération,could,no,yes,propre à Lacet
+Zones à éviter dessinées sur la carte,génération,could,yes,partial,RunnrZ 2.3 ; Lacet : signalements ponctuels de 25 m
+Aller-retour ou point à point,génération,could,yes,no,Apple Plans Strava Trail Router ; hors de la promesse « boucle »
+Tracer à la main,génération,could,yes,no,Footpath Strava Komoot ; hors du cœur
+Popularité / heatmap,génération,could,yes,skip,Strava Garmin Komoot : données d'activités propriétaires
+Note de sécurité par boucle,sécurité,must,yes,yes,Walkable 0–100 et SafeRoute notent sans générer ; aucun générateur ne note
+Voies rapides et routes exposées retirées,sécurité,must,no,yes,36 avis (6 apps) sur des grands axes sans trottoir
+Rues éclairées la nuit,sécurité,should,yes,yes,Trail Router SafeRoute Walkable ; heatmap nuit Strava
+Alerte avant une traversée non protégée,sécurité,should,no,yes,propre à Lacet
+Bouton SOS par SMS,sécurité,should,yes,yes,RunnrZ LIT Run
+Prévenir un proche au départ et à l'arrivée,sécurité,should,yes,no,LIT Run (arrivée notifiée) Komoot (contacts) ; sans serveur : SMS préparé
+Suivi en direct par un proche,sécurité,could,yes,no,Strava Beacon Garmin LiveTrack LIT Run ; demande un serveur
+Alerte silencieuse,sécurité,could,yes,no,LIT Run double-tap
+Signaler un passage fermé et recalculer,sécurité,must,yes,yes,RunnrZ signale sans recalculer (avis 2.4.1) ; Lacet écarte le point et recalcule
+Guidage vocal pas à pas,guidage,must,yes,yes,RunnrZ RunGo Trail Router Komoot
+Voix écran verrouillé et musique baissée,guidage,must,yes,yes,RunGo ; avis : voix qui se tait écran verrouillé
+Recalcul hors parcours,guidage,must,yes,yes,RunnrZ 2.4 Trail Router Komoot ; RunGo non
+Recalcul qui tient la distance,guidage,should,no,yes,propre à Lacet
+Rentrer au départ maintenant,guidage,should,yes,no,RunnrZ 2.4 « parcours retour » ; avis Footpath (« huge safety flaw »)
+Contresens détecté,guidage,could,no,yes,propre à Lacet
+Écran de verrouillage et Dynamic Island,guidage,should,yes,yes,Komoot widget (avis : il se fige)
+Réglages de la voix,guidage,should,yes,partial,RunnrZ 2.4 personnalisable ; Lacet : marche/arrêt et annonces km
+Sorties de rond-point comptées (vélo),guidage,could,yes,no,Komoot (avis : compte mal) ; à pied sans objet
+Notes vocales posées sur le tracé,guidage,could,yes,no,RunGo
+Profil et sécurité sur le même axe,interface,should,yes,yes,Komoot superpose surfaces et profil ; Lacet superpose sécurité
+Répartition des surfaces en %,interface,should,yes,yes,Roovr Komoot
+Aperçu 3D / survol de la boucle,interface,could,yes,no,Roovr (cité dans 1 avis sur 4) Footpath
+Sans compte,interface,must,yes,yes,Roovr Trail Router ; RunnrZ exige une connexion (4 avis de connexion ratée)
+Hors ligne : rues et fond de carte,sortie,must,yes,yes,RunnrZ « erreur réseau » ; AllTrails plante hors ligne
+Export GPX,sortie,must,yes,yes,RunnrZ l'a rendu payant en 2026
+Points d'eau et toilettes,sortie,should,yes,yes,Strava POI 2025
+Historique et totaux mensuels,sortie,should,yes,yes,RunnrZ par activité et mois
+Apple Watch,sortie,could,yes,no,Strava Komoot RunGo ; 47 mentions sur 6 apps ; watchOS natif + AltStore
+Boucle pour une séance (fractionné sur ligne droite plate),génération,could,no,no,personne ne le fait (recherche du 2026-10-18)
+Synchro directe Strava,sortie,could,yes,skip,Roovr ; retirée de Lacet en octobre 2026
+Apple Santé,sortie,could,yes,skip,RunnrZ ; AltStore n'active pas HealthKit
