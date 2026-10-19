@@ -281,6 +281,50 @@ describe('la sortie guidée', () => {
     expect(dit.some((d) => d.startsWith("Tu t'es écarté"))).toBe(false)
   })
 
+  it('ne répète pas « pas de chemin de retour » à chaque essai', async () => {
+    // Cinq minutes hors du tracé, sans chemin de retour : l'essai revenait
+    // toutes les trente secondes, et la phrase avec lui — plus de soixante
+    // fois de suite dans `LiveRun.voice.test.jsx`. Une voix qui radote, on la
+    // coupe, et avec elle le prochain virage.
+    const { detourOnDevice } = await import('./engine/client')
+    const voice = await import('./voice')
+    detourOnDevice.mockReset()
+    detourOnDevice.mockResolvedValue(null)
+    voice.speak.mockClear()
+    vi.useFakeTimers()
+    try {
+      render(
+        <LiveRun route={boucle} request={{ lat: 47.9, lon: 7.2 }} sport="run" stage={null} onPosition={() => {}} onStop={vi.fn()} />,
+      )
+      const [lon, lat] = geometry[0]
+      const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
+      // Cent mètres au sud du carré, en allant et venant sur soixante mètres.
+      const auSud = (k) => [lon + (15 * Math.abs((k % 8) - 4)) / kx, lat - 100 / 110_540]
+      let t = Date.now()
+      const pas = async (point) => {
+        await act(async () => vi.advanceTimersByTimeAsync(5000))
+        t += 5000
+        await relever(point, t)
+      }
+      const sansChemin = () => voice.speak.mock.calls.filter(([d]) => d.startsWith('Pas de chemin de retour')).length
+
+      await relever(geometry[0], t)
+      for (let k = 0; k < 60; k += 1) await pas(auSud(k))
+      // Les essais continuent — on aura bougé —, mais la phrase n'est dite qu'une fois.
+      expect(detourOnDevice.mock.calls.length).toBeGreaterThanOrEqual(5)
+      expect(sansChemin()).toBe(1)
+
+      // Revenu sur le tracé puis reparti : c'est un autre écart, qui se dit.
+      await pas(geometry[1])
+      expect(voice.speak.mock.calls.map(([d]) => d)).toContain('Te revoilà sur le parcours.')
+      for (let k = 0; k < 12; k += 1) await pas(auSud(k))
+      expect(sansChemin()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+      detourOnDevice.mockReset()
+    }
+  })
+
   it('propose de signaler un passage fermé quand on rebrousse chemin', async () => {
     // Le portail fermé au bout de soixante mètres : on fait demi-tour sur le
     // tracé lui-même. Ce n'était pas « hors parcours », et l'app ne disait rien.

@@ -67,7 +67,11 @@ plus : à Paris, il y a une fontaine tous les deux cents mètres.
 
 **Le hors-parcours** se signale après trois relevés consécutifs à plus de 45 m
 du tracé. Un point aberrant est banal entre deux immeubles ; trois de suite,
-non. Le retour sur le tracé est annoncé aussi.
+non. Le retour sur le tracé est annoncé aussi. Vingt secondes plus tard, un
+nouveau chemin se calcule ; s'il n'y en a pas, l'app le dit **une fois** et
+réessaie toutes les trente secondes en silence, le compte à rebours à l'écran —
+redite à chaque essai, la phrase revenait des dizaines de fois à qui continuait
+hors du tracé.
 
 **Rentrer au départ** se propose en pause, à côté de « Terminer » : une
 blessure, un orage, la nuit qui tombe, et la distance prévue ne compte plus. La
