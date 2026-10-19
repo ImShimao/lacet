@@ -102,7 +102,14 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 
 ## Réglages
 
-`backend/.env` (copie `.env.example`) :
+Dans l'app, **Mon compte › Recherche** choisit les **filtres affichés** : une
+case par filtre (Activité, Terrain, Dénivelé, Direction, Sécurité, Éviter). La
+longueur et l'allure restent toujours. Un filtre masqué revient à sa valeur par
+défaut, écrite sous la case — sauf l'activité, qui garde la sienne. **Pendant la
+sortie › Écran** laisse l'écran se mettre en veille (téléphone au brassard) au
+lieu de rester allumé.
+
+Côté moteur Python, `backend/.env` (copie `.env.example`) :
 
 | Variable | Défaut | Rôle |
 |---|---|---|

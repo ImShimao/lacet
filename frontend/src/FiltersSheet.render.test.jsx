@@ -127,4 +127,22 @@ describe('le panneau des filtres', () => {
     // moteur, quoi qu'on affiche.
     expect(screen.queryByRole('button', { name: 'min/km' })).not.toBeInTheDocument()
   })
+
+  it('n’affiche pas un filtre masqué dans les réglages, mais garde la longueur', () => {
+    ouvrir({ ...DEFAULTS, hiddenFilters: ['terrain', 'direction'] })
+    expect(screen.queryByText('Terrain')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Nord-est' })).not.toBeInTheDocument()
+    // Les essentiels et les autres filtres restent.
+    expect(screen.getByText('Longueur')).toBeInTheDocument()
+    expect(screen.getByText('Allure')).toBeInTheDocument()
+    expect(screen.getByText('Dénivelé')).toBeInTheDocument()
+  })
+
+  it('réinitialise les filtres sans réafficher ceux qu’on a masqués', () => {
+    const { onApply } = ouvrir({ ...DEFAULTS, hiddenFilters: ['avoid'], count: 12, surface: 'trail' })
+    fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    // Le nombre de propositions se règle dans « Mon compte » : il reste aussi.
+    expect(onApply.mock.calls[0][0]).toMatchObject({ hiddenFilters: ['avoid'], count: 12, surface: 'mixed' })
+  })
 })

@@ -18,7 +18,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
+import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
@@ -172,7 +172,15 @@ function summaryOf(key, { params, poiPrefs }) {
       return `Poids ${params.weight_kg || 70} kg`
     case 'search': {
       const moment = MOMENTS.find((m) => m.key === (params.time_of_day ?? 'auto'))?.label ?? 'Auto'
-      return `Moment ${moment.toLowerCase()} · ${params.count ?? 5} boucles proposées`
+      const hidden = params.hiddenFilters?.length ?? 0
+      return [
+        `Moment ${moment.toLowerCase()}`,
+        // « proposées » tombe quand un filtre est masqué : la ligne débordait.
+        `${params.count ?? 5} boucles${hidden ? '' : ' proposées'}`,
+        hidden ? `${hidden} filtre${hidden > 1 ? 's' : ''} masqué${hidden > 1 ? 's' : ''}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'run': {
       const stops = Object.entries(KINDS)
@@ -236,6 +244,10 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
         <>
           <h3 className="section">Pause automatique</h3>
           <AutoPauseSetting />
+          {/* L'écran verrouillé était rangé sous « Pause automatique », avec
+              laquelle il n'a rien à voir. */}
+          <h3 className="section">Écran</h3>
+          <ScreenOnSetting />
           <LockScreenSetting />
           <h3 className="section">Voix</h3>
           <VoiceSetting />
@@ -416,8 +428,7 @@ function SearchSettings({ params, onProfile }) {
         />
         <p className="field__hint">
           La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
-          quand ils raccourcissent. « Auto » compare l'heure du calcul au coucher du
-          soleil, calculé pour le point de départ et pour aujourd'hui.
+          quand ils rallongent. « Auto » choisit selon l'heure du coucher du soleil au départ.
         </p>
       </div>
 
@@ -433,6 +444,65 @@ function SearchSettings({ params, onProfile }) {
           le calcul, et les dernières se ressemblent davantage.
         </p>
       </div>
+
+      <ShownFilters params={params} onProfile={onProfile} />
+    </div>
+  )
+}
+
+/**
+ * Les filtres qu'on veut voir dans le panneau, une case par filtre.
+ *
+ * Décocher remet le filtre à sa valeur par défaut, et la case le dit : un
+ * réglage qu'on ne voit plus ne doit pas continuer d'agir en douce (voir
+ * `OPTIONAL_FILTERS`). La longueur et l'allure sont cochées pour de bon.
+ */
+function ShownFilters({ params, onProfile }) {
+  const hidden = params.hiddenFilters ?? []
+  const toggle = (f) =>
+    onProfile(
+      hidden.includes(f.key)
+        ? { hiddenFilters: hidden.filter((k) => k !== f.key) }
+        : { hiddenFilters: [...hidden, f.key], ...f.reset },
+    )
+  return (
+    <div className="field">
+      <span className="label">Filtres affichés</span>
+      <div className="checks">
+        <button role="checkbox" aria-checked="true" className="check check--on" disabled>
+          <span className="check__box">
+            <Icon name="check" size={13} />
+          </span>
+          <span>
+            Longueur et allure
+            <em>Toujours affichées : sans elles, pas de recherche.</em>
+          </span>
+        </button>
+        {OPTIONAL_FILTERS.map((f) => {
+          const on = !hidden.includes(f.key)
+          return (
+            <button
+              key={f.key}
+              role="checkbox"
+              aria-checked={on}
+              className={`check ${on ? 'check--on' : ''}`}
+              onClick={() => toggle(f)}
+            >
+              <span className="check__box">
+                <Icon name="check" size={13} />
+              </span>
+              <span>
+                {f.label}
+                <em>{on ? f.hint : `Masqué. ${f.fixed}`}</em>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="field__hint">
+        Décoche ce que tu ne changes jamais : le panneau Filtres raccourcit d'autant. Un filtre
+        masqué revient à son réglage par défaut, écrit sous son nom.
+      </p>
     </div>
   )
 }
@@ -702,6 +772,44 @@ function AutoPauseSetting() {
         {on
           ? "Le chrono et la distance s'arrêtent quand tu t'arrêtes — à un feu, pour boire — et repartent dès que tu repars. Marcher, même lentement en côte, ne met pas en pause."
           : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
+      </p>
+    </>
+  )
+}
+
+/**
+ * L'écran reste allumé pendant une sortie, par défaut : c'est la carte qu'on
+ * suit. Mais le téléphone au brassard ou dans la poche n'est jamais regardé, et
+ * l'écran allumé une heure et demie vide la batterie bien avant la fin d'une
+ * sortie longue. Éteint, la voix et l'écran verrouillé guident quand même.
+ * Lu au départ d'une sortie (`LiveRun.jsx`).
+ */
+function ScreenOnSetting() {
+  const [on, setOn] = useState(() => load().keepScreenOn !== false)
+  return (
+    <>
+      <div className="seg" role="radiogroup" aria-label="Écran allumé pendant la sortie">
+        {[
+          [true, 'Toujours allumé'],
+          [false, 'Veille normale'],
+        ].map(([value, label]) => (
+          <button
+            key={String(value)}
+            role="radio"
+            aria-checked={on === value}
+            onClick={() => {
+              setOn(value)
+              save({ keepScreenOn: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {on
+          ? "L'écran ne s'éteint pas pendant la sortie : la carte reste sous les yeux, au prix de la batterie."
+          : "L'écran s'éteint comme d'habitude : la voix et l'écran verrouillé continuent de guider. Le bon choix pour un téléphone au brassard ou dans la poche."}
       </p>
     </>
   )

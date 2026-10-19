@@ -327,9 +327,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     }
   }, [])
 
-  // Garder l'écran allumé pendant la sortie.
+  // Garder l'écran allumé pendant la sortie, sauf si on a choisi la veille
+  // normale dans « Mon compte » (téléphone au brassard, batterie à garder).
   useEffect(() => {
-    if (!isNative()) return undefined
+    if (!isNative() || load().keepScreenOn === false) return undefined
     const native = import('./native')
     native.then((n) => n.keepScreenOn())
     return () => {

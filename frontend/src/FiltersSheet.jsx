@@ -157,7 +157,68 @@ export const DEFAULTS = {
   direction: 'auto',
   // Sert seulement à estimer les calories d'une sortie (onglet compte).
   weight_kg: 70,
+  // Les filtres retirés du panneau (`OPTIONAL_FILTERS`). Vide : tout s'affiche,
+  // comme avant que le choix existe.
+  hiddenFilters: [],
 }
+
+/**
+ * Les filtres qu'on peut retirer du panneau, depuis « Mon compte › Recherche ».
+ *
+ * Qui court toujours sur la route, sans jamais toucher au cap, fait défiler
+ * Terrain et Direction à chaque sortie pour atteindre « Rechercher ». La
+ * longueur et l'allure ne sont pas dans la liste : sans elles, aucune
+ * recherche n'a de sens.
+ *
+ * Un filtre masqué revient à sa valeur par défaut (`reset`), et la case le dit
+ * (`fixed`). Le garder sur la valeur choisie avant de le masquer, c'était
+ * chercher des boucles « Sentier » sans plus jamais voir le mot nulle part.
+ * Seule l'activité garde la sienne : un cycliste qui masque le choix veut rester
+ * à vélo, et le bouton Filtres le dit en km/h.
+ */
+export const OPTIONAL_FILTERS = [
+  { key: 'sport', label: 'Activité', hint: 'Course ou vélo.', fixed: "L'activité du moment est gardée." },
+  {
+    key: 'terrain',
+    label: 'Terrain',
+    hint: 'Route, mixte ou sentier, et les voies sans voitures.',
+    fixed: 'Mixte, voies sans voitures d’abord.',
+    reset: { surface: DEFAULTS.surface, carfree: DEFAULTS.carfree },
+  },
+  {
+    key: 'relief',
+    label: 'Dénivelé',
+    hint: 'Plat, vallonné, côtes, ou un D+ précis.',
+    fixed: 'Vallonné.',
+    reset: { elevation: DEFAULTS.elevation, climb_m: null },
+  },
+  {
+    key: 'direction',
+    label: 'Direction',
+    hint: 'Le côté du départ où partir.',
+    fixed: 'Auto.',
+    reset: { direction: DEFAULTS.direction },
+  },
+  {
+    key: 'safety',
+    label: 'Sécurité',
+    hint: 'Sûr, ou montrer aussi les boucles exposées.',
+    fixed: 'Sûr.',
+    reset: { safety: DEFAULTS.safety },
+  },
+  {
+    key: 'avoid',
+    label: 'Éviter',
+    hint: 'Escaliers, rues non éclairées.',
+    fixed: 'Rien n’est évité.',
+    reset: { avoid: [] },
+  },
+]
+
+// Ce que « Réinitialiser » ne touche pas : ce qui se règle dans « Mon compte »,
+// pas dans ce panneau. Il remettait à 5 les douze propositions choisies là-bas,
+// et aurait réaffiché les filtres masqués.
+const KEPT_ON_RESET = ['sport', 'weight_kg', 'time_of_day', 'count', 'hiddenFilters']
 
 /**
  * Pas d'incrément de la distance.
@@ -209,6 +270,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   const maxKm = MAX_KM[draft.sport]
   const km = draft.mode === 'distance' ? draft.distance_km : estimateKm(draft)
   const climbing = draft.climb_m != null
+  const shown = (key) => !(draft.hiddenFilters ?? []).includes(key)
 
   return (
     <div className="modal" onClick={onClose}>
@@ -226,35 +288,39 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           <h2>Filtres</h2>
           <button
             className="modal__reset"
-            onClick={() => setDraft({ ...DEFAULTS, sport: draft.sport })}
+            onClick={() =>
+              setDraft({ ...DEFAULTS, ...Object.fromEntries(KEPT_ON_RESET.map((k) => [k, draft[k] ?? DEFAULTS[k]])) })
+            }
           >
             Réinitialiser
           </button>
         </div>
 
         <div className="modal__body">
-          <Field label="Activité" info="sport" sport={draft.sport}>
-            <div className="tiles">
-              {SPORTS.map((s) => (
-                <Tile
-                  key={s.key}
-                  label={s.label}
-                  icon={s.icon}
-                  on={draft.sport === s.key}
-                  // Le focus d'ouverture tombe sur l'activité choisie, pas sur
-                  // « Réinitialiser », premier bouton dans l'ordre du document.
-                  focusFirst={draft.sport === s.key}
-                  onClick={() =>
-                    set({
-                      sport: s.key,
-                      speedUnit: s.key === 'bike' ? 'speed' : 'pace',
-                      distance_km: Math.min(draft.distance_km, MAX_KM[s.key]),
-                    })
-                  }
-                />
-              ))}
-            </div>
-          </Field>
+          {shown('sport') && (
+            <Field label="Activité" info="sport" sport={draft.sport}>
+              <div className="tiles">
+                {SPORTS.map((s) => (
+                  <Tile
+                    key={s.key}
+                    label={s.label}
+                    icon={s.icon}
+                    on={draft.sport === s.key}
+                    // Le focus d'ouverture tombe sur l'activité choisie, pas sur
+                    // « Réinitialiser », premier bouton dans l'ordre du document.
+                    focusFirst={draft.sport === s.key}
+                    onClick={() =>
+                      set({
+                        sport: s.key,
+                        speedUnit: s.key === 'bike' ? 'speed' : 'pace',
+                        distance_km: Math.min(draft.distance_km, MAX_KM[s.key]),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </Field>
+          )}
 
           <Field label="Longueur">
             <Segmented
@@ -416,158 +482,168 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </div>
           </Field>
 
-          <Field label="Terrain" info="terrain" sport={draft.sport}>
-            <div className="tiles">
-              {TERRAINS[draft.sport].map((t) => (
-                <Tile
-                  key={t.key}
-                  label={t.label}
-                  icon={t.icon}
-                  on={draft.surface === t.key}
-                  onClick={() => set({ surface: t.key })}
-                />
-              ))}
-            </div>
-            {/* Absent des réglages d'avant : coché, comme par défaut. */}
-            <div className="checks checks--after">
-              <button
-                role="checkbox"
-                aria-checked={draft.carfree !== false}
-                className={`check ${draft.carfree !== false ? 'check--on' : ''}`}
-                onClick={() => set({ carfree: draft.carfree === false })}
-              >
-                <span className="check__box">
-                  <Icon name="check" size={13} />
-                </span>
-                <span>
-                  Voies sans voitures d'abord
-                  <em>Pistes, chemins et allées ; la route quand il le faut</em>
-                </span>
-              </button>
-            </div>
-          </Field>
+          {shown('terrain') && (
+            <Field label="Terrain" info="terrain" sport={draft.sport}>
+              <div className="tiles">
+                {TERRAINS[draft.sport].map((t) => (
+                  <Tile
+                    key={t.key}
+                    label={t.label}
+                    icon={t.icon}
+                    on={draft.surface === t.key}
+                    onClick={() => set({ surface: t.key })}
+                  />
+                ))}
+              </div>
+              {/* Absent des réglages d'avant : coché, comme par défaut. */}
+              <div className="checks checks--after">
+                <button
+                  role="checkbox"
+                  aria-checked={draft.carfree !== false}
+                  className={`check ${draft.carfree !== false ? 'check--on' : ''}`}
+                  onClick={() => set({ carfree: draft.carfree === false })}
+                >
+                  <span className="check__box">
+                    <Icon name="check" size={13} />
+                  </span>
+                  <span>
+                    Voies sans voitures d'abord
+                    <em>Pistes, chemins et allées ; la route quand il le faut</em>
+                  </span>
+                </button>
+              </div>
+            </Field>
+          )}
 
-          <Field label="Dénivelé" info="relief" sport={draft.sport}>
-            <div className="tiles">
-              {RELIEFS.map((r) => (
-                <Tile
-                  key={r.key}
-                  label={r.label}
-                  icon={r.icon}
-                  on={!climbing && draft.elevation === r.key}
-                  onClick={() => set({ elevation: r.key, climb_m: null })}
-                />
-              ))}
-            </div>
-            {/* « On ne peut pas demander un D+ en particulier » : la plainte
-                revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
-                (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
-                cible de Vallonné. */}
-            <div className="checks checks--after">
-              <button
-                role="checkbox"
-                aria-checked={climbing}
-                className={`check ${climbing ? 'check--on' : ''}`}
-                onClick={() => set({ climb_m: climbing ? null : Math.max(10, Math.round(km) * 10) })}
-              >
-                <span className="check__box">
-                  <Icon name="check" size={13} />
-                </span>
-                <span>
-                  Un D+ précis
-                  <em>« Environ 150 m », plutôt que les trois réglages</em>
-                </span>
-              </button>
-            </div>
-            {climbing && (
-              <>
-                <Stepper
-                  text={`${draft.climb_m} m de D+`}
-                  editable={{
-                    value: draft.climb_m,
-                    onCommit: (v) => set({ climb_m: Math.round(clamp(v, 0, MAX_CLIMB)) }),
-                  }}
-                  onStep={(d) => {
-                    const step = climbStep(draft.climb_m + (d > 0 ? 0 : -0.001))
-                    set({ climb_m: round(clamp(draft.climb_m + d * step, 0, MAX_CLIMB), step) })
-                  }}
-                  canDown={draft.climb_m > 0}
-                  canUp={draft.climb_m < MAX_CLIMB}
-                />
-                <p className="field__hint">
-                  {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
-                    draft.climb_m,
-                    km,
-                  )
-                    .map(Math.round)
-                    .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
-                </p>
-              </>
-            )}
-          </Field>
+          {shown('relief') && (
+            <Field label="Dénivelé" info="relief" sport={draft.sport}>
+              <div className="tiles">
+                {RELIEFS.map((r) => (
+                  <Tile
+                    key={r.key}
+                    label={r.label}
+                    icon={r.icon}
+                    on={!climbing && draft.elevation === r.key}
+                    onClick={() => set({ elevation: r.key, climb_m: null })}
+                  />
+                ))}
+              </div>
+              {/* « On ne peut pas demander un D+ en particulier » : la plainte
+                  revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
+                  (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
+                  cible de Vallonné. */}
+              <div className="checks checks--after">
+                <button
+                  role="checkbox"
+                  aria-checked={climbing}
+                  className={`check ${climbing ? 'check--on' : ''}`}
+                  onClick={() => set({ climb_m: climbing ? null : Math.max(10, Math.round(km) * 10) })}
+                >
+                  <span className="check__box">
+                    <Icon name="check" size={13} />
+                  </span>
+                  <span>
+                    Un D+ précis
+                    <em>« Environ 150 m », plutôt que les trois réglages</em>
+                  </span>
+                </button>
+              </div>
+              {climbing && (
+                <>
+                  <Stepper
+                    text={`${draft.climb_m} m de D+`}
+                    editable={{
+                      value: draft.climb_m,
+                      onCommit: (v) => set({ climb_m: Math.round(clamp(v, 0, MAX_CLIMB)) }),
+                    }}
+                    onStep={(d) => {
+                      const step = climbStep(draft.climb_m + (d > 0 ? 0 : -0.001))
+                      set({ climb_m: round(clamp(draft.climb_m + d * step, 0, MAX_CLIMB), step) })
+                    }}
+                    canDown={draft.climb_m > 0}
+                    canUp={draft.climb_m < MAX_CLIMB}
+                  />
+                  <p className="field__hint">
+                    {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
+                      draft.climb_m,
+                      km,
+                    )
+                      .map(Math.round)
+                      .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
+                  </p>
+                </>
+              )}
+            </Field>
+          )}
 
-          <Field label="Direction">
-            {/* Neuf choix sur une ligne : serrés, ils tiennent à 390 px. */}
-            <div className="directions">
+          {shown('direction') && (
+            <Field label="Direction">
+              {/* Neuf choix sur une ligne : serrés, ils tiennent à 390 px. */}
+              <div className="directions">
+                <Segmented
+                  options={DIRECTIONS}
+                  value={directionOf(draft.direction)?.key ?? 'auto'}
+                  onChange={(direction) => set({ direction })}
+                />
+              </div>
+              <p className="field__hint">
+                {directionOf(draft.direction)
+                  ? `Les boucles partent ${directionOf(draft.direction).toward} : leur centre tombe à moins de 45° de ce cap. S'il n'y en a aucune de sûre de ce côté, Lacet le dit et propose les autres.`
+                  : // « Tout autour » promettait trop : à Guebwiller, les boucles du
+                    // nord et de l'ouest montent dans les Vosges, et le dénivelé
+                    // demandé les fait passer après celles de la plaine.
+                    'Les boucles se répartissent autour du départ, du côté où le dénivelé demandé se trouve. Choisis un cap pour partir ailleurs.'}
+              </p>
+            </Field>
+          )}
+
+          {shown('safety') && (
+            <Field label="Sécurité" info="safety" sport={draft.sport}>
               <Segmented
-                options={DIRECTIONS}
-                value={directionOf(draft.direction)?.key ?? 'auto'}
-                onChange={(direction) => set({ direction })}
+                options={SAFETY}
+                value={draft.safety}
+                onChange={(safety) => set({ safety })}
               />
-            </div>
-            <p className="field__hint">
-              {directionOf(draft.direction)
-                ? `Les boucles partent ${directionOf(draft.direction).toward} : leur centre tombe à moins de 45° de ce cap. S'il n'y en a aucune de sûre de ce côté, Lacet le dit et propose les autres.`
-                : // « Tout autour » promettait trop : à Guebwiller, les boucles du
-                  // nord et de l'ouest montent dans les Vosges, et le dénivelé
-                  // demandé les fait passer après celles de la plaine.
-                  'Les boucles se répartissent autour du départ, du côté où le dénivelé demandé se trouve. Choisis un cap pour partir ailleurs.'}
-            </p>
-          </Field>
+              <p className="field__hint">
+                {draft.safety === 'safe'
+                  ? "Contourne chaque bout de route à 80 km/h ou plus sans trottoir ni accotement, et écarte les boucles qui en gardent ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
+                  : 'Montre aussi les itinéraires exposés, avec le détail des portions concernées.'}
+              </p>
+            </Field>
+          )}
 
-          <Field label="Sécurité" info="safety" sport={draft.sport}>
-            <Segmented
-              options={SAFETY}
-              value={draft.safety}
-              onChange={(safety) => set({ safety })}
-            />
-            <p className="field__hint">
-              {draft.safety === 'safe'
-                ? "Contourne chaque bout de route à 80 km/h ou plus sans trottoir ni accotement, et écarte les boucles qui en gardent ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
-                : 'Montre aussi les itinéraires exposés, avec le détail des portions concernées.'}
-            </p>
-          </Field>
-
-          <Field label="Éviter" info="avoid" sport={draft.sport}>
-            <div className="checks">
-              {AVOIDABLE.filter((a) => !a.sport || a.sport === draft.sport).map((a) => {
-                const on = (draft.avoid || []).includes(a.key)
-                return (
-                  <button
-                    key={a.key}
-                    role="checkbox"
-                    aria-checked={on}
-                    className={`check ${on ? 'check--on' : ''}`}
-                    onClick={() =>
-                      set({
-                        avoid: on
-                          ? draft.avoid.filter((k) => k !== a.key)
-                          : [...(draft.avoid || []), a.key],
-                      })
-                    }
-                  >
-                    <span className="check__box">
-                      <Icon name="check" size={13} />
-                    </span>
-                    <span>
-                      {a.label}
-                      <em>{a.hint}</em>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </Field>
+          {shown('avoid') && (
+            <Field label="Éviter" info="avoid" sport={draft.sport}>
+              <div className="checks">
+                {AVOIDABLE.filter((a) => !a.sport || a.sport === draft.sport).map((a) => {
+                  const on = (draft.avoid || []).includes(a.key)
+                  return (
+                    <button
+                      key={a.key}
+                      role="checkbox"
+                      aria-checked={on}
+                      className={`check ${on ? 'check--on' : ''}`}
+                      onClick={() =>
+                        set({
+                          avoid: on
+                            ? draft.avoid.filter((k) => k !== a.key)
+                            : [...(draft.avoid || []), a.key],
+                        })
+                      }
+                    >
+                      <span className="check__box">
+                        <Icon name="check" size={13} />
+                      </span>
+                      <span>
+                        {a.label}
+                        <em>{a.hint}</em>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
 
         </div>
 
