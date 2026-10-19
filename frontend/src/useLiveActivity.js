@@ -18,6 +18,9 @@ export default function useLiveActivity(route) {
   const ready = useRef(false)
   const shown = useRef(null)
   const shownAt = useRef(0)
+  // Le bilan à laisser sur l'écran de verrouillage en partant — voir
+  // `finishedState`. Sans lui, l'activité s'efface d'un coup.
+  const farewell = useRef(null)
 
   useEffect(() => {
     if (!isNative() || !route) return undefined
@@ -44,11 +47,13 @@ export default function useLiveActivity(route) {
     return () => {
       cancelled = true
       ready.current = false
-      native.then((n) => n.endLiveActivity())
+      const last = farewell.current
+      farewell.current = null
+      native.then((n) => n.endLiveActivity(last))
     }
   }, [route])
 
-  return useCallback((build, minMs) => {
+  const refresh = useCallback((build, minMs) => {
     if (!ready.current) return
     const next = build()
     const now = Date.now()
@@ -57,4 +62,8 @@ export default function useLiveActivity(route) {
     shownAt.current = now
     import('./native').then((n) => n.updateLiveActivity(next))
   }, [])
+  const conclude = useCallback((state) => {
+    farewell.current = state
+  }, [])
+  return { refresh, conclude }
 }

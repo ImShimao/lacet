@@ -417,7 +417,7 @@ function defauts(route, run) {
   const ditJusqua = (d, n) => d.debut + (n / synthese.parSeconde) * 1000
   // Arrivé devant sa porte, on est rentré, même si le tracé la dépasse pour y
   // revenir par un demi-tour : ce qui suit peut ne plus se dire.
-  const arrivees = dites.filter((d) => d.texte === 'Arrivée. Sortie terminée.')
+  const arrivees = dites.filter((d) => d.texte.startsWith('Arrivée. Sortie terminée'))
   const rentre = arrivees.length ? at(arrivees[0]) : Infinity
   const pas = manoeuvres(route)
 

@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import RunSummary from './RunSummary.jsx'
 
@@ -57,5 +57,23 @@ describe('l’écran de fin', () => {
     const maintenant = sortie()
     render(<RunSummary entry={maintenant} history={[maintenant]} onClose={vi.fn()} />)
     expect(screen.queryByText(/passage/)).toBeNull()
+  })
+
+  it('fête une boucle bouclée, et laisse repartir si l’arrivée venait trop tôt', () => {
+    const onContinue = vi.fn()
+    const avant = sortie({ ranAt: '2026-10-01T08:00:00.000Z', actual_distance_m: 1500, actual_duration_s: 600, geometry: [], track: [] })
+    const maintenant = sortie({ arrived: true, ranAt: '2026-10-19T08:00:00.000Z' })
+    render(<RunSummary entry={maintenant} history={[maintenant, avant]} onClose={vi.fn()} onContinue={onContinue} />)
+    expect(screen.getByText('Boucle bouclée')).toBeTruthy()
+    expect(screen.getByText(/Ta plus longue sortie à pied/)).toBeTruthy()
+    expect(screen.getByText(/2ᵉ sortie du mois/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Pas fini ? Reprendre la sortie'))
+    expect(onContinue).toHaveBeenCalledTimes(1)
+  })
+
+  it('ne propose pas de reprendre une sortie terminée au bouton', () => {
+    render(<RunSummary entry={sortie()} onClose={vi.fn()} onContinue={vi.fn()} />)
+    expect(screen.getByText('Sortie enregistrée')).toBeTruthy()
+    expect(screen.queryByText(/Reprendre la sortie/)).toBeNull()
   })
 })

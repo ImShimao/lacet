@@ -38,6 +38,19 @@ const AWAY_M = 6
 // Au bout de ce temps-là, le point le plus proche ne sera pas battu.
 const HOLD_MS = 5000
 
+// Le GPS du moment élargit le cercle d'arrivée, jusqu'à ce plafond : entre deux
+// immeubles, à quinze ou vingt mètres près, le point le plus proche peut tomber
+// à dix-huit mètres d'une ligne qu'on a pourtant franchie — et la sortie ne se
+// terminait pas.
+const MAX_NEAR_M = 25
+
+// **On s'arrête un peu avant.** La boucle part de la rue, devant la porte : on
+// finit souvent à la porte elle-même, vingt ou trente mètres plus loin que le
+// tracé, ou sur le trottoir d'en face. Arrêté là un quart de minute, tout au bout
+// du parcours, on est arrivé.
+const STOP_NEAR_M = 35
+const STOPPED_MS = 15_000
+
 // Il faut avoir fait la boucle. Trois conditions, et chacune répond à un cas
 // précis :
 //
@@ -66,6 +79,9 @@ export function arrivalWatcher({ armM = ARM_M, nearM = NEAR_M, awayM = AWAY_M, h
   let everFar = false
   let closest = Infinity
   let closestAt = 0
+  // Ce que l'appelant voulait retenir au point le plus proche — sa distance
+  // courue, son chrono : c'est là qu'on est arrivé, pas au relevé qui le prouve.
+  let mark = null
   let done = false
 
   return {
@@ -75,13 +91,18 @@ export function arrivalWatcher({ armM = ARM_M, nearM = NEAR_M, awayM = AWAY_M, h
     get closest() {
       return closest
     },
+    get mark() {
+      return mark
+    },
     /**
      * @param toFinish  distance à vol d'oiseau jusqu'au dernier point du tracé
      * @param remaining ce qu'il reste à parcourir sur le tracé
      * @param covered   ce qu'on a réellement parcouru
      * @param planned   la distance prévue pour la sortie
+     * @param accuracy  la précision du relevé, si le GPS la donne
+     * @param at        ce qu'il faut retenir si ce relevé est le plus proche
      */
-    push({ toFinish, remaining, covered, planned, now = Date.now() }) {
+    push({ toFinish, remaining, covered, planned, accuracy = null, at = null, now = Date.now() }) {
       if (done || !Number.isFinite(toFinish)) return null
       // On s'éloigne avant de revenir : tant que ce n'est pas arrivé, il n'y a
       // pas d'arrivée possible.
@@ -94,26 +115,23 @@ export function arrivalWatcher({ armM = ARM_M, nearM = NEAR_M, awayM = AWAY_M, h
         // minutes, qui déclencherait l'arrivée au prochain relevé proche.
         armed = false
         closest = Infinity
+        mark = null
         return null
       }
-      if (!armed && toFinish <= armM) {
+      if (!armed && toFinish > armM) return null
+      if (!armed || toFinish < closest) {
         armed = true
         closest = toFinish
         closestAt = now
+        mark = at
         return null
       }
-      if (!armed) return null
-      if (toFinish < closest) {
-        closest = toFinish
-        closestAt = now
-        return null
-      }
-      if (closest > nearM) return null
-      if (toFinish > closest + awayM || now - closestAt >= holdMs) {
-        done = true
-        return 'arrived'
-      }
-      return null
+      const near = Math.max(nearM, Math.min(MAX_NEAR_M, accuracy ?? 0))
+      const passed = closest <= near && (toFinish > closest + awayM || now - closestAt >= holdMs)
+      const stopped = closest <= STOP_NEAR_M && toFinish <= STOP_NEAR_M + awayM && now - closestAt >= STOPPED_MS
+      if (!passed && !stopped) return null
+      done = true
+      return 'arrived'
     },
   }
 }

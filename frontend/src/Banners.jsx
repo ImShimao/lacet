@@ -11,20 +11,22 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
     <div className="banner banner--resume">
       <Icon name="refresh" size={16} />
       <span>
-        <b>Sortie interrompue.</b>{' '}
-        <span>
-          {km(pending.covered, 1)} km en {Math.round(pending.elapsed / 60)} min, {ago(Date.now() - pending.at)}.
-        </span>
+        <b>Sortie interrompue</b> · {km(pending.covered, 1)} km en {Math.round(pending.elapsed / 60)} min,{' '}
+        {ago(Date.now() - pending.at)}.
       </span>
-      <button className="banner__act" onClick={onResume}>
-        Reprendre
-      </button>
-      <button className="banner__act" onClick={onKeep}>
-        Enregistrer
-      </button>
       <button className="banner__close" onClick={onDrop} aria-label="Oublier">
         <Icon name="close" size={15} />
       </button>
+      {/* Sous le texte, pas à côté : sur une ligne, la phrase se cassait en
+          quatre morceaux entre l'icône et deux boutons. */}
+      <div className="banner__acts">
+        <button className="banner__act" onClick={onResume}>
+          Reprendre
+        </button>
+        <button className="banner__act banner__act--soft" onClick={onKeep}>
+          Enregistrer
+        </button>
+      </div>
     </div>
   )
 }

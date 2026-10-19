@@ -87,3 +87,22 @@ export function bearingOf(a, b) {
   const k = Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180)
   return (Math.atan2((b[0] - a[0]) * k, b[1] - a[1]) * 180) / Math.PI
 }
+
+/**
+ * La trace d'une sortie en croquis SVG, cadrée dans `width` × `height` : le
+ * chemin `d` d'un `<path>`, et le point de départ. `null` sans trace.
+ */
+export function sketch(track, width, height, pad = 6) {
+  if (!(track?.length > 1)) return null
+  const k = Math.cos((track[0][1] * Math.PI) / 180)
+  const xs = track.map(([lon]) => lon * k)
+  const ys = track.map(([, lat]) => lat)
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const scale = Math.min((width - 2 * pad) / (x1 - x0 || 1e-9), (height - 2 * pad) / (y1 - y0 || 1e-9))
+  // Centré : une trace étroite ne colle pas au bord gauche.
+  const ox = (width - (x1 - x0) * scale) / 2
+  const oy = (height - (y1 - y0) * scale) / 2
+  const at = (i) => [ox + (xs[i] - x0) * scale, oy + (y1 - ys[i]) * scale].map((v) => Math.round(v * 10) / 10)
+  const points = track.map((_, i) => at(i))
+  return { d: `M${points.map((p) => p.join(' ')).join('L')}`, start: points[0] }
+}

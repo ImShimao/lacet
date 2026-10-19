@@ -574,7 +574,15 @@ export default function App() {
               }}
             />
           ) : summary ? (
-            <RunSummary entry={summary} history={history} onClose={() => run.closeSummary()} />
+            <RunSummary
+              entry={summary}
+              history={history}
+              weightKg={params.weight_kg}
+              onClose={() => run.closeSummary()}
+              onContinue={() => run.continueRun(summary, (entry) => library.forget(entry))}
+              onKeep={!summary.free && selected ? () => library.toggleFavorite(selected) : null}
+              kept={isFavorite}
+            />
           ) : running ? (
             <LiveRun
               route={freeRun ? null : selected}

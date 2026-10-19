@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import Icon from './Icon.jsx'
+import Icon, { SolidIcon } from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
 import AscentNote from './AscentNote.jsx'
-import { Splits, Standing } from './RunDetail.jsx'
-import { standing } from './knownRoutes'
-import { announcing, arrivalText, contactOf, textTo } from './contact'
+import { PlanGap, Splits, Standing, whenLabel } from './RunDetail.jsx'
+import { records, standing } from './knownRoutes'
+import { energy } from './Library.jsx'
+import { announcing, arrivalText, contactOf, shareText, textTo } from './contact'
+import { sketch } from './routeDraw'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -23,8 +25,12 @@ import { announcing, arrivalText, contactOf, textTo } from './contact'
  * `RunDetail.jsx` : ils n'apparaissaient qu'en rouvrant la sortie depuis
  * l'historique, alors que c'est en arrivant, essoufflé, qu'on veut savoir si
  * l'on a battu dimanche dernier.
+ *
+ * `onContinue` : l'arrivée s'est déclenchée d'elle-même, et l'on n'avait pas
+ * fini — un tour de plus, un retour au calme. `onKeep` : garder le parcours en
+ * favori, quand la sortie en suivait un.
  */
-export default function RunSummary({ entry, history = [], onClose }) {
+export default function RunSummary({ entry, history = [], weightKg = 70, onClose, onContinue, onKeep, kept = false }) {
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
@@ -33,19 +39,43 @@ export default function RunSummary({ entry, history = [], onClose }) {
   const planned = entry.free ? null : entry.distance_m || null
   const gap = planned ? distance - planned : null
   const rang = useMemo(() => standing(entry, history), [entry, history])
+  const best = useMemo(() => records(entry, history), [entry, history])
   const splits = entry.splits?.length ? entry.splits : null
   const shown = useCountUp(distance)
+  const kcal = Math.round(energy(distance, weightKg, entry.sport))
+  // La trace courue, en croquis : la page couvre la carte, et c'est pourtant le
+  // dessin de sa sortie qu'on veut voir en arrivant.
+  const drawn = useMemo(() => sketch(entry.track, 160, 96), [entry.track])
+
+  const share = () =>
+    shareText(
+      [
+        `${entry.name} — ${km(distance, 1)} km en ${duration(seconds)}`,
+        bike ? `${speed.toFixed(1).replace('.', ',')} km/h de moyenne` : `${pace(perKm)}/km`,
+        entry.actual_ascent_m != null ? `D+ ${entry.actual_ascent_m} m` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') + ' — avec Lacet',
+      'Ma sortie',
+    )
 
   return (
     <div className="panel summary">
-      <div className="origin">
-        <span className="origin__pin origin__pin--done">
-          <Icon name="check" size={18} />
-        </span>
-        <div>
-          <b>Sortie enregistrée</b>
-          <em>{entry.name}</em>
-        </div>
+      <div className="summary__hero">
+        {drawn ? (
+          <svg className="sketch" viewBox="0 0 160 96" aria-hidden="true">
+            <path d={drawn.d} pathLength="1" />
+            <circle cx={drawn.start[0]} cy={drawn.start[1]} r="4" />
+          </svg>
+        ) : (
+          <span className="origin__pin origin__pin--done summary__badge" aria-hidden="true">
+            <Icon name={entry.arrived ? 'flag' : 'check'} size={22} />
+          </span>
+        )}
+        <b>{entry.arrived ? 'Boucle bouclée' : 'Sortie enregistrée'}</b>
+        <em>
+          {entry.name} · {whenLabel(entry.ranAt)}
+        </em>
       </div>
 
       <div className="summary__big">
@@ -53,7 +83,7 @@ export default function RunSummary({ entry, history = [], onClose }) {
         <span>KILOMÈTRES</span>
       </div>
 
-      <div className="stats stats--live">
+      <div className="stats stats--four">
         <div>
           <b>{duration(seconds)}</b>
           <span>Temps</span>
@@ -66,26 +96,46 @@ export default function RunSummary({ entry, history = [], onClose }) {
           <b>{entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—'}</b>
           <span>Dénivelé +</span>
         </div>
+        <div>
+          <b>{kcal > 0 ? kcal.toLocaleString('fr-FR') : '—'}</b>
+          <span>kcal estimées</span>
+        </div>
       </div>
 
-      {entry.paused_s > 0 && (
-        <p className="muted small">
-          Chrono arrêté {duration(entry.paused_s)} — feux, pauses, attentes : le temps ci-dessus
-          est celui en mouvement.
-        </p>
+      {/* Ce qui mérite d'être fêté, en premier : c'est ce qu'on regarde. */}
+      {best.list.length > 0 && (
+        <div className="summary__records">
+          {best.list.includes('longest') && (
+            <span>
+              <Icon name="routes" size={15} />
+              Ta plus longue sortie {bike ? 'à vélo' : 'à pied'}
+            </span>
+          )}
+          {best.list.includes('fastest') && (
+            <span>
+              <Icon name="flag" size={15} />
+              {bike ? 'Ta vitesse la plus haute' : 'Ton allure la plus rapide'}, sur 3 km ou plus
+            </span>
+          )}
+        </div>
       )}
 
       {rang && <Standing rang={rang} bike={bike} />}
 
       {splits && <Splits splits={splits} bike={bike} />}
 
-      {gap !== null && (
-        <p className="muted small">
-          Prévu {km(planned, 1)} km — tu as fait <b>{Math.abs(Math.round(gap))} m</b>{' '}
-          {gap >= 0 ? 'de plus' : 'de moins'}.
-          {entry.rerouted ? ' Un nouveau chemin a été calculé en route.' : ''}
-        </p>
-      )}
+      {gap !== null && <PlanGap entry={entry} planned={planned} gap={gap} />}
+
+      <p className="muted small">
+        {best.monthCount > 1
+          ? `${best.monthCount}ᵉ sortie du mois · ${km(best.monthM, 1)} km depuis le 1er.`
+          : 'Première sortie du mois.'}
+        {entry.paused_s > 0
+          ? ` Chrono arrêté ${duration(entry.paused_s)} — feux, pauses : le temps ci-dessus est celui en mouvement.`
+          : ''}
+        {entry.rerouted ? ' Un nouveau chemin a été calculé en route.' : ''}
+      </p>
+
       {entry.actual_ascent_m == null ? (
         <p className="muted small">
           Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n'ont donné
@@ -105,17 +155,43 @@ export default function RunSummary({ entry, history = [], onClose }) {
         </button>
       )}
 
-      <div className="row">
+      <div className="summary__actions">
+        <button className="btn btn--icon" onClick={share} aria-label="Partager la sortie" title="Partager">
+          <Icon name="upload" size={18} />
+        </button>
         {entry.track?.length > 1 && (
-          <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
-            <Icon name="download" size={16} />
-            Exporter
+          <button
+            className="btn btn--icon"
+            onClick={() => downloadRun(entry)}
+            aria-label="Exporter la trace en GPX"
+            title="Exporter en GPX"
+          >
+            <Icon name="download" size={18} />
+          </button>
+        )}
+        {onKeep && (
+          <button
+            className={`btn btn--icon ${kept ? 'btn--on' : ''}`}
+            onClick={onKeep}
+            aria-pressed={kept}
+            aria-label={kept ? 'Retirer le parcours des favoris' : 'Garder ce parcours en favori'}
+            title={kept ? 'Retirer des favoris' : 'Garder en favori'}
+          >
+            {kept ? <SolidIcon name="heart" size={18} /> : <Icon name="heart" size={18} />}
           </button>
         )}
         <button className="btn btn--primary" onClick={onClose}>
           Terminer
         </button>
       </div>
+
+      {/* L'arrivée s'est déclenchée d'elle-même : si c'était trop tôt, on repart
+          sans rien perdre. */}
+      {entry.arrived && onContinue && (
+        <button className="linkish" onClick={onContinue}>
+          Pas fini ? Reprendre la sortie
+        </button>
+      )}
 
       <p className="muted small">
         Tout est dans « Mes parcours ». La trace reste sur l'appareil : la

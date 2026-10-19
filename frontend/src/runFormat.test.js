@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clock, lapAt, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenSpeed, turnIcon } from './runFormat'
+import { arrivalSpeech, clock, lapAt, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenDuration, spokenSpeed, turnIcon } from './runFormat'
 
 describe('ce que l’écran de course écrit', () => {
   it('écrit une durée en heures et minutes, jamais comme un chrono', () => {
@@ -93,5 +93,21 @@ describe('le tour en cours', () => {
   it('compte une sortie gardée avant les « 8 » comme avant', () => {
     expect(lapAt({ laps: 2, lap_distance_m: 4950 }, 5000)).toBe(2)
     expect(lapAt({ distance_m: 9000 }, 8000)).toBe(1)
+  })
+})
+
+describe('ce que la voix dit à l’arrivée', () => {
+  it('donne la distance, le temps et l’allure, en mots que la voix lit bien', () => {
+    expect(arrivalSpeech(10_240, 3500)).toBe(
+      'Arrivée. Sortie terminée : 10,2 kilomètres en 58 minutes, allure moyenne 5 minutes 42.',
+    )
+    expect(arrivalSpeech(42_000, 6000, true)).toBe(
+      'Arrivée. Sortie terminée : 42,0 kilomètres en 1 heure 40, moyenne 25,2 kilomètres-heure.',
+    )
+    expect(spokenDuration(7200)).toBe('2 heures')
+  })
+
+  it('se contente de l’essentiel quand il n’y a rien à dire', () => {
+    expect(arrivalSpeech(40, 30)).toBe('Arrivée. Sortie terminée.')
   })
 })

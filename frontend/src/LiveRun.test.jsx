@@ -115,6 +115,24 @@ describe('la sortie guidée', () => {
     // Ce qui est enregistré est bien la sortie faite : le tour du carré.
     expect(bilan.distance).toBeGreaterThan(350)
     expect(bilan.distance).toBeLessThan(500)
+    // Terminée d'elle-même : l'écran de fin le dit, et propose de repartir.
+    expect(bilan.arrived).toBe(true)
+  })
+
+  it('en course libre, propose de terminer en repassant au départ', async () => {
+    const onStop = vi.fn()
+    render(<LiveRun route={null} request={null} sport="run" stage={null} onPosition={() => {}} onStop={onStop} />)
+    // Trois tours du carré : douze cents mètres, et l'on repasse au départ.
+    let t = Date.now()
+    for (const point of [...geometry, ...geometry, ...geometry]) {
+      t += 2000
+      await relever(point, t)
+    }
+    expect(screen.getByText('De retour au départ')).toBeTruthy()
+    // Proposé, pas imposé : rien n'est terminé tant qu'on n'a pas touché.
+    expect(onStop).not.toHaveBeenCalled()
+    await act(async () => screen.getByText('Terminer', { selector: '.live__home' }).click())
+    expect(onStop).toHaveBeenCalledTimes(1)
   })
 
   it('laisse ses huit secondes à une traversée qui suit de près la précédente', async () => {
@@ -246,7 +264,9 @@ describe('la sortie guidée', () => {
     // Aucune annonce isolée : chacune a été dite avec le virage d'avant.
     expect(dit.filter((d) => d.startsWith('Dans'))).toEqual([])
     // Et l'arrivée n'est dite qu'une fois, en y arrivant.
-    expect(dit.filter((d) => /arrivée|revenu/i.test(d) && !d.startsWith('Maintenant'))).toEqual(['Arrivée. Sortie terminée.'])
+    const arrivees = dit.filter((d) => /arrivée|revenu/i.test(d) && !d.startsWith('Maintenant'))
+    expect(arrivees).toHaveLength(1)
+    expect(arrivees[0]).toMatch(/^Arrivée\. Sortie terminée/)
   })
 
   it('continue de guider pendant une pause automatique', async () => {

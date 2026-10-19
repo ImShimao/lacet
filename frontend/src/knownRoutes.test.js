@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alreadyRun, sameRoute, standing } from './knownRoutes'
+import { alreadyRun, records, sameRoute, standing } from './knownRoutes'
 
 /**
  * Reconnaître un chemin déjà parcouru.
@@ -128,5 +128,29 @@ describe('déjà couru', () => {
     // lancé puis arrêté tout de suite.
     const sansTrace = { ...sortie(null), track: null, geometry: anneau(7.2, 47.9, 800) }
     expect(alreadyRun(boucle, [sansTrace])).not.toBeNull()
+  })
+})
+
+describe('les records', () => {
+  const run = (ranAt, km, minutes, sport = 'run') => ({
+    ranAt,
+    sport,
+    actual_distance_m: km * 1000,
+    actual_duration_s: minutes * 60,
+  })
+  const avant = [run('2026-10-02T08:00:00Z', 8, 48), run('2026-09-20T08:00:00Z', 12, 75), run('2026-10-05T08:00:00Z', 30, 70, 'bike')]
+
+  it('reconnaît la plus longue et la plus rapide, entre sorties du même sport', () => {
+    const sortie = run('2026-10-19T08:00:00Z', 13, 70)
+    const r = records(sortie, [sortie, ...avant])
+    expect(r.list).toEqual(['longest', 'fastest'])
+    // Octobre : celle du 2, et celle-ci — pas le vélo.
+    expect(r.monthCount).toBe(2)
+    expect(r.monthM).toBe(21_000)
+  })
+
+  it('ne fête rien sans sortie à battre, ni une allure sur un kilomètre', () => {
+    expect(records(run('2026-10-19T08:00:00Z', 5, 20), []).list).toEqual([])
+    expect(records(run('2026-10-19T08:00:00Z', 1, 3), avant).list).toEqual([])
   })
 })

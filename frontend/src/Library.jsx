@@ -468,8 +468,8 @@ function Totals({ history, profile }) {
       </div>
       <p className="muted small">
         Allure moyenne {pace(averagePace)}/km · environ{' '}
-        {Math.round(energy(sums.distance, profile)).toLocaleString('fr-FR')} kcal, estimées
-        à partir de ton poids — pas mesurées.
+        {Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString('fr-FR')}{' '}
+        kcal, estimées à partir de ton poids — pas mesurées.
       </p>
     </>
   )
@@ -481,9 +481,14 @@ function Totals({ history, profile }) {
 // fois moins à distance égale.
 const KCAL_PER_KG_PER_KM = { run: 0.95, bike: 0.30 }
 
-function energy(distanceM, profile) {
-  const factor = KCAL_PER_KG_PER_KM[profile?.sport] ?? KCAL_PER_KG_PER_KM.run
-  return (distanceM / 1000) * (profile?.weight_kg || 70) * factor
+/**
+ * Chaque sortie au coût de son sport : le total mêlait course et vélo au tarif
+ * du sport réglé dans les filtres, et cent kilomètres de vélo y pesaient comme
+ * cent kilomètres courus.
+ */
+export function energy(distanceM, weightKg, sport = 'run') {
+  const factor = KCAL_PER_KG_PER_KM[sport] ?? KCAL_PER_KG_PER_KM.run
+  return (distanceM / 1000) * (weightKg || 70) * factor
 }
 
 /** Le mois d'une sortie : « 2026-09 ». */

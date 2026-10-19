@@ -28,6 +28,67 @@
   margin-top: 2px;
 }
 
+/* L'arrivée, en tête : le fanion d'une boucle bouclée, le nom et l'heure. */
+.summary__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding-top: 4px;
+}
+.summary__badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  margin-bottom: 4px;
+}
+.summary__hero b {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.summary__hero em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* Un record : rare, donc dit en couleur. */
+.summary__records {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.summary__records span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--caution);
+  background: rgba(255, 212, 38, 0.1);
+  border: 1px solid rgba(255, 212, 38, 0.3);
+}
+
+/* Les gestes de la fin, collés au bas comme la barre d'Explorer : « Terminer »
+   reste sous le pouce quel que soit l'endroit où l'on a fait défiler. */
+.summary__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  margin: 0 -18px;
+  padding: 14px 18px 12px;
+  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+}
+.summary__actions .btn--primary {
+  flex: 1;
+}
+
 /* La sortie interrompue, retrouvée au lancement : violette et non rouge — ce
    n'est pas une panne, c'est quelque chose à récupérer. */
 .banner--resume {
@@ -43,10 +104,58 @@
   border-color: var(--accent);
   color: #fff;
 }
-.banner--resume .banner__act:last-of-type {
+.banner--resume .banner__act--soft {
   background: none;
-  border-color: var(--accent-line);
+  border: 1px solid var(--accent-line);
   color: var(--accent-text);
+}
+.banner--resume {
+  flex-wrap: wrap;
+}
+.banner--resume .banner__close {
+  margin-left: auto;
+}
+.banner__acts {
+  flex-basis: 100%;
+  display: flex;
+  gap: 8px;
+  padding-left: 26px;
+}
+.shell[data-sheet='peek'] .banner--resume {
+  background: #1d1730;
+}
+
+/* Le croquis de la trace, qui se dessine en arrivant : départ marqué d'un point. */
+.sketch {
+  width: 160px;
+  height: 96px;
+  margin-bottom: 2px;
+}
+.sketch path {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sketch-draw 1.1s ease-out 0.15s forwards;
+}
+.sketch circle {
+  fill: var(--accent);
+  stroke: #fff;
+  stroke-width: 2;
+}
+@keyframes sketch-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sketch path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
 
 /* ══ les départs enregistrés ══════════════════════════════════════════════ */

@@ -118,10 +118,46 @@ Le premier passage a trouvé, et fait corriger :
 Deux limites restent, connues. Trois virages en soixante mètres ne laissent pas
 le temps de tout dire : la phrase du deuxième — « serre à gauche puis tout de
 suite à droite dans la rue François Vernay, puis dans 30 mètres… » — est coupée
-par le « maintenant » du troisième avant d'arriver à son annonce. Et l'arrivée
-ne se déclenche que si le GPS passe à moins de 14 m de la porte (`arrival.js`) :
-une fois sur vingt graines, il en passait à quinze, et c'est le bouton qui
-termine.
+par le « maintenant » du troisième avant d'arriver à son annonce.
+
+### L'arrivée
+
+La boucle revient à sa porte, et la sortie s'arrête d'elle-même
+(`arrival.js`) : l'arrivée s'arme à 70 m de la fin du tracé, puis se fixe au
+**point le plus proche** — une fois qu'on s'en éloigne, ou qu'on y reste cinq
+secondes. Trois réglages la rendent plus sûre :
+
+- **Le cercle suit le GPS.** 14 m en terrain dégagé, jusqu'à 25 m quand le
+  relevé du moment se dit imprécis : entre deux immeubles, le point le plus
+  proche tombait à quinze ou dix-huit mètres d'une ligne pourtant franchie, et
+  c'était au bouton de terminer.
+- **On s'arrête à la porte.** La boucle part de la rue, devant le point choisi ;
+  on finit souvent à la porte elle-même, vingt ou trente mètres plus loin.
+  Arrêté à moins de 35 m de la fin, un quart de minute, tout au bout du
+  parcours : c'est l'arrivée.
+- **Le chrono s'arrête au point le plus proche**, pas au relevé qui le
+  confirme : les quelques secondes et mètres d'après n'entrent ni dans le temps
+  ni dans l'allure.
+
+La voix donne alors le bilan — « Arrivée. Sortie terminée : 10,2 kilomètres en
+58 minutes, allure moyenne 5 minutes 41. » —, l'écran de verrouillage le garde
+un quart d'heure (drapeau à damier, temps et allure), et l'écran de fin s'ouvre
+sur « Boucle bouclée ». S'il s'est déclenché trop tôt — un tour de plus, un
+retour au calme —, « Pas fini ? Reprendre la sortie » repart sans rien perdre :
+la sortie quitte l'historique et reprend ses chiffres, le temps passé devant le
+bilan en moins.
+
+En **course libre**, il n'y a pas de tracé : repassé à moins de 40 m de son
+départ, un kilomètre au moins plus tard, l'app le dit et propose « Terminer ».
+Elle ne termine pas d'elle-même — rien ne dit qu'on rentre plutôt qu'on passe
+devant sa porte pour un second tour.
+
+**L'écran de fin** montre le croquis de la trace courue, qui se dessine, puis
+la distance, le temps, l'allure, le D+ et les calories estimées ; un record — la
+plus longue sortie, l'allure la plus rapide sur 3 km ou plus — passe devant ;
+puis la comparaison aux passages d'avant sur le même chemin, les temps au
+kilomètre, l'écart au prévu, et le cumul du mois. Partager, exporter en GPX, et
+garder le parcours en favori se font de là.
 
 **Le journal de la voix.** Chaque phrase dite pendant la sortie est gardée avec
 elle — l'heure, la distance courue, la position, les mots — et se relit dans le

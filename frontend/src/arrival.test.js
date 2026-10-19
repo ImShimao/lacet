@@ -128,3 +128,34 @@ describe("l'arrivée", () => {
     expect(out).toContain('arrived')
   })
 })
+
+describe("l'arrivée, au plus juste", () => {
+  it('élargit le cercle quand le GPS est imprécis', () => {
+    // Entre deux immeubles, à vingt mètres près : passé à dix-huit mètres de la
+    // ligne, on l'a franchie.
+    const w = arrivalWatcher()
+    w.push({ toFinish: 500, remaining: 500, covered: 10_000, planned: 10_000, now: 0 })
+    let out = null
+    ;[60, 35, 18, 30].forEach((toFinish, i) => {
+      out ??= w.push({ toFinish, remaining: toFinish, covered: 10_000, planned: 10_000, accuracy: 20, now: 1000 * (i + 1) })
+    })
+    expect(out).toBe('arrived')
+  })
+
+  it('termine quand on s’arrête à la porte, un peu à côté du tracé', () => {
+    // La boucle finit sur la rue ; on s'arrête à la porte, vingt-huit mètres
+    // plus loin, et on n'y bouge plus.
+    const w = arrivalWatcher()
+    expect(approche(w, [60, 40, ...Array(14).fill(28)])).toBeNull()
+    expect(approche(arrivalWatcher(), [60, 40, ...Array(18).fill(28)])?.at).toBe(17)
+  })
+
+  it('retient le point le plus proche, pas le relevé qui le prouve', () => {
+    const w = arrivalWatcher()
+    w.push({ toFinish: 500, remaining: 500, covered: 9500, planned: 10_000, now: 0 })
+    ;[40, 12, 5, 9, 14].forEach((toFinish, i) => {
+      w.push({ toFinish, remaining: toFinish, covered: 10_000 + i, planned: 10_000, at: { covered: 10_000 + i }, now: 1000 * (i + 1) })
+    })
+    expect(w.mark).toEqual({ covered: 10_002 })
+  })
+})

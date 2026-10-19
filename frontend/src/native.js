@@ -202,7 +202,8 @@ export async function startLiveActivity(state) {
 }
 
 export const updateLiveActivity = (state) => LiveActivity.update(state).catch(() => {})
-export const endLiveActivity = () => LiveActivity.end().catch(() => {})
+/** Termine l'activité — sur `final`, laissé un quart d'heure, ou tout de suite. */
+export const endLiveActivity = (final = null) => LiveActivity.end(final ?? {}).catch(() => {})
 
 /**
  * Ce que l'écran de verrouillage peut afficher — ou `null` si l'app a été

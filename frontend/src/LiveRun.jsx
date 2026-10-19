@@ -8,7 +8,7 @@ import { NextStops } from './Stops.jsx'
 import useLiveActivity from './useLiveActivity'
 import { haversine } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, runsBack, wrongWay } from './routeTracker'
-import { lockScreenState } from './lockScreen'
+import { finishedState, lockScreenState } from './lockScreen'
 import { actAt, announcement, chains, followingStep, previewAt, rightAfter, speedOr, thenLabel } from './guidance'
 import { motionTracker } from './autoPause'
 import { arrivalWatcher } from './arrival'
@@ -21,7 +21,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
-import { capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
+import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
@@ -117,6 +117,13 @@ const SPLIT_EVERY_KM = { run: 1, bike: 5 }
 const BARO_READ_MS = 5000
 const BARO_MIN_SAMPLES = 30
 
+// Course libre : repassé à ce point de son départ, au moins un kilomètre plus
+// tard, on propose d'y finir. Repartir à plus de cent cinquante mètres retire
+// la proposition, qui revient au kilomètre suivant.
+const FREE_HOME_NEAR_M = 40
+const FREE_HOME_MIN_M = 1000
+const FREE_HOME_LEAVE_M = 150
+
 const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
 
 /**
@@ -147,6 +154,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // null en course ; 'auto' arrêté à un feu ; 'manual' mis en pause au bouton.
   const [paused, setPaused] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  // Course libre revenue à son départ — voir `watchHome`.
+  const [backHome, setBackHome] = useState(false)
+  const origin = useRef(resuming?.trail?.[0] ?? null)
+  const homeAt = useRef(null)
+  const homeShown = useRef(false)
 
   // Le tracé suivi : le parcours choisi, puis, après un recalcul, le raccord et
   // la fin de la boucle. Tenu aussi en référence : les relevés GPS arrivent
@@ -201,7 +213,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const heading = useRef(null)
   const moved = useRef(null)
   // L'écran de verrouillage — voir `useLiveActivity.js` — et la consigne qu'il montre.
-  const refreshLock = useLiveActivity(route)
+  const lockScreen = useLiveActivity(route)
+  const refreshLock = lockScreen.refresh
   const upcomingStep = useRef(null)
   // Les arrêts le long du tracé — lus dans le rappel des positions, créé une
   // fois pour toutes — et ceux déjà annoncés.
@@ -223,6 +236,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const arrival = useRef(null)
   if (!arrival.current) arrival.current = arrivalWatcher()
   const finishing = useRef(false)
+  // La précision du dernier relevé : l'arrivée s'y règle (`arrival.js`).
+  const accuracyNow = useRef(null)
   // Le temps de chaque kilomètre, relevé au passage. Sans lui, une sortie
   // relue plus tard n'a qu'une allure moyenne — voir `RunDetail.jsx`.
   const splits = useRef([])
@@ -320,6 +335,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         const { longitude, latitude, accuracy } = position.coords
         const point = [longitude, latitude]
         here.current = point
+        accuracyNow.current = Number.isFinite(accuracy) ? accuracy : null
         // Le cap du GPS : il dit dans quel sens on suit le tracé — voir `locate`.
         // Lu sur la vitesse, pas sur les positions : un reflet ne le fausse pas.
         // À l'arrêt, il ne vaut rien.
@@ -391,6 +407,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (route) {
           followRoute(point, { at, course })
           warnCrossing(point)
+        } else {
+          watchHome(point)
         }
         heading.current = runHeading(point) ?? heading.current
         onPosition(point, heading.current)
@@ -859,13 +877,46 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       covered: covered.current,
       // Rentré plus tôt, on n'a pas couru la moitié prévue : l'arrivée compte quand même.
       planned: guided.home ? null : plannedM || null,
+      accuracy: accuracyNow.current,
+      // L'instant de l'arrivée est celui du point le plus proche : le relevé qui
+      // le confirme vient quelques mètres ou quelques secondes plus tard, et ils
+      // n'ont rien à faire dans le chrono.
+      at: { covered: covered.current, elapsed: movingSeconds() },
       now: Date.now(),
     })
     if (verdict !== 'arrived') return
     finishing.current = true
-    talk('Arrivée. Sortie terminée.')
+    const at = arrival.current.mark ?? { covered: covered.current, elapsed: movingSeconds() }
+    // Le bilan, dit à voix haute : on arrive essoufflé, le téléphone au bras, et
+    // c'est la seule chose qu'on veut savoir avant de le regarder.
+    talk(arrivalSpeech(at.covered, at.elapsed, sport === 'bike'))
     haptic('warnHaptic')
-    finish()
+    finish({ ...at, arrived: true })
+  }
+
+  /**
+   * Course libre : sans tracé, pas d'arrivée à guetter — mais on part le plus
+   * souvent de chez soi, et l'on y revient. Repassé au départ, un kilomètre
+   * au moins plus tard, l'app le dit et propose de terminer là. Elle ne termine
+   * pas d'elle-même : sans parcours, rien ne dit qu'on rentre plutôt qu'on
+   * passe devant sa porte pour un second tour.
+   */
+  function watchHome(point) {
+    origin.current ??= point
+    const away = haversine(point, origin.current)
+    if (homeShown.current) {
+      if (away > FREE_HOME_LEAVE_M) {
+        homeShown.current = false
+        setBackHome(false)
+      }
+      return
+    }
+    if (away > FREE_HOME_NEAR_M || covered.current - (homeAt.current ?? 0) < FREE_HOME_MIN_M) return
+    homeAt.current = covered.current
+    homeShown.current = true
+    setBackHome(true)
+    haptic('pulseHaptic')
+    talk('Retour au point de départ. Touche « Terminer » pour finir la sortie.', { priority: false })
   }
 
   /**
@@ -1051,11 +1102,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    * les deux chemins est exactement le genre de piège que ce fichier évite
    * partout ailleurs avec des références.
    */
-  const finish = () => {
+  const finish = (at = null) => {
     clearRun()
+    const distance = at?.covered ?? covered.current
+    const elapsed = at?.elapsed ?? movingSeconds()
+    if (distance >= 100) {
+      lockScreen.conclude(finishedState({ name: route?.name, distanceM: distance, elapsedS: elapsed, bike: sport === 'bike' }))
+    }
     onStop({
-      distance: covered.current,
-      elapsed: movingSeconds(),
+      distance,
+      elapsed,
+      arrived: Boolean(at?.arrived),
       // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
       // reprendre, et un point tous les huit mètres y suffit.
       trail: simplify(trace.current.points),
@@ -1124,6 +1181,19 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         homeNote={homeNote}
       />
 
+      {backHome && (
+        <div className="live__paused" role="status">
+          <Icon name="flag" size={17} />
+          <div>
+            <b>De retour au départ</b>
+            <span>Termine ici, ou continue : la sortie suit.</span>
+          </div>
+          <button className="live__home" onClick={() => finish()}>
+            Terminer
+          </button>
+        </div>
+      )}
+
       {route && stops.length > 0 && <NextStops stops={stops} along={along} />}
 
       {alert && (
@@ -1145,7 +1215,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
       <RunControls
         paused={paused}
-        onFinish={finish}
+        onFinish={() => finish()}
         onProfile={hasProfile ? () => setProfileOpen(true) : null}
         onTogglePause={togglePause}
         here={here}

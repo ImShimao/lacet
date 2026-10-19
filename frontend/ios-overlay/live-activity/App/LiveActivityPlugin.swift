@@ -140,14 +140,26 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    /// Termine l'activité. Avec un dernier état — le bilan de la sortie —, il
+    /// reste un quart d'heure sur l'écran de verrouillage : on range le
+    /// téléphone en arrivant, et c'est en le rallumant qu'on lit son temps.
+    /// Sans, l'activité s'efface tout de suite.
     @objc func end(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else {
             call.resolve()
             return
         }
+        let final: LacetRunAttributes.ContentState? = call.getString("instruction") != nil ? Self.state(from: call) : nil
         Task { @MainActor in
             for activity in Activity<LacetRunAttributes>.activities {
-                await activity.end(nil, dismissalPolicy: .immediate)
+                if let final = final {
+                    await activity.end(
+                        ActivityContent(state: final, staleDate: nil),
+                        dismissalPolicy: .after(Date().addingTimeInterval(15 * 60))
+                    )
+                } else {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             }
             call.resolve()
         }

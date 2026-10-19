@@ -116,33 +116,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
 
       {entry.spoken?.length > 0 && <Spoken spoken={entry.spoken} />}
 
-      {gap !== null && (
-        <div className="rundet__plan">
-          <div>
-            <span>Prévu</span>
-            <b>{km(planned, 1)} km</b>
-          </div>
-          <div>
-            <span>Écart</span>
-            <b className={Math.abs(gap) > 300 ? 'rundet__off' : ''}>
-              {gap >= 0 ? '+' : '−'}
-              {Math.abs(Math.round(gap))} m
-            </b>
-          </div>
-          {entry.ascent_m != null && (
-            <div>
-              <span>D+ prévu</span>
-              <b>{Math.round(entry.ascent_m)} m</b>
-            </div>
-          )}
-          {entry.grade && (
-            <div>
-              <span>Sécurité</span>
-              <b className={`grade grade--${entry.grade}`}>{entry.grade}</b>
-            </div>
-          )}
-        </div>
-      )}
+      {gap !== null && <PlanGap entry={entry} planned={planned} gap={gap} />}
 
       {entry.rerouted && (
         <p className="muted small">
@@ -198,6 +172,37 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Le prévu en regard du fait : distance, écart, D+ annoncé, note de sécurité. */
+export function PlanGap({ entry, planned, gap }) {
+  return (
+    <div className="rundet__plan">
+      <div>
+        <span>Prévu</span>
+        <b>{km(planned, 1)} km</b>
+      </div>
+      <div>
+        <span>Écart</span>
+        <b className={Math.abs(gap) > 300 ? 'rundet__off' : ''}>
+          {gap >= 0 ? '+' : '−'}
+          {Math.abs(Math.round(gap))} m
+        </b>
+      </div>
+      {entry.ascent_m != null && (
+        <div>
+          <span>D+ prévu</span>
+          <b>{Math.round(entry.ascent_m)} m</b>
+        </div>
+      )}
+      {entry.grade && (
+        <div>
+          <span>Sécurité</span>
+          <b className={`grade grade--${entry.grade}`}>{entry.grade}</b>
+        </div>
+      )}
     </div>
   )
 }
@@ -318,7 +323,7 @@ export function Spoken({ spoken }) {
 const heure = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 /** « Mardi 16 septembre, 18 h 42 » */
-function whenLabel(iso) {
+export function whenLabel(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'Date inconnue'
   const jour = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })

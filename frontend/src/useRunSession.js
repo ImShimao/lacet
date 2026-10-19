@@ -127,6 +127,28 @@ export default function useRunSession({ toEntry, remember }) {
     closeSummary() {
       setSummary(null)
     },
+    /**
+     * « Pas fini » : l'arrivée s'est déclenchée, mais on repart — un tour de
+     * plus, un retour au calme. La sortie rangée est retirée de l'historique
+     * (`drop`) et reprend où elle s'était arrêtée, comme une sortie
+     * interrompue : le temps passé devant le bilan ne compte pas.
+     */
+    continueRun(entry, drop) {
+      if (!entry) return
+      drop?.(entry)
+      setSummary(null)
+      setFreeRun(Boolean(entry.free))
+      setResume({
+        covered: entry.actual_distance_m,
+        elapsed: entry.actual_duration_s,
+        trail: entry.track ?? [],
+        splits: entry.splits ?? [],
+        spoken: entry.spoken ?? [],
+        ascent: entry.actual_ascent_m ?? null,
+        ascentSource: entry.actual_ascent_source ?? null,
+      })
+      setRunning(true)
+    },
 
     /** Où l'on est, et dans quel sens — à chaque relevé. */
     track(point, cap) {

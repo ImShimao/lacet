@@ -7,6 +7,9 @@
 // que préparer ces quelques valeurs, déjà formatées : l'extension les affiche
 // telles quelles, sans rien recalculer.
 
+import { pace } from './format'
+import { clock } from './runFormat'
+
 // En dessous de cette distance parcourue, l'allure réelle ne dit encore rien :
 // le premier kilomètre part d'un feu rouge ou d'un lacet à renouer. On se fie à
 // l'allure prévue par le parcours jusque-là.
@@ -78,6 +81,31 @@ export function lockScreenState({ route, step, along, offRoute, paused = false, 
     // En pause, l'écran le dit au lieu d'un compte à rebours qui filerait vers
     // une arrivée qu'on n'atteindra pas à l'heure dite.
     paused: Boolean(paused),
+  }
+}
+
+/**
+ * Le dernier état de l'écran de verrouillage : le bilan, drapeau à damier,
+ * laissé un quart d'heure (`LiveActivityPlugin.end`). On range le téléphone
+ * en arrivant ; c'est en le rallumant qu'on veut lire son temps.
+ */
+export function finishedState({ name, distanceM, elapsedS, bike = false, now = Date.now() }) {
+  const perKm = distanceM > 100 ? elapsedS / (distanceM / 1000) : 0
+  const average = bike
+    ? `${((distanceM / Math.max(1, elapsedS)) * 3.6).toFixed(1).replace('.', ',')} km/h`
+    : perKm
+      ? `${pace(perKm)}/km`
+      : null
+  return {
+    name: name || 'Sortie',
+    instruction: ['Sortie terminée', [clock(elapsedS), average].filter(Boolean).join(' · ')].join(' — '),
+    distance: `${(distanceM / 1000).toFixed(1).replace('.', ',')} km`,
+    turn: 'finish',
+    remaining: '0 m',
+    arrival: now,
+    progress: 1,
+    offRoute: false,
+    paused: false,
   }
 }
 

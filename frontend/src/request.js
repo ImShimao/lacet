@@ -118,6 +118,8 @@ export function runEntry(stats, { route, free, sport }, params) {
     // Ce que la voix a dit, phrase par phrase — voir `RunDetail.jsx`.
     spoken: stats.spoken?.length ? stats.spoken : null,
     rerouted: Boolean(stats.rerouted),
+    // Terminée d'elle-même, en revenant au départ — voir `arrival.js`.
+    arrived: Boolean(stats.arrived),
     free: Boolean(free),
     sport,
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lockScreenState, paceEstimate, shortDistance, shouldRefresh } from './lockScreen'
+import { finishedState, lockScreenState, paceEstimate, shortDistance, shouldRefresh } from './lockScreen'
 import { bearing, buildTrack, headingAt } from './routeTracker'
 
 /**
@@ -168,3 +168,17 @@ describe('l’avancée après un détour', () => {
   })
 })
 
+
+describe('le bilan laissé sur l’écran de verrouillage', () => {
+  it('dit la distance, le temps et l’allure, drapeau à damier', () => {
+    const s = finishedState({ name: 'Boucle nord', distanceM: 10_240, elapsedS: 3500, now: 1000 })
+    expect(s).toMatchObject({
+      name: 'Boucle nord',
+      instruction: 'Sortie terminée — 00:58:20 · 5:42/km',
+      distance: '10,2 km',
+      turn: 'finish',
+      progress: 1,
+      arrival: 1000,
+    })
+  })
+})

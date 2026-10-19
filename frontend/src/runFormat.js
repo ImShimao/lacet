@@ -104,6 +104,30 @@ export function ordinal(n) {
   return `${word}ième`
 }
 
+/** « 58 minutes », « 1 heure 12 » — pour la voix, qui lit « 1 h 12 » de travers. */
+export function spokenDuration(seconds) {
+  const total = Math.round((seconds || 0) / 60)
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (!h) return total > 1 ? `${total} minutes` : '1 minute'
+  const hours = h > 1 ? `${h} heures` : '1 heure'
+  return m ? `${hours} ${m}` : hours
+}
+
+/**
+ * Ce que la voix dit à l'arrivée : « Arrivée. Sortie terminée : 10,2
+ * kilomètres en 58 minutes, allure moyenne 5 minutes 41. »
+ */
+export function arrivalSpeech(metres, seconds, bike = false) {
+  const head = 'Arrivée. Sortie terminée'
+  if (!(metres > 100) || !(seconds > 0)) return `${head}.`
+  const distance = `${(metres / 1000).toFixed(1).replace('.', ',')} kilomètres`
+  const average = bike
+    ? `moyenne ${spokenSpeed(metres / 1000 / (seconds / 3600))}`
+    : `allure moyenne ${spoken(seconds / (metres / 1000))}`
+  return `${head} : ${distance} en ${spokenDuration(seconds)}, ${average}.`
+}
+
 /** « 24,5 kilomètres-heure ». */
 export function spokenSpeed(kmh) {
   if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'

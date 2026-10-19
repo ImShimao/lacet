@@ -185,3 +185,33 @@ function coverage(mine, theirs, near) {
   }
   return seen / mine.length
 }
+
+// Sous trois kilomètres, une allure ne dit pas grand-chose : un aller-retour à
+// la boulangerie au pas de course battrait tous les records.
+const RECORD_MIN_M = 3000
+
+/**
+ * Ce que cette sortie a de remarquable parmi toutes les autres, quel que soit
+ * le chemin : la plus longue, la plus rapide, et où l'on en est du mois.
+ *
+ * `history` peut contenir la sortie elle-même — l'écran de fin la reçoit juste
+ * après l'avoir rangée : elle est écartée par son heure de départ.
+ */
+export function records(entry, history = []) {
+  const sport = entry.sport || 'run'
+  const mine = entry.actual_distance_m || 0
+  const others = history.filter((r) => r.ranAt !== entry.ranAt && (r.sport || 'run') === sport && r.actual_distance_m > 0)
+  const perKm = (r) => (r.actual_duration_s || 0) / ((r.actual_distance_m || 1) / 1000)
+  const out = []
+  if (others.length && mine > Math.max(...others.map((r) => r.actual_distance_m))) out.push('longest')
+  const comparable = others.filter((r) => r.actual_distance_m >= RECORD_MIN_M && r.actual_duration_s > 0)
+  if (comparable.length && mine >= RECORD_MIN_M && perKm(entry) < Math.min(...comparable.map(perKm))) out.push('fastest')
+
+  const month = (iso) => String(iso ?? '').slice(0, 7)
+  const sameMonth = others.filter((r) => month(r.ranAt) === month(entry.ranAt))
+  return {
+    list: out,
+    monthCount: sameMonth.length + 1,
+    monthM: sameMonth.reduce((m, r) => m + r.actual_distance_m, 0) + mine,
+  }
+}

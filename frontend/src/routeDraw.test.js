@@ -1,6 +1,6 @@
 /** Le tracé qui se dessine s'arrête au bon endroit, dans le bon tronçon, et finit entier. */
 import { describe, expect, it } from 'vitest'
-import { alongLine, bearingOf, drawPlan, drawnPart } from './routeDraw'
+import { alongLine, bearingOf, drawPlan, drawnPart, sketch } from './routeDraw'
 
 const line = (coordinates, level = 'safe') => ({
   type: 'Feature',
@@ -39,5 +39,16 @@ describe('le tracé qui se dessine', () => {
   it('accepte une ligne seule, celle d\'un parcours sans tronçons', () => {
     const { features } = drawnPart(drawPlan(line([[0, 0], [0, 0.01]])), 0.5)
     expect(features[0].geometry.coordinates[1][1]).toBeCloseTo(0.005, 9)
+  })
+})
+
+describe('le croquis de la trace', () => {
+  it('tient dans son cadre, centré, nord en haut', () => {
+    // Une trace plus haute que large : elle remplit la hauteur et se centre.
+    const { d, start } = sketch([[7, 47], [7, 47.01], [7.001, 47.01]], 120, 80)
+    expect(start).toEqual([57.7, 74])
+    expect(d.startsWith('M57.7 74L')).toBe(true)
+    expect(d).toContain('L57.7 6')
+    expect(sketch([[7, 47]], 120, 80)).toBeNull()
   })
 })
