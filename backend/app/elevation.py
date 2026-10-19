@@ -1,8 +1,10 @@
 """Altitude et dénivelé.
 
-Deux fournisseurs, tous deux gratuits et sans clé :
+Trois sources, toutes gratuites et sans clé :
 
 * **IGN Géoplateforme** (RGE ALTI, 1 à 5 m) — France uniquement, de loin le plus précis.
+* **Terrain Tiles** d'AWS (zoom 12, ~25 m en Europe) — seulement les tuiles déjà
+  gardées : c'est l'altitude sans réseau (voir `TERRAIN_URL`).
 * **OpenTopoData** (EU-DEM 25 m puis SRTM 30 m) — couverture mondiale, limité à
   1 requête par seconde. Utilisable ici parce qu'on l'appelle depuis un
   serveur : **ce service n'envoie aucun en-tête CORS**, donc le moteur
@@ -39,9 +41,11 @@ import asyncio
 import json
 import logging
 import math
+import struct
 import threading
+import zlib
 from pathlib import Path
-from typing import NamedTuple
+from typing import Callable, NamedTuple
 
 import httpx
 
@@ -57,6 +61,19 @@ OPENTOPO_URL = "https://api.opentopodata.org/v1/{dataset}"
 # config » — un HTTP 400 avalé par le repli, et le seul fournisseur mondial
 # était hors service sans que rien ne le dise.
 OPENTOPO_DATASETS = "eudem25m,srtm30m"
+
+# Les Terrain Tiles d'AWS (Mapzen, d'après Copernicus EU-DEM en Europe) : le
+# relief **sans réseau**. L'IGN et OpenTopoData sont des services : sans
+# couverture, plus de D+. Ces tuiles, elles, se gardent comme les fonds de carte.
+# Mesuré le 19 octobre 2026 (`scripts/terrain_tiles.py`) sur les boucles de
+# Guebwiller et Soultz : au zoom 12, 3,5 m d'écart moyen avec l'IGN et un D+ à
+# −1 % au total, à condition de le compter au réglage grossier — ce que fait
+# `shape_relief`, puisque ce fournisseur n'est pas l'IGN. Les zooms 13 et 14 ne
+# font qu'agrandir les mêmes données. Seules les tuiles déjà sur le disque
+# servent : ce fournisseur est celui du hors-ligne, pas un service de plus.
+TERRAIN_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+TERRAIN_ZOOM = 12
+TERRAIN_DIR = settings.cache_dir / "terrarium"
 
 BATCH = 100  # points par requête — limite d'OpenTopoData, et prudent pour IGN
 
@@ -191,15 +208,20 @@ async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
             # Aucun fournisseur n'a répondu. Avec une partie seulement des
             # points, le profil serait faux plutôt qu'absent : on préfère absent.
             return [None] * len(routes)
-        values, coarse = answer
+        values, coarse, local = answer
         # Un point que personne ne connaît n'est pas gardé : le mettre en cache
         # interdirait de le redemander le jour où un fournisseur l'aura. La
         # finesse, elle, est gardée avec la valeur : sans elle, un point relu du
         # cache retrouverait le seuil fin, et le tremblement avec lui.
-        fresh = {
-            c: (z, gros) for c, z, gros in zip(missing, values, coarse) if z is not None
-        }
-        wanted.update(fresh)
+        #
+        # Ni ce que disent les tuiles gardées : elles le rediront sans réseau, et
+        # l'IGN, s'il était rangé à leur place, ne serait plus jamais redemandé.
+        fresh: dict[Coord, tuple[float, bool]] = {}
+        for c, z, gros, lu in zip(missing, values, coarse, local):
+            if z is not None:
+                wanted[c] = (z, gros)
+                if not lu:
+                    fresh[c] = (z, gros)
         _cache.store(fresh)
 
     # Un tracé dont un seul point manque n'a pas de profil : mieux vaut
@@ -222,7 +244,7 @@ async def fetch_many(routes: list[list[Coord]]) -> list[Relief | None]:
 
 async def _fetch_with_fallback(
     coords: list[Coord],
-) -> tuple[list[float | None], list[bool]] | None:
+) -> tuple[list[float | None], list[bool], list[bool]] | None:
     """Chaque fournisseur complète ce que le précédent n'a pas su dire.
 
     Le second ne remplace pas le premier : il ne reçoit que les points restés
@@ -232,14 +254,18 @@ async def _fetch_with_fallback(
     points manquants à traiter au lieu de tous.
 
     Rend `None` si personne n'a rien su dire ; sinon les altitudes (à trous) et,
-    point par point, si elles viennent d'un modèle grossier.
+    point par point, si elles viennent d'un modèle grossier, puis des tuiles
+    gardées sur l'appareil.
     """
     values: list[float | None] = [None] * len(coords)
     # Quels points viennent d'un modèle grossier : c'est ce qui décide du seuil.
     coarse = [False] * len(coords)
+    local = [False] * len(coords)
     todo = list(range(len(coords)))
 
-    for provider in (settings.elevation_provider, settings.elevation_fallback):
+    # Les tuiles gardées passent avant le service mondial : elles répondent
+    # sans réseau, et mieux que lui (−1 % de D+ contre −2 %).
+    for provider in (settings.elevation_provider, "terrain", settings.elevation_fallback):
         if not todo or provider in {"none", ""}:
             continue
         try:
@@ -262,12 +288,16 @@ async def _fetch_with_fallback(
             else:
                 values[index] = answer[k]
                 coarse[index] = provider != "ign"
+                local[index] = provider == "terrain"
         todo = rest
 
-    return None if len(todo) == len(coords) else (values, coarse)
+    return None if len(todo) == len(coords) else (values, coarse, local)
 
 
 async def _fetch(provider: str, coords: list[Coord]) -> list[float | None]:
+    if provider == "terrain":
+        return terrain_values(coords, _disk_tile)
+
     batches = [coords[i : i + BATCH] for i in range(0, len(coords), BATCH)]
     timeout = httpx.Timeout(settings.elevation_timeout_s, connect=10.0)
 
@@ -330,6 +360,118 @@ def _opentopo_values(data: dict) -> list[float | None]:
         z = item.get("elevation")
         out.append(None if z in _MISSING else float(z))
     return out
+
+
+# --- Terrain Tiles ----------------------------------------------------------
+
+
+def decode_png(data: bytes) -> list[bytearray]:
+    """Les lignes RGB d'un PNG 8 bits sans entrelacement, filtres défaits.
+
+    À la main (zlib et les cinq filtres de ligne) : Pillow, pour lire trois
+    octets par pixel, serait une dépendance de trop — et le moteur de l'app
+    fait le même décodage, octet pour octet.
+    """
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("pas un PNG")
+    pos, idat = 8, b""
+    width = height = channels = 0
+    while pos < len(data):
+        length, kind = struct.unpack(">I4s", data[pos : pos + 8])
+        body = data[pos + 8 : pos + 8 + length]
+        if kind == b"IHDR":
+            width, height, depth, color, _c, _f, interlace = struct.unpack(">IIBBBBB", body)
+            if depth != 8 or interlace != 0 or color not in (2, 6):
+                raise ValueError("PNG inattendu")
+            channels = 3 if color == 2 else 4
+        elif kind == b"IDAT":
+            idat += body
+        pos += 12 + length
+    raw = zlib.decompress(idat)
+    stride = width * channels
+    rows: list[bytearray] = []
+    prev = bytearray(stride)
+    for y in range(height):
+        start = y * (stride + 1)
+        kind, line = raw[start], bytearray(raw[start + 1 : start + 1 + stride])
+        for i in range(stride):
+            a = line[i - channels] if i >= channels else 0
+            b = prev[i]
+            c = prev[i - channels] if i >= channels else 0
+            if kind == 1:
+                line[i] = (line[i] + a) & 255
+            elif kind == 2:
+                line[i] = (line[i] + b) & 255
+            elif kind == 3:
+                line[i] = (line[i] + (a + b) // 2) & 255
+            elif kind == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(line)
+        prev = line
+    if channels == 4:
+        rows = [bytearray(v for k, v in enumerate(r) if k % 4 != 3) for r in rows]
+    return rows
+
+
+def terrarium_grid(data: bytes) -> list[list[float]]:
+    """Les altitudes d'une tuile : R × 256 + G + B / 256 − 32768."""
+    return [
+        [r[i] * 256 + r[i + 1] + r[i + 2] / 256 - 32768 for i in range(0, len(r), 3)]
+        for r in decode_png(data)
+    ]
+
+
+def terrarium_pixel(lon: float, lat: float, z: int = TERRAIN_ZOOM) -> tuple[float, float]:
+    """La position en pixels du monde entier au zoom `z`, centres de pixels à .0."""
+    n = 2**z * 256
+    gx = (lon + 180) / 360 * n - 0.5
+    s = math.sin(math.radians(lat))
+    gy = (0.5 - math.log((1 + s) / (1 - s)) / (4 * math.pi)) * n - 0.5
+    return gx, gy
+
+
+def terrain_values(
+    coords: list[Coord],
+    tile: Callable[[int, int, int], list[list[float]] | None],
+    z: int = TERRAIN_ZOOM,
+) -> list[float | None]:
+    """L'altitude de chaque point, interpolée entre les quatre centres de pixels
+    voisins — comme le relief de MapLibre —, par-delà le bord de tuile s'il le
+    faut. `tile(z, x, y)` rend la grille d'une tuile, ou `None` si elle n'est
+    pas là : le point reste alors sans réponse, pour le fournisseur suivant."""
+    grids: dict[tuple[int, int], list[list[float]] | None] = {}
+
+    def px(x: int, y: int) -> float | None:
+        key = (x // 256, y // 256)
+        if key not in grids:
+            grids[key] = tile(z, key[0], key[1])
+        grid = grids[key]
+        return None if grid is None else grid[y % 256][x % 256]
+
+    out: list[float | None] = []
+    for lon, lat in coords:
+        gx, gy = terrarium_pixel(lon, lat, z)
+        x0, y0 = math.floor(gx), math.floor(gy)
+        u, v = gx - x0, gy - y0
+        a, b = px(x0, y0), px(x0 + 1, y0)
+        c, d = px(x0, y0 + 1), px(x0 + 1, y0 + 1)
+        if a is None or b is None or c is None or d is None:
+            out.append(None)
+            continue
+        top = (1 - u) * a + u * b
+        bottom = (1 - u) * c + u * d
+        out.append((1 - v) * top + v * bottom)
+    return out
+
+
+def _disk_tile(z: int, x: int, y: int) -> list[list[float]] | None:
+    """Une tuile gardée dans `cache/terrarium/`, ou rien : jamais le réseau."""
+    try:
+        return terrarium_grid((TERRAIN_DIR / str(z) / str(x) / f"{y}.png").read_bytes())
+    except (OSError, ValueError, zlib.error, struct.error):
+        return None
 
 
 class ElevationCache:

@@ -298,7 +298,8 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
           <h3 className="section">Sources</h3>
           <p className="disclaimer">
             Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © OpenFreeMap,
-            © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI et Valhalla (FOSSGIS) · Recherche de
+            © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors
+            ligne) et Valhalla (FOSSGIS) · Recherche de
             lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
           </p>
         </>

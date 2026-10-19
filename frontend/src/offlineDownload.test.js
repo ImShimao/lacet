@@ -114,6 +114,26 @@ describe('quand la place ne manque pas', () => {
   })
 })
 
+describe('le relief de la zone', () => {
+  it('part avec la carte, pour que le D+ reste connu sans réseau', async () => {
+    reseau({ 10: 5e3, 11: 5e3, 12: 5e3, 13: 5e3, 14: 5e3 })
+    await download(PARCOURS, STYLE)
+    const relief = mises.filter((u) => u.includes('/terrarium/12/'))
+    // Le carré de Paris est à cheval sur deux tuiles dans chaque sens au zoom
+    // 12 ; une de plus tout autour : quatre sur quatre.
+    expect(relief.length).toBe(16)
+    // Et son poids compte avec celui de la carte, qui l'efface avec elle.
+    expect(storedBytes(PARCOURS)).toBeGreaterThanOrEqual(16 * 1024)
+  })
+
+  it('part aussi quand le plafond des fonds de carte a mordu', async () => {
+    // Un mégaoctet de relief ne mérite pas d'attendre la place des bâtiments.
+    reseau({ 10: 60e6, 11: 60e6, 12: 60e6, 13: 60e6, 14: 60e6 })
+    await download(PARCOURS, STYLE)
+    expect(mises.some((u) => u.includes('/terrarium/12/'))).toBe(true)
+  })
+})
+
 describe('quand les tuiles sont énormes', () => {
   /** Six mégaoctets la tuile : Paris au zoom 14 dépasserait les 200 Mo. */
   const enorme = { 10: 6e6, 11: 6e6, 12: 6e6, 13: 6e6, 14: 6e6 }

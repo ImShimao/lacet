@@ -2,11 +2,11 @@
 //
 // Les calculs sont fidèles aux modules Python. Les appels réseau, eux, partent
 // désormais du téléphone : même services, mêmes paramètres, mêmes précautions
-// (échec silencieux pour le vent, repli IGN → Valhalla pour l'altitude, un
-// envoi à la fois vers Valhalla), et le cache vit dans IndexedDB.
+// (échec silencieux pour le vent, repli IGN → tuiles gardées → Valhalla pour
+// l'altitude, un envoi à la fois vers Valhalla), et le cache vit dans IndexedDB.
 
 import { store } from './store'
-import { degrees, pyFixed, pyHypot, pymod, pyRound, pyRoundInt, radians } from './py'
+import { degrees, pyFixed, pyfloordiv, pyHypot, pymod, pyRound, pyRoundInt, radians } from './py'
 
 // === Soleil ===================================================================
 
@@ -297,7 +297,7 @@ export class Terrain {
 }
 
 /** Altitudes de plusieurs tracés en une fois — `fetch_many`. */
-export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign', 'valhalla'] } = {}) {
+export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign', 'terrain', 'valhalla'] } = {}) {
   if (!routes.length) return []
   await purgeLegacy()
 
@@ -335,6 +335,9 @@ export async function fetchMany(routes, { fetchImpl = fetch, providers = ['ign',
       // cache retrouverait le seuil fin, et le tremblement avec lui.
       const kept = fresh.coarse[i] ? { z: fresh.values[i], c: 1 } : fresh.values[i]
       wanted.set(key, kept)
+      // Ni ce que disent les tuiles gardées : elles le rediront sans réseau, et
+      // l'IGN, s'il était rangé à leur place, ne serait plus jamais redemandé.
+      if (fresh.local[i]) return
       const [lon, lat] = coords[i]
       const tile = `${Math.floor(lon / ELEVATION_TILE)}_${Math.floor(lat / ELEVATION_TILE)}`
       tiles.get(tile)[key] = kept
@@ -371,12 +374,15 @@ const roundKey = (c) => `${pyRound(c[0], ROUND)},${pyRound(c[1], ROUND)}`
  * l'IGN côté français et prend Valhalla côté suisse, au lieu de tout redemander
  * au second et de perdre la précision du premier.
  *
- * Rend `null` si personne n'a rien su dire, et une liste à trous sinon.
+ * Rend `null` si personne n'a rien su dire, et une liste à trous sinon —
+ * avec, point par point, si l'altitude vient d'un modèle grossier, et si elle
+ * vient des tuiles gardées sur l'appareil.
  */
 async function fetchWithFallback(coords, providers, fetchImpl) {
   const values = new Array(coords.length).fill(null)
   // Quels points viennent d'un modèle grossier : c'est ce qui décide du seuil.
   const coarse = new Array(coords.length).fill(false)
+  const local = new Array(coords.length).fill(false)
   let todo = coords.map((_, i) => i)
 
   for (const provider of providers) {
@@ -398,15 +404,17 @@ async function fetchWithFallback(coords, providers, fetchImpl) {
       else {
         values[index] = answer[k]
         coarse[index] = provider !== 'ign'
+        local[index] = provider === 'terrain'
       }
     })
     todo = rest
   }
 
-  return todo.length === coords.length ? null : { values, coarse }
+  return todo.length === coords.length ? null : { values, coarse, local }
 }
 
 async function fetchProvider(provider, coords, fetchImpl) {
+  if (provider === 'terrain') return storedTerrain(coords)
   if (provider === 'ign') {
     const out = []
     for (let i = 0; i < coords.length; i += IGN_BATCH) {
@@ -491,6 +499,181 @@ async function valhallaHeights(batch, fetchImpl) {
   const heights = data.height ?? []
   if (heights.length !== batch.length) throw new Error(`${heights.length} altitudes pour ${batch.length} points`)
   return heights.map((z) => (missing(z) ? null : Number(z)))
+}
+
+// === Terrain Tiles ============================================================
+
+/**
+ * L'altitude sans réseau — `TERRAIN_URL` dans `elevation.py`.
+ *
+ * L'IGN et Valhalla sont des services : sans couverture, plus de D+. Les
+ * Terrain Tiles d'AWS (Mapzen, d'après Copernicus EU-DEM en Europe) se gardent,
+ * elles, avec la carte d'un parcours (`offlineMaps.js`), dans le même magasin.
+ * Mesuré le 19 octobre 2026 autour de Guebwiller et Soultz : au zoom 12, 3,5 m
+ * d'écart moyen avec l'IGN et un D+ à −1 % au total — au réglage grossier, que
+ * ce fournisseur reçoit puisqu'il n'est pas l'IGN. Les zooms 13 et 14 ne font
+ * qu'agrandir les mêmes données. On ne lit que les tuiles déjà sur l'appareil :
+ * en ligne, l'IGN répond mieux, et Valhalla sans rien télécharger.
+ */
+export const TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+export const TERRAIN_ZOOM = 12
+export const terrainTileUrl = (x, y, z = TERRAIN_ZOOM) =>
+  TERRAIN_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y)
+
+const mapFiles = store('maps')
+// Une tuile décodée pèse 256 Ko : on en garde une poignée, de quoi couvrir
+// une recherche de quinze kilomètres (six tuiles) sans tout relire.
+const GRID_MEMORY = 16
+const grids = new Map()
+
+/** Les octets RGB d'un PNG 8 bits sans entrelacement, filtres défaits — `decode_png`. */
+export async function decodePng(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
+  if (signature.some((v, i) => data[i] !== v)) throw new Error('pas un PNG')
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const idat = []
+  let width = 0
+  let height = 0
+  let channels = 0
+  for (let pos = 8; pos < data.length; ) {
+    const length = view.getUint32(pos)
+    const kind = String.fromCharCode(...data.subarray(pos + 4, pos + 8))
+    const body = data.subarray(pos + 8, pos + 8 + length)
+    if (kind === 'IHDR') {
+      width = view.getUint32(pos + 8)
+      height = view.getUint32(pos + 12)
+      const [depth, color, , , interlace] = body.subarray(8, 13)
+      if (depth !== 8 || interlace !== 0 || (color !== 2 && color !== 6)) throw new Error('PNG inattendu')
+      channels = color === 2 ? 3 : 4
+    } else if (kind === 'IDAT') idat.push(body)
+    pos += 12 + length
+  }
+  // DecompressionStream plutôt qu'une bibliothèque : WebKit l'a depuis iOS 16.4.
+  const stream = new Blob(idat).stream().pipeThrough(new DecompressionStream('deflate'))
+  const raw = new Uint8Array(await new Response(stream).arrayBuffer())
+
+  const stride = width * channels
+  const rgb = new Uint8Array(width * height * 3)
+  let prev = new Uint8Array(stride)
+  for (let y = 0; y < height; y += 1) {
+    const start = y * (stride + 1)
+    const kind = raw[start]
+    const line = raw.slice(start + 1, start + 1 + stride)
+    for (let i = 0; i < stride; i += 1) {
+      const a = i >= channels ? line[i - channels] : 0
+      const b = prev[i]
+      const c = i >= channels ? prev[i - channels] : 0
+      if (kind === 1) line[i] = (line[i] + a) & 255
+      else if (kind === 2) line[i] = (line[i] + b) & 255
+      else if (kind === 3) line[i] = (line[i] + ((a + b) >> 1)) & 255
+      else if (kind === 4) {
+        const p = a + b - c
+        const pa = Math.abs(p - a)
+        const pb = Math.abs(p - b)
+        const pc = Math.abs(p - c)
+        line[i] = (line[i] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255
+      }
+    }
+    for (let x = 0; x < width; x += 1) {
+      for (let k = 0; k < 3; k += 1) rgb[(y * width + x) * 3 + k] = line[x * channels + k]
+    }
+    prev = line
+  }
+  return { width, height, rgb }
+}
+
+/**
+ * Les altitudes d'une tuile, ligne après ligne — `terrarium_grid`.
+ *
+ * Float32 suffit et reste exact : R × 256 + G + B / 256 tient en 24 bits.
+ */
+export async function terrariumGrid(bytes) {
+  const { width, height, rgb } = await decodePng(bytes)
+  const grid = new Float32Array(width * height)
+  for (let k = 0; k < grid.length; k += 1) grid[k] = rgb[3 * k] * 256 + rgb[3 * k + 1] + rgb[3 * k + 2] / 256 - 32768
+  return grid
+}
+
+/** La position en pixels du monde entier au zoom `z` — `terrarium_pixel`. */
+export function terrariumPixel(lon, lat, z = TERRAIN_ZOOM) {
+  const n = 2 ** z * 256
+  const gx = ((lon + 180) / 360) * n - 0.5
+  const s = Math.sin(radians(lat))
+  const gy = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n - 0.5
+  return [gx, gy]
+}
+
+/**
+ * L'altitude de chaque point, interpolée entre les quatre centres de pixels
+ * voisins — `terrain_values`. `tile(z, x, y)` rend la grille d'une tuile (256 ×
+ * 256, ligne après ligne) ou `null` : le point reste alors sans réponse.
+ */
+export function terrainValues(coords, tile, z = TERRAIN_ZOOM) {
+  const seen = new Map()
+  const px = (x, y) => {
+    const tx = pyfloordiv(x, 256)
+    const ty = pyfloordiv(y, 256)
+    const key = `${tx},${ty}`
+    if (!seen.has(key)) seen.set(key, tile(z, tx, ty))
+    const grid = seen.get(key)
+    return grid ? grid[pymod(y, 256) * 256 + pymod(x, 256)] : null
+  }
+  return coords.map(([lon, lat]) => {
+    const [gx, gy] = terrariumPixel(lon, lat, z)
+    const x0 = Math.floor(gx)
+    const y0 = Math.floor(gy)
+    const u = gx - x0
+    const v = gy - y0
+    const a = px(x0, y0)
+    const b = px(x0 + 1, y0)
+    const c = px(x0, y0 + 1)
+    const d = px(x0 + 1, y0 + 1)
+    if (a === null || b === null || c === null || d === null) return null
+    const top = (1 - u) * a + u * b
+    const bottom = (1 - u) * c + u * d
+    return (1 - v) * top + v * bottom
+  })
+}
+
+/** Les tuiles qu'il faut pour ces points : celles des quatre pixels voisins. */
+function terrainTilesFor(coords, z = TERRAIN_ZOOM) {
+  const keys = new Set()
+  for (const [lon, lat] of coords) {
+    const [gx, gy] = terrariumPixel(lon, lat, z)
+    for (const x of [Math.floor(gx), Math.floor(gx) + 1]) {
+      for (const y of [Math.floor(gy), Math.floor(gy) + 1]) keys.add(`${pyfloordiv(x, 256)},${pyfloordiv(y, 256)}`)
+    }
+  }
+  return [...keys].map((k) => k.split(',').map(Number))
+}
+
+/** Les altitudes lues dans les tuiles gardées, sans jamais toucher au réseau. */
+async function storedTerrain(coords) {
+  // Celles de cet appel à part : le ménage de la mémoire ne doit pas jeter une
+  // tuile dont un long parcours a encore besoin.
+  const here = new Map()
+  for (const [x, y] of terrainTilesFor(coords)) {
+    const url = terrainTileUrl(x, y)
+    if (grids.has(url)) {
+      here.set(url, grids.get(url))
+      continue
+    }
+    let grid = null
+    try {
+      const file = await mapFiles.get(url)
+      if (file) grid = await terrariumGrid(file.bytes)
+    } catch {
+      grid = null // une tuile illisible vaut une tuile absente
+    }
+    // Une tuile absente n'est pas retenue : elle peut arriver avec la
+    // prochaine carte gardée.
+    if (!grid) continue
+    if (grids.size >= GRID_MEMORY) grids.delete(grids.keys().next().value)
+    grids.set(url, grid)
+    here.set(url, grid)
+  }
+  return terrainValues(coords, (z, x, y) => here.get(terrainTileUrl(x, y, z)) ?? null)
 }
 
 /** D+ et D− avec seuil d'hystérésis — `ascent_descent`. */

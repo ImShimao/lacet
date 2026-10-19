@@ -1,5 +1,16 @@
+import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { ELEVATION_STEP_M, ascentDescent, fetchMany, shapeRelief, smoothAlong } from './environment'
+import {
+  ELEVATION_STEP_M,
+  ascentDescent,
+  fetchMany,
+  shapeRelief,
+  smoothAlong,
+  terrainTileUrl,
+  terrariumGrid,
+  terrariumPixel,
+} from './environment'
+import { store } from './store'
 
 /**
  * L'altitude des boucles proposées.
@@ -216,5 +227,91 @@ describe('le dénivelé annoncé', () => {
 
   it('ne lisse rien quand les points sont plus espacés que le noyau', () => {
     expect(smoothAlong([100, 104, 100, 104], 100, 60)).toEqual([100, 104, 100, 104])
+  })
+})
+
+/**
+ * Un PNG RGB dont chaque ligne porte le filtre demandé (0 à 4). Les vraies
+ * tuiles mêlent les cinq, surtout le quatrième (Paeth) : un filtre mal défait
+ * décale l'altitude de toute la suite de la ligne.
+ */
+function png(rows, filters) {
+  const width = rows[0].length
+  const lines = rows.map((row) => Uint8Array.from(row.flat()))
+  const out = []
+  lines.forEach((line, y) => {
+    const prev = y ? lines[y - 1] : new Uint8Array(line.length)
+    const f = filters[y]
+    const enc = line.map((v, i) => {
+      const a = i >= 3 ? line[i - 3] : 0
+      const b = prev[i]
+      const c = i >= 3 ? prev[i - 3] : 0
+      const p = a + b - c
+      const paeth =
+        Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c
+      const pred = [0, a, b, (a + b) >> 1, paeth][f]
+      return (v - pred) & 255
+    })
+    out.push(f, ...enc)
+  })
+  const chunk = (kind, body) => {
+    const head = Buffer.alloc(8)
+    head.writeUInt32BE(body.length, 0)
+    head.write(kind, 4, 'latin1')
+    return Buffer.concat([head, Buffer.from(body), Buffer.alloc(4)])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(rows.length, 4)
+  ihdr.set([8, 2, 0, 0, 0], 8)
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(Buffer.from(out))),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+describe("l'altitude sans réseau, dans les tuiles gardées", () => {
+  it('décode un PNG terrarium quel que soit le filtre de ligne', async () => {
+    // 128 × 256 + 10 + 128 / 256 − 32768 = 10,5 m
+    const rows = [
+      [[128, 10, 128], [128, 20, 0], [130, 0, 0]],
+      [[128, 30, 64], [127, 255, 0], [129, 7, 192]],
+      [[128, 1, 0], [128, 2, 0], [128, 3, 0]],
+    ]
+    for (const filters of [[0, 0, 0], [1, 2, 3], [4, 4, 4], [3, 1, 4]]) {
+      expect([...(await terrariumGrid(png(rows, filters)))]).toEqual([10.5, 20, 512, 30.25, -1, 263.75, 1, 2, 3])
+    }
+  })
+
+  it('donne un D+ hors ligne quand la tuile est gardée, sans le figer dans le cache', async () => {
+    // Une pente douce d'ouest en est : un mètre par pixel, sur toute la tuile.
+    const rows = Array.from({ length: 256 }, () => Array.from({ length: 256 }, (_, x) => [128, x, 0]))
+    const [lon, lat] = [7.2108, 47.9097]
+    const [gx, gy] = terrariumPixel(lon, lat)
+    const url = terrainTileUrl(Math.floor(gx / 256), Math.floor(gy / 256))
+    await store('maps').set(url, { type: 'image/png', bytes: png(rows, rows.map(() => 4)) })
+
+    const horsLigne = async () => {
+      throw new TypeError('Load failed')
+    }
+    const route = [[lon, lat], [lon + 0.0005, lat]]
+    const [relief] = await fetchMany([route], { fetchImpl: horsLigne })
+    expect(relief.coarse).toBe(true)
+    expect(relief.values[1]).toBeGreaterThan(relief.values[0])
+
+    // Le réseau revenu, l'IGN est redemandé : sa réponse vaut mieux que la tuile.
+    const { fetchImpl, calls } = fakeIgn()
+    const [enLigne] = await fetchMany([route], { fetchImpl })
+    expect(calls.length).toBeGreaterThan(0)
+    expect(enLigne.coarse).toBe(false)
+  })
+
+  it('sans tuile ni réseau, pas de profil — et pas d’erreur', async () => {
+    const horsLigne = async () => {
+      throw new TypeError('Load failed')
+    }
+    expect(await fetchMany([[[-60.1, -20.2]]], { fetchImpl: horsLigne })).toEqual([null])
   })
 })

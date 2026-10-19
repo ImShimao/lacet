@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import math
+import struct
+import zlib
 
 import pytest
 
@@ -19,6 +21,9 @@ from app.elevation import (
     fetch_many,
     shape_relief,
     smooth_along,
+    terrain_values,
+    terrarium_grid,
+    terrarium_pixel,
 )
 from app.geo import bearing_deg, haversine_m, point_in_ring, resample
 from app.solar import is_night
@@ -199,8 +204,10 @@ class TestCouverture:
     """
 
     @staticmethod
-    def _fournisseurs(monkeypatch, ign, opentopo):
+    def _fournisseurs(monkeypatch, ign, opentopo, terrain=lambda coords: [None] * len(coords)):
         async def faux(provider, coords):
+            if provider == "terrain":
+                return terrain(coords)
             return ign(coords) if provider == "ign" else opentopo(coords)
 
         monkeypatch.setattr("app.elevation._fetch", faux)
@@ -225,7 +232,7 @@ class TestCouverture:
 
         self._fournisseurs(monkeypatch, ign, opentopo)
         coords = [(7.1, 47.5), (7.3, 47.5)]
-        values, coarse = asyncio.run(_fetch_with_fallback(coords))
+        values, coarse, _local = asyncio.run(_fetch_with_fallback(coords))
         assert values == [710.0, 1000.0]
         # Le second n'a reçu que le point resté sans réponse.
         assert vus == [[(7.3, 47.5)]]
@@ -277,3 +284,60 @@ class TestCouverture:
         monkeypatch.setattr("app.elevation._cache", ElevationCache(tmp_path))
         routes = [[(7.5, 46.3), (7.51, 46.3)]]
         assert asyncio.run(fetch_many(routes)) == [None]
+
+
+def _png(rows: list[list[tuple[int, int, int]]], filters: list[int]) -> bytes:
+    """Un PNG RGB, chaque ligne avec le filtre demandé (0 rien, 1 gauche, 2 haut)."""
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+    width, raw, prev = len(rows[0]), b"", bytes(len(rows[0]) * 3)
+    for row, f in zip(rows, filters):
+        line = bytes(v for px in row for v in px)
+        if f == 1:
+            line = bytes((line[i] - (line[i - 3] if i >= 3 else 0)) & 255 for i in range(len(line)))
+        elif f == 2:
+            line = bytes((line[i] - prev[i]) & 255 for i in range(len(line)))
+        raw += bytes([f]) + line
+        prev = bytes(v for px in row for v in px)
+    head = struct.pack(">IIBBBBB", width, len(rows), 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", head) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+class TestTerrainTiles:
+    """L'altitude sans réseau, lue dans les tuiles terrarium gardées."""
+
+    def test_le_png_se_decode_quel_que_soit_le_filtre(self):
+        # 128 × 256 + 10 + 128 / 256 − 32768 = 10,5 m
+        rows = [[(128, 10, 128), (128, 20, 0)], [(128, 30, 64), (127, 255, 0)]]
+        for filters in ([0, 0], [1, 2], [2, 1]):
+            assert terrarium_grid(_png(rows, filters)) == [[10.5, 20.0], [30.25, -1.0]]
+
+    def test_au_centre_d_un_pixel_sa_valeur(self):
+        grid = [[float(x + 1000 * y) for x in range(256)] for y in range(256)]
+        gx, gy = terrarium_pixel(7.2108, 47.9097)
+        x, y = math.floor(gx), math.floor(gy)
+        # Un point posé pile au centre du pixel lit ce pixel, sans voisin.
+        lon = (x + 0.5) / (2**12 * 256) * 360 - 180
+        z = terrain_values([(lon, 47.9097)], lambda *_: grid)[0]
+        assert z == pytest.approx(x % 256 + 1000 * (gy % 256), abs=1e-6)
+
+    def test_sans_tuile_pas_de_reponse(self):
+        assert terrain_values([(7.21, 47.91)], lambda *_: None) == [None]
+
+    def test_les_tuiles_completent_l_ign_sans_entrer_au_cache(self, monkeypatch, tmp_path):
+        """Hors ligne, les tuiles répondent, au réglage grossier. Mais leur
+        réponse n'est pas rangée : l'IGN, sinon, ne serait plus redemandé."""
+
+        def hors_ligne(coords):
+            raise OSError("pas de réseau")
+
+        TestCouverture._fournisseurs(
+            monkeypatch, hors_ligne, hors_ligne, terrain=lambda coords: [300.0] * len(coords)
+        )
+        cache = ElevationCache(tmp_path)
+        monkeypatch.setattr("app.elevation._cache", cache)
+        relief = asyncio.run(fetch_many([[(7.1, 47.5), (7.15, 47.5)]]))[0]
+        assert relief == Relief([300.0, 300.0], True)
+        assert cache.lookup([(7.1, 47.5)]) == {}
