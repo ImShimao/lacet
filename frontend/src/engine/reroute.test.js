@@ -157,6 +157,21 @@ describe('le recalcul en course', () => {
     // Le profil prévu se lit toujours sur le parcours d'origine.
     expect(1000 + next.plan_offset_m).toBeCloseTo(1500, -1)
   })
+
+  it('garde, après un recalcul au premier tour, les traversées du second', () => {
+    // Deux tours : chaque traversée est listée une fois par passage, comme le
+    // moteur la rend. Celle de (3, 0) est déjà passée au premier tour, celle de
+    // (6, 4) encore devant. Cherchées sur tout le tracé, les deux copies de
+    // (3, 0) tombaient sur le premier tour, et le second la perdait aussi.
+    const geometry = [...loop, ...loop.slice(1)]
+    const [x, y] = [at(3, 0), at(6, 4)].map(([lon, lat]) => ({ lon, lat, protected: false }))
+    const tours = { distance_m: 4800, laps: 2, geometry, instructions: [], segments: [], crossings: [x, y, { ...x }, { ...y }] }
+    // Écarté en (3, 2), on retrouve la boucle en (6, 2) : 300 m de raccord.
+    const raccord = { coords: [at(3, 2), at(4, 2), at(5, 2), at(6, 2)], connectM: 300, joinIndex: 8, steps: [] }
+    const next = spliceRoute(tours, raccord, buildTrack(geometry).cumulative[raccord.joinIndex])
+
+    expect(next.crossings.map(({ lon, lat }) => [lon, lat])).toEqual([at(6, 4), at(3, 0), at(6, 4)])
+  })
 })
 
 /**
