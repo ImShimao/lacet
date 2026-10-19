@@ -11,7 +11,7 @@
 
 import { bearingDeg, resample, haversineM } from './geo'
 import { Candidate, GOLDEN, figureEight, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
-import { blockedEdges } from './blocked'
+import { blockedEdges, withZones } from './blocked'
 import { carryBlocked, openDoor } from './door'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, pySum, sortByKey } from './py'
@@ -176,6 +176,9 @@ export function normalizeRequest(input) {
     //   blocked                    Les signalements faits en courant. Ils ne
     //                              quittent jamais l'appareil, et un serveur
     //                              n'aurait rien à en faire.
+    //   zones                      Les zones à éviter dessinées sur la carte,
+    //                              `{lon, lat, radius_m}` : leurs rues pèsent
+    //                              comme un signalement — voir `blocked.js`.
     //   doorstep                   Partir de la rue devant le point choisi, et
     //                              non du carrefour le plus proche : la rue est
     //                              coupée au droit de la porte, et la boucle
@@ -208,6 +211,7 @@ export function normalizeRequest(input) {
     avoid_bearings: input.avoid_bearings ?? [],
     avoid: input.avoid ?? [],
     blocked: input.blocked ?? [],
+    zones: input.zones ?? [],
     doorstep: input.doorstep ?? true,
     street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
     carfree: input.carfree !== false,
@@ -249,6 +253,15 @@ export function normalizeRequest(input) {
     bounded(p?.[0], 'blocked', { min: -180, max: 180 }),
     bounded(p?.[1], 'blocked', { min: -90, max: 90 }),
   ])
+  if (!Array.isArray(req.zones) || req.zones.length > 50) throw new PlanningError('Paramètre zones invalide.')
+  // Le curseur (`zones.js`) va de 100 m à 2 km ; le moteur tolère un peu plus
+  // large, mais pas une zone plus vaste que la ville : ce ne serait plus un
+  // évitement, mais une recherche sans réseau.
+  req.zones = req.zones.map((z) => ({
+    lon: bounded(z?.lon, 'zones', { min: -180, max: 180 }),
+    lat: bounded(z?.lat, 'zones', { min: -90, max: 90 }),
+    radius_m: bounded(z?.radius_m, 'zones', { min: 25, max: 5000 }),
+  }))
 
   req.seconds_per_km = req.sport === 'bike' ? 3600 / req.speed_kmh : req.pace_sec_per_km
 
@@ -384,7 +397,7 @@ export async function planLoops(input, deps) {
 
   // Les signalements se rapprochent des rues du graphe partagé : le graphe
   // dérivé ci-dessous partage ses géométries, pas ses tranches de coordonnées.
-  let blocked = blockedEdges(graph, req.blocked)
+  let blocked = withZones(graph, blockedEdges(graph, req.blocked), req.zones)
 
   // Le départ devant la porte, sur la rue — voir `door.js`. Le graphe de la
   // zone reste en cache tel quel ; la recherche travaille sur un dérivé qui
@@ -632,7 +645,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   // déclenché ce recalcul.
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
     avoid: req.avoid,
-    blocked: blockedEdges(graph, req.blocked),
+    blocked: withZones(graph, blockedEdges(graph, req.blocked), req.zones),
     carfree: req.carfree,
   })
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })

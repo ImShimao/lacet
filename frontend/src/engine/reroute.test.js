@@ -3,6 +3,8 @@ import { blockedEdges } from './blocked'
 import { buildGraph } from './graph'
 import { buildProfile } from './weights'
 import { planRejoin } from './reroute'
+import { planDetour } from './service'
+import { haversineM } from './geo'
 import { spliceRoute } from '../detour'
 import { buildTrack } from '../routeTracker'
 
@@ -206,6 +208,23 @@ describe('le retour au départ', () => {
     expect(near(retour.coords.at(-1), porte)).toBe(true)
     for (const b of barrages) expect(passesBy(retour.coords, b)).toBe(false)
     expect(retour.connectM).toBeCloseTo(500, -1)
+  })
+
+  it('contourne une zone à éviter, par la demande de la boucle', async () => {
+    // Le recalcul passe par `planDetour`, comme dans l'app : la zone voyage dans
+    // la demande. Elle couvre les avenues 2 et 3 entre les rues 1 et 2 ; le plus
+    // court (400 m) y passait, le tour par l'avenue 1 en fait 600.
+    const zone = { lon: at(2.5, 1.5)[0], lat: at(2.5, 1.5)[1], radius_m: 80 }
+    const retour = await planDetour(
+      {
+        request: { lat: LAT0, lon: LON0, distance_km: 2.4, zones: [zone] },
+        position: at(2.5, 3), heading: 180, geometry: loop, fromAlong: 900, travelledM: 900, plannedM: 2400, home: porte,
+      },
+      { loadGraph: async () => graph },
+    )
+    expect(near(retour.coords.at(-1), porte)).toBe(true)
+    for (const c of retour.coords) expect(haversineM(c, [zone.lon, zone.lat])).toBeGreaterThan(zone.radius_m)
+    expect(retour.connectM).toBeCloseTo(600, -1)
   })
 
   it('remplace la fin de la boucle — et des tours — par l’arrivée à la porte', () => {

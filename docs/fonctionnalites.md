@@ -47,6 +47,12 @@ s'exporte en un fichier si tu veux les emporter.
 fontaine, la rue d'un ami — et toutes les boucles proposées y passent, notées
 comme les autres.
 
+**Et il évite ce que tu ne veux pas.** Un quartier, une forêt de chasse, un
+chantier qui dure : le cercle hachuré des outils de carte pose une zone que
+toutes les boucles contournent, et le recalcul en course aussi. Elle reste
+d'une recherche à l'autre, et se renomme, se désactive ou se supprime dans
+« Mon compte › Sécurité ».
+
 Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
 « Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta

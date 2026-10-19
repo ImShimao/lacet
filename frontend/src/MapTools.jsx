@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
+import { ZONE_RADIUS } from './zones'
 
 /**
  * La colonne de boutons posée sur la carte, hors course.
  *
  * Trois questions, un bouton chacune, dans l'ordre où on se les pose : à quoi
  * ressemble la carte, où suis-je, d'où je pars. La boussole n'apparaît que
- * carte tournée, pour la remettre nord en haut.
+ * carte tournée, pour la remettre nord en haut. Le cercle hachuré dessine une
+ * zone que toutes les boucles contournent — voir `zones.js`.
  */
 export function MapTools({
   stylesOpen,
@@ -25,6 +27,8 @@ export function MapTools({
   onNorth,
   flying = false,
   onFlyover = null,
+  drawingZone = false,
+  onZone = null,
 }) {
   const [menu, setMenu] = useState(false)
 
@@ -119,6 +123,16 @@ export function MapTools({
           </div>
         )}
       </div>
+      {onZone && (
+        <button
+          className={`tool ${drawingZone ? 'tool--on' : ''}`}
+          onClick={onZone}
+          aria-pressed={drawingZone}
+          aria-label={drawingZone ? 'Annuler la zone à éviter' : 'Dessiner une zone à éviter'}
+        >
+          <Icon name="zone" />
+        </button>
+      )}
       {/* Le survol de la boucle choisie : seul bouton qui reste pendant qu'il
           tourne, pour l'arrêter. */}
       {onFlyover && (
@@ -134,6 +148,62 @@ export function MapTools({
       <button ref={compassRef} className="tool tool--compass" onClick={onNorth} aria-label="Remettre le nord en haut">
         <span className="needle" aria-hidden="true" />
       </button>
+    </div>
+  )
+}
+
+/**
+ * Poser une zone à éviter : toucher la carte au centre, régler le rayon, la nommer.
+ *
+ * La carte reste libre sous la carte de réglage — on la déplace et on zoome pour
+ * viser —, et chaque toucher déplace le centre : se tromper ne coûte qu'un
+ * autre toucher. Pourquoi un cercle plutôt qu'un contour : voir `zones.js`.
+ */
+export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
+  const placed = Number.isFinite(draft.lon)
+  const km = draft.radius_m >= 1000
+  return (
+    <div className="zonedraft" role="dialog" aria-label="Zone à éviter">
+      <b>Zone à éviter</b>
+      {placed ? (
+        <>
+          <label className="zonedraft__radius">
+            <span>
+              Rayon <em>{km ? `${(draft.radius_m / 1000).toFixed(1).replace('.', ',')} km` : `${draft.radius_m} m`}</em>
+            </span>
+            <input
+              type="range"
+              aria-label="Rayon de la zone"
+              min={ZONE_RADIUS.min}
+              max={ZONE_RADIUS.max}
+              step={ZONE_RADIUS.step}
+              value={draft.radius_m}
+              onChange={(e) => onChange({ ...draft, radius_m: Number(e.target.value) })}
+            />
+          </label>
+          <input
+            className="field"
+            type="text"
+            autoCapitalize="sentences"
+            autoCorrect="off"
+            maxLength={60}
+            placeholder="Forêt de chasse, chantier, quartier…"
+            aria-label="Nom de la zone"
+            value={draft.name}
+            onChange={(e) => onChange({ ...draft, name: e.target.value })}
+          />
+        </>
+      ) : (
+        <p className="muted small">Touche la carte au centre de ce que les boucles doivent contourner.</p>
+      )}
+      <div className="row">
+        <button className="btn" onClick={onCancel}>
+          Annuler
+        </button>
+        <button className="btn btn--primary" disabled={!placed} onClick={onKeep}>
+          Éviter cette zone
+        </button>
+      </div>
     </div>
   )
 }

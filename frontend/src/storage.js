@@ -347,6 +347,8 @@ export function importAll(text) {
   const favorites = merge(current.favorites, data.favorites, (r) => `${r.id}|${r.distance_m}`)
   const history = merge(current.history, data.history, (r) => r.ranAt || `${r.id}`)
   const reports = merge(current.reports, data.reports, (r) => r.id)
+  // Les zones à éviter de même : une zone dessinée depuis ne doit pas disparaître.
+  const zones = merge(current.zones, data.zones, (z) => z.id)
   // Les départs nommés aussi : « Chez moi » enregistré depuis la sauvegarde
   // ne doit pas disparaître parce qu'elle ne le connaissait pas.
   const places = merge(current.places, data.places, (p) => p.id ?? `${p.name}|${p.lat}|${p.lon}`)
@@ -357,6 +359,7 @@ export function importAll(text) {
     favorites: favorites.slice(0, 40),
     history: history.slice(0, 200),
     reports: reports.slice(0, 200),
+    zones: zones.slice(0, 30),
     places: places.slice(0, 8),
   })
   return { favorites: favorites.length, history: history.length }

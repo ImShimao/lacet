@@ -99,6 +99,38 @@ describe('la boucle', () => {
     expect(fin).toEqual(apres.routes[0].geometry[0])
   }, 30_000)
 
+  it('contourne une zone à éviter dessinée sur la carte', async () => {
+    // Le cas visé : un quartier, une forêt de chasse. La zone est posée sur la
+    // boucle qu'on obtenait sans elle ; aucune proposition n'y entre plus.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3 }
+    const avant = await planLoops({ ...demande, limit: 1 }, deps)
+    const chemin = avant.routes[0].geometry
+    const [lon, lat] = chemin[Math.floor(chemin.length / 2)]
+    const zone = { lon, lat, radius_m: 150 }
+
+    const apres = await planLoops({ ...demande, zones: [zone] }, deps)
+    expect(apres.routes.length).toBeGreaterThan(0)
+    for (const route of apres.routes) {
+      expect(Math.min(...route.geometry.map((c) => haversineM(c, [lon, lat])))).toBeGreaterThan(zone.radius_m)
+      expect(route.geometry.at(-1)).toEqual(route.geometry[0])
+    }
+  }, 60_000)
+
+  it('trouve encore des boucles quand le départ est dans la zone', async () => {
+    // Interdire la zone, ce serait n'avoir aucune boucle depuis chez soi : elle
+    // pèse lourd, et la boucle en sort par le plus court au lieu d'y tourner.
+    const zone = { lon: 4.8395, lat: 47.0245, radius_m: 300 }
+    const result = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3, zones: [zone] },
+      deps,
+    )
+    expect(result.routes.length).toBeGreaterThan(0)
+    for (const route of result.routes) {
+      const inside = route.geometry.filter((c) => haversineM(c, [zone.lon, zone.lat]) < zone.radius_m).length
+      expect(inside / route.geometry.length).toBeLessThan(0.25)
+    }
+  }, 60_000)
+
   it('cherche d’autres boucles entières avant de proposer des tours', async () => {
     // Douze propositions : le premier tirage n'en tient qu'une poignée de
     // distinctes, et la liste se complétait de tours.
