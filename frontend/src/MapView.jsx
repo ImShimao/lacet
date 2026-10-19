@@ -5,7 +5,8 @@ import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
-import { alongLine, bearingOf, drawPlan, drawnPart } from './routeDraw'
+import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt } from './routeDraw'
+import { km } from './format'
 
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
@@ -26,8 +27,10 @@ const DRAW_MS = 750
 const LONG_PRESS_MS = 500
 
 // Le survol : assez bas pour lire les rues, assez incliné pour voir venir le
-// relief, et le cap pris 250 m plus loin pour lisser les virages.
-const FLY_ZOOM = 15.6
+// relief, et le cap pris 250 m plus loin pour lisser les virages. Au zoom 15,6,
+// une colline des Vosges remplissait l'écran et ne se lisait plus comme telle :
+// 14,8 en montre le flanc entier, les rues toujours lisibles.
+const FLY_ZOOM = 14.8
 const FLY_PITCH = 62
 const FLY_AHEAD_M = 250
 
@@ -227,6 +230,8 @@ export default function MapView({
     })
 
     instance.on('click', (event) => {
+      // Pendant le survol, toucher la carte le met en pause : rien d'autre.
+      if (flying.current) return
       if (handlers.current.placingVia) {
         handlers.current.onVia?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
@@ -475,43 +480,114 @@ export default function MapView({
   }, [overview])
 
   // --- survol 3D ------------------------------------------------------------------
-  // La boucle vue d'en haut, carte inclinée, de la porte à la porte : on y
-  // reconnaît les rues avant d'y courir. Un doigt sur la carte l'arrête, et la
-  // carte revient à plat sur toute la boucle.
+  // La boucle vue d'en haut, carte inclinée sur le relief, de la porte à la
+  // porte : une pastille y court, la caméra la suit, et la part déjà parcourue
+  // s'allume derrière elle — on y reconnaît les rues et les côtes avant d'y
+  // courir. Toucher la carte met en pause et reprend ; la faire glisser arrête
+  // le survol, et la carte revient à plat sur toute la boucle.
+  const hud = useRef(null)
+  const flying = useRef(false)
   useEffect(() => {
     const m = map.current
-    const line = nav.current.route?.geometry
+    const route = nav.current.route
+    const line = route?.geometry
+    // Une carte recréée dont le style n'est pas encore posé n'a pas de tracé à
+    // survoler : y ajouter le relief plantait toute l'app. Le bouton repasse
+    // alors sur « 3D », au lieu de rester sur un survol qui ne vient pas.
     if (!m || !flyover || !(line?.length > 1)) return undefined
+    if (!m.getLayer('route-line')) {
+      handlers.current.onFlyoverEnd?.()
+      return undefined
+    }
+    flying.current = true
     const { total, at } = alongLine(line)
+    const plan = drawPlan({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } })
     // Environ 600 m par seconde : une boucle de 10 km se survole en 17 s.
     const ms = Math.min(30_000, Math.max(10_000, total / 0.6))
-    const camera = (d, bearing) => ({ center: at(d), bearing, pitch: FLY_PITCH, zoom: FLY_ZOOM })
+    // Mouvement réduit : la caméra ne bouge pas, la boucle se voit d'un bloc,
+    // inclinée, et seule la pastille avance.
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const camera = (center, bearing) => ({ center, bearing, pitch: FLY_PITCH, zoom: FLY_ZOOM })
     const ahead = (d) => bearingOf(at(d), at(d + FLY_AHEAD_M))
+    const unrelief = relief(m)
+
+    const el = document.createElement('div')
+    el.className = 'flypin'
+    el.innerHTML = '<span class="flypin__pulse"></span><span class="flypin__dot"></span>'
+    const pin = new maplibregl.Marker({ element: el }).setLngLat(line[0]).addTo(m)
+    // Le reste de la boucle s'efface un peu : ce qui est parcouru doit se détacher.
+    m.setPaintProperty('route-line', 'line-opacity', 0.55)
+    m.setPaintProperty('route-arrows', 'line-opacity', 0.4)
+
+    const show = (d, paused) => {
+      const box = hud.current
+      if (!box) return
+      box.querySelector('[data-km]').textContent = km(d, 1)
+      const ele = profileAt(route.elevation_profile, (d / total) * (route.elevation_profile?.at(-1)?.dist_m ?? total))
+      box.querySelector('[data-ele]').textContent = ele == null ? '' : `${Math.round(ele)} m`
+      box.dataset.paused = String(paused)
+    }
+
     let raf = 0
     let bearing = ahead(0)
-    let t0 = null
+    let elapsed = 0
+    let last = null
+    let paused = false
     const frame = (now) => {
-      t0 ??= now
-      const t = Math.min(1, (now - t0) / ms)
+      const dt = last == null ? 0 : now - last
+      last = now
+      if (!paused) elapsed += dt
+      const t = Math.min(1, elapsed / ms)
       const d = t * total
-      // Le cap rattrape celui de la route petit à petit, par le plus court.
-      const turn = ((((ahead(d) - bearing) % 360) + 540) % 360) - 180
-      bearing += turn * 0.05
-      m.jumpTo(camera(d, bearing))
+      // La pastille est au bout de la traînée : tirées du même calcul, elles
+      // ne se décollent jamais l'une de l'autre.
+      const flown = drawnPart(plan, t)
+      const head = flown.features[0]?.geometry.coordinates.at(-1) ?? line[0]
+      m.getSource('flown')?.setData(flown)
+      pin.setLngLat(head)
+      if (!still && !paused) {
+        bearing = easeBearing(bearing, ahead(d), dt)
+        m.jumpTo(camera(head, bearing))
+      }
+      show(d, paused)
       if (t < 1) raf = requestAnimationFrame(frame)
       else handlers.current.onFlyoverEnd?.()
     }
-    m.easeTo({ ...camera(0, bearing), duration: 1200 })
-    const begin = setTimeout(() => (raf = requestAnimationFrame(frame)), 1200)
+    if (still) {
+      const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
+      m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 50, duration: 0 })
+    } else {
+      m.easeTo({ ...camera(line[0], bearing), duration: 1200 })
+    }
+    show(0, false)
+    const begin = setTimeout(() => (raf = requestAnimationFrame(frame)), still ? 0 : 1200)
+
+    const toggle = () => {
+      paused = !paused
+    }
     const stop = (event) => {
       if (event.originalEvent) handlers.current.onFlyoverEnd?.()
     }
-    const events = ['mousedown', 'touchstart', 'wheel']
+    const events = ['dragstart', 'wheel', 'rotatestart', 'pitchstart']
     for (const name of events) m.on(name, stop)
+    m.on('click', toggle)
     return () => {
+      flying.current = false
       clearTimeout(begin)
       cancelAnimationFrame(raf)
       for (const name of events) m.off(name, stop)
+      m.off('click', toggle)
+      pin.remove()
+      // La carte a pu être détruite avant ce nettoyage (démontage, rechargement
+      // à chaud) : la toucher encore plantait l'app.
+      if (map.current !== m) return
+      m.getSource('flown')?.setData(empty())
+      if (m.getLayer('route-line')) {
+        m.setPaintProperty('route-line', 'line-opacity', 1)
+        m.setPaintProperty('route-arrows', 'line-opacity', 1)
+      }
+      // Pas de relief en course : il coûte des tuiles et du calcul à chaque image.
+      unrelief()
       // Le départ d'une sortie reprend la caméra lui-même.
       if (nav.current.navigate) return
       const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
@@ -628,6 +704,15 @@ export default function MapView({
   return (
     <>
       <div ref={container} className="map" />
+      {flyover && (
+        <div className="flyhud" ref={hud} data-paused="false">
+          <span className="flyhud__km">
+            <b data-km>0,0</b> km
+          </span>
+          <span className="flyhud__ele" data-ele />
+          <span className="flyhud__hint">En pause · touche pour reprendre</span>
+        </div>
+      )}
       {navigate && !locked && (
         <button
           className="recenter"
@@ -873,6 +958,24 @@ function addLayers(m) {
     paint: { 'line-pattern': 'route-chevron', 'line-width': 12 },
   })
 
+  // La traînée du survol : la part de boucle déjà parcourue par la pastille,
+  // blanche cernée de violet, au-dessus du tracé que le survol atténue.
+  m.addSource('flown', { type: 'geojson', data: empty() })
+  m.addLayer({
+    id: 'flown-glow',
+    type: 'line',
+    source: 'flown',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#8B5CF6', 'line-width': 14, 'line-opacity': 0.55, 'line-blur': 4 },
+  })
+  m.addLayer({
+    id: 'flown-line',
+    type: 'line',
+    source: 'flown',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F2F0F7', 'line-width': 5 },
+  })
+
   m.addSource('crossings', { type: 'geojson', data: empty() })
   m.addLayer({
     id: 'crossing-dots',
@@ -901,6 +1004,67 @@ function addLayers(m) {
 }
 
 const empty = () => ({ type: 'FeatureCollection', features: [] })
+
+// Le relief du survol : les Terrain Tiles d'AWS (Mapzen), libres et sans clé.
+// Au-delà du zoom 12, elles n'apportent rien en France (mesuré le 19 octobre
+// 2026 : les zooms 13 et 14 ne font qu'agrandir les mêmes données).
+const DEM = {
+  type: 'raster-dem',
+  tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+  encoding: 'terrarium',
+  tileSize: 256,
+  maxzoom: 12,
+  attribution: 'Relief : Mapzen / Copernicus EU-DEM',
+}
+
+/**
+ * Pose le relief sous la carte et rend de quoi le retirer. Hors ligne, ou dès
+ * qu'une tuile d'altitude échoue, la carte reste — ou retombe — à plat :
+ * un relief troué de tuiles manquantes serait pire que pas de relief.
+ *
+ * Deux sources plutôt qu'une : MapLibre recommande de ne pas partager celle du
+ * relief avec l'ombrage, qui se disputeraient son cache de tuiles.
+ */
+function relief(m) {
+  if (!navigator.onLine) return () => {}
+  const drop = () => {
+    m.off('error', failed)
+    if (m.getTerrain?.()) m.setTerrain(null)
+    if (m.getLayer('flyover-shade')) m.removeLayer('flyover-shade')
+    for (const id of ['flyover-dem', 'flyover-shade-dem']) if (m.getSource(id)) m.removeSource(id)
+  }
+  const failed = (event) => {
+    if (event.sourceId === 'flyover-dem' || event.sourceId === 'flyover-shade-dem') drop()
+  }
+  try {
+    m.addSource('flyover-dem', DEM)
+    m.addSource('flyover-shade-dem', DEM)
+    // Sous tout ce que l'app dessine. Plus marqué que l'ombrage d'une carte
+    // claire : sur le fond sombre, à 0,35, les collines de Guebwiller ne se
+    // voyaient pas ; les versants éclairés prennent le violet de l'app.
+    m.addLayer(
+      {
+        id: 'flyover-shade',
+        type: 'hillshade',
+        source: 'flyover-shade-dem',
+        paint: {
+          'hillshade-exaggeration': 0.6,
+          'hillshade-shadow-color': 'rgba(0, 0, 0, 0.7)',
+          'hillshade-highlight-color': 'rgba(183, 157, 255, 0.22)',
+          'hillshade-accent-color': 'rgba(10, 9, 16, 0.2)',
+        },
+      },
+      'accuracy-fill',
+    )
+    // Un peu exagéré : vue de haut et de biais, une côte de 50 m se lit à
+    // peine à l'échelle réelle.
+    m.setTerrain({ source: 'flyover-dem', exaggeration: 1.5 })
+    m.on('error', failed)
+  } catch {
+    drop()
+  }
+  return drop
+}
 
 /** Cercle géographique approché — MapLibre ne sait pas dessiner un rayon en mètres. */
 function circlePolygon([lon, lat], radiusM, steps = 48) {

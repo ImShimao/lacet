@@ -89,6 +89,30 @@ export function bearingOf(a, b) {
 }
 
 /**
+ * Le cap de la caméra du survol, qui rattrape `target` par le plus court
+ * chemin, en un temps qui ne dépend pas de la cadence d'affichage : avec un pas
+ * fixe par image, un iPhone à 120 Hz tournait deux fois plus vite qu'à 60 Hz,
+ * et une image sautée donnait un à-coup au virage.
+ */
+export function easeBearing(current, target, dtMs, tauMs = 500) {
+  const turn = ((((target - current) % 360) + 540) % 360) - 180
+  return current + turn * (1 - Math.exp(-Math.max(0, dtMs) / tauMs))
+}
+
+/** L'altitude à `metres` du départ, interpolée dans le profil de la boucle, ou `null`. */
+export function profileAt(profile, metres) {
+  if (!profile?.length) return null
+  if (metres <= profile[0].dist_m) return profile[0].ele_m
+  for (let i = 1; i < profile.length; i += 1) {
+    const [a, b] = [profile[i - 1], profile[i]]
+    if (metres > b.dist_m) continue
+    const span = b.dist_m - a.dist_m
+    return span ? a.ele_m + ((b.ele_m - a.ele_m) * (metres - a.dist_m)) / span : b.ele_m
+  }
+  return profile[profile.length - 1].ele_m
+}
+
+/**
  * La trace d'une sortie en croquis SVG, cadrée dans `width` × `height` : le
  * chemin `d` d'un `<path>`, et le point de départ. `null` sans trace.
  */
