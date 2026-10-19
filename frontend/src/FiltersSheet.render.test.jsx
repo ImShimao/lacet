@@ -92,6 +92,33 @@ describe('le panneau des filtres', () => {
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('demande un D+ précis à la place des trois réglages', () => {
+    // « On ne peut pas demander un D+ en particulier », reprochait-on à RunnrZ.
+    const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
+    fireEvent.click(screen.getByRole('checkbox', { name: /Un D\+ précis/ }))
+    // On part de 10 m par kilomètre, la cible de Vallonné, qui se décoche.
+    expect(screen.getByText('100 m de D+')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Vallonné/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText(/entre 80 et 120 m passent devant/)).toBeInTheDocument()
+
+    // Au clavier, comme la distance : « environ 150 m ».
+    fireEvent.click(screen.getByText('100 m de D+'))
+    const champ = screen.getByRole('textbox', { name: 'Valeur' })
+    fireEvent.change(champ, { target: { value: '150' } })
+    fireEvent.keyDown(champ, { key: 'Enter' })
+    expect(screen.getByText(/entre 120 et 180 m passent devant/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0]).toMatchObject({ climb_m: 150 })
+  })
+
+  it('reprend une tuile de relief en oubliant le D+ précis', () => {
+    const { onApply } = ouvrir({ ...DEFAULTS, climb_m: 150 })
+    fireEvent.click(screen.getByRole('button', { name: /Plat/ }))
+    expect(screen.queryByText(/m de D\+/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0]).toMatchObject({ elevation: 'flat', climb_m: null })
+  })
+
   it('montre la vitesse et non l’allure à vélo', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', speed_kmh: 20 })
     expect(screen.getByText('Vitesse')).toBeInTheDocument()

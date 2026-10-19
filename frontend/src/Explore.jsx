@@ -16,7 +16,7 @@ import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
-import { reliefMismatch, surfaceMismatch } from './explain'
+import { climbMismatch, reliefMismatch, surfaceMismatch } from './explain'
 import { km } from './format'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
@@ -171,7 +171,8 @@ export default function Explore({
   }
 
   const terrain = TERRAINS[params.sport].find((t) => t.key === params.surface)
-  const relief = reliefMismatch(params.elevation, routes)
+  const relief =
+    params.climb_m != null ? climbMismatch(params.climb_m, routes) : reliefMismatch(params.elevation, routes)
   const ground = surfaceMismatch(params.surface, routes)
 
   const exportGpx = async () => {
@@ -233,9 +234,11 @@ export default function Explore({
           Le dire, plutôt que de laisser croire que ces boucles sont des côtes. */}
       {relief && (
         <div className="notice">
-          {relief.kind === 'hilly'
-            ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
-            : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
+          {relief.kind === 'climb'
+            ? `Rien autour de ${params.climb_m} m d'ici : la boucle la plus proche monte de ${relief.ascent} m.`
+            : relief.kind === 'hilly'
+              ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
+              : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
         </div>
       )}
       {/* Le même aveu pour le terrain : ces boucles passent devant parce

@@ -15,6 +15,11 @@
  *   (cd frontend && npx vite-node scripts/measure_loops.mjs)
  *   … -- --region <dossier des tuiles> --out mesure.json --only soultz --heading
  *
+ * `--climb` mesure plutôt le D+ visé (« environ 150 m ») : combien de boucles
+ * tombent à ±20 % du D+ demandé, avec la préférence la plus proche (Plat,
+ * Vallonné, Côtes) puis avec le D+ lui-même. Le dénivelé y est celui de l'app,
+ * sur l'altitude IGN fine, gardée dans `scripts/.cache/elevation.json`.
+ *
  * Les budgets de temps de la recherche sont pensés pour l'iPhone, un peu plus
  * de deux fois plus lent qu'un PC de bureau (`docs/performances.md`) : ils sont
  * divisés par `--ratio` (2,2 par défaut), pour que le PC s'arrête là où
@@ -125,6 +130,31 @@ function offlineElevations(grid) {
     })
 }
 
+/**
+ * `fetchElevations` réel, l'altitude IGN de chaque point, gardée sur le disque
+ * au cent-millième de degré comme dans l'app : le D+ qu'on compte est celui
+ * que l'app annoncerait. La grille de la zone, elle, reste celle du cache.
+ */
+const fineFile = join(CACHE, 'elevation.json')
+const fineStore = existsSync(fineFile) ? JSON.parse(readFileSync(fineFile, 'utf8')) : {}
+const fineKey = ([x, y]) => `${x.toFixed(5)},${y.toFixed(5)}`
+function fineElevations(grid) {
+  const terrain = offlineElevations(grid)
+  return async (routes) => {
+    if (routes.length === 1 && routes[0].length === grid.points().length) return terrain(routes)
+    const unknown = [...new Set(routes.flat().map(fineKey))].filter((k) => !(k in fineStore))
+    if (unknown.length) {
+      const [relief] = await fetchMany([unknown.map((k) => k.split(',').map(Number))])
+      if (!relief?.values?.length) throw new Error('Altitude IGN indisponible')
+      unknown.forEach((k, i) => {
+        fineStore[k] = relief.values[i]
+      })
+      writeFileSync(fineFile, JSON.stringify(fineStore))
+    }
+    return routes.map((coords) => ({ values: coords.map((c) => fineStore[fineKey(c)]), coarse: false }))
+  }
+}
+
 // --- une recherche -------------------------------------------------------------
 
 async function run(name, distanceKm, limit, elevation, safety, extra = {}) {
@@ -138,7 +168,7 @@ async function run(name, distanceKm, limit, elevation, safety, extra = {}) {
   const t0 = performance.now()
   const result = await planLoops(input, {
     loadGraph: async () => graph,
-    fetchElevations: offlineElevations(grid),
+    fetchElevations: flag('climb') ? fineElevations(grid) : offlineElevations(grid),
     wind: async () => null,
     settings: { ...SETTINGS, widenBudgetMs: WIDEN_BUDGET_MS / RATIO },
     trace: {
@@ -170,7 +200,59 @@ async function run(name, distanceKm, limit, elevation, safety, extra = {}) {
     missingTiles: missing,
     bearings: whole.map((r) => r.bearing),
     shapes: whole.map((r) => r.shape),
+    ascents: result.routes.map((r) => r.ascent_m),
+    routeGrades: result.routes.map((r) => r.safety.grade),
   }
+}
+
+// --- « environ 150 m » -------------------------------------------------------------
+
+if (flag('climb')) {
+  // Des D+ ronds, comme on les tape, de la plaine aux Vosges.
+  const CLIMBS = { 5: [25, 50, 75, 100, 150], 9: [40, 75, 110, 150, 225, 300], 15: [60, 120, 180, 250, 375, 500] }
+  // Les cibles de `ELEVATION_TARGET_PER_KM` : avant, on prenait la plus proche.
+  const PRESETS = { flat: 3, rolling: 10, hilly: 22 }
+  const nearest = (perKm) =>
+    Object.keys(PRESETS).reduce((a, b) => (Math.abs(PRESETS[b] - perKm) < Math.abs(PRESETS[a] - perKm) ? b : a))
+  const near = (ascent, climb) => ascent !== null && Math.abs(ascent - climb) <= 0.2 * climb
+  const presetRuns = new Map()
+  const cases = []
+  for (const name of option('only')?.split(',') ?? Object.keys(STARTS)) {
+    for (const [km, climbs] of Object.entries(CLIMBS)) {
+      for (const climb of climbs) {
+        const preset = nearest(climb / km)
+        const key = `${name},${km},${preset}`
+        if (!presetRuns.has(key)) presetRuns.set(key, await run(name, Number(km), 8, preset, 'safe'))
+        const before = presetRuns.get(key)
+        const after = await run(name, Number(km), 8, preset, 'safe', { climb_m: climb })
+        const tally = (row) => ({
+          near: row.ascents.filter((z) => near(z, climb)).length,
+          first: near(row.ascents[0] ?? null, climb),
+          routes: row.routes,
+          a: row.routeGrades.filter((g) => g === 'A').length,
+          seconds: row.seconds,
+        })
+        cases.push({ name, km: Number(km), climb, preset, before: tally(before), after: tally(after) })
+        process.stderr.write(
+          `${name} ${km} km ${climb} m (${preset}) : ±20 % ${tally(before).near} → ${tally(after).near} / 8, ` +
+            `A ${tally(before).a} → ${tally(after).a}, D+ ${after.ascents.join(' ')}\n`,
+        )
+      }
+    }
+  }
+  const add = (g, side, key) => g.reduce((t, c) => t + Number(c[side][key]), 0)
+  const line = (label, g) =>
+    `| ${label} | ${add(g, 'before', 'near')} / ${add(g, 'before', 'routes')} | ${add(g, 'after', 'near')} / ${add(g, 'after', 'routes')} | ` +
+    `${add(g, 'before', 'first')} → ${add(g, 'after', 'first')} / ${g.length} | ${add(g, 'before', 'a')} → ${add(g, 'after', 'a')} |`
+  console.log('\n| Demande | Boucles à ±20 %, avant | Après | 1ʳᵉ proposition à ±20 % | Notées A |')
+  console.log('|---|---|---|---|---|')
+  for (const [km, climbs] of Object.entries(CLIMBS)) {
+    for (const climb of climbs) console.log(line(`${km} km, ${climb} m`, cases.filter((c) => c.km === Number(km) && c.climb === climb)))
+  }
+  for (const name of new Set(cases.map((c) => c.name))) console.log(line(name, cases.filter((c) => c.name === name)))
+  console.log(line('Total', cases))
+  if (OUT) writeFileSync(OUT, JSON.stringify(cases, null, 1))
+  process.exit(0)
 }
 
 // --- le tableau ------------------------------------------------------------------

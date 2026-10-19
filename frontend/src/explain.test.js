@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reliefMismatch, surfaceMismatch } from './explain'
+import { climbBand, climbMismatch, reliefMismatch, surfaceMismatch } from './explain'
 
 /**
  * Le relief demandé que le terrain ne donne pas. À Colmar, « Côtes » rendait
@@ -25,6 +25,24 @@ describe('reliefMismatch', () => {
   it('ne juge ni « Vallonné », ni des boucles sans altitude', () => {
     expect(reliefMismatch('rolling', [boucle(8)])).toBeNull()
     expect(reliefMismatch('hilly', [boucle(null)])).toBeNull()
+  })
+})
+
+/** Le D+ visé que le coin n'offre pas : 400 m en pleine plaine. */
+describe('climbMismatch', () => {
+  it('reprend la fourchette du moteur', () => {
+    expect(climbBand(150, 10)).toEqual([120, 180])
+    // Jamais moins de 2 m/km de part et d'autre : 20 m sur 10 km.
+    expect(climbBand(40, 10)).toEqual([20, 60])
+  })
+
+  it('dit ce qui s’en approche le plus quand rien ne tombe dedans', () => {
+    expect(climbMismatch(400, [boucle(120), boucle(210), boucle(90)])).toEqual({ kind: 'climb', ascent: 210 })
+  })
+
+  it('se tait dès qu’une boucle tient le D+, ou sans D+ visé', () => {
+    expect(climbMismatch(150, [boucle(60), boucle(170)])).toBeNull()
+    expect(climbMismatch(null, [boucle(60)])).toBeNull()
   })
 })
 

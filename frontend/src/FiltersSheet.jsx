@@ -2,6 +2,7 @@ import { useState } from 'react'
 import useModal from './useModal'
 import Icon from './Icon.jsx'
 import { InfoButton } from './Explain.jsx'
+import { climbBand } from './explain'
 import { pace } from './format'
 
 export const SPORTS = [
@@ -132,6 +133,8 @@ export const DEFAULTS = {
   duration_min: 60,
   surface: 'mixed',
   elevation: 'rolling',
+  // Un D+ visé, en mètres — « environ 150 m » —, à la place des trois tuiles.
+  climb_m: null,
   safety: 'safe',
   time_of_day: 'auto',
   pace_sec_per_km: 390,
@@ -174,6 +177,16 @@ function durationStep(min) {
   return min < 120 ? 5 : 15
 }
 
+// Le D+ visé : au-delà, le moteur refuse (`normalizeRequest`).
+const MAX_CLIMB = 5000
+
+/** Dix mètres en bas, cinquante en montagne : comme la distance, le pas suit la valeur. */
+function climbStep(m) {
+  if (m < 200) return 10
+  if (m < 500) return 25
+  return 50
+}
+
 /**
  * Ce qui change le tracé, et rien d'autre.
  *
@@ -194,6 +207,8 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   // panneau montre donc exactement ce qui sera utilisé.
   const usesSpeed = isBike || draft.speedUnit === 'speed'
   const maxKm = MAX_KM[draft.sport]
+  const km = draft.mode === 'distance' ? draft.distance_km : estimateKm(draft)
+  const climbing = draft.climb_m != null
 
   return (
     <div className="modal" onClick={onClose}>
@@ -439,11 +454,56 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                   key={r.key}
                   label={r.label}
                   icon={r.icon}
-                  on={draft.elevation === r.key}
-                  onClick={() => set({ elevation: r.key })}
+                  on={!climbing && draft.elevation === r.key}
+                  onClick={() => set({ elevation: r.key, climb_m: null })}
                 />
               ))}
             </div>
+            {/* « On ne peut pas demander un D+ en particulier » : la plainte
+                revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
+                (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
+                cible de Vallonné. */}
+            <div className="checks checks--after">
+              <button
+                role="checkbox"
+                aria-checked={climbing}
+                className={`check ${climbing ? 'check--on' : ''}`}
+                onClick={() => set({ climb_m: climbing ? null : Math.max(10, Math.round(km) * 10) })}
+              >
+                <span className="check__box">
+                  <Icon name="check" size={13} />
+                </span>
+                <span>
+                  Un D+ précis
+                  <em>« Environ 150 m », plutôt que les trois réglages</em>
+                </span>
+              </button>
+            </div>
+            {climbing && (
+              <>
+                <Stepper
+                  text={`${draft.climb_m} m de D+`}
+                  editable={{
+                    value: draft.climb_m,
+                    onCommit: (v) => set({ climb_m: Math.round(clamp(v, 0, MAX_CLIMB)) }),
+                  }}
+                  onStep={(d) => {
+                    const step = climbStep(draft.climb_m + (d > 0 ? 0 : -0.001))
+                    set({ climb_m: round(clamp(draft.climb_m + d * step, 0, MAX_CLIMB), step) })
+                  }}
+                  canDown={draft.climb_m > 0}
+                  canUp={draft.climb_m < MAX_CLIMB}
+                />
+                <p className="field__hint">
+                  {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
+                    draft.climb_m,
+                    km,
+                  )
+                    .map(Math.round)
+                    .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
+                </p>
+              </>
+            )}
           </Field>
 
           <Field label="Direction">

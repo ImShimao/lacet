@@ -185,6 +185,33 @@ describe('le relief', () => {
     expect(result.meta.elevation_skipped).toBe(true)
     expect(result.routes[0].elevation_profile).toBeNull()
   }, 2_000)
+
+  it('va chercher le D+ demandé', async () => {
+    // « Environ 60 m » : un coteau à 5 % à l'est du départ, la plaine à l'ouest.
+    // Avec les réglages de l'app — départ devant la porte, tirages
+    // supplémentaires —, que la parité ne voit pas.
+    const height = ([lon]) => 200 + Math.max(0, lon - 4.8395) * 111_320 * Math.cos((47 * Math.PI) / 180) * 0.05
+    const deps = {
+      loadGraph: async () => graph,
+      fetchElevations: async (routes) => routes.map((coords) => ({ values: coords.map(height), coarse: false })),
+      wind: async () => null,
+    }
+    const ascents = async (climb) =>
+      (await planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 5, limit: 4, climb_m: climb }, deps)).routes.map(
+        (r) => r.ascent_m,
+      )
+    const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length
+    const plat = await ascents(0)
+    const coteau = await ascents(60)
+    expect(Math.abs(coteau[0] - 60)).toBeLessThan(Math.abs(plat[0] - 60))
+    expect(mean(coteau)).toBeGreaterThan(mean(plat) + 20)
+  }, 30_000)
+
+  it('refuse un D+ négatif', async () => {
+    await expect(
+      planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 5, climb_m: -10 }, { loadGraph: async () => graph }),
+    ).rejects.toThrow('Paramètre climb_m invalide.')
+  })
 })
 
 describe('un village sans boucle', () => {

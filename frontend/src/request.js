@@ -46,6 +46,8 @@ export function toRequest(p, start) {
   if (avoid.length) body.avoid = avoid
   // Actif par défaut dans le moteur : seul le refus se dit.
   if (p.carfree === false) body.carfree = false
+  // Un D+ visé remplace Plat, Vallonné, Côtes dans le moteur.
+  if (p.climb_m != null) body.climb_m = p.climb_m
   // « Auto » ne se dit pas : sans cap, la recherche est celle d'avant.
   const direction = directionOf(p.direction)
   if (direction) body.heading = direction.deg
