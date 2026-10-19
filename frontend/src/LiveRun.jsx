@@ -189,6 +189,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // `followRoute`. Une sortie reprise après une coupure, elle, est n'importe où.
   const fromStart = useRef(!resuming)
   const strayCount = useRef(0)
+  // « Pas de chemin de retour » déjà dit pour cet écart — voir `detour`.
+  const saidNoPath = useRef(false)
   const lastSplit = useRef(0)
   const heading = useRef(null)
   const moved = useRef(null)
@@ -658,6 +660,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       strayCount.current += 1
       if (strayCount.current === OFF_ROUTE_FIXES) {
         setOffRoute(true)
+        // Un nouvel écart : qu'il n'y ait pas de chemin se dit de nouveau. Le
+        // retour sur le tracé et le recalcul remettent tous deux `strayCount` à
+        // zéro, et repassent donc par ici.
+        saidNoPath.current = false
         // Parti du mauvais côté : on est sur la fin de la boucle, à rebours.
         // « Écarté » ne dit pas quoi faire ; « demi-tour », si.
         const backwards = wrongWay(track, lastOnPoint.current, point, farthest.current)
@@ -939,7 +945,14 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       } else if (strayCount.current >= OFF_ROUTE_FIXES) {
         dueAt.current = Date.now() + REROUTE_RETRY_MS
         setRerouteDue(dueAt.current)
-        talk("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
+        // Une fois par écart : les essais suivants se font en silence, le
+        // compte à rebours reste à l'écran. Redite toutes les trente secondes,
+        // la phrase revenait plus de soixante fois de suite à qui continuait
+        // hors du tracé — et une voix qui radote, on la coupe.
+        if (!saidNoPath.current) {
+          saidNoPath.current = true
+          talk("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
+        }
       }
     } finally {
       detouring.current = false
