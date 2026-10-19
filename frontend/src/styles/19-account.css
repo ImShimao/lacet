@@ -189,3 +189,9 @@
 .acct--page > .section:first-child {
   margin-top: 0;
 }
+
+/* La case « Longueur et allure » : cochée pour de bon. Grisée, on comprend
+   qu'elle ne se décoche pas avant même d'avoir essayé. */
+.check:disabled {
+  opacity: 0.6;
+}

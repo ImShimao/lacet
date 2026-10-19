@@ -15,6 +15,8 @@ vi.mock('./platform', () => ({ isNative: () => false, saveTextFile: vi.fn() }))
 
 const Account = (await import('./Account.jsx')).default
 const { DEFAULTS } = await import('./FiltersSheet.jsx')
+const { voiceSettings } = await import('./voice')
+const { load } = await import('./storage')
 
 /** L'écran de l'app, réduit à ce qui compte ici : le corps qui défile, et le retour de l'en-tête. */
 function Ecran() {
@@ -95,5 +97,96 @@ describe('Mon compte', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('garde les réglages de la voix pour la sortie suivante', () => {
+    localStorage.clear()
+    const page = () =>
+      render(
+        <Account
+          page="run"
+          params={DEFAULTS}
+          geo={{ status: 'idle' }}
+          history={[]}
+          poiPrefs={{}}
+          onPoiPrefs={() => {}}
+          onProfile={() => {}}
+          onClearData={async () => {}}
+          onRestored={() => {}}
+        />,
+      )
+    page()
+    fireEvent.click(screen.getByRole('button', { name: 'Tous les 2 km' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Temps du km' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Temps couru' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plus tôt' }))
+    expect(voiceSettings()).toEqual({ km: 2, lap: false, pace: true, total: true, lead: 'early' })
+
+    // Rouverte, la page montre ce qui a été gardé.
+    cleanup()
+    page()
+    expect(screen.getByRole('button', { name: 'Tous les 2 km' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Temps du km' }).getAttribute('aria-pressed')).toBe('false')
+
+    // Kilomètres tus : ce qu'ils diraient n'a plus à se régler.
+    fireEvent.click(screen.getByRole('button', { name: 'Jamais' }))
+    expect(screen.queryByRole('button', { name: 'Allure' })).toBeNull()
+    expect(voiceSettings().km).toBe(0)
+    localStorage.clear()
+  })
+
+  it('masque un filtre en le remettant à sa valeur par défaut', () => {
+    const onProfile = vi.fn()
+    const page = (params) =>
+      render(
+        <Account
+          page="search"
+          params={params}
+          geo={{ status: 'idle' }}
+          history={[]}
+          poiPrefs={{}}
+          onPoiPrefs={() => {}}
+          onProfile={onProfile}
+          onClearData={async () => {}}
+          onRestored={() => {}}
+        />,
+      )
+    page({ ...DEFAULTS, surface: 'trail', carfree: false })
+    // La longueur ne se décoche pas : sans elle, pas de recherche.
+    expect(screen.getByRole('checkbox', { name: /Longueur et allure/ }).disabled).toBe(true)
+
+    // Un « Sentier » masqué ne doit pas continuer d'agir sans qu'on le voie.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Terrain/ }))
+    expect(onProfile).toHaveBeenLastCalledWith({ hiddenFilters: ['terrain'], surface: 'mixed', carfree: true })
+
+    // Masqué, la case dit la valeur qui s'applique ; recochée, elle réapparaît.
+    cleanup()
+    page({ ...DEFAULTS, hiddenFilters: ['terrain'] })
+    const terrain = screen.getByRole('checkbox', { name: /Terrain/ })
+    expect(terrain.getAttribute('aria-checked')).toBe('false')
+    expect(terrain.textContent).toContain('Masqué. Mixte')
+    fireEvent.click(terrain)
+    expect(onProfile).toHaveBeenLastCalledWith({ hiddenFilters: [] })
+  })
+
+  it('laisse l’écran se mettre en veille si on le demande', () => {
+    localStorage.clear()
+    render(
+      <Account
+        page="run"
+        params={DEFAULTS}
+        geo={{ status: 'idle' }}
+        history={[]}
+        poiPrefs={{}}
+        onPoiPrefs={() => {}}
+        onProfile={() => {}}
+        onClearData={async () => {}}
+        onRestored={() => {}}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Toujours allumé' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Veille normale' }))
+    expect(load().keepScreenOn).toBe(false)
+    localStorage.clear()
   })
 })

@@ -18,7 +18,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
+import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
 import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
@@ -26,6 +26,7 @@ import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { StopsSetting } from './Stops.jsx'
 import { KINDS } from './pois'
+import { voiceSettings } from './voice'
 
 /** Les familles du sommaire, dans leur ordre. */
 const GROUPS = ['Paramètres', 'Données', 'Infos']
@@ -171,13 +172,23 @@ function summaryOf(key, { params, poiPrefs }) {
       return `Poids ${params.weight_kg || 70} kg`
     case 'search': {
       const moment = MOMENTS.find((m) => m.key === (params.time_of_day ?? 'auto'))?.label ?? 'Auto'
-      return `Moment ${moment.toLowerCase()} · ${params.count ?? 5} boucles proposées`
+      const hidden = params.hiddenFilters?.length ?? 0
+      return [
+        `Moment ${moment.toLowerCase()}`,
+        // « proposées » tombe quand un filtre est masqué : la ligne débordait.
+        `${params.count ?? 5} boucles${hidden ? '' : ' proposées'}`,
+        hidden ? `${hidden} filtre${hidden > 1 ? 's' : ''} masqué${hidden > 1 ? 's' : ''}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'run': {
       const stops = Object.entries(KINDS)
         .filter(([kind]) => poiPrefs?.[kind])
         .map(([, k]) => k.label.toLowerCase())
-      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, ...stops].join(' · ')
+      const { km } = voiceSettings()
+      const voice = km ? (km > 1 ? 'Voix tous les 2 km' : null) : 'Kilomètres tus'
+      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, voice, ...stops].filter(Boolean).join(' · ')
     }
     case 'safety': {
       const reports = activeReports().length
@@ -233,7 +244,13 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
         <>
           <h3 className="section">Pause automatique</h3>
           <AutoPauseSetting />
+          {/* L'écran verrouillé était rangé sous « Pause automatique », avec
+              laquelle il n'a rien à voir. */}
+          <h3 className="section">Écran</h3>
+          <ScreenOnSetting />
           <LockScreenSetting />
+          <h3 className="section">Voix</h3>
+          <VoiceSetting />
           <h3 className="section">Le long du parcours</h3>
           <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
         </>
@@ -411,8 +428,7 @@ function SearchSettings({ params, onProfile }) {
         />
         <p className="field__hint">
           La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
-          quand ils raccourcissent. « Auto » compare l'heure du calcul au coucher du
-          soleil, calculé pour le point de départ et pour aujourd'hui.
+          quand ils rallongent. « Auto » choisit selon l'heure du coucher du soleil au départ.
         </p>
       </div>
 
@@ -428,6 +444,65 @@ function SearchSettings({ params, onProfile }) {
           le calcul, et les dernières se ressemblent davantage.
         </p>
       </div>
+
+      <ShownFilters params={params} onProfile={onProfile} />
+    </div>
+  )
+}
+
+/**
+ * Les filtres qu'on veut voir dans le panneau, une case par filtre.
+ *
+ * Décocher remet le filtre à sa valeur par défaut, et la case le dit : un
+ * réglage qu'on ne voit plus ne doit pas continuer d'agir en douce (voir
+ * `OPTIONAL_FILTERS`). La longueur et l'allure sont cochées pour de bon.
+ */
+function ShownFilters({ params, onProfile }) {
+  const hidden = params.hiddenFilters ?? []
+  const toggle = (f) =>
+    onProfile(
+      hidden.includes(f.key)
+        ? { hiddenFilters: hidden.filter((k) => k !== f.key) }
+        : { hiddenFilters: [...hidden, f.key], ...f.reset },
+    )
+  return (
+    <div className="field">
+      <span className="label">Filtres affichés</span>
+      <div className="checks">
+        <button role="checkbox" aria-checked="true" className="check check--on" disabled>
+          <span className="check__box">
+            <Icon name="check" size={13} />
+          </span>
+          <span>
+            Longueur et allure
+            <em>Toujours affichées : sans elles, pas de recherche.</em>
+          </span>
+        </button>
+        {OPTIONAL_FILTERS.map((f) => {
+          const on = !hidden.includes(f.key)
+          return (
+            <button
+              key={f.key}
+              role="checkbox"
+              aria-checked={on}
+              className={`check ${on ? 'check--on' : ''}`}
+              onClick={() => toggle(f)}
+            >
+              <span className="check__box">
+                <Icon name="check" size={13} />
+              </span>
+              <span>
+                {f.label}
+                <em>{on ? f.hint : `Masqué. ${f.fixed}`}</em>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="field__hint">
+        Décoche ce que tu ne changes jamais : le panneau Filtres raccourcit d'autant. Un filtre
+        masqué revient à son réglage par défaut, écrit sous son nom.
+      </p>
     </div>
   )
 }
@@ -699,6 +774,109 @@ function AutoPauseSetting() {
           : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
       </p>
     </>
+  )
+}
+
+/**
+ * L'écran reste allumé pendant une sortie, par défaut : c'est la carte qu'on
+ * suit. Mais le téléphone au brassard ou dans la poche n'est jamais regardé, et
+ * l'écran allumé une heure et demie vide la batterie bien avant la fin d'une
+ * sortie longue. Éteint, la voix et l'écran verrouillé guident quand même.
+ * Lu au départ d'une sortie (`LiveRun.jsx`).
+ */
+function ScreenOnSetting() {
+  const [on, setOn] = useState(() => load().keepScreenOn !== false)
+  return (
+    <>
+      <div className="seg" role="radiogroup" aria-label="Écran allumé pendant la sortie">
+        {[
+          [true, 'Toujours allumé'],
+          [false, 'Veille normale'],
+        ].map(([value, label]) => (
+          <button
+            key={String(value)}
+            role="radio"
+            aria-checked={on === value}
+            onClick={() => {
+              setOn(value)
+              save({ keepScreenOn: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {on
+          ? "L'écran ne s'éteint pas pendant la sortie : la carte reste sous les yeux, au prix de la batterie."
+          : "L'écran s'éteint comme d'habitude : la voix et l'écran verrouillé continuent de guider. Le bon choix pour un téléphone au brassard ou dans la poche."}
+      </p>
+    </>
+  )
+}
+
+const KM_EVERY = [
+  { key: 1, label: 'Chaque km' },
+  { key: 2, label: 'Tous les 2 km' },
+  { key: 0, label: 'Jamais' },
+]
+const KM_SAYS = [
+  ['lap', 'Temps du km'],
+  ['pace', 'Allure'],
+  ['total', 'Temps couru'],
+]
+const LEADS = [
+  { key: 'early', label: 'Plus tôt' },
+  { key: 'normal', label: 'Normal' },
+  { key: 'late', label: 'Plus tard' },
+]
+
+/**
+ * Ce que la voix dit de confort, et quand.
+ *
+ * La plainte n° 1 dans les avis des apps concurrentes, c'est la voix : trop
+ * bavarde pour les uns, muette pour les autres. Seul le confort se règle :
+ * les alertes de traversée, l'écart du parcours et le « maintenant » d'un
+ * virage se disent toujours. Lu au départ d'une sortie (`LiveRun.jsx`).
+ */
+function VoiceSetting() {
+  const [prefs, setPrefs] = useState(voiceSettings)
+  const change = (patch) => {
+    const next = { ...prefs, ...patch }
+    setPrefs(next)
+    save({ voice: next })
+  }
+  return (
+    <div className="fields">
+      <div className="field">
+        <span className="label">Kilomètres</span>
+        <Segmented options={KM_EVERY} value={prefs.km} onChange={(km) => change({ km })} />
+        <p className="field__hint">À vélo, la voix parle tous les 5 km, ou tous les 10.</p>
+      </div>
+
+      {prefs.km !== 0 && (
+        <div className="field">
+          <span className="label">À chaque kilomètre</span>
+          <div className="seg" role="group" aria-label="Ce que dit la voix à chaque kilomètre">
+            {KM_SAYS.map(([key, label]) => (
+              <button key={key} aria-pressed={prefs[key]} onClick={() => change({ [key]: !prefs[key] })}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="field__hint">La distance est toujours dite ; le reste, à ton choix.</p>
+        </div>
+      )}
+
+      <div className="field">
+        <span className="label">Annonce des virages</span>
+        <Segmented options={LEADS} value={prefs.lead} onChange={(lead) => change({ lead })} />
+        <p className="field__hint">
+          Une trentaine de secondes avant le carrefour, à la normale. Le « Maintenant », lui, ne
+          bouge pas, et les alertes de traversée ou d'écart se disent toujours.
+        </p>
+      </div>
+    </div>
   )
 }
 
