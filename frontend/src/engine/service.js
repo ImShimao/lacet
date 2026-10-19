@@ -211,6 +211,9 @@ export function normalizeRequest(input) {
     doorstep: input.doorstep ?? true,
     street: typeof input.street === 'string' && input.street.trim() ? input.street.trim().slice(0, 120) : null,
     carfree: input.carfree !== false,
+    // Préférer parcs, bois, eau et sentiers balisés — partagé avec Python
+    // (`LoopRequest.nature`), donc vu par la parité.
+    nature: input.nature !== false,
     widen: input.widen !== false,
     heading: input.heading ?? null,
     via: input.via ?? null,
@@ -433,6 +436,7 @@ export async function planLoops(input, deps) {
     avoid: req.avoid,
     blocked,
     carfree: req.carfree,
+    nature: req.nature,
     terrain: wantsFlat(req) ? terrain : null,
   })
 
@@ -634,6 +638,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
     avoid: req.avoid,
     blocked: blockedEdges(graph, req.blocked),
     carfree: req.carfree,
+    nature: req.nature,
   })
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }

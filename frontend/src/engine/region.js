@@ -79,6 +79,11 @@ export function fromRegionTile(data) {
     landuse: data.l.map(([id, coords]) => ({ id, flat: unpair(coords) })),
     crossings: nodes.filter((n) => n.tags?.highway === 'crossing'),
     barriers: nodes.filter((n) => keptBarrier(n.tags)),
+    // Parcs, bois, eau, et voies de sentiers balisés — depuis octobre 2026.
+    // Une tuile plus ancienne n'en a pas ; elle se relit sans, et la voie
+    // y perd seulement sa préférence pour la nature.
+    green: (data.g ?? []).map(([id, fill, rings]) => ({ id, fill: fill === 1, rings: rings.map(unpair) })),
+    marked: data.r ?? [],
   }
 }
 
@@ -97,6 +102,8 @@ export function toRegionTile(extract) {
     w: extract.ways.map((way) => [way.id, way.tags, delta(way.nodes), pair(way.flat)]),
     l: extract.landuse.map((area) => [area.id, pair(area.flat)]),
     c: nodesOf(extract).map((c) => [c.id, Math.round(c.lon * 1e7), Math.round(c.lat * 1e7), c.tags]),
+    g: (extract.green ?? []).map((area) => [area.id, area.fill ? 1 : 0, area.rings.map(pair)]),
+    r: extract.marked ?? [],
   }
 }
 

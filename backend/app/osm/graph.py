@@ -21,6 +21,7 @@ from typing import Any
 
 from ..geo import Coord, haversine_m, planar_distance, point_in_ring, ring_bbox
 from .extract import Extract, Way, read as read_extract
+from .green import green_index
 from ..safety.exclusion import is_excluded, oneway_for, tunnel_is_unprotected
 from ..safety.risk import EdgeSafety, evaluate_edge
 
@@ -48,6 +49,10 @@ class Edge:
     name: str | None
     tunnel: bool
     oneway: int = 0  # 1 : de a vers b seulement ; -1 : de b vers a — voir `oneway_for`
+    # Part de l'arête qui longe un parc, un bois ou l'eau (0 à 1) — voir `osm.green`.
+    green: float = 0.0
+    # Sur un sentier balisé : la voie fait partie d'une relation `route`.
+    marked: bool = False
 
     def other(self, node: int) -> int:
         return self.b if self.a == node else self.a
@@ -463,10 +468,15 @@ def build_graph(
                     name=name,
                     tunnel=tunnel,
                     oneway=oneway,
+                    marked=way_id in extract.marked,
                 )
             )
             graph.adj[ra].append(idx)
             graph.adj[rb].append(idx)
+
+    # --- indice vert ---------------------------------------------------------
+    for edge, green in zip(graph.edges, green_index([e.coords for e in graph.edges], extract.green, origin)):
+        edge.green = green
 
     # --- traversées --------------------------------------------------------
     for node in extract.crossings:

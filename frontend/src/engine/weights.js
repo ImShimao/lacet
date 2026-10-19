@@ -5,6 +5,12 @@
 import { pyMin } from './py'
 import { CYCLE_FACILITY, EXPOSED_RISK, nightFactor } from './safety'
 
+// La préférence « nature » — voir `GREEN_BONUS` en Python : un bonus borné pour
+// ce qui longe un parc, un bois ou l'eau, et pour les sentiers balisés, jamais
+// pour une voie exposée.
+const GREEN_BONUS = 0.25
+const MARKED_BONUS = 0.15
+
 const LAMBDA = { safe: 4, standard: 1.5 }
 
 // L'ordre des clés compte : `min(self._factors.values())` les lit dans cet ordre.
@@ -81,12 +87,23 @@ const NIGHT_MIN_FACTOR = 0.7 * 0.9
 const CLIMB_WEIGHT = 25
 
 export class Profile {
-  constructor({ lam, surface, night, sport = 'run', avoid = [], blocked = null, carfree = false, terrain = null }) {
+  constructor({
+    lam,
+    surface,
+    night,
+    sport = 'run',
+    avoid = [],
+    blocked = null,
+    carfree = false,
+    terrain = null,
+    nature = true,
+  }) {
     this.lam = lam
     this.surface = surface
     this.night = night
     this.sport = sport
     this.carfree = carfree
+    this.nature = nature
     this.factors = (sport === 'bike' ? SURFACE_FACTOR_BIKE : SURFACE_FACTOR)[surface]
     this.avoid = avoid.filter((key) => key in AVOIDS).map((key) => AVOIDS[key])
     this.blocked = blocked
@@ -109,6 +126,9 @@ export class Profile {
     if (this.terrain !== null) {
       w *= 1 + (CLIMB_WEIGHT * this.terrain.climb(graph.coordsFrom(e, graph.edgeA[e]))) / Math.max(graph.edgeLen[e], 1)
     }
+    if (this.nature && s.risk < EXPOSED_RISK) {
+      w *= 1 - GREEN_BONUS * graph.edgeGreen[e] - (graph.edgeMarked[e] ? MARKED_BONUS : 0)
+    }
     if (this.carfree && s.carFree && surface <= CAR_FREE_SURFACE_MAX) w *= CAR_FREE_FACTOR
     for (const test of this.avoid) if (test(s)) w *= AVOID_FACTOR
     if (this.blocked?.has(e)) w *= BLOCKED_FACTOR
@@ -128,6 +148,7 @@ export class Profile {
   get minFactor() {
     let factor = pyMin(this.factors.values())
     if (this.night) factor *= NIGHT_MIN_FACTOR
+    if (this.nature) factor *= 1 - GREEN_BONUS - MARKED_BONUS
     // L'heuristique d'A* reste admissible : une voie sans voitures descend sous
     // le facteur de surface.
     if (this.carfree) factor *= CAR_FREE_FACTOR
@@ -140,7 +161,7 @@ export function buildProfile(
   safety,
   night,
   sport = 'run',
-  { avoid = [], blocked = null, carfree = false, terrain = null } = {},
+  { avoid = [], blocked = null, carfree = false, terrain = null, nature = true } = {},
 ) {
-  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree, terrain })
+  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree, terrain, nature })
 }

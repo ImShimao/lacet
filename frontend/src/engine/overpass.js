@@ -208,6 +208,20 @@ out geom;
   node["barrier"]["bicycle"~"^(no|private)$"](${bbox});
   node["barrier"~"^(${NO_BIKE_BARRIERS})$"](${bbox});
 );
+out body;
+(
+  way["leisure"="park"](${bbox});
+  way["landuse"="forest"](${bbox});
+  way["natural"~"^(wood|water)$"](${bbox});
+  way["waterway"~"^(river|canal)$"](${bbox});
+  rel["type"="multipolygon"]["leisure"="park"](${bbox});
+  rel["type"="multipolygon"]["landuse"="forest"](${bbox});
+  rel["type"="multipolygon"]["natural"~"^(wood|water)$"](${bbox});
+);
+out geom;
+(
+  rel["route"~"^(hiking|foot|running)$"](${bbox});
+);
 out body;`
 }
 
@@ -296,8 +310,29 @@ export function splitIntoTiles(extract, rect) {
     }
   }
 
-  for (const way of extract.ways) place(way.flat, (part) => part.ways.push(way))
+  // Une voie de sentier balisé le reste dans chaque tuile où elle va.
+  const marked = new Set(extract.marked ?? [])
+  for (const way of extract.ways) {
+    place(way.flat, (part) => {
+      part.ways.push(way)
+      if (marked.has(way.id)) part.marked.push(way.id)
+    })
+  }
   for (const area of extract.landuse) place(area.flat, (part) => part.landuse.push(area))
+  // Une forêt entière dans chaque tuile qu'elle touche : son intérieur ne se
+  // peint qu'avec tout son contour (`green.js`).
+  for (const area of extract.green ?? []) {
+    let all = area.rings[0]
+    if (area.rings.length > 1) {
+      all = new Float64Array(area.rings.reduce((sum, r) => sum + r.length, 0))
+      let at = 0
+      for (const r of area.rings) {
+        all.set(r, at)
+        at += r.length
+      }
+    }
+    place(all, (part) => part.green.push(area))
+  }
   for (const c of extract.crossings) {
     place(Float64Array.of(c.lon, c.lat), (part) => part.crossings.push(c))
   }

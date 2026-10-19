@@ -52,6 +52,10 @@ BUCKET = 20
 EXCLUDED_HIGHWAYS = "motorway|motorway_link|trunk|trunk_link|construction|proposed|raceway|bus_guideway|escape"
 BUILTUP_LANDUSE = "residential|retail|commercial|industrial|education"
 EXCLUDED_SERVICE = "parking_aisle|driveway|drive-through|slipway"
+# Parcs, bois et eau, et les sentiers balisés : l'indice vert du moteur
+# (`src/engine/green.js`). Recopiés de `GREEN_TAGS` dans `src/engine/extract.js`.
+GREEN_TAGS = {"leisure": ["park"], "landuse": ["forest"], "natural": ["wood", "water"], "waterway": ["river", "canal"]}
+ROUTES = {"hiking", "foot", "running"}
 
 EXCLUDED = set(EXCLUDED_HIGHWAYS.split("|"))
 BUILTUP = set(BUILTUP_LANDUSE.split("|"))
@@ -63,6 +67,10 @@ SERVICE = set(EXCLUDED_SERVICE.split("|"))
 # garde que ce qui est fermé, sans quoi les parcs perdraient leurs allées.
 CLOSED_ACCESS = {"no", "private"}
 NO_BIKE_BARRIERS = {"stile", "turnstile", "full-height_turnstile", "kissing_gate"}
+
+
+def is_green(tags: dict) -> bool:
+    return any(tags.get(key) in values for key, values in GREEN_TAGS.items())
 
 
 def kept_node(tags: dict) -> bool:
@@ -286,20 +294,34 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
     (`kept_node`). Une voie qui porte à la fois
     `highway` et un `landuse` bâti est rangée comme voie — c'est ce que fait
     `fromOverpass` de la même voie revenue par la seconde requête.
+
+    Et pour l'indice vert : chaque parc, bois ou plan d'eau (`g`, rempli), dans
+    toutes les tuiles qu'il touche — son intérieur ne se peint qu'avec tout son
+    contour —, chaque rivière comme un trait, et les voies de sentiers balisés
+    (`r`). Les multipolygones arrivent assemblés par osmium, quand Overpass les
+    rend en morceaux : `green.js` remplit les deux pareil.
     """
     count = 0
-    # Le filtre ne laisse remonter en Python que ce qui porte une de ces clés :
-    # quelques millions d'objets au lieu de centaines de millions de nœuds. Les
-    # positions, elles, sont retenues avant le filtre.
     import osmium  # ici, et non en tête : le choix des tuiles se teste sans lui.
 
+    routes = marked_ways(pbf)
+    # Le filtre ne laisse remonter en Python que ce qui porte une de ces clés :
+    # quelques millions d'objets au lieu de centaines de millions de nœuds. Les
+    # positions, elles, sont retenues avant le filtre. Seules les relations
+    # vertes sont assemblées en surfaces, pas les millions de bâtiments.
     processor = (
         osmium.FileProcessor(str(pbf))
         .with_locations(locations)
-        .with_filter(osmium.filter.KeyFilter("highway", "landuse", "barrier"))
+        .with_areas(osmium.filter.KeyFilter("leisure", "landuse", "natural"))
+        .with_filter(osmium.filter.KeyFilter("highway", "landuse", "barrier", "leisure", "natural", "waterway"))
     )
     for obj in processor:
         tags = {t.k: t.v for t in obj.tags}
+        if obj.is_area():
+            # Une rivière fermée reste un trait, comme dans `fromOverpass`.
+            if is_green(tags) and not tags.get("waterway"):
+                write_green(obj, keep, buckets)
+            continue
         if obj.is_node():
             if kept_node(tags) and obj.location.valid():
                 x, y = obj.location.x, obj.location.y
@@ -319,7 +341,8 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
             and tags.get("area") != "yes"
         )
         built = tags.get("landuse") in BUILTUP
-        if not road and not built:
+        river = highway is None and not built and tags.get("waterway") in GREEN_TAGS["waterway"]
+        if not road and not built and not river:
             continue
 
         refs, xs, ys = [], [], []
@@ -335,14 +358,53 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
         if highway is not None:
             kind = "w"
             record = json.dumps([obj.id, tags, delta(refs), delta_pairs(xs, ys)], ensure_ascii=False, separators=(",", ":"))
-        else:
+        elif built:
             kind = "l"
             record = json.dumps([obj.id, delta_pairs(xs, ys)], separators=(",", ":"))
+        else:
+            kind = "g"
+            record = json.dumps([obj.id, 0, [delta_pairs(xs, ys)]], separators=(",", ":"))
         for ix, iy in tiles_of(xs, ys, keep):
             buckets.write(ix, iy, kind, obj.id, record)
             if kind == "w":
                 count += 1
+                if obj.id in routes:
+                    buckets.write(ix, iy, "r", obj.id, str(obj.id))
     return count
+
+
+def marked_ways(pbf: Path) -> set[int]:
+    """Les voies des sentiers balisés, membres d'une relation `route` de randonnée ou de course.
+
+    Un passage à part, sur les seules relations : il faut les connaître avant de
+    croiser leurs voies, qui viennent avant elles dans le fichier.
+    """
+    import osmium
+
+    ways: set[int] = set()
+    for rel in osmium.FileProcessor(str(pbf), osmium.osm.RELATION).with_filter(osmium.filter.KeyFilter("route")):
+        if rel.tags.get("route") in ROUTES:
+            ways.update(m.ref for m in rel.members if m.type == "w")
+    return ways
+
+
+def write_green(area, keep: set[tuple[int, int]], buckets: Buckets) -> None:
+    """Range une surface verte, anneaux extérieurs et trous, dans chaque tuile qu'elle touche."""
+    rings = []
+    for outer in area.outer_rings():
+        for ring in [outer, *area.inner_rings(outer)]:
+            points = [n.location for n in ring if n.location.valid()]
+            if points:
+                rings.append(([p.x for p in points], [p.y for p in points]))
+    if not rings:
+        return
+    # Même espace d'identifiants que `fromOverpass` : la voie, ou la relation en négatif.
+    gid = area.orig_id() if area.from_way() else -area.orig_id()
+    record = json.dumps([gid, 1, [delta_pairs(xs, ys) for xs, ys in rings]], separators=(",", ":"))
+    xs = [x for ring_xs, _ in rings for x in ring_xs]
+    ys = [y for _, ring_ys in rings for y in ring_ys]
+    for ix, iy in tiles_of(xs, ys, keep):
+        buckets.write(ix, iy, "g", gid, record)
 
 
 # --- second passage : ranger tuile par tuile -------------------------------------------------
@@ -350,7 +412,7 @@ def sort_to_disk(pbf: Path, keep: set[tuple[int, int]], buckets: Buckets, locati
 
 def tiles_in(bucket_file: Path):
     """Les tuiles d'un carré, dans l'ordre (ligne, colonne), texte JSON prêt."""
-    grouped = defaultdict(lambda: {"w": [], "l": [], "c": []})
+    grouped = defaultdict(lambda: {"w": [], "l": [], "c": [], "g": [], "r": []})
     with bucket_file.open(encoding="utf-8") as handle:
         for line in handle:
             ix, iy, kind, oid, record = line.rstrip("\n").split("\t", 4)
@@ -360,7 +422,7 @@ def tiles_in(bucket_file: Path):
         if not parts["w"]:
             continue  # une tuile sans rue — lac, forêt sans chemin : Overpass dira pareil
         body = {k: ",".join(r for _, r in sorted(v)) for k, v in parts.items()}
-        yield ix, iy, f'{{"w":[{body["w"]}],"l":[{body["l"]}],"c":[{body["c"]}]}}'
+        yield ix, iy, "{" + ",".join(f'"{k}":[{body[k]}]' for k in ("w", "l", "c", "g", "r")) + "}"
 
 
 def main() -> None:

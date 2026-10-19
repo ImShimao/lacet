@@ -322,6 +322,9 @@ export function openDoor(
   g.edgeWayId = grow(Float64Array, graph.edgeWayId, edges.map((x) => graph.edgeWayId[x.like]))
   g.edgeTunnel = grow(Uint8Array, graph.edgeTunnel, edges.map((x) => x.tunnel))
   g.edgeOneway = grow(Int8Array, graph.edgeOneway, edges.map((x) => x.oneway))
+  // Les morceaux de la rue coupée, et le bout de trottoir, en gardent la verdure.
+  g.edgeGreen = grow(Float64Array, graph.edgeGreen, edges.map((x) => graph.edgeGreen[x.like]))
+  g.edgeMarked = grow(Uint8Array, graph.edgeMarked, edges.map((x) => graph.edgeMarked[x.like]))
   g.edgeSafety = graph.edgeSafety.concat(edges.map((x) => x.safety))
   g.edgeName = graph.edgeName.concat(edges.map((x) => x.name))
   if (shapes.has(e)) {

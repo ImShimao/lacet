@@ -53,11 +53,29 @@ class CrossingNode:
     tags: dict[str, str]
 
 
+@dataclass(slots=True)
+class GreenArea:
+    """Un parc, un bois, une forêt, un plan d'eau ou une rivière.
+
+    `rings` porte les lignes telles qu'OpenStreetMap les donne : l'anneau fermé
+    d'une voie, ou les morceaux de contour d'un multipolygone, extérieurs et
+    trous mêlés. `fill` dit s'il faut aussi peindre l'intérieur — pas pour une
+    rivière, qui n'est qu'un trait. Voir `osm.green`.
+    """
+
+    id: int
+    fill: bool
+    rings: list[list[Coord]]
+
+
 @dataclass
 class Extract:
     ways: list[Way] = field(default_factory=list)
     landuse: list[list[Coord]] = field(default_factory=list)
     crossings: list[CrossingNode] = field(default_factory=list)
+    green: list[GreenArea] = field(default_factory=list)
+    # Les voies qui font partie d'un sentier balisé (relation `route`).
+    marked: set[int] = field(default_factory=set)
 
     def __bool__(self) -> bool:
         return bool(self.ways)
@@ -96,16 +114,50 @@ def clip_to_disk(extract: Extract, lon: float, lat: float, radius_m: float) -> E
             for node in extract.crossings
             if ((node.lon - lon) * kx) ** 2 + ((node.lat - lat) * ky) ** 2 <= radius_m * radius_m
         ],
+        green=[area for area in extract.green if any(ring and reaches(ring) for ring in area.rings)],
+        marked=extract.marked,
     )
+
+
+# Ce qu'on compte comme verdure ou eau — mêmes valeurs que la requête Overpass.
+GREEN_TAGS = {
+    "leisure": {"park"},
+    "landuse": {"forest"},
+    "natural": {"wood", "water"},
+    "waterway": {"river", "canal"},
+}
+BUILTUP_LANDUSE = {"residential", "retail", "commercial", "industrial", "education"}
+
+
+def is_green(tags: dict[str, str]) -> bool:
+    return any(tags.get(key) in values for key, values in GREEN_TAGS.items())
 
 
 def from_overpass(payload: dict[str, Any]) -> Extract:
     """Range une réponse Overpass brute. C'est le seul endroit qui la connaît."""
     extract = Extract()
+    routes: set[int] = set()
 
     for el in payload.get("elements", ()):
         etype = el.get("type")
         tags = el.get("tags") or {}
+
+        if etype == "relation":
+            members = el.get("members") or ()
+            if tags.get("route"):
+                routes.update(m["ref"] for m in members if m.get("type") == "way")
+            elif is_green(tags):
+                # Un identifiant négatif : une relation et une voie peuvent
+                # porter le même numéro, et la fusion des tuiles dédoublonne
+                # par identifiant.
+                rings = [
+                    [(p["lon"], p["lat"]) for p in m["geometry"]]
+                    for m in members
+                    if m.get("type") == "way" and m.get("geometry")
+                ]
+                if rings:
+                    extract.green.append(GreenArea(id=-int(el["id"]), fill=True, rings=rings))
+            continue
 
         if etype == "node":
             if tags.get("highway") == "crossing":
@@ -128,9 +180,16 @@ def from_overpass(payload: dict[str, Any]) -> Extract:
                     coords=coords,
                 )
             )
-        elif tags.get("landuse"):
+        elif tags.get("landuse") in BUILTUP_LANDUSE:
             extract.landuse.append(coords)
+        elif is_green(tags):
+            # Une rivière est un trait ; un bois, un anneau fermé qu'on remplit.
+            fill = not tags.get("waterway") and len(coords) > 2 and coords[0] == coords[-1]
+            extract.green.append(GreenArea(id=int(el.get("id", 0)), fill=fill, rings=[coords]))
 
+    # Seules les voies présentes comptent : une relation de grande randonnée
+    # cite des milliers de voies, d'un bout à l'autre de la région.
+    extract.marked = routes & {way.id for way in extract.ways}
     return extract
 
 
@@ -143,6 +202,8 @@ def to_cache(extract: Extract) -> dict[str, Any]:
         ],
         "landuse": [_flatten(ring) for ring in extract.landuse],
         "crossings": [[c.id, c.lon, c.lat, c.tags] for c in extract.crossings],
+        "green": [[a.id, a.fill, [_flatten(r) for r in a.rings]] for a in extract.green],
+        "marked": sorted(extract.marked),
     }
 
 
@@ -161,6 +222,12 @@ def from_cache(data: dict[str, Any]) -> Extract | None:
             CrossingNode(id=cid, lon=lon, lat=lat, tags=tags)
             for cid, lon, lat, tags in data.get("crossings", ())
         ],
+        # Absents des extraits écrits avant l'indice vert : ils se relisent sans.
+        green=[
+            GreenArea(id=gid, fill=fill, rings=[_unflatten(r) for r in rings])
+            for gid, fill, rings in data.get("green", ())
+        ],
+        marked=set(data.get("marked", ())),
     )
 
 

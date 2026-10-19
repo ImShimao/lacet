@@ -344,6 +344,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     profile = build_profile(
         req.surface, req.safety, night, req.sport,
         terrain=terrain if wants_flat(req) else None,
+        nature=req.nature,
     )
 
     # Le vent est demandé maintenant pour que l'appel réseau se déroule pendant
