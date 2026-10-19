@@ -22,6 +22,8 @@ export function MapTools({
   onKeepStart,
   compassRef,
   onNorth,
+  flying = false,
+  onFlyover = null,
 }) {
   const [menu, setMenu] = useState(false)
 
@@ -108,6 +110,18 @@ export function MapTools({
           </div>
         )}
       </div>
+      {/* Le survol de la boucle choisie : seul bouton qui reste pendant qu'il
+          tourne, pour l'arrêter. */}
+      {onFlyover && (
+        <button
+          className={`tool tool--fly ${flying ? 'tool--on' : ''}`}
+          onClick={onFlyover}
+          aria-pressed={flying}
+          aria-label={flying ? 'Arrêter le survol' : 'Survoler la boucle en 3D'}
+        >
+          {flying ? <Icon name="stop" /> : <b className="tool__text">3D</b>}
+        </button>
+      )}
       <button ref={compassRef} className="tool tool--compass" onClick={onNorth} aria-label="Remettre le nord en haut">
         <span className="needle" aria-hidden="true" />
       </button>

@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
 import AscentNote from './AscentNote.jsx'
 import { Splits, Standing } from './RunDetail.jsx'
 import { standing } from './knownRoutes'
+import { announcing, arrivalText, contactOf, textTo } from './contact'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -33,6 +34,7 @@ export default function RunSummary({ entry, history = [], onClose }) {
   const gap = planned ? distance - planned : null
   const rang = useMemo(() => standing(entry, history), [entry, history])
   const splits = entry.splits?.length ? entry.splits : null
+  const shown = useCountUp(distance)
 
   return (
     <div className="panel summary">
@@ -47,7 +49,7 @@ export default function RunSummary({ entry, history = [], onClose }) {
       </div>
 
       <div className="summary__big">
-        <b>{km(distance)}</b>
+        <b>{km(shown)}</b>
         <span>KILOMÈTRES</span>
       </div>
 
@@ -93,6 +95,16 @@ export default function RunSummary({ entry, history = [], onClose }) {
         <AscentNote entry={entry} />
       )}
 
+      {/* Le départ a été annoncé : le retour se dit d'un geste, ici, où l'on
+          arrive. Pas tout seul — « Terminer » peut venir d'ailleurs que de
+          la porte, et un « tout va bien » parti trop tôt rassurerait à tort. */}
+      {announcing() && (
+        <button className="btn" onClick={() => textTo(contactOf(), arrivalText(entry), 'Lacet — de retour')}>
+          <Icon name="check" size={16} />
+          Prévenir que je suis de retour
+        </button>
+      )}
+
       <div className="row">
         {entry.track?.length > 1 && (
           <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
@@ -111,4 +123,31 @@ export default function RunSummary({ entry, history = [], onClose }) {
       </p>
     </div>
   )
+}
+
+/**
+ * Les kilomètres comptent jusqu'au total, une seconde à peine : l'arrivée se
+ * fête, et l'œil va droit au chiffre. Sans animation quand le système en
+ * demande moins.
+ */
+function useCountUp(target, ms = 900) {
+  const still = typeof matchMedia !== 'function' || matchMedia('(prefers-reduced-motion: reduce)').matches
+  const [value, setValue] = useState(still ? target : 0)
+  useEffect(() => {
+    if (still) {
+      setValue(target)
+      return undefined
+    }
+    let raf = 0
+    const t0 = performance.now()
+    const frame = (now) => {
+      const t = Math.min(1, (now - t0) / ms)
+      setValue(target * (1 - (1 - t) ** 3))
+      if (t < 1) raf = requestAnimationFrame(frame)
+    }
+    raf = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
+  return value
 }

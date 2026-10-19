@@ -5,6 +5,7 @@ import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
+import { alongLine, bearingOf, drawPlan, drawnPart } from './routeDraw'
 
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
@@ -16,6 +17,16 @@ maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
 const NAV_ZOOM = 17
 const NAV_PITCH = 50
 const NAV_LOW = 0.22
+
+// Le temps que met une boucle à se dessiner : celui du recadrage, à peu près,
+// pour que la carte et le tracé arrivent ensemble.
+const DRAW_MS = 750
+
+// Le survol : assez bas pour lire les rues, assez incliné pour voir venir le
+// relief, et le cap pris 250 m plus loin pour lisser les virages.
+const FLY_ZOOM = 15.6
+const FLY_PITCH = 62
+const FLY_AHEAD_M = 250
 
 // Deux repères d'arrêt du même genre plus proches que ça, le long du tracé,
 // n'en font qu'un sur la carte.
@@ -53,6 +64,8 @@ export default function MapView({
   onPlace,
   onPickRoute,
   onUserMove,
+  flyover = false,
+  onFlyoverEnd,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -64,7 +77,7 @@ export default function MapView({
   const [revision, setRevision] = useState(0)
 
   const handlers = useRef({})
-  handlers.current = { onPlace, onPickRoute, onUserMove, placing, compassRef }
+  handlers.current = { onPlace, onPickRoute, onUserMove, onFlyoverEnd, placing, compassRef }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
   // On la laisse alors où la main l'a mise, et « Recentrer » la reprend. Le
@@ -387,6 +400,51 @@ export default function MapView({
     m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 0, duration: 800 })
   }, [overview])
 
+  // --- survol 3D ------------------------------------------------------------------
+  // La boucle vue d'en haut, carte inclinée, de la porte à la porte : on y
+  // reconnaît les rues avant d'y courir. Un doigt sur la carte l'arrête, et la
+  // carte revient à plat sur toute la boucle.
+  useEffect(() => {
+    const m = map.current
+    const line = nav.current.route?.geometry
+    if (!m || !flyover || !(line?.length > 1)) return undefined
+    const { total, at } = alongLine(line)
+    // Environ 600 m par seconde : une boucle de 10 km se survole en 17 s.
+    const ms = Math.min(30_000, Math.max(10_000, total / 0.6))
+    const camera = (d, bearing) => ({ center: at(d), bearing, pitch: FLY_PITCH, zoom: FLY_ZOOM })
+    const ahead = (d) => bearingOf(at(d), at(d + FLY_AHEAD_M))
+    let raf = 0
+    let bearing = ahead(0)
+    let t0 = null
+    const frame = (now) => {
+      t0 ??= now
+      const t = Math.min(1, (now - t0) / ms)
+      const d = t * total
+      // Le cap rattrape celui de la route petit à petit, par le plus court.
+      const turn = ((((ahead(d) - bearing) % 360) + 540) % 360) - 180
+      bearing += turn * 0.05
+      m.jumpTo(camera(d, bearing))
+      if (t < 1) raf = requestAnimationFrame(frame)
+      else handlers.current.onFlyoverEnd?.()
+    }
+    m.easeTo({ ...camera(0, bearing), duration: 1200 })
+    const begin = setTimeout(() => (raf = requestAnimationFrame(frame)), 1200)
+    const stop = (event) => {
+      if (event.originalEvent) handlers.current.onFlyoverEnd?.()
+    }
+    const events = ['mousedown', 'touchstart', 'wheel']
+    for (const name of events) m.on(name, stop)
+    return () => {
+      clearTimeout(begin)
+      cancelAnimationFrame(raf)
+      for (const name of events) m.off(name, stop)
+      // Le départ d'une sortie reprend la caméra lui-même.
+      if (nav.current.navigate) return
+      const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
+      m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 0, duration: 900 })
+    }
+  }, [flyover])
+
   const lastNorth = useRef(northAt)
   useEffect(() => {
     const m = map.current
@@ -449,13 +507,37 @@ export default function MapView({
   }, [cursor, revision])
 
   // --- tracés -------------------------------------------------------------------
+  const drawing = useRef(0)
   useEffect(() => {
     const m = map.current
-    if (!m || !revision) return
+    if (!m || !revision) return undefined
 
-    m.getSource('route')?.setData(routeToGeoJson(route))
-    m.getSource('crossings')?.setData(crossingsToGeoJson(route))
     m.getSource('ghost')?.setData(ghostToGeoJson(ghost, route))
+
+    // Le parcours se dessine depuis le départ, dans son sens, puis ses
+    // traversées s'y posent. Pas en course : un détour remplace le tracé sous
+    // les pieds, et doit y être tout de suite.
+    const data = routeToGeoJson(route)
+    const finish = () => {
+      m.getSource('route')?.setData(data)
+      m.getSource('crossings')?.setData(crossingsToGeoJson(route))
+    }
+    const still = nav.current.navigate || matchMedia('(prefers-reduced-motion: reduce)').matches
+    const plan = still ? null : drawPlan(data)
+    if (!plan?.total) {
+      finish()
+    } else {
+      m.getSource('crossings')?.setData(empty())
+      const t0 = performance.now()
+      const frame = (now) => {
+        const t = Math.min(1, (now - t0) / DRAW_MS)
+        if (t >= 1) return finish()
+        // Rapide au départ, posé à l'arrivée : la boucle se referme sans à-coup.
+        m.getSource('route')?.setData(drawnPart(plan, 1 - (1 - t) ** 3))
+        drawing.current = requestAnimationFrame(frame)
+      }
+      drawing.current = requestAnimationFrame(frame)
+    }
 
     // En course, la carte suit le coureur : un nouveau tracé — un détour — ne
     // doit pas la faire sauter sur une vue d'ensemble.
@@ -466,6 +548,7 @@ export default function MapView({
       )
       m.fitBounds(bounds, { padding: dockPadding(m), duration: 700 })
     }
+    return () => cancelAnimationFrame(drawing.current)
   }, [route, ghost, revision])
 
   return (

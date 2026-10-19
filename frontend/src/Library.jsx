@@ -13,7 +13,7 @@ import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 
-export default function Library({ saved, history, onOpen, onOpenRun, onImport, profile, mapStyle }) {
+export default function Library({ saved, history, onOpen, onOpenRun, onImport, onExplore, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
   const [view, setView] = useState(() =>
@@ -85,6 +85,15 @@ export default function Library({ saved, history, onOpen, onOpenRun, onImport, p
                 : "Aucune sortie enregistrée. Lance-en une depuis l'onglet Explorer."
               : 'Aucun parcours en favori. Le cœur, sous une proposition, la garde ici.'}
           </p>
+          {/* Un écran vide qui dit « va ailleurs » sans y mener laisse chercher
+              l'onglet du regard : le bouton y emmène. Pas pour un filtre qui ne
+              rend rien — il y a déjà des sorties, et l'on veut changer de filtre. */}
+          {onExplore && !(view === 'history' && history.length) && (
+            <button className="btn btn--primary" onClick={onExplore}>
+              <Icon name="search" size={17} />
+              Trouver une boucle
+            </button>
+          )}
         </div>
       ) : (
         <>

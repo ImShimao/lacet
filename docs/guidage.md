@@ -161,6 +161,16 @@ c'est la personne qui appuie sur envoyer. Il s'arme par **appui maintenu** : un
 bouton d'alerte posé à côté de « Terminer », sur un écran qu'on touche en
 courant, part tout seul au premier frôlement. Le numéro reste sur l'appareil.
 
+**Prévenir au départ et au retour** (« Mon compte → Sécurité », coupé par
+défaut) : au « Démarrer », Messages s'ouvre vers ce même numéro avec la
+distance, un lien vers le point de départ et l'heure prévue du retour — « Je
+pars courir 10,2 km depuis ici : … Retour prévu vers 19:40. » Le compte à
+rebours attend qu'on revienne dans l'app. À l'arrivée, l'écran de fin propose
+« Prévenir que je suis de retour », jamais tout seul : « Terminer » peut venir
+d'ailleurs que de la porte, et un « tout va bien » parti trop tôt rassurerait à
+tort. Sans serveur, pas de suivi en direct à la LiveTrack ; ces deux SMS en
+gardent l'essentiel (`contact.js`).
+
 **La course libre** enregistre une sortie sans itinéraire. C'est ce que fait la
 moitié des sorties — on part sans savoir où l'on va — et l'exiger obligeait à
 choisir une boucle pour lancer le chronomètre.

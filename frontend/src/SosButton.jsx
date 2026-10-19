@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { duration, km } from './format'
 import { load, save } from './storage'
+import { mapLink, shareText, textTo } from './contact'
 import useModal from './useModal'
 
 // Appui long, en millisecondes, avant que le SOS ne s'arme. Un bouton d'alerte
@@ -65,48 +66,17 @@ export default function SosButton({ position, distance, elapsed, className = '' 
 
   function message() {
     const point = position?.current
-    const where = point
-      ? `https://www.google.com/maps?q=${point[1].toFixed(5)},${point[0].toFixed(5)}`
-      : 'position inconnue'
     return (
       `J'ai besoin d'aide pendant ma sortie. ` +
-      `Je suis ici : ${where}. ` +
+      `Je suis ici : ${point ? mapLink(point) : 'position inconnue'}. ` +
       `Parcouru ${km(distance, 1)} km en ${duration(elapsed)}.`
     )
   }
 
-  async function sendTo(contact) {
-    const text = message()
-    // `sms:` ouvre l'application de messagerie avec le texte prérempli. Le
-    // séparateur diffère : « ?body= » sur Android, « &body= » sur iOS. Mettre
-    // les deux marche partout — l'un est ignoré comme paramètre inconnu.
-    // Le numéro réduit à ses chiffres (et au « + » international) : « 06.12.34 »
-    // ou « 06-12-34 », tels qu'on les tape, ne sont pas des numéros pour Messages.
-    const href = `sms:${contact.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(text)}`
-    // Le lanceur d'iOS ouvre Messages à coup sûr, sans dépendre de la façon
-    // dont WebKit traite un lien d'un autre schéma. Et s'il n'y parvient pas —
-    // lien refusé, aucune app pour l'ouvrir —, la feuille de partage prend le
-    // relais : un SOS qui échoue sans rien dire est le pire des cas.
-    try {
-      const native = await import('./native')
-      const { completed } = (await native.openExternal(href)) ?? {}
-      if (completed !== false) return
-    } catch {
-      /* le partage, ci-dessous */
-    }
-    await shareInstead()
-  }
+  const sendTo = (contact) => textTo(contact, message(), 'Lacet — besoin d’aide')
 
   async function shareInstead() {
-    const text = message()
-    try {
-      const native = await import('./native')
-      await native.shareText('Lacet — besoin d’aide', text)
-    } catch (error) {
-      // Refermer la feuille de partage n'est pas une panne : iOS le signale
-      // comme une erreur, et le message à copier surgissait alors pour rien.
-      if (!/cancel/i.test(error?.message || '')) window.prompt('Copie ce message et envoie-le :', text)
-    }
+    await shareText(message(), 'Lacet — besoin d’aide')
     setAsking(false)
   }
 

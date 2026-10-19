@@ -24,7 +24,7 @@ Voies rapides et routes exposées retirées,sécurité,must,no,yes,36 avis (6 ap
 Rues éclairées la nuit,sécurité,should,yes,yes,Trail Router SafeRoute Walkable ; heatmap nuit Strava
 Alerte avant une traversée non protégée,sécurité,should,no,yes,propre à Lacet
 Bouton SOS par SMS,sécurité,should,yes,yes,RunnrZ LIT Run
-Prévenir un proche au départ et à l'arrivée,sécurité,should,yes,no,LIT Run (arrivée notifiée) Komoot (contacts) ; sans serveur : SMS préparé
+Prévenir un proche au départ et à l'arrivée,sécurité,should,yes,yes,LIT Run (arrivée notifiée) Komoot (contacts) ; sans serveur : SMS préparé
 Suivi en direct par un proche,sécurité,could,yes,no,Strava Beacon Garmin LiveTrack LIT Run ; demande un serveur
 Alerte silencieuse,sécurité,could,yes,no,LIT Run double-tap
 Signaler un passage fermé et recalculer,sécurité,must,yes,yes,RunnrZ signale sans recalculer (avis 2.4.1) ; Lacet écarte le point et recalcule
@@ -40,7 +40,7 @@ Sorties de rond-point comptées (vélo),guidage,could,yes,no,Komoot (avis : comp
 Notes vocales posées sur le tracé,guidage,could,yes,no,RunGo
 Profil et sécurité sur le même axe,interface,should,yes,yes,Komoot superpose surfaces et profil ; Lacet superpose sécurité
 Répartition des surfaces en %,interface,should,yes,yes,Roovr Komoot
-Aperçu 3D / survol de la boucle,interface,could,yes,no,Roovr (cité dans 1 avis sur 4) Footpath
+Aperçu 3D / survol de la boucle,interface,could,yes,yes,Roovr (cité dans 1 avis sur 4) Footpath
 Sans compte,interface,must,yes,yes,Roovr Trail Router ; RunnrZ exige une connexion (4 avis de connexion ratée)
 Hors ligne : rues et fond de carte,sortie,must,yes,yes,RunnrZ « erreur réseau » ; AllTrails plante hors ligne
 Export GPX,sortie,must,yes,yes,RunnrZ l'a rendu payant en 2026

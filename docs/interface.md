@@ -53,6 +53,17 @@ symboles. Le motif suit la ligne dans le sens où la géométrie a été écrite
 le backend écrit chaque tronçon dans le sens du parcours, si bien que le chevron
 indique la bonne direction sans aucun calcul supplémentaire.
 
+**La boucle se dessine** depuis le départ, dans son sens, à chaque nouvelle
+proposition choisie : on voit d'un coup d'œil par où elle part et par où elle
+revient (`routeDraw.js`). Pas en course, où un détour doit apparaître tout de
+suite, ni quand l'iPhone demande de réduire les animations.
+
+**Le survol 3D** : le bouton « 3D » de la colonne de droite fait voler la carte
+le long de la boucle choisie, inclinée, de la porte à la porte — une dizaine de
+secondes pour 10 km. Le panneau s'efface pendant ce temps ; un doigt sur la
+carte ou le bouton d'arrêt le termine, et la carte revient à plat sur toute la
+boucle.
+
 **Les propositions** s'affichent ensemble : la retenue en couleur, les autres en
 pointillés. Toucher l'une d'elles sur la carte la met en avant. Chacune porte sa
 distance **et sa direction** — c'est elle qui les distingue vraiment, puisque

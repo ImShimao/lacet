@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import Countdown from './Countdown.jsx'
 import MapView from './MapView.jsx'
@@ -27,6 +27,8 @@ import { blockedPoints } from './reports'
 import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { km } from './format'
 import { load, save } from './storage'
+import { haptic } from './platform'
+import { announceDeparture, announcing } from './contact'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
 
@@ -106,6 +108,12 @@ export default function App() {
   const [overviewAt, setOverviewAt] = useState(0)
   const [northAt, setNorthAt] = useState(0)
   const [naming, setNaming] = useState(false)
+  // Le survol 3D de la boucle choisie (`MapView`) : tant qu'il tourne, le
+  // panneau s'efface pour laisser toute la carte.
+  const [flying, setFlying] = useState(false)
+  // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
+  // allumé, il serait reparti au retour sur la carte.
+  useEffect(() => setFlying(false), [running, tab, viewing, summary, selected?.id])
   const stageRef = useRef(null)
   const compassRef = useRef(null)
 
@@ -203,7 +211,18 @@ export default function App() {
   // calcule en course.
   const detourRequest = useMemo(() => requestFor(selected, result, params), [selected, result, params])
 
-  const beginRun = (kind) => run.countdown(kind)
+  // Le départ s'annonce au proche, si on l'a demandé : Messages s'ouvre avec
+  // le message prêt, et le compte à rebours part au retour dans l'app.
+  const beginRun = async (kind) => {
+    if (announcing()) {
+      await announceDeparture({
+        route: kind === 'route' ? selected : null,
+        sport: params.sport,
+        from: geo.position ?? (start ? [start.lon, start.lat] : null),
+      })
+    }
+    run.countdown(kind)
+  }
 
   // --- l'autre sens ------------------------------------------------------------
   // La même boucle retournée : mêmes rues, même note, mais les côtes dans
@@ -322,7 +341,7 @@ export default function App() {
         : ''
 
   return (
-    <div className="shell" data-map={theme} data-sheet={sheetMode} ref={shellRef}>
+    <div className="shell" data-map={theme} data-sheet={sheetMode} data-flying={flying || undefined} ref={shellRef}>
       {/* `main` plutôt que `div` : la carte, la recherche de lieu et les
           commandes qui flottent dessus sont le contenu principal de l'app. Sans
           ce repère, un lecteur d'écran ne propose aucun moyen d'y sauter, et le
@@ -351,6 +370,8 @@ export default function App() {
           placing={placing}
           onPlace={(p) => applyStart(p)}
           onUserMove={here.release}
+          flyover={flying}
+          onFlyoverEnd={() => setFlying(false)}
           onPickRoute={(id) => {
             const match = result?.routes.find((r) => r.id === id)
             if (match) setSelected(match)
@@ -401,6 +422,17 @@ export default function App() {
             onKeepStart={start ? () => setNaming(true) : null}
             compassRef={compassRef}
             onNorth={() => setNorthAt(Date.now())}
+            flying={flying}
+            onFlyover={
+              selected?.geometry?.length > 1 && tab === 'explore' && !viewing && !summary
+                ? () => {
+                    // Le suivi de position ramènerait la carte sur soi à chaque relevé.
+                    here.release()
+                    setSheet('peek')
+                    setFlying((f) => !f)
+                  }
+                : null
+            }
           />
         )}
 
@@ -520,6 +552,7 @@ export default function App() {
               mapStyle={mapStyle}
               onOpen={openRoute}
               onOpenRun={setViewing}
+              onExplore={() => setTab('explore')}
             />
           ) : tab === 'account' ? (
             <Account
@@ -598,7 +631,10 @@ export default function App() {
                   : null
               }
               onOpenFilters={() => setFiltersOpen(true)}
-              onFavorite={() => library.toggleFavorite(selected)}
+              onFavorite={() => {
+                haptic('tickHaptic')
+                library.toggleFavorite(selected)
+              }}
               onStart={() => beginRun('route')}
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}

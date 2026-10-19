@@ -18,6 +18,7 @@ import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { climbMismatch, reliefMismatch, surfaceMismatch } from './explain'
 import { km } from './format'
+import { haptic } from './platform'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
@@ -81,7 +82,7 @@ export default function Explore({
   if (error) {
     return (
       <div className="panel">
-        <div className="notice">{error.message}</div>
+        <div className="notice notice--error">{error.message}</div>
         {error.offline ? (
           <button className="btn btn--primary" onClick={onOpenSaved}>
             <Icon name="routes" size={17} />
@@ -157,7 +158,7 @@ export default function Explore({
   if (!routes.length) {
     return (
       <div className="panel">
-        <div className="notice">{meta.message}</div>
+        <div className="notice notice--warn">{meta.message}</div>
         {rejected?.length > 0 && <RejectedList rejected={rejected} />}
         <button className="btn btn--primary" onClick={onOpenFilters}>
           Modifier les filtres
@@ -528,7 +529,11 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
       const id = best?.el.dataset.id
       if (!id || id === String(current.current)) return
       const route = routes.find((r) => String(r.id) === id)
-      if (route) onSelect(route)
+      if (!route) return
+      // Un tapotement quand la carte se pose : le pouce sent qu'une autre
+      // boucle est choisie, sans quitter la carte des yeux.
+      haptic('tickHaptic')
+      onSelect(route)
     }, 110)
   }
 

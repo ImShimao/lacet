@@ -46,5 +46,6 @@ s'exporte en un fichier si tu veux les emporter.
 Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
 « Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
-position, export GPX horodaté vers une montre, profil de dénivelé consultable
+position, SMS à un proche au départ (avec l'heure prévue du retour) et à
+l'arrivée, survol 3D de la boucle avant de partir, export GPX horodaté vers une montre, profil de dénivelé consultable
 en pleine sortie, historique avec totaux mensuels.

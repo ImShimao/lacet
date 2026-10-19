@@ -86,6 +86,47 @@
   animation: none;
 }
 
+/* Changer d'onglet se voit : la page monte d'un cran au lieu de remplacer
+   l'autre d'un coup, qu'on prenait pour un écran qui clignote. Dans « Mon
+   compte », une page arrive de la droite et le sommaire revient de la gauche. */
+@keyframes push {
+  from {
+    transform: translateX(26px);
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: translateX(-26px);
+    opacity: 0;
+  }
+}
+.shell[data-sheet='page'] .side__body > .panel {
+  animation: rise 0.22s ease-out;
+}
+.shell[data-sheet='page'] .side__body > .acct--in {
+  animation: push 0.22s ease-out;
+}
+.shell[data-sheet='page'] .side__body > .acct--back {
+  animation: pop 0.22s ease-out;
+}
+/* Les sorties se rangent l'une après l'autre, les premières d'abord. */
+.list__group {
+  animation: rise 0.24s ease-out backwards;
+}
+.list__group:nth-child(2) {
+  animation-delay: 0.03s;
+}
+.list__group:nth-child(3) {
+  animation-delay: 0.06s;
+}
+.list__group:nth-child(4) {
+  animation-delay: 0.09s;
+}
+.list__group:nth-child(n + 5) {
+  animation-delay: 0.12s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .runbar,
   .rcard,
@@ -95,7 +136,9 @@
   .startmenu,
   .live__paused,
   .live__alert,
-  .shell[data-sheet='full'] .side {
+  .shell[data-sheet='full'] .side,
+  .shell[data-sheet='page'] .side__body > .panel,
+  .list__group {
     animation: none;
   }
   .btn:active,
@@ -106,5 +149,24 @@
   .runctl__main:active,
   .sportpill:active {
     transform: none;
+  }
+}
+
+/* L'arrivée : la coche du bilan apparaît d'un petit bond. */
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+  }
+}
+.origin__pin--done {
+  animation: bounce-in 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .origin__pin--done {
+    animation: none;
   }
 }

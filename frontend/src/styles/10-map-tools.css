@@ -106,3 +106,25 @@
 .stage__tools--run {
   top: calc(env(safe-area-inset-top) + 112px);
 }
+
+/* Le survol 3D : « 3D » en toutes lettres, plus parlant qu'un pictogramme. */
+.tool__text {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+/* Pendant le survol, la carte seule : le panneau, la recherche et les autres
+   boutons s'effacent, et seul reste celui qui l'arrête. */
+.shell[data-flying] .side,
+.shell[data-flying] .stage__top,
+.shell[data-flying] .sportpill,
+.shell[data-flying] .stage__tools > :not(.tool--fly) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+/* Et tout revient en fondu, pas d'un coup. */
+.shell[data-sheet='peek'] .side,
+.stage__top {
+  transition: opacity 0.3s ease;
+}

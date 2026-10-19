@@ -9,6 +9,11 @@
 export const isNative = () =>
   typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true
 
+/** Une vibration de l'iPhone (`tickHaptic`, `pulseHaptic`…) — rien ailleurs. */
+export const haptic = (kind) => {
+  if (isNative()) import('./native').then((n) => n[kind]())
+}
+
 /**
  * Enregistre un fichier texte là où l'utilisateur peut le reprendre : la
  * feuille de partage d'iOS — Fichiers, AirDrop, Strava, une montre…

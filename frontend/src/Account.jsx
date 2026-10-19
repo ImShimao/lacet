@@ -16,7 +16,7 @@
  * qui porte le retour au sommaire, et l'onglet le referme quand on y revient.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { COUNTS, MOMENTS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
@@ -71,8 +71,17 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
     onPage(key)
   }
 
+  // Une page arrive de la droite, le sommaire revient de la gauche — comme
+  // partout sur iPhone. Le sens se fige au changement de page : changé sur un
+  // élément déjà là, il relancerait l'animation à chaque rendu.
+  const first = useRef(true)
+  const motion = useMemo(() => (known ? 'acct--in' : first.current ? '' : 'acct--back'), [page])
+  useEffect(() => {
+    first.current = false
+  }, [])
+
   return (
-    <div className={`panel acct ${known ? 'acct--page' : ''}`} ref={top}>
+    <div key={known ? page : 'summary'} className={`panel acct ${known ? 'acct--page' : ''} ${motion}`} ref={top}>
       {known ? <SectionPage page={page} {...props} /> : <Summary onPage={open} {...props} />}
     </div>
   )
@@ -172,7 +181,9 @@ function summaryOf(key, { params, poiPrefs }) {
     }
     case 'safety': {
       const reports = activeReports().length
-      const contact = saved.emergencyContact ? `SOS vers ${saved.emergencyContact}` : "Pas de contact d'urgence"
+      const contact = saved.emergencyContact
+        ? `SOS vers ${saved.emergencyContact}${saved.notifyContact ? ' · départ et retour annoncés' : ''}`
+        : "Pas de contact d'urgence"
       return reports ? `${contact} · ${reports} signalement${reports > 1 ? 's' : ''}` : contact
     }
     case 'storage': {
@@ -286,6 +297,7 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
  */
 function EmergencyContact() {
   const [contact, setContact] = useState(() => load().emergencyContact || '')
+  const [announce, setAnnounce] = useState(() => Boolean(load().notifyContact))
   return (
     <>
       <p className="muted small">
@@ -305,6 +317,32 @@ function EmergencyContact() {
           save({ emergencyContact: e.target.value.trim() })
         }}
       />
+      <h3 className="section">Prévenir au départ et au retour</h3>
+      <div className="seg" role="radiogroup" aria-label="Prévenir au départ et au retour">
+        {[
+          [true, 'Activé'],
+          [false, 'Désactivé'],
+        ].map(([value, label]) => (
+          <button
+            key={String(value)}
+            role="radio"
+            aria-checked={announce === value}
+            onClick={() => {
+              setAnnounce(value)
+              save({ notifyContact: value })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {!announce
+          ? 'Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.'
+          : contact.trim()
+            ? 'Au départ, Messages s’ouvre avec la distance, le point de départ et l’heure prévue du retour : envoie, puis reviens dans Lacet pour le compte à rebours. À l’arrivée, un bouton prépare « De retour de ma sortie ».'
+            : 'Donne un numéro ci-dessus : sans lui, rien ne part.'}
+      </p>
     </>
   )
 }
