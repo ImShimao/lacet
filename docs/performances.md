@@ -168,6 +168,20 @@ connexions TLS, et des lots à moitié vides. Tous les points partent maintenant
 ensemble, et une recherche relancée après un changement de filtre ne repaie plus
 rien (4,75 s → 0,01 s).
 
+**Terrain Tiles d'AWS feraient un secours hors ligne honnête, au zoom 12.**
+Mesuré le 19 octobre 2026 (`scripts/terrain_tiles.py`) sur douze boucles de
+5 à 15 km autour de Guebwiller et de Soultz, contre l'IGN tous les 50 m : 3,5 m
+d'écart moyen par point (p95 13 m, biais +1,4 m), et un D+ à −1 % au total,
+8 % par boucle (pire cas 25 à 37 %, sur des boucles plates de 25 m de D+) — à
+condition de le compter au réglage grossier (noyau 100 m, seuil 3 m) : au
+réglage fin de l'IGN, le tremblement du modèle ajoute 9 % au total et 14 % par
+boucle. C'est la qualité du repli Valhalla actuel. Les zooms 13 et 14 donnent
+exactement la même erreur : en France la source est EU-DEM à 25 m, et zoomer ne
+fait que la suréchantillonner. Le poids : 55 Mo pour l'Alsace au zoom 12
+(493 tuiles de 111 ko), contre 199 Mo au 13 et 622 Mo au 14 ; une recherche de
+15 km n'en lit que six (0,7 Mo). Licence libre, avec l'attribution « Mapzen »
+et la mention Copernicus EU-DEM.
+
 **La zone bâtie est mémoïsée par cellule de 80 m.** La question était reposée
 pour chacune des 350 000 voies d'un extrait parisien, alors que la notion est
 déjà une approximation à l'échelle du quartier.
