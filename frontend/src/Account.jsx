@@ -26,6 +26,7 @@ import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { StopsSetting } from './Stops.jsx'
 import { KINDS } from './pois'
+import { voiceSettings } from './voice'
 
 /** Les familles du sommaire, dans leur ordre. */
 const GROUPS = ['Paramètres', 'Données', 'Infos']
@@ -177,7 +178,9 @@ function summaryOf(key, { params, poiPrefs }) {
       const stops = Object.entries(KINDS)
         .filter(([kind]) => poiPrefs?.[kind])
         .map(([, k]) => k.label.toLowerCase())
-      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, ...stops].join(' · ')
+      const { km } = voiceSettings()
+      const voice = km ? (km > 1 ? 'Voix tous les 2 km' : null) : 'Kilomètres tus'
+      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, voice, ...stops].filter(Boolean).join(' · ')
     }
     case 'safety': {
       const reports = activeReports().length
@@ -234,6 +237,8 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
           <h3 className="section">Pause automatique</h3>
           <AutoPauseSetting />
           <LockScreenSetting />
+          <h3 className="section">Voix</h3>
+          <VoiceSetting />
           <h3 className="section">Le long du parcours</h3>
           <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
         </>
@@ -699,6 +704,71 @@ function AutoPauseSetting() {
           : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
       </p>
     </>
+  )
+}
+
+const KM_EVERY = [
+  { key: 1, label: 'Chaque km' },
+  { key: 2, label: 'Tous les 2 km' },
+  { key: 0, label: 'Jamais' },
+]
+const KM_SAYS = [
+  ['lap', 'Temps du km'],
+  ['pace', 'Allure'],
+  ['total', 'Temps couru'],
+]
+const LEADS = [
+  { key: 'early', label: 'Plus tôt' },
+  { key: 'normal', label: 'Normal' },
+  { key: 'late', label: 'Plus tard' },
+]
+
+/**
+ * Ce que la voix dit de confort, et quand.
+ *
+ * La plainte n° 1 dans les avis des apps concurrentes, c'est la voix : trop
+ * bavarde pour les uns, muette pour les autres. Seul le confort se règle :
+ * les alertes de traversée, l'écart du parcours et le « maintenant » d'un
+ * virage se disent toujours. Lu au départ d'une sortie (`LiveRun.jsx`).
+ */
+function VoiceSetting() {
+  const [prefs, setPrefs] = useState(voiceSettings)
+  const change = (patch) => {
+    const next = { ...prefs, ...patch }
+    setPrefs(next)
+    save({ voice: next })
+  }
+  return (
+    <div className="fields">
+      <div className="field">
+        <span className="label">Kilomètres</span>
+        <Segmented options={KM_EVERY} value={prefs.km} onChange={(km) => change({ km })} />
+        <p className="field__hint">À vélo, la voix parle tous les 5 km, ou tous les 10.</p>
+      </div>
+
+      {prefs.km !== 0 && (
+        <div className="field">
+          <span className="label">À chaque kilomètre</span>
+          <div className="seg" role="group" aria-label="Ce que dit la voix à chaque kilomètre">
+            {KM_SAYS.map(([key, label]) => (
+              <button key={key} aria-pressed={prefs[key]} onClick={() => change({ [key]: !prefs[key] })}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="field__hint">La distance est toujours dite ; le reste, à ton choix.</p>
+        </div>
+      )}
+
+      <div className="field">
+        <span className="label">Annonce des virages</span>
+        <Segmented options={LEADS} value={prefs.lead} onChange={(lead) => change({ lead })} />
+        <p className="field__hint">
+          Une trentaine de secondes avant le carrefour, à la normale. Le « Maintenant », lui, ne
+          bouge pas, et les alertes de traversée ou d'écart se disent toujours.
+        </p>
+      </div>
+    </div>
   )
 }
 

@@ -21,7 +21,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
-import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenSpeed } from './runFormat'
+import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
@@ -260,6 +260,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
   const trail = useRef([])
   const autoPause = useRef(load().autoPause !== false)
+  // Les réglages de la voix, lus au départ : changés en courant, ils valent à la sortie suivante.
+  const voicePrefs = useRef(voice.voiceSettings())
   // La trace réellement suivie, et le dénivelé qu'elle a coûté (voir `trail.js`).
   const trace = useRef(null)
   if (!trace.current) trace.current = trailRecorder(resuming?.trail ?? [], resuming?.ascent ?? 0)
@@ -622,23 +624,26 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       splitTimer.current = setTimeout(() => setSplitShown(null), SPLIT_SHOWN_MS)
     }
 
-    const every = SPLIT_EVERY_KM[sport] ?? 1
+    const { km, lap, pace: average, total } = voicePrefs.current
+    if (!km) return
+    const every = (SPLIT_EVERY_KM[sport] ?? 1) * km
     if (Math.floor(done / every) <= Math.floor(previous / every)) return
+    const ran = total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      talk(`${done} kilomètres. Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
+      talk(`${done} kilomètres.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false })
       return
     }
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
     // compte pas les annonces, et la borne dite par son rang répond d'un coup
     // aux deux questions — où en suis-je, et à quelle allure.
     const which = `${capitalize(ordinal(done))} kilomètre`
-    const average = `Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
     // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
     // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
-    let said = `${which}. ${average}`
-    if (gap === 1 && each > 0) said = done === 1 ? `${which} à ${spoken(each)}.` : `${which} à ${spoken(each)}. ${average}`
-    talk(said, { priority: false })
+    const own = lap && gap === 1 && each > 0
+    let said = own ? `${which} à ${spoken(each)}.` : `${which}.`
+    if (average && !(own && done === 1)) said += ` Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
+    talk(said + ran, { priority: false })
   }
 
   /**
@@ -780,7 +785,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // gauche », et l'on n'entendait jamais de quel côté partir.
       talk(announcement(step, remaining, { stage: 'act', following, speed }), { priority: !toldSoon.current.has(index) })
       if (rightAfter(following, speed)) toldSoon.current.add(following.index)
-    } else if (remaining <= previewAt(speed) && !previewed.current.has(index)) {
+    } else if (remaining <= previewAt(speed) * (voice.LEAD[voicePrefs.current.lead] ?? 1) && !previewed.current.has(index)) {
       previewed.current.add(index)
       // **Une annonce attend son tour.** Elle vise un carrefour à une demi-minute :
       // deux secondes de plus ne changent rien, alors qu'en coupant le

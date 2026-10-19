@@ -9,6 +9,7 @@ import { buildGraph } from './engine/graph'
 import { planLoops } from './engine/service'
 import { haversine } from './format'
 import { bearing, buildTrack, headingAt, locate, pointAt } from './routeTracker'
+import { save } from './storage'
 
 /**
  * Une sortie entière, écoutée du départ à l'arrivée.
@@ -409,10 +410,12 @@ function distanceDite(texte) {
  * Tout ce qui cloche dans ce qu'on a entendu, en clair — une liste vide quand
  * la sortie a été guidée du premier au dernier mètre.
  */
-function defauts(route, run) {
+function defauts(route, run, { km = 1, avance = 1 } = {}) {
   const out = []
   const { dites, alongAt } = run
   const at = (d) => alongAt(d.demande)
+  // Une annonce réglée plus tôt (`LEAD`, dans `voice.js`) vise plus loin.
+  const annonceAvant = ANNONCE_AVANT_M * Math.max(1, avance)
   // Le moment où une phrase a fini de dire ses `n` premiers caractères.
   const ditJusqua = (d, n) => d.debut + (n / synthese.parSeconde) * 1000
   // Arrivé devant sa porte, on est rentré, même si le tracé la dépasse pour y
@@ -485,7 +488,7 @@ function defauts(route, run) {
         d.texte.startsWith('Dans ') &&
         d.texte.includes(`, ${texte}`) &&
         at(d) < step.dist_m &&
-        at(d) >= step.dist_m - ANNONCE_AVANT_M,
+        at(d) >= step.dist_m - annonceAvant,
     )
     const serree = step.dist_m - (pas[k - 1]?.dist_m ?? 0) <= SERRE_M
     const enchainee = ditLaSuite(precedente, /, puis (tout de suite|dans \d)/, serree ? -Infinity : 20)
@@ -501,7 +504,7 @@ function defauts(route, run) {
   for (const d of dites.filter((x) => x.texte.startsWith('Dans '))) {
     const vise = pas.find(
       (step) =>
-        d.texte.includes(`, ${lower(step.text)}`) && step.dist_m >= at(d) && step.dist_m - at(d) <= ANNONCE_AVANT_M,
+        d.texte.includes(`, ${lower(step.text)}`) && step.dist_m >= at(d) && step.dist_m - at(d) <= annonceAvant,
     )
     if (!vise) out.push(`annonce sans carrefour devant soi, à ${Math.round(at(d))} m : ${d.texte}`)
     else if (Math.abs(distanceDite(d.texte) - (vise.dist_m - at(d))) > ANNONCE_ECART_M) {
@@ -530,9 +533,11 @@ function defauts(route, run) {
   // **Les bornes** : « Troisième kilomètre » au troisième kilomètre, pas à
   // deux mille cinq cents mètres parce qu'un reflet a compté pour cent.
   const bornes = dites.filter((x) => /^[^,]+ kilomètre(?: à|\.)/.test(x.texte) && !/^(Dans|Maintenant)/.test(x.texte))
+  // Réglées une sur deux, au deuxième, au quatrième ; tues, jamais.
+  if (!km && bornes.length) out.push(`bornes dites alors qu'elles sont tues : ${bornes[0].texte}`)
   bornes.forEach((d, i) => {
     const m = run.couruA(d.demande)
-    if (Math.abs(m - (i + 1) * 1000) > BORNE_ECART_M + BORNE_PART * m) {
+    if (Math.abs(m - (i + 1) * 1000 * km) > BORNE_ECART_M + BORNE_PART * m) {
       out.push(`borne ${i + 1} dite à ${Math.round(m)} m courus : ${d.texte}`)
     }
   })
@@ -556,6 +561,7 @@ function defauts(route, run) {
 }
 
 afterEach(() => {
+  localStorage.clear()
   cleanup()
   vi.useRealTimers()
 })
@@ -614,4 +620,37 @@ describe('une sortie entière, écoutée', () => {
     const run = await courir(route, demande, { graine: 8 })
     expect(defauts(route, run).join('\n'), transcription(run)).toBe('')
   }, 120_000)
+})
+
+describe('la voix réglée', () => {
+  // Ce qu'on règle dans « Pendant la sortie » ne touche que le confort : la
+  // sortie reste guidée du premier au dernier virage, et l'écart se dit
+  // toujours, même kilomètres tus.
+  const ecouter = async (voice) => {
+    save({ voice })
+    const { demande, routes } = await boucles(BEAUNE, 5)
+    const route = routes.find((r) => r.laps === 1)
+    return { route, run: await courir(route, demande, { ecart: true }) }
+  }
+  const annonces = (run) => run.dites.map((d) => distanceDite(d.texte)).filter((m) => m != null)
+  const ecartDit = (run) => run.dites.some((d) => d.texte.startsWith("Tu t'es écarté"))
+
+  it('un kilomètre sur deux, l’allure et le temps couru, les virages annoncés plus tôt', async () => {
+    const { route, run } = await ecouter({ km: 2, lap: false, pace: true, total: true, lead: 'early' })
+    expect(defauts(route, run, { km: 2, avance: 1.5 }).join('\n'), transcription(run)).toBe('')
+    expect(ecartDit(run), transcription(run)).toBe(true)
+    const bornes = run.dites.filter((d) => /^\S+ kilomètre\./.test(d.texte)).map((d) => d.texte)
+    expect(bornes.length, transcription(run)).toBeGreaterThan(0)
+    for (const b of bornes) expect(b).toMatch(/^(Deuxième|Quatrième) kilomètre\. Allure moyenne [^.]+\. \d+ minutes de course\.$/)
+    // À l'allure du coureur, une trentaine de secondes font cent mètres : la
+    // moitié de plus, cent cinquante.
+    expect(Math.max(...annonces(run)), transcription(run)).toBeGreaterThan(130)
+  }, 60_000)
+
+  it('les kilomètres tus, les virages annoncés plus tard, et l’écart dit quand même', async () => {
+    const { route, run } = await ecouter({ km: 0, lead: 'late' })
+    expect(defauts(route, run, { km: 0 }).join('\n'), transcription(run)).toBe('')
+    expect(ecartDit(run), transcription(run)).toBe(true)
+    expect(Math.max(...annonces(run)), transcription(run)).toBeLessThanOrEqual(70)
+  }, 60_000)
 })

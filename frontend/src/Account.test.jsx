@@ -15,6 +15,7 @@ vi.mock('./platform', () => ({ isNative: () => false, saveTextFile: vi.fn() }))
 
 const Account = (await import('./Account.jsx')).default
 const { DEFAULTS } = await import('./FiltersSheet.jsx')
+const { voiceSettings } = await import('./voice')
 
 /** L'écran de l'app, réduit à ce qui compte ici : le corps qui défile, et le retour de l'en-tête. */
 function Ecran() {
@@ -95,5 +96,41 @@ describe('Mon compte', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('garde les réglages de la voix pour la sortie suivante', () => {
+    localStorage.clear()
+    const page = () =>
+      render(
+        <Account
+          page="run"
+          params={DEFAULTS}
+          geo={{ status: 'idle' }}
+          history={[]}
+          poiPrefs={{}}
+          onPoiPrefs={() => {}}
+          onProfile={() => {}}
+          onClearData={async () => {}}
+          onRestored={() => {}}
+        />,
+      )
+    page()
+    fireEvent.click(screen.getByRole('button', { name: 'Tous les 2 km' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Temps du km' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Temps couru' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plus tôt' }))
+    expect(voiceSettings()).toEqual({ km: 2, lap: false, pace: true, total: true, lead: 'early' })
+
+    // Rouverte, la page montre ce qui a été gardé.
+    cleanup()
+    page()
+    expect(screen.getByRole('button', { name: 'Tous les 2 km' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Temps du km' }).getAttribute('aria-pressed')).toBe('false')
+
+    // Kilomètres tus : ce qu'ils diraient n'a plus à se régler.
+    fireEvent.click(screen.getByRole('button', { name: 'Jamais' }))
+    expect(screen.queryByRole('button', { name: 'Allure' })).toBeNull()
+    expect(voiceSettings().km).toBe(0)
+    localStorage.clear()
   })
 })

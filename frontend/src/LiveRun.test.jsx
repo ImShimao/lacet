@@ -21,7 +21,8 @@ vi.mock('./position', () => ({
     }
   },
 }))
-vi.mock('./voice', () => ({
+vi.mock('./voice', async (original) => ({
+  ...(await original()),
   available: false,
   speak: vi.fn(),
   stop: vi.fn(),

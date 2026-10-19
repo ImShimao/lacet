@@ -14,7 +14,25 @@
 // en coupait une autre suffisait — et la musique restait en sourdine jusqu'au
 // bout de la sortie.
 
+import { load } from './storage'
+
 const nativeModule = () => import('./native')
+
+/**
+ * Ce que la voix dit de confort, réglé dans « Mon compte › Pendant la sortie ».
+ *
+ * `km` : une borne sur combien (1, 2), 0 pour les taire. `lap`, `pace`,
+ * `total` : le temps du dernier kilomètre, l'allure moyenne, le temps couru.
+ * `lead` : l'annonce d'un virage plus tôt ou plus tard. Seul le confort se
+ * règle : les alertes de traversée, l'écart du parcours et le « maintenant »
+ * d'un virage se disent toujours, et au même moment.
+ */
+export const VOICE_DEFAULTS = { km: 1, lap: true, pace: true, total: false, lead: 'normal' }
+
+/** L'avance de l'annonce d'un virage : une trentaine de secondes, ou plus, ou moins. */
+export const LEAD = { early: 1.5, normal: 1, late: 0.6 }
+
+export const voiceSettings = () => ({ ...VOICE_DEFAULTS, ...load().voice })
 
 let enabled = false
 

@@ -63,6 +63,13 @@ de phrases : avec l'extension de synthèse d'avant, une seule fin de phrase
 perdue — une consigne qui en coupait une autre — la laissait en sourdine
 jusqu'au bout de la sortie.
 
+**La voix se règle** dans « Mon compte › Pendant la sortie » (`voice.js`,
+`voiceSettings`) : les kilomètres à chaque borne, une sur deux ou jamais ; ce
+qu'ils disent — temps du kilomètre, allure moyenne, temps couru ; et l'annonce
+d'un virage plus tôt (×1,5) ou plus tard (×0,6). Seul le confort se règle : le
+« maintenant », les alertes de traversée et d'écart se disent toujours. Le débit
+de la voix reste celui de `VoicePlugin.swift`, qui ne le reçoit pas encore.
+
 ### Une sortie entière, écoutée
 
 La plainte n° 1 contre les apps de course, dans les avis de l'App Store : une
