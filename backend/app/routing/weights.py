@@ -21,7 +21,7 @@ from ..elevation import Terrain
 from ..models import SafetyMode, Sport, SurfacePref
 from ..osm.graph import Edge, Graph
 from ..safety.night import night_factor
-from ..safety.risk import CYCLE_FACILITY
+from ..safety.risk import CYCLE_FACILITY, EXPOSED_RISK
 
 LAMBDA = {
     SafetyMode.safe: 4.0,
@@ -70,6 +70,16 @@ NIGHT_MIN_FACTOR = 0.70 * 0.90
 # lent. Le facteur ne descend jamais sous 1 : l'heuristique d'A* reste admissible.
 CLIMB_WEIGHT = 25.0
 
+# La préférence « nature » : une arête qui longe un parc, un bois ou l'eau
+# (`Edge.green`, de 0 à 1) coûte jusqu'à `GREEN_BONUS` de moins, et une voie de
+# sentier balisé `MARKED_BONUS` de moins encore. Un bonus, jamais une
+# obligation : il ne descend pas sous `1 − GREEN_BONUS − MARKED_BONUS`, bien
+# moins que ce que coûte le risque d'une route (×11 pour une départementale en
+# mode Sûr), et il ne va jamais à une voie exposée — longer la rivière sur la
+# nationale n'est pas « nature ». Valeurs mesurées : voir `docs/generation.md`.
+GREEN_BONUS = 0.25
+MARKED_BONUS = 0.15
+
 
 @dataclass
 class Profile:
@@ -79,6 +89,7 @@ class Profile:
     sport: str = "run"
     # Le relief de la zone, seulement quand on demande du plat.
     terrain: Terrain | None = None
+    nature: bool = True
 
     @property
     def _factors(self) -> dict[str, float]:
@@ -98,6 +109,8 @@ class Profile:
             w *= night_factor(s)
         if self.terrain is not None:
             w *= 1.0 + CLIMB_WEIGHT * self.terrain.climb(edge.coords) / max(edge.length_m, 1.0)
+        if self.nature and s.risk < EXPOSED_RISK:
+            w *= 1.0 - GREEN_BONUS * edge.green - (MARKED_BONUS if edge.marked else 0.0)
         return w
 
     def precompute(self, graph: Graph) -> list[float]:
@@ -114,12 +127,14 @@ class Profile:
         """Poids minimal par mètre que cette fonction de coût puisse produire.
 
         Sert d'heuristique admissible à A*. Le terme de risque vaut au minimum 1
-        (risque nul) et la pénalité d'escalier au minimum 1 : seuls la surface et
-        le facteur de nuit peuvent descendre sous 1.
+        (risque nul) et la pénalité d'escalier au minimum 1 : seuls la surface,
+        le facteur de nuit et la préférence « nature » peuvent descendre sous 1.
         """
         factor = min(self._factors.values())
         if self.night:
             factor *= NIGHT_MIN_FACTOR
+        if self.nature:
+            factor *= 1.0 - GREEN_BONUS - MARKED_BONUS
         return factor
 
 
@@ -129,6 +144,7 @@ def build_profile(
     night: bool,
     sport: Sport = Sport.run,
     terrain: Terrain | None = None,
+    nature: bool = True,
 ) -> Profile:
     return Profile(
         lam=LAMBDA[safety],
@@ -136,4 +152,5 @@ def build_profile(
         night=night,
         sport=sport.value,
         terrain=terrain,
+        nature=nature,
     )

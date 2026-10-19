@@ -3,7 +3,9 @@
 On demande en une seule requête :
   - toutes les voies `highway` (le réseau routable),
   - les polygones de zone bâtie (`landuse`) — nécessaires à la règle du doute (L2),
-  - les nœuds de traversée (`highway=crossing`) — nécessaires au comptage L3.
+  - les nœuds de traversée (`highway=crossing`) — nécessaires au comptage L3,
+  - les parcs, bois, forêts, plans d'eau et rivières, et les relations de
+    sentiers balisés — l'indice vert de chaque arête (`osm.green`).
 """
 
 from __future__ import annotations
@@ -79,6 +81,20 @@ out geom;
   node["highway"="crossing"]({s},{w},{n},{e});
 );
 out body;
+(
+  way["leisure"="park"]({s},{w},{n},{e});
+  way["landuse"="forest"]({s},{w},{n},{e});
+  way["natural"~"^(wood|water)$"]({s},{w},{n},{e});
+  way["waterway"~"^(river|canal)$"]({s},{w},{n},{e});
+  rel["type"="multipolygon"]["leisure"="park"]({s},{w},{n},{e});
+  rel["type"="multipolygon"]["landuse"="forest"]({s},{w},{n},{e});
+  rel["type"="multipolygon"]["natural"~"^(wood|water)$"]({s},{w},{n},{e});
+);
+out geom;
+(
+  rel["route"~"^(hiking|foot|running)$"]({s},{w},{n},{e});
+);
+out body;
 """
 
 
@@ -103,8 +119,9 @@ def area_key(lat: float, lon: float, radius_m: float, target_m: float = 0.0) -> 
 def _cache_key(lat: float, lon: float, radius_m: float, detail: str) -> str:
     # Arrondi pour que deux départs voisins partagent le même cache. Le niveau
     # de détail en fait partie : deux extraits de même emprise mais de finesse
-    # différente ne sont pas interchangeables.
-    raw = f"{lat:.3f},{lon:.3f},{int(radius_m // 500) * 500},{detail}"
+    # différente ne sont pas interchangeables. « vert » : les extraits d'avant
+    # l'indice vert n'ont ni parcs ni sentiers balisés, on les redemande.
+    raw = f"{lat:.3f},{lon:.3f},{int(radius_m // 500) * 500},{detail},vert"
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 

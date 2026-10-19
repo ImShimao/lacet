@@ -12,6 +12,7 @@ import {
   tilesFor,
 } from './overpass'
 import { fromRegionTile, resetRegion } from './region'
+import { GREEN_TAGS } from './extract'
 
 /**
  * Ne plus attendre les rues.
@@ -196,6 +197,8 @@ describe('la carte régionale', () => {
       expect(py).toBe(js)
     }
     expect(python).toMatch(new RegExp(`TILE_DEG = ${TILE_DEG}\\b`))
+    // Les parcs, bois et eaux de l'indice vert : la même liste des deux côtés.
+    expect(JSON.parse(python.match(/GREEN_TAGS = (\{.*\})/)[1])).toEqual(GREEN_TAGS)
   })
 })
 

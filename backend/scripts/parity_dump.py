@@ -60,6 +60,12 @@ CASES = [
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 2.5, "safety": "standard"}},
     {"name": "damier-velo", "extract": "grid15",
      "req": {"lat": 48.8105, "lon": 2.3105, "distance_km": 4.0, "sport": "bike", "limit": 8}},
+    # Un parc, une rivière et un sentier balisé : l'indice vert et le bonus
+    # « nature », avec puis sans.
+    {"name": "damier-nature", "extract": "grid9-nature",
+     "req": {"lat": 48.806, "lon": 2.306, "distance_km": 2.5}},
+    {"name": "damier-sans-nature", "extract": "grid9-nature",
+     "req": {"lat": 48.806, "lon": 2.306, "distance_km": 2.5, "nature": False}},
     {"name": "damier-tours", "extract": "grid9",
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6}},
     {"name": "beaune-course", "extract": "beaune",
@@ -119,6 +125,8 @@ def load_extract(name: str) -> dict:
         return to_cache(read_extract(grid_payload(9)))
     if name == "grid9-danger":
         return to_cache(read_extract(grid_payload(9, dangerous_row=4)))
+    if name == "grid9-nature":
+        return to_cache(read_extract(grid_payload(9, nature=True)))
     if name == "grid15":
         return to_cache(read_extract(grid_payload(15)))
     with gzip.open(extract_path(name), "rt", encoding="utf-8") as fh:
@@ -153,6 +161,8 @@ async def run_case(case: dict) -> dict:
             "edges": len(graph.edges),
             "length_m": sum(e.length_m for e in graph.edges),
             "crossings": len(graph.crossings),
+            "green": sum(e.green for e in graph.edges),
+            "marked": sum(e.marked for e in graph.edges),
             "first_edges": [[e.a, e.b, e.length_m] for e in graph.edges[:20]],
         }
         return graph
@@ -241,7 +251,7 @@ async def main() -> None:
         await fetch_real()
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for name in () if check else ("grid9", "grid9-danger", "grid15"):
+    for name in () if check else ("grid9", "grid9-danger", "grid9-nature", "grid15"):
         write_gz(extract_path(name), load_extract(name))
 
     results = []

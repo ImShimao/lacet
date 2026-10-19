@@ -14,6 +14,7 @@
 
 import { haversineM, planarDistance, pointInRing, ringBbox } from './geo'
 import { pairs, pointAt } from './extract'
+import { greenIndex } from './green'
 import { pyfloordiv, pyRound, pySum, radians } from './py'
 import { closedBarrier, evaluateEdge, isExcluded, onewayFor, tunnelIsUnprotected } from './safety'
 
@@ -62,6 +63,10 @@ export class Graph {
     this.edgeTunnel = []
     // Sens permis à vélo : 1 de A vers B, -1 de B vers A, 0 les deux — voir `onewayFor`.
     this.edgeOneway = []
+    // Part de l'arête près d'un parc, d'un bois ou de l'eau, et voie de sentier
+    // balisé — voir `green.js`.
+    this.edgeGreen = new Float64Array(0)
+    this.edgeMarked = []
     this.coords = null
     this.adjOffset = null
     this.adjEdges = null
@@ -240,6 +245,7 @@ export class Graph {
     this.edgeWayId = Float64Array.from(this.edgeWayId)
     this.edgeTunnel = Uint8Array.from(this.edgeTunnel)
     this.edgeOneway = Int8Array.from(this.edgeOneway)
+    this.edgeMarked = Uint8Array.from(this.edgeMarked)
     this.link()
   }
 
@@ -357,6 +363,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
   }
 
   const crossingIds = new Set(extract.crossings.map((c) => c.id))
+  const marked = new Set(extract.marked ?? [])
   const gateIds = new Set((extract.barriers ?? []).filter((b) => closedBarrier(b.tags, sport)).map((b) => b.id))
   const origin = pointAt(extract.ways[0].flat, 0)
   const builtup = new BuiltUpIndex(extract.landuse, origin)
@@ -465,6 +472,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
       graph.edgeWayId.push(way.id)
       graph.edgeTunnel.push(tunnel)
       graph.edgeOneway.push(oneway)
+      graph.edgeMarked.push(marked.has(way.id) ? 1 : 0)
       if (gateIds.size) {
         const e = graph.edgeA.length - 1
         for (const [id, end] of [[a, i === 0], [b, j === n - 1]]) {
@@ -496,6 +504,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
   }
 
   graph.freeze(coords.pack())
+  graph.edgeGreen = greenIndex(graph, extract.green ?? [], origin)
   graph.buildIndex()
   return graph
 }

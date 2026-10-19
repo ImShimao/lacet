@@ -497,6 +497,49 @@ proche de la cible ; **après**, le D+ lui-même :
   lieu de 37 — un seuil de plus pour un écart dans le bruit. Payer la pente
   sans le reste : 120.
 
+## Parcs, bois, eau et sentiers balisés
+
+`backend/app/osm/green.py` · `backend/app/routing/weights.py` (`GREEN_BONUS`) ·
+`frontend/src/engine/green.js`
+
+Strava trace ses itinéraires sur la carte de chaleur de ses millions de
+sorties : Lacet n'en a pas, et ne peut pas l'inventer. Ce qui en tient lieu,
+c'est ce qu'OpenStreetMap sait déjà — comme le `green_index` d'openrouteservice
+ou la préférence « nature » de Trail Router :
+
+- **l'indice vert** de chaque arête : la part de sa longueur à moins de 100 m
+  environ d'un parc, d'un bois, d'une forêt, d'un plan d'eau, d'une rivière ou
+  d'un canal ;
+- **le balisage** : la voie fait partie d'une relation de randonnée ou de
+  course (`route=hiking|foot|running`, réseaux local à international).
+
+Les deux entrent dans le coût comme un bonus borné : jusqu'à 25 % de moins pour
+une arête entièrement verte, 15 % de moins pour une voie balisée. Jamais pour
+une voie exposée — longer la rivière sur la départementale n'a rien de nature —,
+et jamais assez pour racheter un risque : en mode Sûr, une départementale coûte
+onze fois sa longueur. C'est un défaut, sans réglage.
+
+**Ce que ça change**, sur 40 propositions autour de Soultz, Guebwiller, Buhl et
+Issenheim (5 et 10 km, mode Sûr) :
+
+| Bonus vert / balisé | Près du vert | Sur sentier balisé | Écart de distance | Notes |
+|---|---|---|---|---|
+| aucun | 71 % | 40 % | 3,5 % | 37 A, 3 B |
+| 15 % / 10 % | 75 % | 49 % | 3,2 % | 37 A, 3 B |
+| **25 % / 15 %** | **77 %** | **51 %** | **3,6 %** | **37 A, 3 B** |
+| 35 % / 20 % | 76 % | 56 % | 4,0 % | 37 A, 3 B |
+| 45 % / 25 % | 80 % | 62 % | 4,3 % | 30 A, 10 B |
+
+Au-delà de 25 / 15, la distance se tient moins bien, et à 45 / 25 la note
+recule : la boucle va chercher le sentier au prix d'une rue moins protégée.
+
+**Les données** arrivent avec les rues, par la même requête Overpass, et
+pèsent peu : l'extrait de Beaune gagne 9 % compressé. Dans les tuiles, ce sont
+les clés `g` (surfaces et rivières) et `r` (voies balisées) ; une tuile écrite
+avant n'en a pas, et ses rues perdent seulement ce bonus jusqu'à leur
+rafraîchissement. Le calcul de l'indice prend 30 à 60 ms sur un PC, pour un
+graphe construit en 150 à 500 ms.
+
 ## La préférence de terrain
 
 `backend/app/service.py` (`SURFACE_BAND`) · `frontend/src/engine/service.js`

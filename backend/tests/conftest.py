@@ -29,11 +29,16 @@ def grid_payload(
     tags: dict[str, str] | None = None,
     dangerous_row: int | None = None,
     dangerous_tags: dict[str, str] | None = None,
+    nature: bool = False,
 ) -> dict:
     """Damier `size` × `size` de rues résidentielles avec trottoirs.
 
     `dangerous_row` remplace une ligne horizontale par une départementale nue,
     ce qui permet de vérifier que le portail L3 l'écarte.
+
+    `nature` ajoute un parc sur le quart nord-est — un multipolygone, en deux
+    morceaux de contour —, une rivière qui longe la deuxième rue horizontale et
+    un sentier balisé sur la première colonne.
     """
     street = tags or {"highway": "residential", "sidewalk": "both", "maxspeed": "50"}
     # `maxspeed` explicite : le damier est couvert par un polygone `landuse`,
@@ -87,6 +92,35 @@ def grid_payload(
             ],
         }
     )
+
+    if nature:
+        def at(fx: float, fy: float) -> dict[str, float]:
+            return {"lat": ORIGIN_LAT + fy * STEP, "lon": ORIGIN_LON + fx * STEP}
+
+        lo, hi = size * 0.6, size + 0.5
+        elements.append({
+            "type": "relation",
+            "id": 1,
+            "tags": {"type": "multipolygon", "leisure": "park"},
+            "members": [
+                {"type": "way", "ref": 80_001, "role": "outer",
+                 "geometry": [at(lo, lo), at(hi, lo), at(hi, hi)]},
+                {"type": "way", "ref": 80_002, "role": "outer",
+                 "geometry": [at(hi, hi), at(lo, hi), at(lo, lo)]},
+            ],
+        })
+        elements.append({
+            "type": "way",
+            "id": 80_003,
+            "tags": {"waterway": "river"},
+            "geometry": [at(-1, 0.8), at(size, 0.8)],
+        })
+        elements.append({
+            "type": "relation",
+            "id": 2,
+            "tags": {"type": "route", "route": "hiking"},
+            "members": [{"type": "way", "ref": size + 1, "role": ""}],
+        })
 
     return {"elements": elements}
 

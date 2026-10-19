@@ -90,6 +90,8 @@ async function runCase(entry) {
             edges: graph.edgeCount,
             length_m: pySum(graph.edgeLen),
             crossings: graph.crossings.size,
+            green: pySum(graph.edgeGreen),
+            marked: pySum(graph.edgeMarked),
             first_edges: [...graph.edgeA.slice(0, 20)].map((a, i) => [a, graph.edgeB[i], graph.edgeLen[i]]),
           }
         },

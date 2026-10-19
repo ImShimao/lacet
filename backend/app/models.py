@@ -76,6 +76,9 @@ class LoopRequest(BaseModel):
     # d'altitude — un appel réseau par itinéraire — commence à se voir.
     limit: int = Field(default=5, ge=1, le=12)
     with_elevation: bool = True
+    # Préférer les rues et chemins qui longent un parc, un bois ou l'eau, et les
+    # sentiers balisés — voir `routing.weights.GREEN_BONUS`.
+    nature: bool = True
 
     @property
     def seconds_per_km(self) -> float:

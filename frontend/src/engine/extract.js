@@ -8,10 +8,45 @@
 
 import { keptBarrier } from './safety'
 
-/** Range une réponse Overpass brute : `{ways, landuse, crossings, barriers}`. */
+// Ce qu'on compte comme verdure ou eau — `GREEN_TAGS` en Python.
+export const GREEN_TAGS = {
+  leisure: ['park'],
+  landuse: ['forest'],
+  natural: ['wood', 'water'],
+  waterway: ['river', 'canal'],
+}
+const BUILTUP_LANDUSE = new Set(['residential', 'retail', 'commercial', 'industrial', 'education'])
+
+export const isGreen = (tags) => Object.entries(GREEN_TAGS).some(([key, values]) => values.includes(tags[key]))
+
+const toFlat = (geometry) => {
+  const flat = new Float64Array(geometry.length * 2)
+  for (let i = 0; i < geometry.length; i += 1) {
+    flat[2 * i] = geometry[i].lon
+    flat[2 * i + 1] = geometry[i].lat
+  }
+  return flat
+}
+
+/** Range une réponse Overpass brute : `{ways, landuse, crossings, barriers, green, marked}`. */
 export function fromOverpass(payload, into = emptyExtract()) {
+  const routes = new Set()
+  const ways = new Set()
   for (const el of payload.elements ?? []) {
     const tags = el.tags ?? {}
+
+    if (el.type === 'relation') {
+      const members = el.members ?? []
+      if (tags.route) {
+        for (const m of members) if (m.type === 'way') routes.add(m.ref)
+      } else if (isGreen(tags)) {
+        // Identifiant négatif : une relation et une voie peuvent porter le même
+        // numéro, et la fusion des tuiles dédoublonne par identifiant.
+        const rings = members.filter((m) => m.type === 'way' && m.geometry?.length).map((m) => toFlat(m.geometry))
+        if (rings.length) into.green.push({ id: -Math.trunc(el.id), fill: true, rings })
+      }
+      continue
+    }
 
     if (el.type === 'node') {
       if (tags.highway === 'crossing') {
@@ -24,24 +59,33 @@ export function fromOverpass(payload, into = emptyExtract()) {
     const geometry = el.geometry
     if (el.type !== 'way' || !geometry || !geometry.length) continue
 
-    const flat = new Float64Array(geometry.length * 2)
-    for (let i = 0; i < geometry.length; i += 1) {
-      flat[2 * i] = geometry[i].lon
-      flat[2 * i + 1] = geometry[i].lat
-    }
+    const flat = toFlat(geometry)
 
     if (tags.highway) {
-      into.ways.push({ id: Math.trunc(el.id ?? 0), tags, nodes: el.nodes ?? [], flat })
-    } else if (tags.landuse) {
+      const id = Math.trunc(el.id ?? 0)
+      ways.add(id)
+      into.ways.push({ id, tags, nodes: el.nodes ?? [], flat })
+    } else if (BUILTUP_LANDUSE.has(tags.landuse)) {
       into.landuse.push({ id: Math.trunc(el.id ?? 0), flat })
+    } else if (isGreen(tags)) {
+      // Une rivière est un trait ; un bois, un anneau fermé qu'on remplit.
+      const n = geometry.length
+      const fill =
+        !tags.waterway && n > 2 && flat[0] === flat[2 * n - 2] && flat[1] === flat[2 * n - 1]
+      into.green.push({ id: Math.trunc(el.id ?? 0), fill, rings: [flat] })
     }
   }
+  // Seules les voies présentes comptent : une relation de grande randonnée
+  // cite des milliers de voies, d'un bout à l'autre de la région.
+  for (const id of routes) if (ways.has(id)) into.marked.push(id)
   return into
 }
 
 // `barriers` : les portails fermés et ce qui ferme le passage — propres au
 // moteur de l'app (voir `closedBarrier` dans `safety.js`) ; Python n'en a pas.
-export const emptyExtract = () => ({ ways: [], landuse: [], crossings: [], barriers: [] })
+// `green` : parcs, bois et eau — `[{id, fill, rings}]` ; `marked` : les voies de
+// sentiers balisés, par identifiant. Voir `green.js`.
+export const emptyExtract = () => ({ ways: [], landuse: [], crossings: [], barriers: [], green: [], marked: [] })
 
 /**
  * Relit la forme compacte écrite par le moteur Python (`to_cache`, version 2).
@@ -57,6 +101,8 @@ export function fromCompact(data) {
     landuse: data.landuse.map((flat, i) => ({ id: -(i + 1), flat: Float64Array.from(flat) })),
     crossings: data.crossings.map(([id, lon, lat, tags]) => ({ id, lon, lat, tags })),
     barriers: [],
+    green: (data.green ?? []).map(([id, fill, rings]) => ({ id, fill, rings: rings.map((r) => Float64Array.from(r)) })),
+    marked: data.marked ?? [],
   }
 }
 
@@ -104,6 +150,8 @@ export function clipToDisk(extract, lon, lat, radiusM) {
     landuse: extract.landuse.filter((area) => reaches(area.flat)),
     crossings: extract.crossings.filter(inside),
     barriers: (extract.barriers ?? []).filter(inside),
+    green: (extract.green ?? []).filter((area) => area.rings.some(reaches)),
+    marked: extract.marked ?? [],
   }
 }
 
@@ -132,6 +180,8 @@ export function mergeExtracts(parts) {
   const crossings = new Set()
   const barriers = new Set()
   const landuse = new Set()
+  const green = new Set()
+  const marked = new Set()
   for (const part of parts) {
     for (const way of part.ways) {
       if (ways.has(way.id)) continue
@@ -153,6 +203,13 @@ export function mergeExtracts(parts) {
       barriers.add(b.id)
       out.barriers.push(b)
     }
+    for (const area of part.green ?? []) {
+      if (green.has(area.id)) continue
+      green.add(area.id)
+      out.green.push(area)
+    }
+    for (const id of part.marked ?? []) marked.add(id)
   }
+  out.marked = [...marked]
   return out
 }

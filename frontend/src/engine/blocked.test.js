@@ -98,7 +98,7 @@ describe('les évitements cochés', () => {
   // Un faux graphe : le poids ne lit qu'une longueur et une évaluation de
   // tronçon, et fabriquer ici l'escalier ou la voie rapide qu'on cherche vaut
   // mieux que d'espérer en trouver un dans l'extrait de Beaune.
-  const faux = (safety) => ({ edgeLen: [100], edgeSafety: [{ risk: 0, separation: 2, surface: 'paved', lit: null, highway: 'residential', ...safety }] })
+  const faux = (safety) => ({ edgeLen: [100], edgeGreen: [0], edgeMarked: [0], edgeSafety: [{ risk: 0, separation: 2, surface: 'paved', lit: null, highway: 'residential', ...safety }] })
 
   it('multiplie par vingt-cinq un escalier, quand on le refuse', () => {
     const marches = faux({ highway: 'steps' })
