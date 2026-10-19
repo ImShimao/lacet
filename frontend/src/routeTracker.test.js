@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTrack, locate, nextInstruction, OFF_ROUTE_M, wrongWay } from './routeTracker'
+import { buildTrack, locate, nextInstruction, OFF_ROUTE_M, runsBack, wrongWay } from './routeTracker'
 
 /**
  * Le suivi de parcours.
@@ -122,6 +122,42 @@ describe('locate', () => {
     const premier = locate(track, [2.35, LAT], null)
     const ailleurs = locate(track, [2.35, LAT], premier)
     expect(ailleurs).not.toBeNull()
+  })
+
+  it('ne suit pas un reflet tombé sur le tracé deux cents mètres plus loin', () => {
+    // Un relevé par seconde : on n'a pu courir qu'une trentaine de mètres. Le
+    // reflet, pile sur le tracé mais deux cents mètres devant, est loin de
+    // tout ce qu'on a pu atteindre — et la fenêtre tient tout entière dans un
+    // segment de cent mètres, sans qu'on cesse pour autant d'y chercher.
+    const track = buildTrack(ligne(10))
+    const avant = locate(track, [2.35, LAT + 3 * PAS], null)
+    const reflet = locate(track, [2.35, LAT + 5 * PAS], avant, { reach: 27 })
+    expect(reflet.along).toBeLessThan(3 * CENT_METRES + 30)
+    expect(reflet.offRoute).toBe(true)
+    // Revenu à sa place, le relevé suivant y retombe.
+    expect(locate(track, [2.35, LAT + 3.03 * PAS], avant, { reach: 27 }).offset).toBeLessThan(1)
+  })
+
+  it('suit le retour d’un aller-retour dans le sens où l’on court', () => {
+    // Une impasse : on monte jusqu'au bout, on redescend par la même rue. Dix
+    // mètres après le demi-tour, l'aller et le retour sont au même écart, et
+    // l'aller est le plus près de l'avancée attendue si celle-ci retarde un
+    // peu. Le cap du GPS — on descend, plein sud — tranche.
+    const track = buildTrack([...ligne(3), [2.35, LAT + PAS], [2.35, LAT]])
+    const avant = { along: 195, offRoute: false }
+    const ici = [2.35, LAT + 1.9 * PAS]
+    expect(locate(track, ici, avant, { reach: 27, ahead: 3 }).along).toBeCloseTo(190, -1)
+    expect(locate(track, ici, avant, { reach: 27, ahead: 3, course: 180 }).along).toBeCloseTo(210, -1)
+  })
+})
+
+describe('runsBack', () => {
+  it('voit qu’on remonte le tracé, et seulement alors', () => {
+    const track = buildTrack(ligne(5))
+    expect(runsBack(track, 150, 180)).toBe(true)
+    expect(runsBack(track, 150, 10)).toBe(false)
+    // À angle droit, ce n'est pas un demi-tour : une rue qu'on traverse.
+    expect(runsBack(track, 150, 90)).toBe(false)
   })
 })
 

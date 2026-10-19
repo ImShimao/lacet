@@ -113,6 +113,8 @@ export function runEntry(stats, { route, free, sport }, params) {
     // pendant la sortie, impossibles à retrouver après coup.
     splits: stats.splits?.length ? stats.splits : null,
     paused_s: stats.pausedS || 0,
+    // Ce que la voix a dit, phrase par phrase — voir `RunDetail.jsx`.
+    spoken: stats.spoken?.length ? stats.spoken : null,
     rerouted: Boolean(stats.rerouted),
     free: Boolean(free),
     sport,

@@ -257,6 +257,34 @@
   color: var(--text-2);
 }
 
+/* Ce que la voix a dit : une ligne par phrase, l'heure et le kilomètre en
+   colonne, pour retrouver d'un coup d'œil où elle s'est tue. */
+.spoken summary {
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.spoken ol {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.spoken li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.spoken time,
+.spoken em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
 /* ── signaler, en courant ────────────────────────────────────────────────
    Discret au repos : c'est une ligne de plus dans un panneau où chaque ligne
    compte, et l'immense majorité des sorties n'a rien à signaler. Ouvert, il

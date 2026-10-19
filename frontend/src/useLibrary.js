@@ -78,10 +78,11 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
      *
      * Les traces des sorties anciennes tombent : une trace pèse quelques
      * dizaines de kilooctets, et c'est par elles que le stockage se remplit.
+     * Le journal de la voix part avec : il sert à relire une sortie récente.
      */
     remember(entry) {
       const suite = [entry, ...history]
-        .map((sortie, i) => (i < MAX_TRACKS ? sortie : { ...sortie, track: null }))
+        .map((sortie, i) => (i < MAX_TRACKS ? sortie : { ...sortie, track: null, spoken: null }))
         .slice(0, MAX_HISTORY)
       put('history', suite, setHistory)
       return entry

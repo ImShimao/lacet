@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actAt, announcement, chains, distanceWords, followingStep, previewAt, speedOr, thenLabel } from './guidance'
+import { actAt, announcement, chains, distanceWords, followingStep, previewAt, rightAfter, speedOr, thenLabel } from './guidance'
 
 /**
  * Ce que le guidage dit, et quand.
@@ -156,6 +156,17 @@ describe('l’arrivée et les tours', () => {
   it('dit la fin du tour quand on y est, pas avant', () => {
     expect(announcement(tour, 100, { stage: 'preview' })).toBe(null)
     expect(announcement(tour, 5, { stage: 'act' })).toBe(tour.text)
+  })
+
+  it('enchaîne le virage qui suit de près la fin du tour', () => {
+    // Le guidage le donnait pour annoncé dans cette phrase, sans l'y dire : le
+    // premier virage du second tour n'avait que son « maintenant ».
+    const droite = { index: 4, step: step(2060, 'right', 'Tourne à droite'), gap: 60 }
+    expect(announcement(tour, 5, { stage: 'act', following: droite, speed: PIED })).toBe(
+      'Fin du premier tour. Dernier tour. Repars vers le nord, puis dans 60 mètres, à droite.',
+    )
+    expect(rightAfter(droite, PIED)).toBe(false)
+    expect(rightAfter({ ...droite, gap: 20 }, PIED)).toBe(true)
   })
 })
 

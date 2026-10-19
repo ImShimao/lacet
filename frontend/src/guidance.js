@@ -88,6 +88,9 @@ export function chains(following, speed) {
   return following.gap <= previewAt(speed)
 }
 
+/** La manœuvre suivante est-elle dite « tout de suite », dans la même phrase que celle-ci ? */
+export const rightAfter = (following, speed) => chains(following, speed) && following.gap <= RIGHT_AFTER_M
+
 /**
  * La phrase à dire, ou `null` s'il n'y a rien à dire à ce moment-là.
  *
@@ -119,7 +122,10 @@ export function announcement(step, remaining, { stage = 'act', following = null,
   }
   if (step.turn === 'lap') {
     if (stage !== 'act') return null
-    return calm && !calm.finish ? `${step.text} Continue pendant ${calm.distance}.` : `${step.text}${tail}`
+    // La manœuvre qui suit de près se dit ici, comme après un virage : on la
+    // donnait pour annoncée, sans la dire, et le premier virage du second tour
+    // n'avait que son « maintenant ».
+    return calm && !calm.finish ? `${step.text} Continue pendant ${calm.distance}.` : `${trimDot(step.text)}${after}.${tail}`
   }
 
   if (stage === 'preview') {
