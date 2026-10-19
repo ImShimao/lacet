@@ -501,11 +501,17 @@ function defauts(route, run, { km = 1, avance = 1 } = {}) {
 
   // **Aucune annonce périmée** : chacune vise un carrefour encore devant, à la
   // distance qu'elle dit.
+  // Deux « tourne à droite » à 150 m l'un de l'autre : l'annonce dite juste
+  // après le premier vise le second, pas celui qu'on finit de passer à 7 m —
+  // c'est la distance dite qui départage (boucle de Beaune, poids « nature »).
   for (const d of dites.filter((x) => x.texte.startsWith('Dans '))) {
-    const vise = pas.find(
-      (step) =>
-        d.texte.includes(`, ${lower(step.text)}`) && step.dist_m >= at(d) && step.dist_m - at(d) <= annonceAvant,
-    )
+    const ecart = (step) => Math.abs(distanceDite(d.texte) - (step.dist_m - at(d)))
+    const vise = pas
+      .filter(
+        (step) =>
+          d.texte.includes(`, ${lower(step.text)}`) && step.dist_m >= at(d) && step.dist_m - at(d) <= annonceAvant,
+      )
+      .sort((a, b) => ecart(a) - ecart(b))[0]
     if (!vise) out.push(`annonce sans carrefour devant soi, à ${Math.round(at(d))} m : ${d.texte}`)
     else if (Math.abs(distanceDite(d.texte) - (vise.dist_m - at(d))) > ANNONCE_ECART_M) {
       out.push(`annonce à ${Math.round(vise.dist_m - at(d))} m réels : ${d.texte}`)
