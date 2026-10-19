@@ -337,8 +337,8 @@ export async function fetchArea(args) {
     targetM,
     onProgress = () => {},
     // Appelé quand il faut passer par le réseau — archives ou Overpass. Sans
-    // lui, l'écran annonçait un téléchargement même chez soi, autour de
-    // Guebwiller, où les rues sont livrées avec l'app.
+    // lui, l'écran annonçait un téléchargement même chez soi, en Alsace, où
+    // toutes les rues sont livrées avec l'app.
     onDownload = () => {},
     fetchImpl = fetch,
     now = Date.now,

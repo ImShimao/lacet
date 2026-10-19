@@ -29,6 +29,16 @@ la développer — pas l'app : le GPS, la voix, l'écran de verrouillage, le
 baromètre et les vibrations n'existent que dans l'app installée. La position y est donc
 toujours « indisponible », et l'app retombe sur le dernier départ choisi.
 
+**Les rues livrées** (`frontend/public/region/`, toute l'Alsace) ne sont pas
+versionnées : la compilation de l'IPA les fabrique. Sans elles, l'aperçu
+télécharge les rues comme à l'étranger ; avec une copie ancienne, il en lit
+d'autres que l'app. Pour qu'il lise la même carte que le téléphone, reprends-la
+dans la dernière IPA :
+
+```bash
+unzip -o -j Lacet.ipa 'Payload/Lacet.app/public/region/*' -d frontend/public/region
+```
+
 Le moteur de référence Python n'a plus de serveur : l'app calcule tout sur le
 téléphone. Il s'interroge par ses tests, par `scripts/smoke.py` (plus bas), et
 par `scripts/parity_dump.py`, qui écrit la réponse que le moteur de l'app doit
@@ -44,7 +54,7 @@ reproduire.
 | Backend — test réel sur une ville | Génère de vraies boucles sur Paris et affiche le résultat dans le terminal. |
 | Front — Chrome | Ouvre Chrome attaché au débogueur, points d'arrêt dans le JSX. |
 
-**Tests** — la suite Python du moteur de référence, et 544 côté app (moteur
+**Tests** — la suite Python du moteur de référence, et celle de l'app (moteur
 JavaScript et interface). `Ctrl+Shift+P → Exécuter la tâche → Lacet — tous les
 tests` lance les deux ; l'onglet « Test » permet de rejouer un cas à la fois. En
 ligne de commande :

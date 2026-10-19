@@ -518,7 +518,10 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             <p className="field__hint">
               {directionOf(draft.direction)
                 ? `Les boucles partent ${directionOf(draft.direction).toward} : leur centre tombe à moins de 45° de ce cap. S'il n'y en a aucune de sûre de ce côté, Lacet le dit et propose les autres.`
-                : 'Les boucles se répartissent tout autour du départ.'}
+                : // « Tout autour » promettait trop : à Guebwiller, les boucles du
+                  // nord et de l'ouest montent dans les Vosges, et le dénivelé
+                  // demandé les fait passer après celles de la plaine.
+                  'Les boucles se répartissent autour du départ, du côté où le dénivelé demandé se trouve. Choisis un cap pour partir ailleurs.'}
             </p>
           </Field>
 

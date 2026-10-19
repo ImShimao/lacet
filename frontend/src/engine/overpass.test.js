@@ -422,7 +422,7 @@ describe('le téléchargement d’une zone', () => {
   }, 20_000)
 
   it('ne parle de téléchargement que si les rues manquent sur l’appareil', async () => {
-    // L'écran disait « Téléchargement des rues » même autour de Guebwiller, où
+    // L'écran disait « Téléchargement des rues » même chez soi, en Alsace, où
     // elles sont livrées avec l'app : il attend désormais ce signal pour le dire.
     const { fetchImpl } = fakeNetwork()
     let appels = 0

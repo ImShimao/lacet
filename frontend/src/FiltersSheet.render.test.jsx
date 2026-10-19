@@ -74,7 +74,7 @@ describe('le panneau des filtres', () => {
   it('choisit le côté où partir, « Auto » par défaut', () => {
     const { onApply } = ouvrir()
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText(/tout autour du départ/)).toBeInTheDocument()
+    expect(screen.getByText(/se répartissent autour du départ/)).toBeInTheDocument()
 
     // « NE » se lit « Nord-est » : deux lettres ne disent rien à une voix.
     fireEvent.click(screen.getByRole('button', { name: 'Nord-est' }))
