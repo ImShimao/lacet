@@ -1,6 +1,6 @@
 /** Le tracé qui se dessine s'arrête au bon endroit, dans le bon tronçon, et finit entier. */
 import { describe, expect, it } from 'vitest'
-import { alongLine, bearingOf, drawPlan, drawnPart, sketch } from './routeDraw'
+import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, sketch } from './routeDraw'
 
 const line = (coordinates, level = 'safe') => ({
   type: 'Feature',
@@ -34,6 +34,27 @@ describe('le tracé qui se dessine', () => {
     expect(at(total * 10)).toEqual([7.01, 47.01])
     expect(bearingOf([7, 47], [7, 47.01])).toBeCloseTo(0, 6)
     expect(bearingOf([7, 47], [7.01, 47])).toBeCloseTo(90, 6)
+  })
+
+  it('tourne la caméra du survol par le plus court, au même rythme quelle que soit la cadence', () => {
+    // De 350° à 10° : vingt degrés vers la droite, pas trois cent quarante vers la gauche.
+    const turned = easeBearing(350, 10, 500)
+    expect(turned).toBeGreaterThan(350)
+    expect(turned).toBeLessThan(370)
+    // Deux images de 8 ms valent une image de 16 ms : un iPhone à 120 Hz ne tourne pas plus vite.
+    expect(easeBearing(easeBearing(0, 90, 8), 90, 8)).toBeCloseTo(easeBearing(0, 90, 16), 9)
+    // Une image sautée ne fait pas dépasser le cap visé.
+    expect(easeBearing(0, 90, 10_000)).toBeCloseTo(90, 6)
+    expect(easeBearing(40, 40, 16)).toBe(40)
+  })
+
+  it('lit l\'altitude du profil au point atteint par la pastille', () => {
+    const profile = [{ dist_m: 0, ele_m: 300 }, { dist_m: 1000, ele_m: 400 }, { dist_m: 2000, ele_m: 350 }]
+    expect(profileAt(profile, 500)).toBeCloseTo(350, 9)
+    expect(profileAt(profile, 1500)).toBeCloseTo(375, 9)
+    expect(profileAt(profile, -5)).toBe(300)
+    expect(profileAt(profile, 9999)).toBe(350)
+    expect(profileAt(null, 10)).toBeNull()
   })
 
   it('accepte une ligne seule, celle d\'un parcours sans tronçons', () => {

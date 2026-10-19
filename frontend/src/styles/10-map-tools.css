@@ -128,3 +128,96 @@
 .stage__top {
   transition: opacity 0.3s ease;
 }
+
+/* ══ survol 3D ══════════════════════════════════════════════════════════ */
+
+/* La pastille qui court sur la boucle : le violet de l'app cerclé de blanc,
+   et une onde qui bat derrière elle pour qu'on la trouve d'un coup d'œil sur
+   le relief. `.flypin` est l'élément du marqueur, placé par MapLibre : sans
+   `position`, qui écraserait la sienne. */
+.flypin {
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+.flypin__dot,
+.flypin__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.flypin__dot {
+  background: var(--accent);
+  border: 4px solid #fff;
+  box-shadow: 0 0 0 2px rgba(10, 9, 16, 0.5), 0 3px 12px var(--accent-glow);
+}
+.flypin__pulse {
+  background: var(--accent-glow);
+  animation: flypulse 1.4s ease-out infinite;
+}
+@keyframes flypulse {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+/* Le compteur du survol : les kilomètres et l'altitude au point atteint, en
+   haut, là où était la recherche, qui s'efface pendant le survol. */
+.flyhud {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 9px 18px;
+  border-radius: 22px;
+  background: rgba(19, 17, 26, 0.86);
+  border: 1px solid var(--accent-line);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fade 0.3s ease-out;
+}
+.flyhud__km b {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.flyhud__ele {
+  color: var(--accent-text);
+}
+.flyhud__ele:empty {
+  display: none;
+}
+.flyhud__hint {
+  display: none;
+  flex-basis: 100%;
+  text-align: center;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+}
+.flyhud[data-paused='true'] .flyhud__hint {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flypin__pulse,
+  .flyhud {
+    animation: none;
+  }
+}

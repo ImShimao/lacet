@@ -82,10 +82,16 @@ revient (`routeDraw.js`). Pas en course, où un détour doit apparaître tout de
 suite, ni quand l'iPhone demande de réduire les animations.
 
 **Le survol 3D** : le bouton « 3D » de la colonne de droite fait voler la carte
-le long de la boucle choisie, inclinée, de la porte à la porte — une dizaine de
-secondes pour 10 km. Le panneau s'efface pendant ce temps ; un doigt sur la
-carte ou le bouton d'arrêt le termine, et la carte revient à plat sur toute la
-boucle.
+le long de la boucle choisie, inclinée sur le relief, de la porte à la porte —
+dix-sept secondes pour 10 km. Une pastille violette court sur le tracé,
+la caméra la suit en tournant doucement aux virages, la part déjà parcourue
+s'allume en blanc, et un compteur en haut donne les kilomètres et l'altitude.
+Le relief (Terrain Tiles d'AWS, zoom 12, exagéré 1,5×, ombrage teinté violet)
+n'est chargé que le temps du survol : hors ligne, ou si une tuile d'altitude
+échoue, le survol se fait à plat. Toucher la carte met en pause et reprend ; la
+faire glisser ou le bouton d'arrêt le termine, et la carte revient à plat sur
+toute la boucle. Si l'iPhone demande moins d'animations, la caméra reste fixe
+sur la boucle inclinée et seule la pastille avance.
 
 **Les propositions** s'affichent ensemble : la retenue en couleur, les autres en
 pointillés. Toucher l'une d'elles sur la carte la met en avant. Chacune porte sa
