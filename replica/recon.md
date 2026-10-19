@@ -36,6 +36,14 @@ avis via le flux RSS officiel d'Apple. Aucun compte utilisé, rien de décompil�
 | 23 | Safetipin et autres | https://en.wikipedia.org/wiki/Safetipin | score de sécurité participatif |
 | 24 | Walkable | https://apps.apple.com/us/app/walkable-safe-route-planner/id6762026493 | score 0–100 éclairage, affluence, visibilité |
 | 25 | Avis App Store | `reviews.csv` | 764 avis de 9 apps, flux `itunes.apple.com/{us,fr,gb}/rss/customerreviews` |
+| 26 | Strava, State of the Map 2024 | https://pretalx.com/sotm2024/talk/HVVYM7/ | un ingénieur Strava : graphe d'arêtes OSM, popularité par arête, traces alignées |
+| 27 | Strava × Mapbox, 2019 | https://www.bikeradar.com/news/strava-and-mapbox-worldwide-map-upgrade | carte conçue avec Mapbox, données OSM |
+| 28 | Strava rachète FATMAP | https://geoweeknews.com/news/tech-news-strava-acquires-3d-mapping-platform-fatmap | janvier 2023, cartographie 3D |
+| 29 | Strava, rendu maison | https://www.advnture.com/news/strava-announces-updates-april-2025 | avril 2025 : moteur de rendu sur FATMAP, relief 3D, satellite, hiver |
+| 30 | Strava, Routes 2025 | https://endurance.biz/2025/industry-news/strava-adds-ai-powered-routing-and-leaderboard-updates-for-summer-2025/ | suggestions « IA » tirées de la heatmap |
+| 31 | GraphHopper, API | https://github.com/graphhopper/graphhopper/blob/master/docs/web/api-doc.md | `algorithm=round_trip`, `round_trip.distance`, `round_trip.seed`, `heading` |
+| 32 | openrouteservice, boucles | https://ask.openrouteservice.org/t/description-of-round-trip-feature/4170 | `round_trip` : `length`, `points`, `seed` ; 21 km demandés, 38 km rendus ([fil](https://ask.openrouteservice.org/t/directions-api-accurate-target-distance-response/7475)) |
+| 33 | Indice vert par rue | https://github.com/redfrexx/green_index | HeiGIT : verdure par arête OSM (Sentinel-2), pour les itinéraires « verts » d'openrouteservice |
 
 ## Le panorama
 
@@ -59,6 +67,55 @@ ligne**. Les générateurs (RunnrZ, Roovr, Trail Router) ne notent pas la sécur
 sécurité (LIT Run, Walkable) ne génèrent pas de boucles ; les gros (Strava, Komoot) ne refusent
 rien, ils recommandent.
 
+## Cartes et itinéraires : comment ils font
+
+Ajouté le 2026-10-19. Toutes ces apps empilent les mêmes quatre couches ; elles ne diffèrent que par
+ce qu'elles mettent dans chacune.
+
+```
+1. fond de carte     un moteur de rendu (Mapbox, MapLibre, MapKit) + des tuiles (vectorielles ou images)
+2. données de rues   presque toujours OpenStreetMap
+3. moteur            un graphe des rues, un coût par arête, un plus court chemin (Dijkstra, A*)
+4. génération        des points de passage autour du départ, reliés par le moteur
+   (+ altitude : un modèle numérique de terrain ; + guidage : la position recalée sur le tracé)
+```
+
+| app | fond de carte | rues | moteur, coût des arêtes | boucle | où ça calcule | confiance |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Strava** | Mapbox (2019), puis rendu maison bâti sur FATMAP (avril 2025) : relief 3D, satellite, hiver | OSM | maison ; chaque arête OSM porte une **popularité** tirée de plus d'un milliard d'activités alignées dessus | suggestions « IA » dans la heatmap ; tracé manuel aimanté vers le plus fréquenté | serveur | haute (ingénieur Strava, n° 26) ; moyenne pour le rendu |
+| **Roovr** | non dit ; aperçu 3D | OSM | **GraphHopper** (« Powered by GraphHopper ») | « pose des points clés autour de toi et les relie », cap N…NO ou auto, nouvelle variante à chaque tirage | serveur : « generating a loop requires connectivity » | haute |
+| **RunnrZ** | non dit ; plan, satellite, relief, 3D (1.3.1), refait « sur les technologies Apple » (2.0) → probablement MapKit | non dit (« cartographie ultra-détaillée ») | « RunGenius », non publié | 5 propositions ; points de passage et zones exclues depuis 2.3 | serveur (avis « erreur réseau ») | faible : rien n'est publié |
+| **Trail Router** | MapLibre (2026) | OSM | préfère parcs, forêts, bords d'eau, évite les grands axes — sans doute un **indice vert** par arête, comme openrouteservice (n° 33) | non publié | serveur | moyenne |
+| **Lacet** | MapLibre ; CARTO, OpenFreeMap, OSM, OpenTopoMap, Esri (+ Mapbox avec un token) | OSM : archives `lacet-data`, Overpass en secours | Dijkstra maison, coût = longueur × (1 + λ·risque) × surface × nuit (`weights.js`) | polygones réguliers orientés, **un seul** Dijkstra, candidats notés A/B/C | **le téléphone**, hors ligne | — |
+
+### Les trois recettes de boucle
+
+1. **Des points sur un cercle** — GraphHopper (`algorithm=round_trip`, `round_trip.distance`,
+   `round_trip.seed`, `heading`), openrouteservice (`round_trip` : `length`, `points`, `seed`), et
+   donc Roovr. On pose *n* points autour du départ, espacés d'environ longueur ÷ *n*, dans une
+   direction tirée au hasard (la graine) ou imposée (le cap), puis on route de l'un à l'autre. Peu
+   cher, mais la distance n'est qu'un souhait : un point tombé de l'autre côté d'une rivière fait
+   rendre 38 km pour 21 demandés (n° 32), et rien n'empêche les allers-retours.
+2. **La popularité** — Strava, Garmin Trendline. Même mécanique, mais le coût d'une arête vient des
+   passages réels. C'est leur seul avantage que Lacet ne peut pas copier : les données sont celles de
+   leurs utilisateurs (voir *Hors périmètre*).
+3. **Lacet** — la recette 1 en plus robuste : polygones réguliers au lieu d'un cercle, un Dijkstra
+   unique pour tous les sommets, des candidats notés et rognés à la distance, la sécurité dans le
+   coût (`docs/generation.md`).
+
+### Ce que Lacet en retient
+
+- Données, moteur et génération : Lacet est au niveau, et seul à tout calculer **hors ligne**. Roovr
+  et RunnrZ ne génèrent rien sans réseau.
+- **Écart visible : le relief en 3D.** Strava et Roovr drapent la boucle sur les montagnes ; Lacet
+  incline la carte, mais à plat — `frontend/src` n'a aucune source `raster-dem`. MapLibre le fait
+  nativement (source `raster-dem` + `map.setTerrain`, couche `hillshade`), avec des tuiles
+  d'altitude gratuites et sans clé (Terrain Tiles, registre Open Data d'AWS, encodage `terrarium`).
+  Taille **S**. Utile là où ça monte : Guebwiller, les Vosges.
+- Un **indice vert** par arête (n° 33) donnerait la préférence « nature » de Trail Router à partir
+  des seules données OSM (parcs, forêts, eau à moins de 100 m). Taille **M**, et c'est un calcul
+  partagé : Python et JS, avec la parité.
+
 ## La boucle cœur
 
 « Je veux courir 10 km depuis chez moi, maintenant, sans réfléchir au trajet et sans me perdre. »
@@ -69,7 +126,7 @@ Tout le reste — terrain, dénivelé, direction, partage — sert à rendre ce 
 | ID | écran | où on le trouve | rôle | composants | état chez Lacet |
 | --- | --- | --- | --- | --- | --- |
 | S01 | Carte d'accueil | tous | position, point de départ | carte, recherche, bouton position | `Explore.jsx`, `SearchBar.jsx` |
-| S02 | Critères | RunnrZ, Roovr, Strava | distance/durée, allure, terrain, dénivelé, direction, niveau | puces, curseurs | `FiltersSheet.jsx` — **sans direction** |
+| S02 | Critères | RunnrZ, Roovr, Strava | distance/durée, allure, terrain, dénivelé, direction, niveau | puces, curseurs | `FiltersSheet.jsx`, direction et D+ visé compris |
 | S03 | Propositions | RunnrZ (5), Strava (3), Roovr (glisser) | comparer | cartes glissables, tracés superposés | 3 à 12, pointillés, noms propres |
 | S04 | Détail d'une boucle | tous | profil, surfaces, D+, durée | profil, % surfaces | bande sécurité + profil, eau, note |
 | S05 | Aperçu 3D / survol | Roovr, Footpath | « voir » la boucle avant | carte inclinée animée | **absent** |
@@ -101,7 +158,7 @@ F03 Chemin fermé pendant la sortie
 
 F04 Abandonner et rentrer (blessure, orage, nuit)
     RunnrZ 2.4 : « parcours retour ». Footpath : il faut arrêter et recréer un itinéraire (avis).
-    Lacet : rien de direct — le recalcul rentre au plus court seulement après un grand détour.
+    Lacet : « Rentrer au départ », dans `LiveRun.jsx`.
 
 F05 Préparer à l'avance, ailleurs
     RunnrZ, Roovr, Lacet : départ depuis une adresse. Lacet garde rues et fond de carte hors ligne.
@@ -135,15 +192,14 @@ Report       point, kind (fermé | privé | travaux), date — RunnrZ 2.4 « sig
              confidence : high
 ```
 
-Lacet a déjà `start`, `distance | duration + pace`, `terrain`, `relief`, `count`, `reports`. Il lui
-manque `direction`, `via[]`, et un D+ chiffré.
+Lacet a tout : `start`, `distance | duration + pace`, `terrain`, `relief` ou D+ visé, `direction`,
+`count`, `reports`, et un point de passage (appui long).
 
 ## Matrice
 
-Voir `features.csv` : 51 lignes. Must 17, should 17, could 17 (dont 3 skip).
-Lacet : 31 oui, 3 partiels, 14 non. **Tous les « must » sont faits** ; les manques sont 5 « should »
-(direction, point de passage, D+ chiffré, prévenir un proche, rentrer maintenant), 2 « should »
-partiels (chemins fantômes, réglages de la voix) et des « could ».
+Voir `features.csv` : 52 lignes. Must 17, should 17, could 18 (dont 3 skip).
+Lacet : 38 oui, 2 partiels, 9 non. **Tous les « must » et « should » sont faits**, sauf les réglages
+de la voix (partiels) ; il reste des « could », dont le relief 3D.
 
 ## Hors périmètre
 
