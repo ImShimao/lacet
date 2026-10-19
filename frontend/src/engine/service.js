@@ -9,7 +9,7 @@
 // avec le téléchargement et le cache réels, et dans les tests de parité, avec
 // l'extrait figé que Python a lui aussi reçu.
 
-import { resample, haversineM } from './geo'
+import { bearingDeg, resample, haversineM } from './geo'
 import { Candidate, GOLDEN, figureEight, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
 import { blockedEdges } from './blocked'
 import { carryBlocked, openDoor } from './door'
@@ -76,6 +76,12 @@ const WIDEN_MIN_ROUNDS = 2
 // entamé, la recherche tient dans deux secondes.
 export const WIDEN_BUDGET_MS = 1500
 const MIN_LAP_M = 1500
+// Le point de passage se rattache à la voie la plus proche dans ce rayon : posé
+// au milieu d'un champ, il vise le chemin qui le borde, pas la route d'en face.
+const VIA_SNAP_M = 300
+// Une boucle qui passe par un point à vol d'oiseau `d` mesure au moins deux
+// fois `d`, plus les détours des rues — un quart de plus en ville.
+const VIA_MAX_SHARE = 0.42
 // Écart de cap minimal entre les deux boucles d'un « 8 » — `EIGHT_MIN_GAP_DEG`.
 const EIGHT_MIN_GAP_DEG = 90
 const LAP_PENALTY = 0.12
@@ -191,6 +197,10 @@ export function normalizeRequest(input) {
     //                              boucles partent de ce côté — voir
     //                              `HEADING_WINDOW_DEG`. `null` (« Auto ») par
     //                              défaut, et la recherche reste celle d'avant.
+    //   via                        « Passer par ici » : un point, `{lat, lon}`,
+    //                              par lequel toutes les boucles passent — voir
+    //                              `threadVia`. Il oriente les polygones comme
+    //                              une direction, qu'il remplace.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -203,6 +213,7 @@ export function normalizeRequest(input) {
     carfree: input.carfree !== false,
     widen: input.widen !== false,
     heading: input.heading ?? null,
+    via: input.via ?? null,
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -222,6 +233,12 @@ export function normalizeRequest(input) {
   }
   req.avoid_bearings = req.avoid_bearings.map((b) => bounded(b, 'avoid_bearings', { min: 0, max: 360 }))
   if (req.heading !== null) req.heading = bounded(req.heading, 'heading', { min: 0, max: 360 })
+  if (req.via !== null) {
+    req.via = {
+      lat: bounded(req.via?.lat, 'via', { min: -90, max: 90 }),
+      lon: bounded(req.via?.lon, 'via', { min: -180, max: 180 }),
+    }
+  }
   if (!Array.isArray(req.avoid)) throw new PlanningError('Paramètre avoid invalide.')
   // Un évitement inconnu est ignoré, pas refusé : une version plus récente de
   // l'app peut en avoir ajouté un, et une sauvegarde rouverte ici ne doit pas
@@ -387,6 +404,29 @@ export async function planLoops(input, deps) {
     }
   }
 
+  // Le point de passage, rattaché à la rue la plus proche du réseau principal.
+  // Trop loin pour la distance demandée, il ne peut pas être atteint : mieux vaut
+  // le dire tout de suite que chercher une minute pour rien.
+  let via = null
+  if (req.via) {
+    const node = area.nearestNode(req.via.lon, req.via.lat, VIA_SNAP_M, mainMask())
+    if (node === null) {
+      throw new PlanningError('Le point de passage est loin de toute voie praticable : pose-le sur une rue ou un chemin.')
+    }
+    const from = graph.node(start)
+    const to = graph.node(node)
+    const straightM = haversineM(from, to)
+    if (straightM > targetM * VIA_MAX_SHARE) {
+      throw new PlanningError(
+        `Ce point de passage est à ${pyFixed(straightM / 1000, 1).replace('.', ',')} km à vol d'oiseau : une boucle de ` +
+          `${pyFixed(req.distance_km, 1).replace('.', ',')} km ne peut pas y aller et en revenir. Allonge la distance, ou rapproche le point.`,
+      )
+    }
+    via = { node, straightM, bearing: bearingDeg(from, to) }
+    // Il fixe le côté où partir : une direction en plus ne ferait que le contredire.
+    req = { ...req, heading: null }
+  }
+
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
   const terrain = terrainTask ? await within(terrainTask, settings.terrainWaitMs ?? TERRAIN_WAIT_MS) : null
   const profile = buildProfile(req.surface, req.safety, night, req.sport, {
@@ -412,6 +452,7 @@ export async function planLoops(input, deps) {
       terrain,
       climbFit: climbFit(req),
       heading: req.heading,
+      via,
     })
   let raw = generate()
   trace.raw?.(start, targetM, raw)
@@ -420,7 +461,7 @@ export async function planLoops(input, deps) {
   const lo = targetM * (1 - req.tolerance)
   const hi = targetM * (1 + req.tolerance)
 
-  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
+  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
 
   // **Rien de ce côté.** Une rivière sans pont, une voie ferrée, une frontière :
   // la direction demandée n'offre aucune boucle qui tienne les seuils. On le dit,
@@ -431,13 +472,13 @@ export async function planLoops(input, deps) {
     missedHeading = req.heading
     req = { ...req, heading: null }
     raw = generate()
-    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
+    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
   }
 
   let relaxed = false
   let salvaged = null
   if (!unique.length && req.safety === 'safe') {
-    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse })
+    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
     relaxed = unique.length > 0
   }
 
@@ -557,7 +598,9 @@ export async function planLoops(input, deps) {
     meta.message =
       "Aucun itinéraire d'ici ne tient les seuils du mode Sûr : le réseau impose de longer la route. Voici ce qui existe malgré tout, avec le détail des portions exposées — à toi de juger."
   } else if (!routes.length) {
-    meta.message = noResultMessage(req, rejected, offTarget)
+    meta.message = via
+      ? `Aucune boucle de ${pyFixed(req.distance_km, 1).replace('.', ',')} km ne passe par ce point en tenant les seuils. Essaie une autre distance, ou déplace le point de passage.`
+      : noResultMessage(req, rejected, offTarget)
   }
   if (missedHeading !== null) {
     meta.heading_missed = directionOf(missedHeading)
@@ -595,7 +638,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
-function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null, { deadline = Infinity, reuse = {} } = {}) {
+function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null, { deadline = Infinity, reuse = {}, via = null } = {}) {
   const [passed, rejected, offTarget] = applyGate(raw, lo, hi, mode, req.sport)
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
 
@@ -630,6 +673,7 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
       terrain,
       climbFit: climbFit(req),
       heading: req.heading,
+      via,
     })
     trace.raw?.(start, targetM, more)
     const [extra] = applyGate(more, lo, hi, mode, req.sport)
@@ -638,7 +682,7 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
   }
 
   if (unique.length < req.limit) {
-    unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace, terrain))
+    unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace, terrain, via))
   }
   return [unique, rejected, offTarget]
 }
@@ -672,7 +716,7 @@ function freshFirst(unique, shown, limit) {
   return fresh.length >= limit ? fresh : [...fresh, ...seen.slice(0, limit - fresh.length)]
 }
 
-function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, terrain = null) {
+function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, terrain = null, via = null) {
   const out = []
   for (const laps of LAP_DIVISORS) {
     if (out.length >= needed) break
@@ -686,8 +730,10 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
       variation: req.variation,
       terrain,
       climbFit: climbFit(req),
-      // Un tour garde le cap de sa boucle : lui aussi part du côté demandé.
+      // Un tour garde le cap de sa boucle : lui aussi part du côté demandé, et
+      // passe par le point demandé.
       heading: req.heading,
+      via,
     })
     trace.raw?.(start, lapTarget, raw)
     const lo = lapTarget * (1 - req.tolerance)

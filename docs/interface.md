@@ -39,6 +39,11 @@ plus près des murs — une maison d'angle, un jardin qui donne sur un chemin. L
 première consigne dit de quel côté partir : « Départ — en sortant, pars à
 droite dans la rue des Tonneliers. » (`engine/door.js`)
 
+**Le point de passage** : un appui long sur la carte (ou « Passer par un
+point » dans le menu du départ) pose un fanion, et la recherche repart avec
+des boucles qui y passent toutes. Le fanion se fait glisser ; la pastille
+« Par ce point », sous la recherche, le retire d'un ✕.
+
 **Le sens de parcours** est marqué par des chevrons le long du tracé. Ce n'est
 pas décoratif : les consignes de navigation, le profil altimétrique et
 l'orientation par rapport au vent décrivent tous la boucle **dans un sens

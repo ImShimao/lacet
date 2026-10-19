@@ -22,6 +22,9 @@ const NAV_LOW = 0.22
 // pour que la carte et le tracé arrivent ensemble.
 const DRAW_MS = 750
 
+// L'appui long qui pose un point de passage : celui d'iOS, à peu près.
+const LONG_PRESS_MS = 500
+
 // Le survol : assez bas pour lire les rues, assez incliné pour voir venir le
 // relief, et le cap pris 250 m plus loin pour lisser les virages.
 const FLY_ZOOM = 15.6
@@ -36,6 +39,8 @@ const THIN_M = 120
 // les pose hors de React, en HTML.
 const svg = (inner) =>
   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`
+const FLAG_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V3.5"/><path d="M6 4.5h12l-2.6 4 2.6 4H6"/></svg>'
 const POI_SVG = {
   water: svg('<path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z"/>'),
   toilets: svg(
@@ -66,6 +71,9 @@ export default function MapView({
   onUserMove,
   flyover = false,
   onFlyoverEnd,
+  via = null,
+  placingVia = false,
+  onVia,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -77,7 +85,7 @@ export default function MapView({
   const [revision, setRevision] = useState(0)
 
   const handlers = useRef({})
-  handlers.current = { onPlace, onPickRoute, onUserMove, onFlyoverEnd, placing, compassRef }
+  handlers.current = { onPlace, onPickRoute, onUserMove, onFlyoverEnd, onVia, placing, placingVia, compassRef, navigate }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
   // On la laisse alors où la main l'a mise, et « Recentrer » la reprend. Le
@@ -185,7 +193,44 @@ export default function MapView({
     instance.on('styledata', collapseAttribution)
     instance.on('idle', collapseAttribution)
 
+    // **L'appui long** pose le point de passage : « passer par ici », le geste
+    // des cartes routières. Un doigt immobile une demi-seconde, et rien
+    // d'autre — un déplacement, un pincement ou un doigt levé l'annulent.
+    let press = null
+    const unpress = () => {
+      clearTimeout(press?.timer)
+      press = null
+    }
+    instance.on('touchstart', (event) => {
+      unpress()
+      if (event.originalEvent.touches?.length !== 1 || handlers.current.navigate || !handlers.current.onVia) return
+      // Un repère qu'on tient avant de le faire glisser n'est pas un appui long sur la carte.
+      if (event.originalEvent.target?.closest?.('.maplibregl-marker')) return
+      const at = event.point
+      press = {
+        at,
+        timer: setTimeout(() => {
+          const { lng, lat } = instance.unproject(at)
+          press = null
+          handlers.current.onVia?.({ lat, lon: lng })
+        }, LONG_PRESS_MS),
+      }
+    })
+    instance.on('touchmove', (event) => {
+      if (press && (event.originalEvent.touches?.length !== 1 || event.point.dist(press.at) > 10)) unpress()
+    })
+    instance.on('touchend', unpress)
+    instance.on('touchcancel', unpress)
+    // À la souris, dans l'aperçu : le clic droit.
+    instance.on('contextmenu', (event) => {
+      if (!handlers.current.navigate) handlers.current.onVia?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+    })
+
     instance.on('click', (event) => {
+      if (handlers.current.placingVia) {
+        handlers.current.onVia?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+        return
+      }
       if (handlers.current.placing) {
         handlers.current.onPlace?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
@@ -214,6 +259,8 @@ export default function MapView({
       // elle restait sans repère de départ, au zoom d'ouverture.
       startMarker.current?.remove()
       startMarker.current = null
+      viaMarker.current?.remove()
+      viaMarker.current = null
       liveMarker.current?.remove()
       liveMarker.current = null
       lastFocus.current = 0
@@ -291,6 +338,33 @@ export default function MapView({
       startMarker.current.setLngLat([start.lon, start.lat])
     }
   }, [start, revision])
+
+  // --- point de passage, déplaçable -------------------------------------------
+  const viaMarker = useRef(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m || !revision) return
+    if (!via) {
+      viaMarker.current?.remove()
+      viaMarker.current = null
+      return
+    }
+    if (!viaMarker.current) {
+      const el = document.createElement('div')
+      el.className = 'viapin'
+      el.setAttribute('role', 'img')
+      el.setAttribute('aria-label', 'Point de passage — fais-le glisser pour le déplacer')
+      el.innerHTML = FLAG_SVG
+      viaMarker.current = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
+      viaMarker.current.on('dragend', () => {
+        const { lat, lng } = viaMarker.current.getLngLat()
+        handlers.current.onVia?.({ lat, lon: lng })
+      })
+      viaMarker.current.setLngLat([via.lon, via.lat]).addTo(m)
+    } else {
+      viaMarker.current.setLngLat([via.lon, via.lat])
+    }
+  }, [via, revision])
 
   // --- position en direct + cercle de précision -------------------------------
   const liveMarker = useRef(null)
@@ -619,7 +693,7 @@ function dockPadding(m) {
   const map = m.getContainer().getBoundingClientRect()
   const pad = { top: 32, bottom: 32, left: 32, right: 32 }
 
-  for (const selector of ['.side', '.stage__top', '.sportpill', '.stage__tools', '.runbar']) {
+  for (const selector of ['.side', '.stage__top', '.sportpill', '.viapill', '.stage__tools', '.runbar']) {
     const el = document.querySelector(selector)
     if (!el) continue
     const r = el.getBoundingClientRect()

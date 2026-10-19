@@ -137,6 +137,29 @@ describe('la boucle', () => {
     expect(result.routes.length).toBeGreaterThan(0)
   }, 30_000)
 
+  it('passe par le point demandé, et reste une boucle', async () => {
+    // « Passer par ici » : un point à un kilomètre et demi au nord-est du départ.
+    // Chaque proposition y passe — à la rue près, le point étant posé à côté —
+    // et revient à la porte.
+    const via = { lat: 47.0345, lon: 4.8505 }
+    const result = await planLoops(
+      { lat: 47.0245, lon: 4.8395, distance_km: 6, sport: 'run', limit: 5, via },
+      deps,
+    )
+    expect(result.routes).toHaveLength(5)
+    for (const route of result.routes) {
+      const closest = Math.min(...route.geometry.map((c) => haversineM(c, [via.lon, via.lat])))
+      expect(closest).toBeLessThan(120)
+      expect(route.geometry.at(-1)).toEqual(route.geometry[0])
+    }
+  }, 60_000)
+
+  it('dit tout de suite quand le point est trop loin pour la distance', async () => {
+    await expect(
+      planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 3, sport: 'run', via: { lat: 47.0445, lon: 4.8395 } }, deps),
+    ).rejects.toThrow(/2,\d km à vol d'oiseau.*boucle de 3,0 km/)
+  })
+
   it('« Régénérer » ne remontre pas une boucle déjà vue', async () => {
     // Tourner les polygones ne suffisait pas : les meilleures rues restaient
     // les meilleures, et une régénération sur deux remontrait une boucle déjà

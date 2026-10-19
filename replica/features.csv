@@ -8,7 +8,7 @@ Préférence plat / vallonné / côtes,génération,must,yes,yes,Roovr Strava ; 
 Départ depuis une adresse ou un point posé,génération,must,yes,yes,RunnrZ Roovr Strava
 Vraie boucle contrôlée par sa forme (pas d'aller-retour),génération,must,yes,yes,les autres ne contrôlent pas la rondeur ; avis Footpath et Komoot sur les allers-retours
 Choisir la direction de départ,génération,should,yes,no,Roovr N…NO + Auto ; Garmin direction de départ
-Passer par un point (parc ou fontaine),génération,should,yes,no,RunnrZ 2.3 Apple Plans Komoot Footpath ; avis Trail Router et Footpath
+Passer par un point (parc ou fontaine),génération,should,yes,yes,RunnrZ 2.3 Apple Plans Komoot Footpath ; avis Trail Router et Footpath
 D+ visé chiffré,génération,should,no,no,demandé chez RunnrZ (« on ne peut pas demander un D+ ») ; Lacet a trois fourchettes
 Écarter les chemins fantômes (trail_visibility abandoned),génération,should,no,partial,20 avis sur 5 apps ; Lacet exclut déjà access=private et portails fermés
 Distance exacte (semi au mètre),génération,should,no,yes,avis Trail Router : distances fausses et pas de décimales

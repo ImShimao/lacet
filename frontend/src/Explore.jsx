@@ -147,7 +147,8 @@ export default function Explore({
         )}
         <p className="muted small">
           Fais glisser le repère, touche la carte en mode placement, ou cherche une
-          adresse pour changer de départ.
+          adresse pour changer de départ. Un appui long sur la carte fait passer la
+          boucle par ce point.
         </p>
       </div>
     )

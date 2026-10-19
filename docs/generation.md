@@ -78,6 +78,33 @@ village, littoral) × trois distances (5, 10, 21,1 km) :
 | Temps maximum | 72 s | **19 s** |
 | Échecs Overpass | 6/24 | **0/24** |
 
+### Passer par un point
+
+Un appui long sur la carte — ou « Passer par un point » dans le menu du départ
+— pose un fanion, et **toutes** les boucles y passent. C'était la demande la
+plus citée dans les avis des apps concurrentes (58 avis sur le contrôle du
+tracé, `replica/fixes.md`). Propre à l'app : Python n'a pas de point de passage,
+et la parité ne le voit pas (`via` dans `normalizeRequest`).
+
+Le point se rattache à la voie la plus proche du réseau principal, à 300 m au
+plus. Il oriente les polygones comme une direction le ferait (±45° autour de
+lui), puis prend sa place parmi leurs sommets, dans l'ordre des caps : il
+remplace le sommet qu'il côtoie, ou s'ajoute entre deux (`threadVia`). Hors de
+l'éventail d'un polygone, il y ferait une pointe : ce polygone-là est laissé.
+
+Un piège, trouvé à Beaune : chaque tronçon est calculé à part, et celui qui
+repartait du point y faisait souvent demi-tour par la rue d'arrivée ;
+l'aller-retour, rogné ensuite, emportait le point avec lui — trente-deux
+boucles tracées, aucune n'y passait. Repartir par la rue d'arrivée coûte donc
+mille fois sa longueur, juste après le point. Au bout d'une impasse, le
+rognage reste inévitable : une boucle qui passe à 60 m du point compte comme
+passée.
+
+Trop loin pour la distance — plus de 42 % de la boucle à vol d'oiseau, quand
+l'aller et le retour en prennent déjà 84 % sans le moindre détour de rue —,
+la recherche s'arrête tout de suite et le dit, plutôt que de chercher une
+minute pour rien.
+
 ## Le choix des propositions
 
 **« Regénérer d'autres boucles » en propose vraiment d'autres.** Le moteur est

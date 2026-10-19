@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyExtract } from './extract'
 import { buildGraph } from './graph'
-import { Candidate, detectCrossings } from './loops'
+import { Candidate, detectCrossings, threadVia } from './loops'
 
 /**
  * Les traversées de route rapide.
@@ -59,5 +59,32 @@ describe('detectCrossings', () => {
 
   it('compte deux traversées éloignées l’une de l’autre', () => {
     expect(crossed(100)).toHaveLength(2)
+  })
+})
+
+/**
+ * « Passer par ici » : le point prend sa place parmi les sommets du polygone,
+ * dans l'ordre des caps — sinon la boucle ferait des allers-retours pour
+ * l'attraper.
+ */
+describe('le point de passage dans un polygone', () => {
+  // Trois sommets à 0°, 60° et 120° du départ (nœud, distance, cap).
+  const sommets = [
+    [1, 1000, 0],
+    [2, 1200, 60],
+    [3, 1000, 120],
+  ]
+
+  it('remplace le sommet qu’il côtoie', () => {
+    expect(threadVia(sommets, [9, 1100, 55], 60).map(([n]) => n)).toEqual([1, 9, 3])
+  })
+
+  it('s’ajoute entre deux sommets éloignés', () => {
+    expect(threadVia(sommets, [9, 800, 90], 60).map(([n]) => n)).toEqual([1, 2, 9, 3])
+    expect(threadVia(sommets, [9, 800, 340], 40).map(([n]) => n)).toEqual([9, 1, 2, 3])
+  })
+
+  it('renonce quand le point tombe hors de l’éventail', () => {
+    expect(threadVia(sommets, [9, 800, 230], 60)).toBeNull()
   })
 })

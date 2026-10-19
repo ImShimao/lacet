@@ -43,6 +43,10 @@ avant.
 tes sorties et tes réglages ne quittent pas l'appareil — une sauvegarde
 s'exporte en un fichier si tu veux les emporter.
 
+**Il passe par où tu veux.** Un appui long sur la carte — un parc, une
+fontaine, la rue d'un ami — et toutes les boucles proposées y passent, notées
+comme les autres.
+
 Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi »,
 « Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta

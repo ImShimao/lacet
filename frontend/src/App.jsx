@@ -111,6 +111,10 @@ export default function App() {
   // Le survol 3D de la boucle choisie (`MapView`) : tant qu'il tourne, le
   // panneau s'efface pour laisser toute la carte.
   const [flying, setFlying] = useState(false)
+  // « Passer par ici » : le point par lequel toutes les boucles passent, posé
+  // d'un appui long sur la carte ou depuis le menu du départ.
+  const [via, setVia] = useState(null)
+  const [placingVia, setPlacingVia] = useState(false)
   // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
   // allumé, il serait reparti au retour sur la carte.
   useEffect(() => setFlying(false), [running, tab, viewing, summary, selected?.id])
@@ -131,7 +135,7 @@ export default function App() {
   // faire autour — ranger les filtres, revenir à l'onglet, replier la feuille.
   // Le calcul, son jeton et son élargissement sont dans `useSearch.js`.
   const search = useCallback(
-    async (next, { regenerate = false } = {}) => {
+    async (next, { regenerate = false, through = via } = {}) => {
       const active = next || params
       if (next) {
         setParams(next)
@@ -145,7 +149,7 @@ export default function App() {
       // même demande relancée sur ses propres propositions — les filtres
       // rouverts et validés sans rien changer — en est une aussi : refaite à
       // l'identique, elle rendait exactement les mêmes boucles.
-      const request = toRequest(active, start)
+      const request = { ...toRequest(active, start), ...(through ? { via: through } : {}) }
       const key = JSON.stringify(request)
       const again = regenerate || (Boolean(result?.request && result.routes.length) && key === lastAsked.current)
       lastAsked.current = key
@@ -176,8 +180,22 @@ export default function App() {
       )
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params, start, result],
+    [params, start, result, via],
   )
+
+  // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient
+  // de poser. Retiré, elle repart sans lui — si des boucles étaient affichées.
+  const passBy = (point) => {
+    setPlacingVia(false)
+    setPlacing(false)
+    haptic('tickHaptic')
+    setVia(point)
+    search(undefined, { through: point })
+  }
+  const dropVia = () => {
+    setVia(null)
+    if (result) search(undefined, { through: null })
+  }
 
   // --- préparation en fond -----------------------------------------------------
   // Dès que le départ et les réglages sont connus, les rues de la zone se
@@ -372,6 +390,9 @@ export default function App() {
           onUserMove={here.release}
           flyover={flying}
           onFlyoverEnd={() => setFlying(false)}
+          via={running ? null : via}
+          placingVia={placingVia}
+          onVia={running || tab !== 'explore' ? null : passBy}
           onPickRoute={(id) => {
             const match = result?.routes.find((r) => r.id === id)
             if (match) setSelected(match)
@@ -414,12 +435,19 @@ export default function App() {
             geo={geo}
             onLocate={here.centerOnMe}
             placing={placing}
-            onPlacing={setPlacing}
+            onPlacing={(on) => {
+              setPlacingVia(false)
+              setPlacing(on)
+            }}
             places={places}
             onPickPlace={(place) => applyStart(placeOf(place), place.name, true)}
             onDropPlace={(id) => library.dropPlace(id)}
             onFromHere={here.startFromHere}
             onKeepStart={start ? () => setNaming(true) : null}
+            onPlacingVia={() => {
+              setPlacing(false)
+              setPlacingVia(true)
+            }}
             compassRef={compassRef}
             onNorth={() => setNorthAt(Date.now())}
             flying={flying}
@@ -441,6 +469,23 @@ export default function App() {
         {placing && (
           <div className="stage__hint">
             Touche la carte pour poser le départ — ou fais glisser le repère.
+          </div>
+        )}
+        {placingVia && (
+          <button className="stage__hint" onClick={() => setPlacingVia(false)}>
+            Touche la carte là où la boucle doit passer. (Annuler)
+          </button>
+        )}
+
+        {/* Le point de passage, dit et retirable d'un geste : sans lui, on
+            oublierait pourquoi toutes les boucles filent du même côté. */}
+        {via && !running && (
+          <div className={`viapill ${tab === 'explore' && result ? 'viapill--low' : ''}`}>
+            <Icon name="flag" size={15} />
+            Par ce point
+            <button onClick={dropVia} aria-label="Ne plus passer par ce point">
+              <Icon name="close" size={13} />
+            </button>
           </div>
         )}
       </main>
@@ -591,6 +636,7 @@ export default function App() {
                 setMapStyle(DEFAULT_STYLE)
                 setPoiPrefs({ water: false, toilets: false })
                 setRunView('heading')
+                setVia(null)
                 run.dropPending()
               }}
               onRestored={() => {

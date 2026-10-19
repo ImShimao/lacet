@@ -20,6 +20,7 @@ export function MapTools({
   onDropPlace,
   onFromHere,
   onKeepStart,
+  onPlacingVia,
   compassRef,
   onNorth,
   flying = false,
@@ -101,6 +102,14 @@ export function MapTools({
               <Icon name="pin" size={17} />
               Choisir sur la carte
             </button>
+            {/* Le même geste qu'un appui long sur la carte, pour qui ne le
+                connaît pas encore. */}
+            {onPlacingVia && (
+              <button role="menuitem" onClick={pick(onPlacingVia)}>
+                <Icon name="flag" size={17} />
+                Passer par un point
+              </button>
+            )}
             {onKeepStart && (
               <button role="menuitem" onClick={pick(onKeepStart)}>
                 <Icon name="plus" size={17} />

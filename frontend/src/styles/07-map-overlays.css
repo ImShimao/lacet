@@ -333,3 +333,59 @@
   color: var(--risk);
   margin: 0;
 }
+
+/* Le point de passage : un fanion, pas une épingle — on ne le confond pas
+   avec le départ. */
+.viapin {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 4px;
+  transform-origin: bottom left;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  cursor: grab;
+}
+.viapin svg {
+  display: block;
+}
+
+/* « Par ce point » : sous la recherche, ou sous la pastille d'activité quand
+   elle est là. Le ✕ le retire. */
+.viapill {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 63px);
+  left: 12px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: rgba(27, 24, 36, 0.94);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.viapill--low {
+  top: calc(env(safe-area-inset-top) + 108px);
+}
+.viapill button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-2);
+  background: var(--surface-3);
+}
+.shell[data-flying] .viapill,
+.shell:not([data-sheet='peek']) .viapill {
+  display: none;
+}

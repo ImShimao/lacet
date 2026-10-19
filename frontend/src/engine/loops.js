@@ -40,6 +40,15 @@ const CORE_RADIUS_BUCKET_M = 50
 // direction imposée.
 export const HEADING_WINDOW_DEG = 45
 
+// Jusqu'où l'arbre des départs doit porter pour atteindre un point de passage,
+// en multiple de sa distance à vol d'oiseau : les rues font des détours.
+const VIA_REACH = 1.8
+// Ce que coûte, juste après le point de passage, de repartir par la rue
+// d'arrivée : de quoi préférer n'importe quel détour raisonnable.
+const VIA_UTURN_PENALTY = 1000
+// Assez près pour dire qu'on y est passé : le bout d'une impasse courte.
+const VIA_NEAR_M = 60
+
 /** Écart entre deux caps, en degrés, de 0 à 180. */
 export const bearingGap = (a, b) => Math.abs(pymod(a - b + 180, 360) - 180)
 
@@ -208,7 +217,7 @@ export function generateLoops(
   profile,
   {
     sectors = 12, maxCandidates = 24, tolerance = 0.1, variation = 0, terrain = null, climbFit = null, heading = null,
-    reuse = null,
+    reuse = null, via = null,
   } = {},
 ) {
   const phase = variation ? (variation * GOLDEN) % 1 : 0
@@ -223,11 +232,14 @@ export function generateLoops(
   const tree = new OutboundTree(graph, start, weights)
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    // Un point de passage oriente les polygones vers lui, comme une direction :
+    // c'est de ce côté-là que la boucle a une chance de l'attraper.
     const batch = generateOnce(
-      graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit, heading,
-      reuse?.seen ?? null, traced,
+      graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase, terrain, climbFit,
+      via ? via.bearing : heading, reuse?.seen ?? null, traced, via,
     )
-    if (heading === null) collected.push(...batch)
+    if (via) collected.push(...batch.filter((c) => passesBy(graph, c, via.node)))
+    else if (heading === null) collected.push(...batch)
     else collected.push(...batch.filter((c) => bearingGap(c.bearing, heading) <= HEADING_WINDOW_DEG))
 
     let usable = 0
@@ -280,14 +292,17 @@ class OutboundTree {
 
 function generateOnce(
   graph, start, targetM, profile, weights, tree, scale, orientations, maxCandidates, phase = 0, terrain = null, climbFit = null,
-  heading = null, seen = null, traced = null,
+  heading = null, seen = null, traced = null, via = null,
 ) {
   const plans = new Map(SHAPES.map((m) => [m, waypointPlan(m, targetM * scale)]))
   const allDistances = []
   for (const plan of plans.values()) for (const [, d] of plan) allDistances.push(d)
 
   const farthest = pyMax(allDistances)
-  const outbound = tree.forRadius(farthest)
+  // L'arbre des départs doit atteindre le point de passage, où qu'il soit.
+  const outbound = tree.forRadius(via ? Math.max(farthest, via.straightM * VIA_REACH) : farthest)
+  const viaVertex = via ? [via.node, outbound.dist[via.node], via.bearing] : null
+  if (viaVertex && !(viaVertex[1] < INF)) return []
 
   const closest = pyMin(allDistances)
   const index = new VertexIndex(
@@ -318,7 +333,8 @@ function generateOnce(
         heading === null
           ? ((k / density + phase) * 360) / orientations
           : facingTheta(heading, m, (k / density + phase + 0.5) / orientations)
-      const vertices = pickVertices(index, plan, theta, maxDev)
+      const picked = pickVertices(index, plan, theta, maxDev)
+      const vertices = picked && viaVertex ? threadVia(picked, viaVertex, 180 / m) : picked
       if (vertices === null) continue
       const fit = density > 1 ? climbFit(leastClimb(graph, terrain, zStart, vertices) / (targetM / 1000)) : 0
       polygons.push({ fit, extra: k % density !== 0 ? 1 : 0, shapeRank, k, vertices })
@@ -334,7 +350,7 @@ function generateOnce(
     signatures.add(signature)
     traced?.add(signature)
 
-    const cand = buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo)
+    const cand = buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo, via?.node)
     if (cand !== null) {
       cand.shape = SHAPES[shapeRank]
       candidates.push(cand)
@@ -390,9 +406,36 @@ function pickVertices(index, plan, theta, maxDev) {
   return vertices
 }
 
-function buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo) {
+/**
+ * Le point de passage pris parmi les sommets d'un polygone, à sa place dans
+ * l'ordre des caps : il remplace le sommet qu'il côtoie, ou s'ajoute entre
+ * deux. Hors de l'éventail du polygone, il y ferait une pointe — on renonce.
+ *
+ * Propre à l'app, comme `heading` : Python ne connaît pas de point de passage.
+ */
+export function threadVia(vertices, via, step) {
+  if (vertices.some(([node]) => node === via[0])) return vertices
+  const first = vertices[0][2]
+  const rel = (b) => pymod(b - first + SWEEP_MARGIN_DEG, 360) - SWEEP_MARGIN_DEG
+  const r = rel(via[2])
+  if (r > rel(vertices[vertices.length - 1][2]) + SWEEP_MARGIN_DEG) return null
+  let nearest = 0
+  for (let i = 1; i < vertices.length; i += 1) {
+    if (Math.abs(rel(vertices[i][2]) - r) < Math.abs(rel(vertices[nearest][2]) - r)) nearest = i
+  }
+  const out = [...vertices]
+  if (Math.abs(rel(vertices[nearest][2]) - r) < step / 2) {
+    out[nearest] = via
+    return out
+  }
+  const at = out.findIndex((v) => rel(v[2]) > r)
+  out.splice(at < 0 ? out.length : at, 0, via)
+  return out
+}
+
+function buildPolygon(graph, start, vertices, outbound, weights, profile, targetM, nodeSector, coreMemo, viaNode = null) {
   for (const clearance of [CORE_CLEARANCE, CORE_CLEARANCE * 0.5, 0]) {
-    const edges = chainLegs(graph, start, vertices, outbound, weights, profile, targetM, clearance, nodeSector, coreMemo)
+    const edges = chainLegs(graph, start, vertices, outbound, weights, profile, targetM, clearance, nodeSector, coreMemo, viaNode)
     if (edges) {
       const cand = new Candidate(edges, nodeSequence(graph, start, edges))
       measure(graph, start, cand, { night: profile.night })
@@ -402,7 +445,7 @@ function buildPolygon(graph, start, vertices, outbound, weights, profile, target
   return null
 }
 
-function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, clearance, nodeSector, coreMemo) {
+function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, clearance, nodeSector, coreMemo, viaNode = null) {
   const first = vertices[0][0]
   const leg = reconstruct(outbound, first)
   if (!leg || !leg.length) return null
@@ -410,6 +453,14 @@ function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, 
   const edges = [...leg]
   const used = new Map()
   for (const e of leg) used.set(e, RETURN_PENALTY)
+  // Arrivé au point de passage, on n'en repart pas par la rue d'où l'on
+  // vient : chaque tronçon est calculé à part, et le suivant y faisait souvent
+  // demi-tour — l'aller-retour, rogné ensuite (`trimSpurs`), emportait le point
+  // avec lui.
+  const arrived = (piece, node) => {
+    if (node === viaNode) used.set(piece[piece.length - 1], VIA_UTURN_PENALTY)
+  }
+  arrived(leg, first)
 
   const core = clearance > 0 ? coreNodes(outbound, vertices[0][1] * clearance, coreMemo) : null
   const legLimit = targetM * LEG_MAX_SHARE
@@ -423,6 +474,7 @@ function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, 
     if (!piece || !piece.length) return null
     edges.push(...piece)
     for (const e of piece) used.set(e, RETURN_PENALTY)
+    arrived(piece, node)
     cursor = node
     cursorBearing = bearing
   }
@@ -433,6 +485,16 @@ function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, 
 
   const trimmed = trimSpurs(edges)
   return trimmed.length ? trimmed : null
+}
+
+/**
+ * La boucle passe-t-elle par le point demandé ? Par lui, ou à deux pas : au
+ * bout d'une impasse, l'aller-retour jusqu'au point est rogné (`trimSpurs`), et
+ * la boucle s'arrête à l'entrée de l'impasse.
+ */
+export function passesBy(graph, cand, node) {
+  const target = graph.node(node)
+  return cand.nodes.some((n) => n === node || haversineM(graph.node(n), target) <= VIA_NEAR_M)
 }
 
 export function trimSpurs(edges) {
