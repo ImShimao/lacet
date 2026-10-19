@@ -30,6 +30,11 @@ const haptic = (kind) => {
 
 // Distance à laquelle on prévient d'une traversée à venir.
 const CROSSING_ALERT_M = 120
+// Ce qu'il faut avoir couru depuis l'alerte pour qu'une même traversée se
+// signale de nouveau. Plus que les 240 m d'un passage — 120 m pour y arriver,
+// autant pour s'en éloigner, où un recalcul ne doit pas la redire —, moins
+// qu'un tour, qui fait au moins 1 500 m (`MIN_LAP_M` du moteur).
+const CROSSING_REARM_M = 500
 
 // En dessous de cette précision GPS, le point est trop douteux pour compter.
 const ACCURACY_LIMIT_M = 35
@@ -159,7 +164,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const announced = useRef(new Set())
   const previewed = useRef(new Set())
   const acted = useRef(new Set())
-  const warned = useRef(new Set())
+  // Les traversées signalées, avec la distance courue à ce moment — voir `warnCrossing`.
+  const warned = useRef(new Map())
   const fix = useRef(null)
   const strayCount = useRef(0)
   const lastSplit = useRef(0)
@@ -884,14 +890,20 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   /** L'alerte de traversée — la seule fois où l'app parle d'elle-même. */
   function warnCrossing(point) {
     // Repérées par leur position, pas par leur rang : un recalcul renumérote la
-    // liste, et une traversée déjà signalée le serait deux fois.
+    // liste, et une traversée déjà signalée le serait deux fois. Mais une
+    // position ne suffit pas : une boucle à tours, ou un « 8 » qui repasse par
+    // la porte, recroise le même passage plus loin, et l'alerte s'y taisait au
+    // second tour. Elle se réarme donc une fois `CROSSING_REARM_M` courus — la
+    // distance courue, et non l'avancée sur le tracé, qui repart de zéro à
+    // chaque recalcul.
+    const ran = covered.current
     const upcoming = (guideRef.current.route?.crossings || [])
       .map((c) => ({ ...c, key: `${c.lon},${c.lat}`, d: haversine(point, [c.lon, c.lat]) }))
-      .filter((c) => c.d < CROSSING_ALERT_M && !warned.current.has(c.key))
+      .filter((c) => c.d < CROSSING_ALERT_M && ran - (warned.current.get(c.key) ?? -Infinity) >= CROSSING_REARM_M)
       .sort((a, b) => a.d - b.d)[0]
 
     if (!upcoming) return
-    warned.current.add(upcoming.key)
+    warned.current.set(upcoming.key, ran)
     setAlert(upcoming)
     haptic('warnHaptic')
     // Chaque alerte a ses huit secondes : le minuteur de la précédente, laissé

@@ -153,6 +153,41 @@ describe('la sortie guidée', () => {
     }
   })
 
+  it('signale la même traversée à chaque tour', async () => {
+    // Deux tours d'un carré de 300 m, une traversée non protégée au coin opposé
+    // au départ — listée deux fois, comme le moteur la rend pour une boucle
+    // répétée. Retenue par sa seule position, elle se taisait au second tour.
+    const grand = carre(7.2, 47.9, 300)
+    const deuxTours = [...grand, ...grand.slice(1)]
+    const coin = { lon: grand[10][0], lat: grand[10][1], protected: false }
+    const route = {
+      ...boucle,
+      geometry: deuxTours,
+      distance_m: 2400,
+      laps: 2,
+      lap_distance_m: 1200,
+      crossings: [coin, { ...coin }],
+    }
+    vi.useFakeTimers()
+    try {
+      render(<LiveRun route={route} request={null} sport="run" stage={null} onPosition={() => {}} onStop={() => {}} />)
+      let t = Date.now()
+      const alertes = []
+      for (const [i, point] of deuxTours.entries()) {
+        // Soixante mètres en quinze secondes : l'alerte d'avant, huit secondes,
+        // est tombée, et celle qu'on lit vient de ce relevé-ci.
+        await act(async () => vi.advanceTimersByTime(15_000))
+        t += 15_000
+        await relever(point, t)
+        if (screen.queryByText(/pas de passage protégé/)) alertes.push(i < grand.length ? 'premier tour' : 'second tour')
+      }
+      // Une alerte par passage : ni silence au second, ni doublon dans le même.
+      expect(alertes).toEqual(['premier tour', 'second tour'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('ne se termine pas au milieu du tour', async () => {
     const onStop = vi.fn()
     render(

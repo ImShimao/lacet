@@ -89,19 +89,29 @@ function sliceSegments(segments, along) {
   return out
 }
 
-/** Les traversées encore devant, après la jonction. */
+/**
+ * Les traversées encore devant, après la jonction.
+ *
+ * Chacune est cherchée sur le tracé après la précédente : la liste suit l'ordre
+ * du parcours, et une boucle à tours — ou un « 8 » qui repasse par la porte —
+ * y met la même traversée une fois par passage. Cherchée sur tout le tracé,
+ * chaque copie tombait sur le premier passage, et un recalcul au premier tour
+ * retirait aussi celle du second.
+ */
 function crossingsAhead(route, joinIndex) {
   const geometry = route.geometry
+  let from = 0
   return (route.crossings || []).filter((c) => {
-    let best = 0
+    let best = from
     let bestD = Infinity
-    for (let i = 0; i < geometry.length; i += 1) {
+    for (let i = from; i < geometry.length; i += 1) {
       const d = haversine(geometry[i], [c.lon, c.lat])
       if (d < bestD) {
         bestD = d
         best = i
       }
     }
+    from = best + 1
     return best >= joinIndex
   })
 }

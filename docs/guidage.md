@@ -77,7 +77,11 @@ rues signalées évitées (`engine/reroute.js`) —, puis guidée à la voix com
 recalcul. Sans chemin, l'app le dit et garde la boucle.
 
 **L'alerte de traversée** prévient 120 m avant chaque passage non protégé, avec
-vibration.
+vibration. Elle revient à chaque passage : sur une boucle à tours ou un « 8 »
+qui repasse par la porte, la même traversée se signale de nouveau une fois
+500 m courus depuis l'alerte — assez loin pour qu'un recalcul fait à côté ne la
+redise pas. Un recalcul au premier tour ne retire que les traversées déjà
+passées, pas leur retour au tour suivant.
 
 **Le bouton SOS** prépare un SMS vers un proche : position, distance parcourue,
 temps écoulé. **L'app ne l'envoie pas** — elle ouvre l'application de messagerie,
