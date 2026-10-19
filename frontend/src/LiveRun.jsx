@@ -13,6 +13,7 @@ import { actAt, announcement, chains, followingStep, previewAt, rightAfter, spee
 import { motionTracker } from './autoPause'
 import { arrivalWatcher } from './arrival'
 import { REPORT_KINDS, addReport, blockedPoints } from './reports'
+import { avoidedZones } from './zones'
 import { load } from './storage'
 import * as voice from './voice'
 import { isNative } from './platform'
@@ -984,8 +985,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // plus utile des trois est celui qu'on vient de faire, il y a une
         // seconde, et c'est lui qui doit écarter la rue barrée.
         // Et le point où l'on a fait demi-tour, le temps de cette sortie : ce
-        // qui nous a fait rebrousser chemin est encore là.
-        request: { ...request, blocked: [...blockedPoints(), ...(turnedBack.current ? [turnedBack.current.point] : [])] },
+        // qui nous a fait rebrousser chemin est encore là. Les zones à éviter
+        // aussi : une boucle d'un favori n'a pas de demande qui les porte.
+        request: {
+          ...request,
+          blocked: [...blockedPoints(), ...(turnedBack.current ? [turnedBack.current.point] : [])],
+          zones: avoidedZones(),
+        },
         position: point,
         heading: heading.current,
         geometry: guided.geometry,

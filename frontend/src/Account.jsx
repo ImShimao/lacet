@@ -22,6 +22,7 @@ import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented, directionOf } fro
 import { surfaceLabel } from './format'
 import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
+import { listZones, removeZone, updateZone } from './zones'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { StopsSetting } from './Stops.jsx'
@@ -195,7 +196,14 @@ function summaryOf(key, { params, poiPrefs }) {
       const contact = saved.emergencyContact
         ? `SOS vers ${saved.emergencyContact}${saved.notifyContact ? ' · départ et retour annoncés' : ''}`
         : "Pas de contact d'urgence"
-      return reports ? `${contact} · ${reports} signalement${reports > 1 ? 's' : ''}` : contact
+      const zones = listZones().filter((z) => z.on !== false).length
+      return [
+        contact,
+        reports && `${reports} signalement${reports > 1 ? 's' : ''}`,
+        zones && `${zones} zone${zones > 1 ? 's' : ''} évitée${zones > 1 ? 's' : ''}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'storage': {
       const info = usage()
@@ -213,7 +221,7 @@ function summaryOf(key, { params, poiPrefs }) {
 }
 
 /** Une page de « Mon compte ». */
-function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored }) {
+function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored, zones = [], onZones = () => {} }) {
   switch (page) {
     case 'profile':
       return (
@@ -260,6 +268,8 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
         <>
           <h3 className="section">Contact d'urgence</h3>
           <EmergencyContact />
+          <h3 className="section">Mes zones à éviter</h3>
+          <MyZones zones={zones} onZones={onZones} />
           <h3 className="section">Mes signalements</h3>
           <MyReports />
         </>
@@ -680,6 +690,52 @@ function MyReports() {
         ))}
       </div>
     </>
+  )
+}
+
+/**
+ * Les zones dessinées sur la carte, que toutes les boucles contournent.
+ *
+ * Comme les signalements, il faut pouvoir les relire : une zone oubliée fait
+ * faire un crochet que plus personne n'explique. On la renomme pour s'y
+ * retrouver, on la désactive le temps qu'elle redevienne praticable — la chasse
+ * ferme en février —, et on la supprime quand elle n'a plus lieu d'être.
+ */
+function MyZones({ zones, onZones }) {
+  if (!zones.length) {
+    return (
+      <p className="muted small">
+        Aucune zone. Sur la carte, le bouton au cercle hachuré pose une zone à éviter — un
+        quartier, une forêt de chasse, un chantier qui dure : toutes les boucles passent autour,
+        et le recalcul en course aussi.
+      </p>
+    )
+  }
+  return (
+    <div className="rows">
+      {zones.map((z) => (
+        <div className="rows__row zonerow" key={z.id}>
+          <input
+            className="zonerow__name"
+            defaultValue={z.name}
+            maxLength={60}
+            aria-label="Nom de la zone"
+            onBlur={(e) => e.target.value !== z.name && onZones(updateZone(z.id, { name: e.target.value }))}
+          />
+          <label className="zonerow__on">
+            <input
+              type="checkbox"
+              checked={z.on !== false}
+              onChange={(e) => onZones(updateZone(z.id, { on: e.target.checked }))}
+            />
+            {z.on !== false ? 'Évitée' : 'Ignorée'}
+          </label>
+          <button className="linkish" onClick={() => onZones(removeZone(z.id))}>
+            Supprimer
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
 

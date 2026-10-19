@@ -77,6 +77,9 @@ export default function MapView({
   via = null,
   placingVia = false,
   onVia,
+  zones = [],
+  zoneDraft = null,
+  onZoneCenter,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -88,7 +91,10 @@ export default function MapView({
   const [revision, setRevision] = useState(0)
 
   const handlers = useRef({})
-  handlers.current = { onPlace, onPickRoute, onUserMove, onFlyoverEnd, onVia, placing, placingVia, compassRef, navigate }
+  handlers.current = {
+    onPlace, onPickRoute, onUserMove, onFlyoverEnd, onVia, placing, placingVia, compassRef, navigate,
+    drawingZone: Boolean(zoneDraft), onZoneCenter,
+  }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
   // On la laisse alors où la main l'a mise, et « Recentrer » la reprend. Le
@@ -207,6 +213,7 @@ export default function MapView({
     instance.on('touchstart', (event) => {
       unpress()
       if (event.originalEvent.touches?.length !== 1 || handlers.current.navigate || !handlers.current.onVia) return
+      if (handlers.current.drawingZone) return
       // Un repère qu'on tient avant de le faire glisser n'est pas un appui long sur la carte.
       if (event.originalEvent.target?.closest?.('.maplibregl-marker')) return
       const at = event.point
@@ -232,6 +239,11 @@ export default function MapView({
     instance.on('click', (event) => {
       // Pendant le survol, toucher la carte le met en pause : rien d'autre.
       if (flying.current) return
+      // Le centre de la zone à éviter : le toucher la pose, un autre la déplace.
+      if (handlers.current.drawingZone) {
+        handlers.current.onZoneCenter?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+        return
+      }
       if (handlers.current.placingVia) {
         handlers.current.onVia?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
@@ -370,6 +382,30 @@ export default function MapView({
       viaMarker.current.setLngLat([via.lon, via.lat])
     }
   }, [via, revision])
+
+  // --- zones à éviter -----------------------------------------------------------
+  // Hachurées, celles qui comptent ; en pointillés, celles qu'on a mises de côté
+  // — on les voit encore, pour comprendre pourquoi une boucle y entre à nouveau.
+  // Celle qu'on est en train de poser se dessine pareil, à jour à chaque cran du
+  // curseur.
+  useEffect(() => {
+    const m = map.current
+    if (!m || !revision) return
+    const shown = navigate ? zones.filter((z) => z.on !== false) : zones
+    const features = shown.map((z) => ({
+      type: 'Feature',
+      properties: { on: z.on !== false },
+      geometry: circlePolygon([z.lon, z.lat], z.radius_m),
+    }))
+    if (zoneDraft && Number.isFinite(zoneDraft.lon)) {
+      features.push({
+        type: 'Feature',
+        properties: { on: true, draft: true },
+        geometry: circlePolygon([zoneDraft.lon, zoneDraft.lat], zoneDraft.radius_m),
+      })
+    }
+    m.getSource('zones')?.setData({ type: 'FeatureCollection', features })
+  }, [zones, zoneDraft, navigate, revision])
 
   // --- position en direct + cercle de précision -------------------------------
   const liveMarker = useRef(null)
@@ -871,6 +907,27 @@ function arrowPattern() {
   return ctx.getImageData(0, 0, width, height)
 }
 
+/** Les hachures d'une zone à éviter : des diagonales rouges, sur fond à peine teinté. */
+function hatchPattern() {
+  const size = 16
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = 'rgba(240, 96, 90, 0.10)'
+  ctx.fillRect(0, 0, size, size)
+  ctx.strokeStyle = 'rgba(240, 96, 90, 0.75)'
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  // Trois traits pour que la diagonale se raccorde d'une tuile à l'autre.
+  for (const offset of [-size, 0, size]) {
+    ctx.moveTo(offset, size)
+    ctx.lineTo(offset + size, 0)
+  }
+  ctx.stroke()
+  return ctx.getImageData(0, 0, size, size)
+}
+
 const colorExpression = (c) => [
   'match',
   ['get', 'level'],
@@ -1001,6 +1058,35 @@ function addLayers(m) {
       'circle-stroke-color': '#FFFFFF',
     },
   })
+
+  // Les zones à éviter, posées en dernier mais glissées sous les tracés : une
+  // zone dit où les boucles ne vont pas, elle ne doit pas masquer celle qui en
+  // sort. En dernier, parce que `addImage` relance `styledata`, donc `setup` :
+  // ajoutée avant la source `route`, l'image faisait tout reposer une seconde
+  // fois — « Source "accuracy" already exists ».
+  if (!m.hasImage('zone-hatch')) m.addImage('zone-hatch', hatchPattern(), { pixelRatio: 2 })
+  m.addSource('zones', { type: 'geojson', data: empty() })
+  m.addLayer({
+    id: 'zones-fill',
+    type: 'fill',
+    source: 'zones',
+    filter: ['get', 'on'],
+    paint: { 'fill-pattern': 'zone-hatch' },
+  }, 'ghost-line')
+  m.addLayer({
+    id: 'zones-line',
+    type: 'line',
+    source: 'zones',
+    filter: ['get', 'on'],
+    paint: { 'line-color': '#F0605A', 'line-width': ['case', ['has', 'draft'], 3, 2] },
+  }, 'ghost-line')
+  m.addLayer({
+    id: 'zones-off',
+    type: 'line',
+    source: 'zones',
+    filter: ['!', ['get', 'on']],
+    paint: { 'line-color': '#A8B2BC', 'line-width': 2, 'line-dasharray': [2, 2] },
+  }, 'ghost-line')
 }
 
 const empty = () => ({ type: 'FeatureCollection', features: [] })

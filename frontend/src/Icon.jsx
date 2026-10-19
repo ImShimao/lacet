@@ -200,6 +200,13 @@ const PATHS = {
       <path d="M3.5 21h17" />
     </>
   ),
+  // La zone à éviter : un cercle hachuré, comme elle s'affiche sur la carte.
+  zone: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M6 18 18 6M9.5 19.5l10-10M4.5 14.5l10-10" />
+    </>
+  ),
   warning: (
     <>
       <path d="M12 3.5 22 20.5H2z" />

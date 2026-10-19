@@ -13,7 +13,7 @@ import RunDetail from './RunDetail.jsx'
 import Account, { sectionTitle } from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import TabBar from './TabBar.jsx'
-import { MapTools, RunTools } from './MapTools.jsx'
+import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
 import { GeoBanner, ResumeBanner } from './Banners.jsx'
 import { SheetGrabber, useSheetCover, useSheetDrag } from './Sheet.jsx'
 import useLibrary from './useLibrary'
@@ -24,6 +24,7 @@ import useStart, { PARIS } from './useStart'
 import usePois from './usePois'
 import { askedOf, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
 import { blockedPoints } from './reports'
+import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
 import { DEFAULT_STYLE, styleByKey } from './mapStyles'
 import { km } from './format'
 import { load, save } from './storage'
@@ -115,6 +116,10 @@ export default function App() {
   // d'un appui long sur la carte ou depuis le menu du départ.
   const [via, setVia] = useState(null)
   const [placingVia, setPlacingVia] = useState(false)
+  // Les zones à éviter, gardées dans le stockage, et celle qu'on pose — `null`
+  // hors du geste, `{ radius_m, name }` puis le centre une fois la carte touchée.
+  const [zones, setZones] = useState(listZones)
+  const [zoneDraft, setZoneDraft] = useState(null)
   // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
   // allumé, il serait reparti au retour sur la carte.
   useEffect(() => setFlying(false), [running, tab, viewing, summary, selected?.id])
@@ -172,6 +177,7 @@ export default function App() {
           variation: variation.current,
           avoid_bearings: avoid,
           blocked: blockedPoints(),
+          zones: avoidedZones(),
         },
         {
           from: asked,
@@ -195,6 +201,19 @@ export default function App() {
   const dropVia = () => {
     setVia(null)
     if (result) search(undefined, { through: null })
+  }
+
+  // La zone gardée, les boucles affichées sont refaites sans elle : c'est la
+  // question qu'on vient de poser, comme pour le point de passage.
+  const keepZone = () => {
+    setZones(addZone(zoneDraft))
+    setZoneDraft(null)
+    haptic('tickHaptic')
+    if (result) search()
+  }
+  const onZones = (next) => {
+    setZones(next)
+    if (result) search()
   }
 
   // --- préparation en fond -----------------------------------------------------
@@ -359,7 +378,14 @@ export default function App() {
         : ''
 
   return (
-    <div className="shell" data-map={theme} data-sheet={sheetMode} data-flying={flying || undefined} ref={shellRef}>
+    <div
+      className="shell"
+      data-map={theme}
+      data-sheet={sheetMode}
+      data-flying={flying || undefined}
+      data-zoning={(zoneDraft && !running) || undefined}
+      ref={shellRef}
+    >
       {/* `main` plutôt que `div` : la carte, la recherche de lieu et les
           commandes qui flottent dessus sont le contenu principal de l'app. Sans
           ce repère, un lecteur d'écran ne propose aucun moyen d'y sauter, et le
@@ -393,6 +419,9 @@ export default function App() {
           via={running ? null : via}
           placingVia={placingVia}
           onVia={running || tab !== 'explore' ? null : passBy}
+          zones={zones}
+          zoneDraft={running ? null : zoneDraft}
+          onZoneCenter={(p) => setZoneDraft((d) => d && { ...d, ...p })}
           onPickRoute={(id) => {
             const match = result?.routes.find((r) => r.id === id)
             if (match) setSelected(match)
@@ -448,6 +477,13 @@ export default function App() {
               setPlacing(false)
               setPlacingVia(true)
             }}
+            drawingZone={Boolean(zoneDraft)}
+            onZone={() => {
+              setPlacing(false)
+              setPlacingVia(false)
+              setSheet('peek')
+              setZoneDraft((d) => (d ? null : { radius_m: ZONE_RADIUS.initial, name: '' }))
+            }}
             compassRef={compassRef}
             onNorth={() => setNorthAt(Date.now())}
             flying={flying}
@@ -470,6 +506,9 @@ export default function App() {
           <div className="stage__hint">
             Touche la carte pour poser le départ — ou fais glisser le repère.
           </div>
+        )}
+        {zoneDraft && !running && (
+          <ZoneDraft draft={zoneDraft} onChange={setZoneDraft} onKeep={keepZone} onCancel={() => setZoneDraft(null)} />
         )}
         {placingVia && (
           <button className="stage__hint" onClick={() => setPlacingVia(false)}>
@@ -609,6 +648,8 @@ export default function App() {
             />
           ) : tab === 'account' ? (
             <Account
+              zones={zones}
+              onZones={onZones}
               page={accountPage}
               onPage={setAccountPage}
               params={params}

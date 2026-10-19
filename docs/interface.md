@@ -62,6 +62,15 @@ point » dans le menu du départ) pose un fanion, et la recherche repart avec
 des boucles qui y passent toutes. Le fanion se fait glisser ; la pastille
 « Par ce point », sous la recherche, le retire d'un ✕.
 
+**La zone à éviter** : le cercle hachuré des outils de carte efface la feuille,
+un toucher sur la carte pose le centre (un autre le déplace), un curseur règle
+le rayon de 100 m à 2 km, un champ la nomme. Un cercle plutôt qu'un contour
+tracé au doigt, qui se battrait avec le déplacement de la carte — voir
+`zones.js`. Ses rues pèsent comme un signalement (`engine/blocked.js`) : un mur,
+sauf quand le départ est dedans, où la boucle en sort par le plus court. Les
+zones gardées se gèrent dans « Mon compte › Sécurité », hachurées sur la carte
+quand elles comptent, en pointillés quand elles sont désactivées.
+
 **Le sens de parcours** est marqué par des chevrons le long du tracé. Ce n'est
 pas décoratif : les consignes de navigation, le profil altimétrique et
 l'orientation par rapport au vent décrivent tous la boucle **dans un sens

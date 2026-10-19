@@ -62,6 +62,24 @@ export function blockedEdges(graph, reports, radiusM = BLOCK_RADIUS_M) {
   return out.size ? out : null
 }
 
+/**
+ * Les arêtes qui entrent dans une zone à éviter, ajoutées à celles des signalements.
+ *
+ * Une zone est un disque `{ lon, lat, radius_m }` : le même calcul qu'un
+ * signalement, avec un rayon choisi au lieu de vingt-cinq mètres. Elle pèse donc
+ * comme lui — un mur, sauf quand il n'y a pas d'autre chemin : c'est ce qui
+ * laisse sortir d'une zone qu'on a dessinée autour de son propre départ, au lieu
+ * de ne trouver aucune boucle.
+ */
+export function withZones(graph, blocked, zones) {
+  let out = blocked
+  for (const zone of zones || []) {
+    const hit = blockedEdges(graph, [[zone.lon, zone.lat]], zone.radius_m)
+    if (hit) out = out ? new Set([...out, ...hit]) : hit
+  }
+  return out
+}
+
 /** Distance d'un point à un segment, en mètres locaux. */
 function toSegment(pLon, pLat, aLon, aLat, bLon, bLat, kx) {
   const px = (pLon - aLon) * kx
