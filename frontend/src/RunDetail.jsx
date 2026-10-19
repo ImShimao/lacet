@@ -114,6 +114,8 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
 
       {splits && <Splits splits={splits} bike={bike} />}
 
+      {entry.spoken?.length > 0 && <Spoken spoken={entry.spoken} />}
+
       {gap !== null && (
         <div className="rundet__plan">
           <div>
@@ -283,6 +285,37 @@ export function Splits({ splits, bike }) {
     </div>
   )
 }
+
+/**
+ * Ce que la voix a dit, phrase par phrase : l'heure, où l'on en était, les mots.
+ *
+ * C'est la plainte n° 1 contre les apps de course : une voix qui se tait au
+ * bout de quelques virages, écran verrouillé, ou qui annonce un virage déjà
+ * passé. `LiveRun.voice.test.jsx` le vérifie sur des sorties simulées ; ce
+ * journal le vérifie sur une vraie, téléphone dans la poche — ce qu'on y a
+ * entendu ne laissait sinon aucune trace. Replié : on ne l'ouvre que pour ça.
+ * La position y est la distance courue ; les coordonnées sont gardées avec.
+ */
+export function Spoken({ spoken }) {
+  return (
+    <details className="spoken">
+      <summary>
+        Ce que la voix a dit · {spoken.length} phrase{spoken.length > 1 ? 's' : ''}
+      </summary>
+      <ol>
+        {spoken.map((s, i) => (
+          <li key={i}>
+            <time>{heure(s.t)}</time>
+            <em>{km(s.m, 2)} km</em>
+            <span>{s.text}</span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  )
+}
+
+const heure = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 /** « Mardi 16 septembre, 18 h 42 » */
 function whenLabel(iso) {

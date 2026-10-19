@@ -83,6 +83,21 @@ describe('le détail d’une sortie', () => {
     expect(screen.getByText(/altitude du GPS/)).toBeTruthy()
   })
 
+  it('garde ce que la voix a dit, pour vérifier une sortie écran verrouillé', () => {
+    const spoken = [
+      { t: Date.parse('2026-09-14T17:42:03Z'), lon: 7.2, lat: 47.9, m: 0, text: 'Départ — pars vers le nord.' },
+      { t: Date.parse('2026-09-14T17:43:41Z'), lon: 7.201, lat: 47.9, m: 312, text: 'Maintenant, tourne à gauche.' },
+    ]
+    rendre(sortie({ spoken }))
+    expect(screen.getByText('Ce que la voix a dit · 2 phrases')).toBeTruthy()
+    expect(screen.getByText('Maintenant, tourne à gauche.')).toBeTruthy()
+    expect(screen.getByText('0,31 km')).toBeTruthy()
+    cleanup()
+    // Une sortie sans voix, ou d'avant le journal : rien.
+    rendre(sortie())
+    expect(screen.queryByText(/Ce que la voix a dit/)).toBeNull()
+  })
+
   it('ne compare pas une sortie libre à un plan qui n’existe pas', () => {
     rendre(sortie({ free: true, distance_m: 0, grade: null, geometry: [] }))
     expect(screen.queryByText('Prévu')).toBeNull()

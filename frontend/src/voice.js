@@ -29,10 +29,14 @@ export function setEnabled(value) {
  * `priority` à false laisse passer une phrase en cours — pour les annonces de
  * confort (kilomètre franchi) qui ne doivent pas couper une consigne de
  * navigation.
+ *
+ * Rend `true` quand la phrase part vers la voix : c'est ce que garde le journal
+ * de la sortie (`LiveRun.jsx`).
  */
 export function speak(text, { priority = true } = {}) {
-  if (!enabled || !text) return
+  if (!enabled || !text) return false
   nativeModule().then((n) => n.speakNative(text, { priority }))
+  return true
 }
 
 export function stop() {

@@ -104,6 +104,7 @@ export default function useRunSession({ toEntry, remember }) {
               elapsed: pending.elapsed,
               trail: pending.trail,
               splits: pending.splits,
+              spoken: pending.spoken,
               ascent: pending.ascent ?? null,
               ascentSource: pending.ascentSource ?? null,
             },

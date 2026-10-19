@@ -54,6 +54,12 @@ describe('l’entrée d’historique', () => {
     expect(entry.actual_ascent_source).toBe('baro')
   })
 
+  it('garde ce que la voix a dit, et rien quand elle s’est tue', () => {
+    const phrase = { t: 1_760_000_000_000, lon: 7.2, lat: 47.9, m: 120, text: 'Maintenant, tourne à gauche.' }
+    expect(runEntry({ distance: 5000, elapsed: 1500, spoken: [phrase] }, { route, sport: 'run' }, DEFAULTS).spoken).toEqual([phrase])
+    expect(runEntry({ distance: 5000, elapsed: 1500, spoken: [] }, { route, sport: 'run' }, DEFAULTS).spoken).toBeNull()
+  })
+
   it('ne donne pas de source à un dénivelé absent', () => {
     const entry = runEntry({ distance: 5000, elapsed: 1500, ascent: null }, { route, sport: 'run' }, DEFAULTS)
     expect(entry.actual_ascent_m).toBeNull()

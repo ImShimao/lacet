@@ -236,12 +236,13 @@ export const forgetTrim = () => save({ trimmed: null })
  * C'est le seul allègement qui ne perd aucun chiffre : distance, temps, allure,
  * tours de kilomètre et parcours prévu restent. Ce qui part, c'est le dessin de
  * ce qu'on a réellement couru — qu'on ne reverra plus sur la carte, et qu'on ne
- * pourra plus exporter.
+ * pourra plus exporter —, et le journal de ce que la voix y a dit.
  */
 export function dropTracks() {
   const data = load()
   const avant = usage()?.bytes ?? 0
-  save({ history: (data.history || []).map((sortie) => (sortie.track ? { ...sortie, track: null } : sortie)) })
+  const allegee = (sortie) => (sortie.track || sortie.spoken ? { ...sortie, track: null, spoken: null } : sortie)
+  save({ history: (data.history || []).map(allegee) })
   return Math.max(0, avant - (usage()?.bytes ?? 0))
 }
 

@@ -7,9 +7,9 @@ import { ReportButton, RunControls, RunStats } from './RunPanel.jsx'
 import { NextStops } from './Stops.jsx'
 import useLiveActivity from './useLiveActivity'
 import { haversine } from './format'
-import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, wrongWay } from './routeTracker'
+import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, runsBack, wrongWay } from './routeTracker'
 import { lockScreenState } from './lockScreen'
-import { actAt, announcement, chains, followingStep, previewAt, speedOr, thenLabel } from './guidance'
+import { actAt, announcement, chains, followingStep, previewAt, rightAfter, speedOr, thenLabel } from './guidance'
 import { motionTracker } from './autoPause'
 import { arrivalWatcher } from './arrival'
 import { REPORT_KINDS, addReport, blockedPoints } from './reports'
@@ -48,6 +48,12 @@ const WALKING_SPEED = 1.3
 // du tremblement d'un GPS à l'arrêt, bien en deçà de ce qu'on remonte avant de
 // chercher un autre chemin.
 const TURN_BACK_M = 50
+// Et il se lit sur les relevés qui tombent sur la voie. À quarante mètres de
+// côté — au retour d'une fontaine, on est encore « sur le parcours » —, la
+// projection glisse jusqu'au point du tracé le plus proche, soixante mètres plus
+// loin parfois : revenu à l'endroit qu'on avait quitté, on « reculait », et la
+// voix disait « Tu reviens sur tes pas » à qui n'avait fait qu'un écart.
+const ON_LINE_M = 25
 
 // Nombre de relevés consécutifs hors du tracé avant d'alerter. Un seul point
 // aberrant est banal en ville, entre deux immeubles ; trois de suite, non.
@@ -69,15 +75,27 @@ const HOME_NEAR_M = 70
 // long pour dépasser l'imprécision du GPS, sinon la carte tourne sur du bruit.
 const MOVE_FOR_HEADING_M = 8
 
-// Un saut de plus de cent mètres entre deux relevés est un artefact du GPS, pas
-// un déplacement — **sauf si le temps écoulé l'explique**. Au sortir d'un
-// tunnel, d'un passage sous voie, d'une minute sans signal dans une rue
-// étroite, le relevé suivant tombe deux ou trois cents mètres plus loin : ces
-// mètres-là ont été courus, et les jeter faussait toute la distance. La vitesse
-// retenue est celle qu'on ne dépasse pas — un sprint à pied, une descente à
-// vélo : au-delà, c'est bien un artefact.
-const JUMP_M = 100
+// Un saut entre deux relevés est un artefact du GPS, pas un déplacement —
+// **sauf si le temps écoulé l'explique**. Au sortir d'un tunnel, d'un passage
+// sous voie, d'une minute sans signal dans une rue étroite, le relevé suivant
+// tombe deux ou trois cents mètres plus loin : ces mètres-là ont été courus, et
+// les jeter faussait toute la distance. La vitesse retenue est celle qu'on ne
+// dépasse pas — un sprint à pied, une descente à vélo : au-delà, c'est bien un
+// artefact.
+//
+// Le saut toléré valait d'abord cent mètres quel que soit le temps : un reflet
+// sur une façade, donné pour précis, ajoutait ainsi soixante à cent mètres en
+// une seconde, et autant au retour. Rejoué sur une boucle de Beaune avec un
+// reflet toutes les minutes et demie, la voix disait « Premier kilomètre » à
+// sept cents mètres (`LiveRun.voice.test.jsx`). Il ne reste, en plus de la
+// course, que le tremblement du GPS.
+const JUMP_SLACK_M = 10
 const TOP_SPEED_MS = { run: 7, bike: 22 }
+
+// Ce que le GPS peut faire bouger, en plus de ce qu'on a couru, entre deux
+// relevés : son tremblement, et la projection qui hésite entre les deux rues
+// d'un carrefour. Voir `locate`.
+const FIX_SLACK_M = 20
 
 // Un point d'eau ou des toilettes s'annoncent à cette distance : assez tôt pour
 // ralentir et regarder, assez tard pour qu'on s'en souvienne en y arrivant.
@@ -159,8 +177,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const announced = useRef(new Set())
   const previewed = useRef(new Set())
   const acted = useRef(new Set())
+  // Les manœuvres déjà dites « tout de suite » dans la phrase d'une autre.
+  const toldSoon = useRef(new Set())
   const warned = useRef(new Set())
   const fix = useRef(null)
+  // Le dernier relevé, et l'ancre — le dernier qui tombait sur le tracé en y
+  // avançant —, chacun avec son heure : voir `followRoute`.
+  const lastFix = useRef(null)
+  const lastOn = useRef(null)
+  // Avant le premier relevé, où chercher sur le tracé : à son début — voir
+  // `followRoute`. Une sortie reprise après une coupure, elle, est n'importe où.
+  const fromStart = useRef(!resuming)
   const strayCount = useRef(0)
   const lastSplit = useRef(0)
   const heading = useRef(null)
@@ -196,6 +223,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // reprise après une coupure n'a plus les tours d'avant, et le premier
   // kilomètre d'après aurait hérité de toute la durée écoulée.
   const splitAt = useRef(0)
+  // Ce que la voix a dit, phrase par phrase — voir `talk`.
+  const journal = useRef(resuming?.spoken ?? [])
   // La distance des dernières secondes, relevé par relevé : l'arrêt n'est sûr
   // qu'au bout de huit secondes, et le tremblement du GPS pendant ce temps —
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
@@ -283,6 +312,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         const { longitude, latitude, accuracy } = position.coords
         const point = [longitude, latitude]
         here.current = point
+        // Le cap du GPS : il dit dans quel sens on suit le tracé — voir `locate`.
+        // Lu sur la vitesse, pas sur les positions : un reflet ne le fausse pas.
+        // À l'arrêt, il ne vaut rien.
+        const { heading: cap, speed: vitesse } = position.coords
+        const course = Number.isFinite(cap) && cap >= 0 && vitesse > 1 ? cap : null
 
         // Un point trop imprécis déplace le repère, mais ne compte pas et ne
         // réoriente pas la carte.
@@ -321,7 +355,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
             // Arrêté à la main, on a le droit d'aller remplir sa gourde en face :
             // l'écran suit, mais rien ne se dit ni ne se recalcule.
             const quiet = pausedKind.current === 'manual'
-            followRoute(point, { quiet })
+            followRoute(point, { quiet, at: position.timestamp ?? Date.now(), course })
             if (!quiet) warnCrossing(point)
           }
           heading.current = runHeading(point) ?? heading.current
@@ -332,9 +366,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         const at = position.timestamp ?? Date.now()
         if (last.current) {
           const step = haversine(last.current, point)
-          // Voir `JUMP_M` : un saut n'est compté que si le temps l'explique.
+          // Voir `JUMP_SLACK_M` : un saut n'est compté que si le temps l'explique.
           const seconds = lastAt.current ? Math.max(0, (at - lastAt.current) / 1000) : 0
-          if (step < Math.max(JUMP_M, seconds * (TOP_SPEED_MS[sport] ?? TOP_SPEED_MS.run))) {
+          if (step <= seconds * (TOP_SPEED_MS[sport] ?? TOP_SPEED_MS.run) + JUMP_SLACK_M) {
             covered.current += step
             setState((s) => ({ ...s, distance: covered.current, points: s.points + 1 }))
             announceSplit(covered.current)
@@ -347,7 +381,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         lastAt.current = at
         trace.current.push(point, position.coords.altitude ?? null, position.coords.altitudeAccuracy ?? null)
         if (route) {
-          followRoute(point)
+          followRoute(point, { at, course })
           warnCrossing(point)
         }
         heading.current = runHeading(point) ?? heading.current
@@ -360,7 +394,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     return () => {
       clearInterval(tick)
       stopWatching()
-      voice.stop()
+      // « Arrivée. Sortie terminée. » se dit jusqu'au bout : la sortie se
+      // referme sur sa phrase, et la voix coupée ici se taisait avant le
+      // premier mot (`LiveRun.voice.test.jsx`).
+      if (!finishing.current) voice.stop()
       onPosition(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -384,6 +421,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       elapsed: movingSeconds(now),
       trail: trace.current.points,
       splits: splits.current,
+      spoken: journal.current,
       ...measuredAscent(),
     })
   }
@@ -433,7 +471,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setPaused(kind)
     setState((s) => ({ ...s, elapsed: movingSeconds(), distance: covered.current }))
     if (kind === 'auto') {
-      voice.speak('Pause automatique.', { priority: false })
+      talk('Pause automatique.', { priority: false })
       haptic('pulseHaptic')
     }
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
@@ -447,7 +485,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     resumedAt.current = Date.now()
     setPaused(null)
     setHomeNote(null)
-    if (spoken) voice.speak('Reprise.', { priority: false })
+    if (spoken) talk('Reprise.', { priority: false })
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
 
@@ -544,7 +582,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (Math.floor(done / every) <= Math.floor(previous / every)) return
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      voice.speak(`${done} kilomètres. Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
+      talk(`${done} kilomètres. Moyenne ${spokenSpeed(kmh)}.`, { priority: false })
       return
     }
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
@@ -556,7 +594,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
     let said = `${which}. ${average}`
     if (gap === 1 && each > 0) said = done === 1 ? `${which} à ${spoken(each)}.` : `${which} à ${spoken(each)}. ${average}`
-    voice.speak(said, { priority: false })
+    talk(said, { priority: false })
   }
 
   /**
@@ -565,14 +603,53 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    * `quiet` : en pause mise à la main. Le bandeau et l'écran de verrouillage
    * suivent, mais rien ne se dit et rien ne se recalcule.
    */
-  function followRoute(point, { quiet = false } = {}) {
+  function followRoute(point, { quiet = false, at = Date.now(), course = null } = {}) {
     const { track, route: guided } = guideRef.current
     const instructions = guided?.instructions || []
-    const found = locate(track, point, fix.current)
+    const since = (moment) => Math.max(0, (at - moment) / 1000)
+    const speed = runSpeed()
+    // On ne cherche sur le tracé que là où l'on a pu courir depuis l'ancre —
+    // voir `locate`, et plus bas pour ce qu'est l'ancre. Depuis le dernier
+    // relevé tout court, un reflet hors du tracé rouvrait la recherche sur deux
+    // cent cinquante mètres au relevé suivant, et l'avancée sautait d'un
+    // passage à l'autre.
+    const anchor = lastOn.current
+    const reach = anchor ? (TOP_SPEED_MS[sport] ?? TOP_SPEED_MS.run) * since(anchor.at) + FIX_SLACK_M : Infinity
+    // La continuité part du relevé d'avant, s'il tombait sur le tracé, avec ce
+    // qu'on a couru depuis : une seconde, trois mètres. Sinon, de l'ancre, sans
+    // rien ajouter : hors du tracé, on n'avance pas dessus. Compter comme
+    // courue la minute passée à la fontaine plaçait le retour sur un passage du
+    // tracé cent vingt mètres plus loin — « Dans 90 mètres » tombait à deux
+    // cents. Et compter depuis une ancre ancienne, arrêté à un feu, aurait tiré
+    // la projection d'autant en avant.
+    const before = lastFix.current && !lastFix.current.fix.offRoute ? lastFix.current : null
+    // **Une sortie commence au début du tracé.** Cherché partout, le premier
+    // relevé tombait aussi bien sur la fin : une boucle qui revient par la rue
+    // du départ y passe au même écart. Tout le parcours passait alors pour
+    // fait — chaque consigne dépassée de trente mètres est classée faite —, et
+    // la voix se taisait jusqu'à l'arrivée : un « 8 » de seize kilomètres des
+    // pentes de la Croix-Rousse, sans une consigne (`LiveRun.voice.test.jsx`).
+    const previous = (before ?? anchor)?.fix ?? (fromStart.current ? { along: 0 } : null)
+    const ahead = before ? speed * since(before.at) : 0
+    const found = locate(track, point, previous, { reach, ahead, course })
     if (!found) return
+    // Noté même à la fontaine d'en face, pendant une pause : sans lui, le
+    // relevé d'avant la pause aurait compté, à la reprise, cinq minutes de
+    // course pour l'avancée attendue.
+    lastFix.current = { fix: found, at }
     // À la fontaine d'en face, pendant une pause : rien à guider.
     if (quiet && found.offRoute) return
     fix.current = found
+    // **L'ancre : un relevé sur le tracé qui y avance comme on court**, ou le
+    // premier qui y retombe après un écart. Accrochée au palier d'un escalier
+    // en lacet, à la volée parallèle d'une montée, l'avancée ne bouge plus ;
+    // ancrée là à chaque relevé, la fenêtre ne bougeait plus non plus, et la
+    // vraie place, partie devant, en sortait pour de bon — « Tu t'es écarté du
+    // parcours » en plein dessus. Sans nouvelle ancre, la fenêtre s'élargit
+    // d'elle-même, et la retrouve.
+    const advancing =
+      !anchor || !before || found.along - anchor.fix.along >= (speed * since(anchor.at)) / 2 - FIX_SLACK_M / 4
+    if (!found.offRoute && advancing) lastOn.current = { fix: found, at }
     setProgress(found)
 
     if (quiet) {
@@ -587,13 +664,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (canDetour) {
           dueAt.current = Date.now() + REROUTE_AFTER_MS
           setRerouteDue(dueAt.current)
-          voice.speak(
+          talk(
             backwards
               ? 'Tu pars à contresens du parcours. Fais demi-tour.'
               : "Tu t'es écarté du parcours. Si tu ne le retrouves pas, je t'en propose un nouveau.",
           )
         } else {
-          voice.speak(
+          talk(
             backwards ? 'Tu pars à contresens du parcours. Fais demi-tour.' : "Tu t'es écarté du parcours. Reviens sur le tracé.",
           )
         }
@@ -604,7 +681,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     } else {
       lastOnAlong.current = found.along
       lastOnPoint.current = point
-      if (strayCount.current >= OFF_ROUTE_FIXES) voice.speak('Te revoilà sur le parcours.')
+      if (strayCount.current >= OFF_ROUTE_FIXES) talk('Te revoilà sur le parcours.')
       strayCount.current = 0
       dueAt.current = null
       setOffRoute(false)
@@ -613,11 +690,20 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
     if (!quiet) {
       watchArrival(point, found)
-      watchTurnBack(found)
+      watchTurnBack(found, course)
       if (!found.offRoute) announceStop(found.along)
     }
 
-    const speed = runSpeed()
+    // Hors du tracé, l'avancée projetée ne dit pas où l'on est : à quatre-vingts
+    // mètres de côté, elle glisse jusqu'au point du tracé le plus proche, peut-être
+    // au-delà du prochain carrefour. La lire classait « faite » toute consigne
+    // qu'elle dépassait de trente mètres — jamais dite, même une fois revenu.
+    // Le bandeau garde la dernière.
+    if (found.offRoute) {
+      refreshLockScreen(upcomingStep.current, lastOnAlong.current)
+      return
+    }
+
     const next = nextInstruction(instructions, found.along, announced.current)
     const following = next ? followingStep(instructions, next.index) : null
     // Ce que lisent le bandeau et l'écran de verrouillage : « Maintenant » au
@@ -630,7 +716,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     refreshLockScreen(upcoming, found.along)
     // Revenu sur ses pas, la prochaine consigne est derrière soi : la dire
     // n'aurait aucun sens — voir `watchTurnBack`.
-    if (!upcoming || found.offRoute || quiet || turnedBack.current) return
+    if (!upcoming || quiet || turnedBack.current) return
 
     const { index, step, remaining } = upcoming
     if (upcoming.imminent && !acted.current.has(index)) {
@@ -639,15 +725,33 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // La suivante est dite dans la même phrase : son annonce, un relevé plus
       // tard, aurait coupé celle-ci au milieu.
       if (chains(following, speed)) previewed.current.add(following.index)
-      say(announcement(step, remaining, { stage: 'act', following, speed }))
+      // **Une consigne déjà dite ne coupe pas la phrase qui la dit.** Dite
+      // « tout de suite » avec la précédente, celle-ci attend que la phrase
+      // finisse : au départ, « Départ — pars vers l'est, puis tout de suite à
+      // gauche » était coupé au bout d'une seconde par « Maintenant, tourne à
+      // gauche », et l'on n'entendait jamais de quel côté partir.
+      talk(announcement(step, remaining, { stage: 'act', following, speed }), { priority: !toldSoon.current.has(index) })
+      if (rightAfter(following, speed)) toldSoon.current.add(following.index)
     } else if (remaining <= previewAt(speed) && !previewed.current.has(index)) {
       previewed.current.add(index)
-      say(announcement(step, remaining, { stage: 'preview', following, speed }))
+      // **Une annonce attend son tour.** Elle vise un carrefour à une demi-minute :
+      // deux secondes de plus ne changent rien, alors qu'en coupant le
+      // « maintenant » du virage d'avant — souvent pas fini de dire —, elle en
+      // faisait perdre le nom de la rue, ou la direction.
+      talk(announcement(step, remaining, { stage: 'preview', following, speed }), { priority: false })
     }
   }
 
-  const say = (text) => {
-    if (text) voice.speak(text)
+  /**
+   * Dit une phrase, et la note au journal de la sortie : l'heure, la distance
+   * courue, la position, les mots. Il se relit dans le détail de la sortie
+   * (`RunDetail.jsx`) — c'est ce qui permet de vérifier une vraie sortie,
+   * écran verrouillé, comme `LiveRun.voice.test.jsx` vérifie les simulées.
+   */
+  function talk(text, ...options) {
+    if (!text || !voice.speak(text, ...options)) return
+    const [lon, lat] = (here.current ?? [null, null]).map((x) => (x == null ? null : Math.round(x * 1e5) / 1e5))
+    journal.current.push({ t: Date.now(), lon, lat, m: Math.round(covered.current), text })
   }
 
   /**
@@ -666,7 +770,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (last != null && next.along - last < STOP_EVERY_M) return
     lastStopSaid.current[next.kind] = next.along
     const metres = Math.max(20, Math.round((next.along - along) / 10) * 10)
-    voice.speak(`${next.kind === 'water' ? "Point d'eau" : 'Toilettes'} dans ${metres} mètres.`, { priority: false })
+    talk(`${next.kind === 'water' ? "Point d'eau" : 'Toilettes'} dans ${metres} mètres.`, { priority: false })
   }
 
   /**
@@ -681,9 +785,14 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    * Passé cinquante mètres de recul — bien au-delà du tremblement du GPS à
    * l'arrêt —, on le dit, on propose de signaler le passage fermé là où l'on a
    * fait demi-tour, et tout nouveau chemin calculé l'évitera.
+   *
+   * `course` : le cap du GPS. Revenir sur ses pas, c'est courir à contresens du
+   * tracé ; sans cette condition, un seul relevé tombé sur la volée parallèle
+   * d'un lacet, cinquante mètres plus tôt sur le tracé, passait pour un
+   * demi-tour, et taisait les consignes jusqu'au point le plus lointain.
    */
-  function watchTurnBack(found) {
-    if (found.offRoute) return
+  function watchTurnBack(found, course) {
+    if (found.offRoute || found.offset > ON_LINE_M) return
     if (found.along > farthest.current) {
       farthest.current = found.along
       if (turnedBack.current) {
@@ -694,9 +803,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       return
     }
     if (turnedBack.current || farthest.current - found.along < TURN_BACK_M) return
+    if (course != null && !runsBack(guideRef.current.track, found.along, course)) return
     turnedBack.current = { along: farthest.current, point: pointAt(guideRef.current.track, farthest.current) }
     setTurnBack(turnedBack.current)
-    voice.speak(
+    talk(
       canDetour
         ? 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » : je t’en trouve un autre.'
         : 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » pour qu’il soit évité la prochaine fois.',
@@ -741,7 +851,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     })
     if (verdict !== 'arrived') return
     finishing.current = true
-    voice.speak('Arrivée. Sortie terminée.')
+    talk('Arrivée. Sortie terminée.')
     haptic('warnHaptic')
     finish()
   }
@@ -761,7 +871,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (at && turnedBack.current) setTurnBack({ ...turnedBack.current, reported: true })
     haptic('pulseHaptic')
     const said = REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.'
-    voice.speak(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
+    talk(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
     if (canDetour) detour(here.current ?? point, { forced: true })
   }
 
@@ -814,7 +924,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // répète pas au relevé suivant.
       acted.current.add(0)
       previewed.current.add(0)
-      voice.speak(`${homeward ? 'Retour au départ.' : 'Nouvel itinéraire.'} ${next.instructions[0]?.text ?? ''}`)
+      talk(`${homeward ? 'Retour au départ.' : 'Nouvel itinéraire.'} ${next.instructions[0]?.text ?? ''}`)
       haptic('pulseHaptic')
       onReroute?.(next)
       // Rentrer, c'est repartir : en pause, le chrono resterait figé et la voix
@@ -823,13 +933,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     } catch {
       if (home) {
         setHomeNote("Pas de chemin sûr d'ici : la boucle reste ton parcours.")
-        voice.speak("Je n'ai pas trouvé de chemin sûr pour rentrer d'ici. Je garde la boucle.")
+        talk("Je n'ai pas trouvé de chemin sûr pour rentrer d'ici. Je garde la boucle.")
       } else if (forced) {
-        voice.speak("Je n'ai pas trouvé d'autre chemin d'ici. Le signalement est gardé pour les prochaines sorties.")
+        talk("Je n'ai pas trouvé d'autre chemin d'ici. Le signalement est gardé pour les prochaines sorties.")
       } else if (strayCount.current >= OFF_ROUTE_FIXES) {
         dueAt.current = Date.now() + REROUTE_RETRY_MS
         setRerouteDue(dueAt.current)
-        voice.speak("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
+        talk("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
       }
     } finally {
       detouring.current = false
@@ -847,7 +957,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (!point) return
     if (haversine(point, route.geometry[0]) <= HOME_NEAR_M) {
       setHomeNote('Tu es déjà au départ : termine quand tu veux.')
-      voice.speak('Tu es déjà au départ.')
+      talk('Tu es déjà au départ.')
       return
     }
     setHomeNote(null)
@@ -866,12 +976,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     turnedBack.current = null
     setTurnBack(null)
     fix.current = null
+    lastFix.current = null
+    lastOn.current = null
+    // Le nouveau tracé part de là où l'on est.
+    fromStart.current = true
     strayCount.current = 0
     lastOnAlong.current = 0
     lastOnPoint.current = null
     announced.current = new Set()
     previewed.current = new Set()
     acted.current = new Set()
+    toldSoon.current = new Set()
     // Les distances des arrêts se comptent désormais sur le nouveau tracé.
     saidStops.current = new Set()
     lastStopSaid.current = {}
@@ -922,6 +1037,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       ...measuredAscent(),
       rerouted: Boolean(guideRef.current.route?.rerouted),
       splits: splits.current.slice(),
+      spoken: journal.current.slice(),
       pausedS: Math.round(pausedMs.current / 1000),
     })
   }

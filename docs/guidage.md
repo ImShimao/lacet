@@ -47,19 +47,87 @@ une décision réelle.
 
 ## La sortie
 
-**Le guidage vocal** annonce chaque manœuvre deux fois : à 110 m — « dans cent
-mètres, tourne à gauche sur l'avenue de la Gare » — puis au moment d'agir. Un
+**Le guidage vocal** annonce chaque manœuvre deux fois : une trentaine de
+secondes avant — « dans cent mètres, tourne à gauche sur l'avenue de la Gare »
+— puis au moment d'agir, cinq secondes avant le carrefour (`guidance.js`). Un
 seul message ne suffit pas : trop tôt on l'oublie, trop tard on a dépassé la
 rue. Les distances sont arrondies à des repères que l'oreille retient, personne
 n'estimant 87 mètres en courant.
 
 C'est la voix d'iOS — aucune clé, aucun réseau —, qui continue écran verrouillé
-et baisse la musique le temps de parler (`VoicePlugin.swift`). Chaque consigne
-coupe la précédente : une consigne périmée dite après le carrefour est pire que
-rien. La musique remonte sur ce que la voix fait vraiment, et non sur un compte
+et baisse la musique le temps de parler (`VoicePlugin.swift`). Le « maintenant »
+d'un carrefour coupe la phrase en cours : une consigne périmée dite après le
+carrefour est pire que rien. Une annonce, elle, attend que la phrase finisse —
+elle vise un carrefour à une demi-minute. La musique remonte sur ce que la voix fait vraiment, et non sur un compte
 de phrases : avec l'extension de synthèse d'avant, une seule fin de phrase
 perdue — une consigne qui en coupait une autre — la laissait en sourdine
 jusqu'au bout de la sortie.
+
+### Une sortie entière, écoutée
+
+La plainte n° 1 contre les apps de course, dans les avis de l'App Store : une
+voix qui se tait au bout de quelques virages, écran verrouillé, ou qui annonce
+un virage déjà passé. `LiveRun.voice.test.jsx` court des boucles réelles des
+extraits de parité — Beaune, la Guillotière, les pentes de la Croix-Rousse (plus
+de trente manœuvres en 5 km), deux tours à Beaune, un « 8 » de 16 km — à
+allure de course : un relevé par seconde, la dérive lente d'un GPS de
+téléphone, un reflet sur une façade donné pour précis toutes les minutes et
+demie, des points que le téléphone sait douteux, et une demi-minute à quarante
+mètres du tracé. Le coureur coupe les angles, comme tout le monde. Tout passe
+par le vrai chemin — `LiveRun.jsx`, `guidance.js`, `voice.js`, `native.js` —
+jusqu'à une synthèse simulée qui suit les règles de `VoicePlugin.swift` : une
+phrase prend le temps de se dire, une consigne coupe celle en cours. On juge ce
+qu'on **entend** : chaque manœuvre annoncée puis « maintenant », dans l'ordre,
+jusqu'à la dernière, la direction entendue au plus tard en traversant le
+carrefour ; aucune annonce sans carrefour devant soi, ni à une distance fausse ;
+la fin de tour dite ; l'arrivée dite une fois, en entier ; les bornes au bon
+kilomètre ; jamais de « Tu reviens sur tes pas » sans demi-tour ; la musique
+jamais plus de trente secondes en sourdine.
+
+Le premier passage a trouvé, et fait corriger :
+
+- **La voix muette d'un bout à l'autre.** Le premier relevé était cherché sur
+  tout le tracé, et sur une boucle qui revient par la rue du départ, il tombait
+  sur la fin : toutes les consignes passaient pour faites. Une sortie commence
+  désormais au début du tracé.
+- **Un reflet qui taisait les consignes.** La recherche sur le tracé couvrait
+  250 m de part et d'autre, une minute de course : un reflet y faisait
+  « avancer » de 200 m, le relevé suivant passait pour un demi-tour, et la voix
+  se taisait jusqu'à ce faux point. Elle ne couvre plus que ce qu'on a pu
+  courir depuis le dernier relevé qui avançait sur le tracé (`locate`).
+- **Les passages superposés.** Au demi-tour d'une impasse, dans les lacets
+  d'une montée ou d'un escalier, deux passages du tracé sont à quelques mètres
+  l'un de l'autre ; l'app suivait le mauvais, à reculons, et s'y perdait. Le cap
+  du GPS — tiré de la vitesse, insensible aux reflets — départage désormais les
+  passages, et seul un relevé qui avance comme on court sert d'ancre.
+- **Une consigne coupée par la suivante.** L'annonce « Dans 100 mètres » du
+  virage d'après coupait le « maintenant » du virage en cours, et le
+  « maintenant » d'un virage dit « tout de suite » coupait la phrase qui le
+  disait — au départ, on n'entendait jamais de quel côté partir. Une annonce, ou
+  une consigne déjà dite, attend désormais la fin de la phrase en cours.
+- **Après une fin de tour**, le premier virage n'était jamais annoncé : la
+  phrase de tour le donnait pour dit sans le dire. Elle l'enchaîne maintenant.
+- **« Arrivée. Sortie terminée. »** n'était jamais entendu : l'écran de course,
+  refermé aussitôt, coupait la voix avant le premier mot.
+- **Les bornes kilométriques** tombaient 30 % trop tôt : un reflet de soixante
+  à cent mètres en une seconde comptait pour couru. Un saut n'est plus compté
+  que si le temps l'explique.
+- **Un écart, puis un retour** : la minute passée hors du tracé était comptée
+  comme courue dessus, et le retour se plaçait cent vingt mètres plus loin.
+
+Deux limites restent, connues. Trois virages en soixante mètres ne laissent pas
+le temps de tout dire : la phrase du deuxième — « serre à gauche puis tout de
+suite à droite dans la rue François Vernay, puis dans 30 mètres… » — est coupée
+par le « maintenant » du troisième avant d'arriver à son annonce. Et l'arrivée
+ne se déclenche que si le GPS passe à moins de 14 m de la porte (`arrival.js`) :
+une fois sur vingt graines, il en passait à quinze, et c'est le bouton qui
+termine.
+
+**Le journal de la voix.** Chaque phrase dite pendant la sortie est gardée avec
+elle — l'heure, la distance courue, la position, les mots — et se relit dans le
+détail de la sortie, sous « Ce que la voix a dit ». C'est la vérification
+d'une vraie sortie écran verrouillé : la voix s'est-elle tue, a-t-elle parlé
+trop tard ? Il part avec la trace quand celle-ci n'est plus gardée.
 
 **Les points d'eau et toilettes**, quand ils sont cochés, s'annoncent cent
 mètres avant — « Point d'eau dans cent mètres » —, une fois par kilomètre au
