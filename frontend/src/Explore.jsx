@@ -16,9 +16,11 @@ import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
-import { climbMismatch, reliefMismatch, surfaceMismatch } from './explain'
+import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
 import { km } from './format'
 import { haptic } from './platform'
+import { summarise } from './request'
+import { clockTime, turnIcon } from './runFormat'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
@@ -120,9 +122,14 @@ export default function Explore({
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
         <div className="row">
-          <button className="btn" onClick={onOpenFilters}>
+          {/* Ce qu'on va chercher, dit avant de chercher : sans ça, il fallait
+              ouvrir les filtres pour savoir si l'on partait pour 10 km ou 21. */}
+          <button className="btn btn--stack" onClick={onOpenFilters}>
             <Icon name="sliders" size={17} />
-            Filtres
+            <span>
+              Filtres
+              <em>{summarise(params)}</em>
+            </span>
           </button>
           <button className="btn btn--ghost" onClick={onFreeRun}>
             <Icon name="play" size={17} />
@@ -176,6 +183,10 @@ export default function Explore({
   const relief =
     params.climb_m != null ? climbMismatch(params.climb_m, routes) : reliefMismatch(params.elevation, routes)
   const ground = surfaceMismatch(params.surface, routes)
+  // Partie maintenant, la boucle finit-elle de nuit ? C'est le moment où une
+  // rue sans éclairage ni trottoir devient dangereuse : le dire avant de partir.
+  const [startLon, startLat] = selected.geometry?.[0] ?? []
+  const dusk = startLat != null && selected.duration_s ? nightfall(startLat, startLon, selected.duration_s) : null
 
   const exportGpx = async () => {
     setExporting(true)
@@ -252,6 +263,12 @@ export default function Explore({
             : `Pas de boucle toute goudronnée d'ici : la plus roulante a encore ${ground.share} % de chemins.`}
         </div>
       )}
+      {dusk && (
+        <div className="notice notice--warn">
+          La nuit tombe vers {clockTime(dusk)}, avant ta fin estimée ({clockTime(Date.now() + selected.duration_s * 1000)}) :
+          frontale et gilet réfléchissant.
+        </div>
+      )}
       {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher
           pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas.
           Dans le détail seulement : sur la carte repliée, ces trois lignes
@@ -298,6 +315,8 @@ export default function Explore({
       <RouteStrip route={selected} onScrub={onScrub} />
 
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
+
+      {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onScrub={onScrub} />}
 
       <button className="disclose" onClick={onToggleDetail} aria-expanded={detail}>
         {detail ? 'Masquer le détail' : 'Voir le détail de la note'}
@@ -672,6 +691,36 @@ function WindNote({ wind }) {
         qui finissent vent dans le dos sont proposées en premier.
       </span>
     </div>
+  )
+}
+
+/**
+ * La feuille de route : chaque consigne, à son kilomètre. On la lit avant de
+ * partir — repérer le virage qui piège, la rue qu'on ne connaît pas — et un
+ * toucher montre l'endroit sur la carte. Repliée : la voix la dira en courant.
+ */
+function RouteSteps({ steps, onScrub }) {
+  return (
+    <details className="steps">
+      <summary>
+        Feuille de route · {steps.length} consignes
+        <Icon name="chevronDown" size={16} />
+      </summary>
+      <ol>
+        {steps.map((s, i) => (
+          <li key={i}>
+            <button
+              onClick={() => onScrub?.(s.lon != null ? [s.lon, s.lat] : null)}
+              aria-label={`${s.text}, à ${km(s.dist_m, 1)} km — montrer sur la carte`}
+            >
+              <Icon name={turnIcon(s.turn)} size={17} />
+              <em>{km(s.dist_m, 1)}</em>
+              <span>{s.text}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </details>
   )
 }
 

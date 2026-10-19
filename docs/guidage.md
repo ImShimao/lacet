@@ -152,6 +152,9 @@ départ, un kilomètre au moins plus tard, l'app le dit et propose « Terminer �
 Elle ne termine pas d'elle-même — rien ne dit qu'on rentre plutôt qu'on passe
 devant sa porte pour un second tour.
 
+**Chaque kilomètre bouclé** s'affiche aussi à l'écran, huit secondes —
+« Km 3 · 5:21 » —, pour qui court musique forte ou voix coupée.
+
 **L'écran de fin** montre le croquis de la trace courue, qui se dessine, puis
 la distance, le temps, l'allure, le D+ et les calories estimées ; un record — la
 plus longue sortie, l'allure la plus rapide sur 3 km ou plus — passe devant ;

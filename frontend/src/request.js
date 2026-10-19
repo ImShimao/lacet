@@ -81,10 +81,10 @@ export function summarise(p) {
 }
 
 /** Entrée d'historique d'une sortie sans itinéraire. */
-export function freeRunEntry(params) {
+export function freeRunEntry(params, startedAt = Date.now()) {
   return {
     id: `free-${Date.now()}`,
-    name: params.sport === 'bike' ? 'Sortie libre à vélo' : 'Sortie libre',
+    name: freeRunName(params.sport, startedAt),
     free: true,
     distance_m: 0,
     duration_s: 0,
@@ -97,9 +97,20 @@ export function freeRunEntry(params) {
   }
 }
 
+/**
+ * « Course du soir », « Vélo du matin » : vingt lignes « Sortie libre » ne se
+ * distinguaient que par leur date. Le moment du départ suffit à les reconnaître,
+ * et le nom se corrige toujours dans le détail de la sortie.
+ */
+export function freeRunName(sport, startedAt) {
+  const h = new Date(startedAt).getHours()
+  const moment = h < 5 ? 'de nuit' : h < 11 ? 'du matin' : h < 14 ? 'de midi' : h < 18 ? "de l'après-midi" : h < 22 ? 'du soir' : 'de nuit'
+  return `${sport === 'bike' ? 'Vélo' : 'Course'} ${moment}`
+}
+
 /** L'entrée d'historique d'une sortie terminée. */
 export function runEntry(stats, { route, free, sport }, params) {
-  const base = free ? freeRunEntry({ ...params, sport }) : slim(route)
+  const base = free ? freeRunEntry({ ...params, sport }, Date.now() - (stats.elapsed || 0) * 1000) : slim(route)
   return {
     ...base,
     ranAt: new Date().toISOString(),

@@ -164,3 +164,19 @@ html.native textarea {
     animation: none;
   }
 }
+
+/* Un bouton qui dit aussi son état : « Filtres », et dessous ce qu'on va
+   chercher. */
+.btn--stack span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+.btn--stack em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  white-space: nowrap;
+}

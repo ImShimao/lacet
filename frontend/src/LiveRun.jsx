@@ -6,7 +6,7 @@ import RunBanner from './RunBanner.jsx'
 import { ReportButton, RunControls, RunStats } from './RunPanel.jsx'
 import { NextStops } from './Stops.jsx'
 import useLiveActivity from './useLiveActivity'
-import { haversine } from './format'
+import { haversine, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, runsBack, wrongWay } from './routeTracker'
 import { finishedState, lockScreenState } from './lockScreen'
 import { actAt, announcement, chains, followingStep, previewAt, rightAfter, speedOr, thenLabel } from './guidance'
@@ -124,6 +124,9 @@ const FREE_HOME_NEAR_M = 40
 const FREE_HOME_MIN_M = 1000
 const FREE_HOME_LEAVE_M = 150
 
+// Le temps du dernier kilomètre reste à l'écran le temps d'y jeter un œil.
+const SPLIT_SHOWN_MS = 8000
+
 const guideOf = (route) => ({ route, track: buildTrack(route?.geometry) })
 
 /**
@@ -156,6 +159,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const [profileOpen, setProfileOpen] = useState(false)
   // Course libre revenue à son départ — voir `watchHome`.
   const [backHome, setBackHome] = useState(false)
+  // Le dernier kilomètre bouclé, montré quelques secondes : la voix le dit, mais
+  // musique forte ou voix coupée, l'écran doit le dire aussi.
+  const [splitShown, setSplitShown] = useState(null)
+  const splitTimer = useRef(null)
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
   const homeShown = useRef(false)
@@ -284,7 +291,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     voice.setEnabled(speaking)
   }, [speaking])
 
-  useEffect(() => () => clearTimeout(alertTimer.current), [])
+  useEffect(
+    () => () => {
+      clearTimeout(alertTimer.current)
+      clearTimeout(splitTimer.current)
+    },
+    [],
+  )
 
   // Un autre parcours — ce qui n'arrive qu'au démarrage : on repart de lui.
   useEffect(() => {
@@ -603,6 +616,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     for (let n = lastSplit.current + 1; n <= done; n += 1) splits.current.push({ km: n, seconds: each })
     splitAt.current = elapsed
     lastSplit.current = done
+    if (gap === 1 && each > 0) {
+      setSplitShown({ km: done, seconds: each })
+      clearTimeout(splitTimer.current)
+      splitTimer.current = setTimeout(() => setSplitShown(null), SPLIT_SHOWN_MS)
+    }
 
     const every = SPLIT_EVERY_KM[sport] ?? 1
     if (Math.floor(done / every) <= Math.floor(previous / every)) return
@@ -1180,6 +1198,15 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         homeBusy={Boolean(rerouting)}
         homeNote={homeNote}
       />
+
+      {splitShown && (
+        <div className="live__split" role="status">
+          <b>Km {splitShown.km}</b>
+          {sport === 'bike'
+            ? `${(3600 / splitShown.seconds).toFixed(1).replace('.', ',')} km/h`
+            : `${pace(splitShown.seconds)}`}
+        </div>
+      )}
 
       {backHome && (
         <div className="live__paused" role="status">

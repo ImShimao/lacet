@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climbBand, climbMismatch, reliefMismatch, surfaceMismatch } from './explain'
+import { climbBand, climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
 
 /**
  * Le relief demandé que le terrain ne donne pas. À Colmar, « Côtes » rendait
@@ -68,5 +68,23 @@ describe('surfaceMismatch', () => {
 
   it('ne juge pas « Mixte », réglé par défaut', () => {
     expect(surfaceMismatch('mixed', [terrain(0)])).toBeNull()
+  })
+})
+
+describe('la nuit qui tombe pendant la boucle', () => {
+  // Guebwiller, le 19 octobre : le soleil s'y couche vers 18 h 30, heure de Paris.
+  const [lat, lon] = [47.91, 7.21]
+  const at = (h, m) => Date.UTC(2026, 9, 19, h - 2, m)
+
+  it('donne l’heure où elle tombe, à la minute près', () => {
+    const t = nightfall(lat, lon, 3600, at(18, 0))
+    expect(t).not.toBeNull()
+    expect(t - at(18, 0)).toBeGreaterThan(10 * 60_000)
+    expect(t - at(18, 0)).toBeLessThan(55 * 60_000)
+  })
+
+  it('se tait de jour à l’arrivée comme de nuit au départ', () => {
+    expect(nightfall(lat, lon, 3600, at(14, 0))).toBeNull()
+    expect(nightfall(lat, lon, 3600, at(21, 0))).toBeNull()
   })
 })

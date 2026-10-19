@@ -12,6 +12,7 @@ import Icon from './Icon.jsx'
 import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
+import { sketch } from './routeDraw'
 
 export default function Library({ saved, history, onOpen, onOpenRun, onImport, onExplore, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
@@ -115,11 +116,7 @@ export default function Library({ saved, history, onOpen, onOpenRun, onImport, o
                     au même écran, qui montrait le plan : relire une sortie
                     passée y était impossible. */}
                 <button className="list__row" onClick={() => (view === 'history' ? onOpenRun(r) : onOpen(r))}>
-                  {view === 'history' && (
-                    <span className="list__sport" aria-hidden="true">
-                      <Icon name={r.sport === 'bike' ? 'bike' : 'run'} size={17} />
-                    </span>
-                  )}
+                  <Thumb line={view === 'history' ? r.track : r.geometry} sport={view === 'history' ? r.sport : null} />
                   <span>
                     {r.name}
                     <em>
@@ -489,6 +486,29 @@ const KCAL_PER_KG_PER_KM = { run: 0.95, bike: 0.30 }
 export function energy(distanceM, weightKg, sport = 'run') {
   const factor = KCAL_PER_KG_PER_KM[sport] ?? KCAL_PER_KG_PER_KM.run
   return (distanceM / 1000) * (weightKg || 70) * factor
+}
+
+/**
+ * La vignette d'une ligne : le dessin de la sortie ou du parcours, qu'on
+ * reconnaît d'un coup d'œil bien mieux qu'un nom — « Boucle sud-ouest », il y
+ * en a dix. Sans trace gardée, l'icône du sport.
+ */
+function Thumb({ line, sport }) {
+  const drawn = useMemo(() => sketch(line, 32, 32, 4), [line])
+  if (!drawn) {
+    return (
+      <span className="list__sport" aria-hidden="true">
+        <Icon name={sport === 'bike' ? 'bike' : sport ? 'run' : 'routes'} size={17} />
+      </span>
+    )
+  }
+  return (
+    <span className="list__sport" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="32" height="32">
+        <path d={drawn.d} />
+      </svg>
+    </span>
+  )
 }
 
 /** Le mois d'une sortie : « 2026-09 ». */

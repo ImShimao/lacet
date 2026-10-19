@@ -39,6 +39,24 @@ plus près des murs — une maison d'angle, un jardin qui donne sur un chemin. L
 première consigne dit de quel côté partir : « Départ — en sortant, pars à
 droite dans la rue des Tonneliers. » (`engine/door.js`)
 
+**La feuille de route**, dans le détail d'un parcours : chaque consigne à son
+kilomètre — « 0,7 · Tourne à gauche sur le quai de Montebello » —, et un
+toucher montre l'endroit sur la carte. On y repère, avant de partir, le virage
+qui piège ou la rue qu'on ne connaît pas.
+
+**La nuit qui tombe** : partie maintenant, si la boucle finit après le coucher
+du soleil (le même calcul que le moteur, `isNight`), un avertissement le dit
+avec l'heure — c'est le moment où une rue sans éclairage ni trottoir devient
+dangereuse.
+
+**Avant de chercher**, le bouton « Filtres » dit ce qu'on va chercher —
+« 10 km · 6:30/km » — sans avoir à l'ouvrir.
+
+**Mes parcours** montre le croquis de chaque sortie et de chaque favori à la
+place d'une icône : dix « Boucle sud-ouest » se reconnaissent à leur dessin. Une
+course libre prend le nom de son moment — « Course du soir », « Vélo du
+matin ».
+
 **Le point de passage** : un appui long sur la carte (ou « Passer par un
 point » dans le menu du départ) pose un fanion, et la recherche repart avec
 des boucles qui y passent toutes. Le fanion se fait glisser ; la pastille

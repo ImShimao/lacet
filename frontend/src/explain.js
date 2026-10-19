@@ -9,6 +9,8 @@
 // `engine/service.js` (dénivelé), `engine/safety.js` (sécurité, notes). S'ils
 // changent là-bas, ils doivent changer ici.
 
+import { isNight } from './engine/environment'
+
 const TERRAIN_RUN = {
   title: 'Types de terrain',
   items: [
@@ -224,4 +226,27 @@ export function explain(topic, sport = 'run') {
   if (topic === 'terrain') return sport === 'bike' ? TERRAIN_BIKE : TERRAIN_RUN
   if (topic === 'safety') return safety(sport)
   return { relief: RELIEF, sport: SPORT, avoid: AVOID }[topic] ?? null
+}
+
+/**
+ * La nuit qui tombe pendant la boucle : l'heure où elle tombe, si l'on part
+ * maintenant et que la boucle dure `durationS` — `null` s'il fait encore jour
+ * à l'arrivée, ou déjà nuit au départ (le moteur a alors choisi des rues
+ * éclairées, et l'écran le sait).
+ *
+ * Cherchée à la minute près entre le départ et l'arrivée, avec le calcul du
+ * moteur (`isNight`) : c'est lui qui décide quand les rues non éclairées
+ * comptent.
+ */
+export function nightfall(lat, lon, durationS, now = Date.now()) {
+  const end = now + durationS * 1000
+  if (isNight(lat, lon, new Date(now)) || !isNight(lat, lon, new Date(end))) return null
+  let lo = now
+  let hi = end
+  while (hi - lo > 60_000) {
+    const mid = (lo + hi) / 2
+    if (isNight(lat, lon, new Date(mid))) hi = mid
+    else lo = mid
+  }
+  return hi
 }

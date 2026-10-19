@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULTS } from './FiltersSheet.jsx'
-import { runEntry, toRequest } from './request'
+import { freeRunName, runEntry, toRequest } from './request'
 
 const start = { lat: 47.9, lon: 7.2 }
 
@@ -71,5 +71,14 @@ describe('l’entrée d’historique', () => {
     const entry = runEntry({ distance: 5000, elapsed: 1500, ascent: null }, { route, sport: 'run' }, DEFAULTS)
     expect(entry.actual_ascent_m).toBeNull()
     expect(entry.actual_ascent_source).toBeNull()
+  })
+})
+
+describe('le nom d’une sortie libre', () => {
+  it('dit le sport et le moment du départ', () => {
+    expect(freeRunName('run', new Date(2026, 9, 19, 7, 30).getTime())).toBe('Course du matin')
+    expect(freeRunName('run', new Date(2026, 9, 19, 19, 5).getTime())).toBe('Course du soir')
+    expect(freeRunName('bike', new Date(2026, 9, 19, 15, 0).getTime())).toBe("Vélo de l'après-midi")
+    expect(freeRunName('run', new Date(2026, 9, 19, 23, 40).getTime())).toBe('Course de nuit')
   })
 })

@@ -389,3 +389,29 @@
 .shell:not([data-sheet='peek']) .viapill {
   display: none;
 }
+
+/* Le kilomètre qu'on vient de boucler : une pastille, le temps d'un regard. */
+.live__split {
+  align-self: center;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-text);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: rise 0.25s ease-out;
+}
+.live__split b {
+  color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .live__split {
+    animation: none;
+  }
+}
