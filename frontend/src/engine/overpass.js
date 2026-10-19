@@ -336,6 +336,10 @@ export async function fetchArea(args) {
     radiusM,
     targetM,
     onProgress = () => {},
+    // Appelé quand il faut passer par le réseau — archives ou Overpass. Sans
+    // lui, l'écran annonçait un téléchargement même chez soi, autour de
+    // Guebwiller, où les rues sont livrées avec l'app.
+    onDownload = () => {},
     fetchImpl = fetch,
     now = Date.now,
     // Pour le rafraîchissement en fond : des tuiles précises, et aucune copie
@@ -406,6 +410,7 @@ export async function fetchArea(args) {
       return !copy || now() - copy.at >= ARCHIVE_AFTER_MS
     })
     if (unfresh.length) {
+      onDownload()
       const archived = await fetchArchived(unfresh, { fetchImpl: archiveFetch })
       const keep = []
       for (const tile of unfresh) {
@@ -471,6 +476,7 @@ export async function fetchArea(args) {
     lastReport = t
     report()
   }
+  if (missing.length) onDownload()
   report()
   refreshLater(args, level, aged, schedule)
   // La tuile du départ d'abord : c'est elle qui mesure la densité de la zone.

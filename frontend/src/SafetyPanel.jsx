@@ -78,7 +78,7 @@ export default function SafetyPanel({ safety, surfaces, segments = [], distance,
   }
 
   const surfaceRows = [
-    ['paved', 'Route', surfaces.paved_m],
+    ['paved', 'Bitume', surfaces.paved_m],
     ['gravel', 'Chemin', surfaces.gravel_m],
     ['trail', 'Sentier', surfaces.trail_m],
     ['unknown', 'Indéterminé', surfaces.unknown_m],

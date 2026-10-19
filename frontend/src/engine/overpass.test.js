@@ -421,6 +421,21 @@ describe('le téléchargement d’une zone', () => {
     expect(second.ways.length).toBe(premier.ways.length)
   }, 20_000)
 
+  it('ne parle de téléchargement que si les rues manquent sur l’appareil', async () => {
+    // L'écran disait « Téléchargement des rues » même autour de Guebwiller, où
+    // elles sont livrées avec l'app : il attend désormais ce signal pour le dire.
+    const { fetchImpl } = fakeNetwork()
+    let appels = 0
+    const zone = { ...BEAUNE, radiusM: 2000, targetM: 3000, fetchImpl, onDownload: () => (appels += 1) }
+
+    await fetchArea(zone)
+    expect(appels).toBeGreaterThan(0)
+
+    appels = 0
+    await fetchArea(zone)
+    expect(appels).toBe(0)
+  })
+
   it('cherche sans les tuiles de bordure quand elles tardent', async () => {
     // Le cas d'une maison à deux kilomètres de la limite de la carte livrée :
     // le cœur de la zone est sur l'appareil, deux tuiles du bord restent à

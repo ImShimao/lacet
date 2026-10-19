@@ -48,8 +48,10 @@ export function profileRange(elevations) {
 }
 
 const SURFACE_LABELS = {
-  // revêtements constatés sur le tracé
-  paved: 'route',
+  // revêtements constatés sur le tracé. « Bitume », pas « route » : un trottoir
+  // est revêtu, et « 53 % route » à côté de « 71 % hors chaussée » se lisait
+  // comme une contradiction.
+  paved: 'bitume',
   gravel: 'chemin',
   trail: 'sentier',
   unknown: 'indéterminé',

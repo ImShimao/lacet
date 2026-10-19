@@ -95,7 +95,9 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
   // serveurs qui n'accordent que deux requêtes à la fois.
   const overlapping = loads.filter((l) => l.level === level && needed.some((k) => l.tiles.has(k)))
   if (overlapping.length) {
-    progress('data', 0)
+    // À l'étape où il en est : rejoint en plein téléchargement, l'écran doit
+    // le dire, pas « lecture des rues » jusqu'à la fin.
+    progress(overlapping[0].stage, 0)
     for (const l of overlapping) l.listeners.add(progress)
     await Promise.allSettled(overlapping.map((l) => l.promise))
     for (const l of overlapping) l.listeners.delete(progress)
@@ -109,8 +111,9 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     // mais les tuiles communes sont désormais sur l'appareil.
   }
 
-  const entry = { level, tiles: new Set(needed), listeners: new Set([progress]), promise: null, info: {} }
+  const entry = { level, tiles: new Set(needed), listeners: new Set([progress]), promise: null, info: {}, stage: 'data' }
   const notify = (stage, fraction) => {
+    entry.stage = stage
     for (const listener of entry.listeners) listener(stage, fraction)
   }
   entry.promise = (async () => {
@@ -118,7 +121,12 @@ async function loadGraph({ lat, lon, radiusM, targetM, sport, allowTrail }, prog
     const startedAt = performance.now()
     const extract = await fetchArea({
       lat, lon, radiusM, targetM,
-      onProgress: (fraction) => notify('data', fraction),
+      onProgress: (fraction) => notify(entry.stage, fraction),
+      // `data` lit l'appareil, `download` attend le réseau : seul le second
+      // mérite le mot « téléchargement ».
+      onDownload: () => {
+        if (entry.stage !== 'download') notify('download', 0)
+      },
     })
     notify('graph', 0)
     const fetched = performance.now()

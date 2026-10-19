@@ -95,7 +95,7 @@ describe('percent', () => {
 
 describe('surfaceLabel', () => {
   it('traduit les revêtements constatés', () => {
-    expect(surfaceLabel('paved')).toBe('route')
+    expect(surfaceLabel('paved')).toBe('bitume')
     expect(surfaceLabel('trail')).toBe('sentier')
   })
 

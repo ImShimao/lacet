@@ -17,7 +17,7 @@ import { StopsList } from './Stops.jsx'
 import { TERRAINS } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
-import { km } from './format'
+import { km, surfaceLabel } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
@@ -411,7 +411,11 @@ export default function Explore({
 }
 
 const STAGES = {
-  data: 'Téléchargement des rues',
+  // Les rues déjà sur l'appareil — livrées avec l'app, ou gardées d'une
+  // recherche précédente. Le moteur ne passe à `download` que s'il lui faut le
+  // réseau : chez soi, l'écran annonçait à tort un téléchargement.
+  data: 'Lecture des rues',
+  download: 'Téléchargement des rues',
   graph: 'Construction du réseau de voies',
   routing: 'Recherche des boucles',
   elevation: 'Calcul du relief',
@@ -433,7 +437,9 @@ const PATIENCE_MS = 12_000
 
 function SearchProgress({ progress }) {
   const stage = progress?.stage ?? 'data'
-  const fraction = stage === 'data' ? (progress?.fraction ?? 0) : null
+  // Le pourcentage suit les tuiles téléchargées ; lues sur l'appareil, elles
+  // arrivent toutes d'un coup.
+  const fraction = stage === 'download' ? (progress?.fraction ?? 0) : null
   const [long, setLong] = useState(false)
 
   // Le compteur repart à chaque avancée réelle : c'est l'absence de mouvement
@@ -458,11 +464,11 @@ function SearchProgress({ progress }) {
         <i style={fraction ? { transform: `scaleX(${Math.max(0.04, fraction)})` } : undefined} />
       </div>
       <p className="muted small">
-        {long && stage === 'data'
+        {long && stage === 'download'
           ? // Les archives couvrent la France et ses voisins ; ailleurs, il faut
             // interroger OpenStreetMap en direct, et c'est là que ça traîne.
             "Ce coin n'est pas dans les archives : Lacet interroge OpenStreetMap en direct, et ses serveurs sont lents en ce moment. Ça aboutit en général en moins d'une minute."
-          : stage === 'data'
+          : stage === 'download'
             ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
             : stage === 'elevation'
               ? // La seule étape qui attend encore quelqu'un d'autre : autant le
@@ -743,11 +749,11 @@ function RejectedList({ rejected }) {
 function surfaceShare(route) {
   const total = route.distance_m || 1
   const parts = [
-    ['route', route.surfaces.paved_m],
-    ['chemin', route.surfaces.gravel_m],
-    ['sentier', route.surfaces.trail_m],
+    ['paved', route.surfaces.paved_m],
+    ['gravel', route.surfaces.gravel_m],
+    ['trail', route.surfaces.trail_m],
   ]
     .filter(([, m]) => m / total > 0.05)
-    .map(([label, m]) => `${Math.round((m / total) * 100)} % ${label}`)
+    .map(([key, m]) => `${Math.round((m / total) * 100)} % ${surfaceLabel(key)}`)
   return parts.join(' · ') || '—'
 }
