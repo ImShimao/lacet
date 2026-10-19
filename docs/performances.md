@@ -168,7 +168,10 @@ connexions TLS, et des lots à moitié vides. Tous les points partent maintenant
 ensemble, et une recherche relancée après un changement de filtre ne repaie plus
 rien (4,75 s → 0,01 s).
 
-**Terrain Tiles d'AWS feraient un secours hors ligne honnête, au zoom 12.**
+**Terrain Tiles d'AWS donnent l'altitude hors ligne, au zoom 12.** Elles
+passent après l'IGN et avant Valhalla, mais seulement celles déjà sur le
+téléphone : elles partent avec la carte gardée d'un parcours (voir
+`guidage.md`).
 Mesuré le 19 octobre 2026 (`scripts/terrain_tiles.py`) sur douze boucles de
 5 à 15 km autour de Guebwiller et de Soultz, contre l'IGN tous les 50 m : 3,5 m
 d'écart moyen par point (p95 13 m, biais +1,4 m), et un D+ à −1 % au total,

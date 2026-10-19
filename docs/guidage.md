@@ -231,6 +231,14 @@ geste est **explicite, parcours par parcours** : garder automatiquement les
 quarante favoris remplirait le téléphone à l'insu de tout le monde, souvent sur
 des données mobiles.
 
+**Le relief part avec la carte.** Sans réseau, l'IGN ne répond plus, et une
+boucle cherchée dehors n'avait plus de D+. Garder la carte d'un parcours garde
+aussi ses tuiles d'altitude (Terrain Tiles d'AWS, Mapzen / Copernicus EU-DEM, au
+zoom 12), une de plus tout autour : environ un mégaoctet, de quoi chercher
+d'autres boucles alentour. Le moteur les lit quand l'IGN se tait, au réglage
+grossier du D+ (−1 % au total contre l'IGN), et ne range pas ces altitudes dans
+son cache : le réseau revenu, l'IGN reprend la main.
+
 Trois choses ont été apprises en mesurant, et chacune a changé le code :
 
 **Le zoom 14 suffit — pour les fonds vectoriels.** La source CARTO déclare

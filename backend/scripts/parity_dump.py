@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from app import service  # noqa: E402
 from app.models import LoopRequest  # noqa: E402
-from app.elevation import Relief  # noqa: E402
+from app.elevation import Relief, terrain_values  # noqa: E402
 from app.osm.extract import read as read_extract, to_cache  # noqa: E402
 from app.osm.overpass import fetch_area  # noqa: E402
 from app.solar import is_night  # noqa: E402
@@ -211,6 +211,23 @@ def solar_table() -> list:
     return rows
 
 
+def fake_tile(z: int, x: int, y: int) -> list[list[float]]:
+    """Une tuile terrarium artificielle : des entiers, donc exacte en JavaScript."""
+    return [
+        [((x * 256 + i) * 37 + (y * 256 + j) * 101) % 997 * 0.25 + 150 for i in range(256)]
+        for j in range(256)
+    ]
+
+
+def terrain_table() -> list:
+    """L'altitude lue dans les tuiles en quelques points, dont certains à cheval
+    sur deux ou quatre tuiles : la projection et l'interpolation de
+    `terrain_values`, que le moteur JavaScript refait à l'identique."""
+    points = [(7.2108 + k * 0.0137, 47.9097 - k * 0.0091) for k in range(40)]
+    points += [(7.03125, 47.98992), (-0.0001, 0.0001), (151.21, -33.87)]
+    return [[lon, lat, z] for (lon, lat), z in zip(points, terrain_values(points, fake_tile))]
+
+
 def first_gap(old, new, path: str = "") -> str | None:
     """Le premier écart entre deux oracles, à la tolérance de `parity.test.js`.
 
@@ -258,7 +275,7 @@ async def main() -> None:
         )
         results.append(result)
 
-    oracle = {"cases": results, "solar": solar_table()}
+    oracle = {"cases": results, "solar": solar_table(), "terrain": terrain_table()}
     if check:
         # Un changement du moteur Python sans oracle refait : `parity.test.js`
         # comparerait alors le JavaScript à l'ancienne réponse, et resterait vert.

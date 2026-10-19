@@ -15,9 +15,8 @@ rues (`tilestore.js`, 250 Mo ≈ trois fois l'Alsace) est taillé pour garder �
 en pesant un échantillon tiré au hasard à chaque zoom.
 
 Les tuiles sont gardées dans `.cache/terrarium/` : le second passage ne
-redemande que ce qui manque. Le PNG est décodé à la main (zlib et les cinq
-filtres de ligne) pour ne pas ajouter Pillow aux dépendances d'un serveur qui
-n'en a pas besoin.
+redemande que ce qui manque. Le PNG est décodé par `app.elevation`, qui lit ces
+mêmes tuiles quand le réseau manque.
 """
 
 from __future__ import annotations
@@ -27,9 +26,7 @@ import logging
 import math
 import random
 import statistics
-import struct
 import sys
-import zlib
 from pathlib import Path
 
 import httpx
@@ -39,19 +36,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import settings  # noqa: E402
 from app.elevation import (  # noqa: E402
     BATCH,
+    TERRAIN_DIR,
+    TERRAIN_URL,
     Relief,
     _cache,
     _ign_batch,
     _round,
     ascent_descent,
     shape_relief,
+    terrarium_grid,
 )
 from app.geo import resample  # noqa: E402
 from app.models import ElevationPref, LoopRequest  # noqa: E402
 from app.service import plan_loops  # noqa: E402
 
-URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-CACHE = settings.cache_dir / "terrarium"
+URL = TERRAIN_URL
+# Le dossier où le moteur lit ses tuiles sans réseau : celles de la mesure
+# servent ensuite au moteur de référence.
+CACHE = TERRAIN_DIR
 ZOOMS = (12, 13, 14)
 STEP_M = settings.elevation_sample_m
 
@@ -72,49 +74,6 @@ ECHANTILLON = 40  # tuiles pesées par zoom
 
 
 # --- tuiles terrarium -------------------------------------------------------
-
-
-def decode_png(data: bytes) -> list[bytearray]:
-    """Les lignes RGB d'un PNG 8 bits sans entrelacement, filtres défaits."""
-    assert data[:8] == b"\x89PNG\r\n\x1a\n", "pas un PNG"
-    pos, idat = 8, b""
-    width = height = channels = 0
-    while pos < len(data):
-        length, kind = struct.unpack(">I4s", data[pos : pos + 8])
-        body = data[pos + 8 : pos + 8 + length]
-        if kind == b"IHDR":
-            width, height, depth, color, _c, _f, interlace = struct.unpack(">IIBBBBB", body)
-            assert depth == 8 and interlace == 0 and color in (2, 6), "PNG inattendu"
-            channels = 3 if color == 2 else 4
-        elif kind == b"IDAT":
-            idat += body
-        pos += 12 + length
-    raw = zlib.decompress(idat)
-    stride = width * channels
-    rows: list[bytearray] = []
-    prev = bytearray(stride)
-    for y in range(height):
-        start = y * (stride + 1)
-        kind, line = raw[start], bytearray(raw[start + 1 : start + 1 + stride])
-        for i in range(stride):
-            a = line[i - channels] if i >= channels else 0
-            b = prev[i]
-            c = prev[i - channels] if i >= channels else 0
-            if kind == 1:
-                line[i] = (line[i] + a) & 255
-            elif kind == 2:
-                line[i] = (line[i] + b) & 255
-            elif kind == 3:
-                line[i] = (line[i] + (a + b) // 2) & 255
-            elif kind == 4:
-                p = a + b - c
-                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
-        rows.append(line)
-        prev = line
-    if channels == 4:
-        rows = [bytearray(v for k, v in enumerate(r) if k % 4 != 3) for r in rows]
-    return rows
 
 
 class Tiles:
@@ -141,12 +100,7 @@ class Tiles:
     async def load(self, z: int, x: int, y: int) -> list[list[float]]:
         key = (z, x, y)
         if key not in self.grids:
-            rows = decode_png(await self.raw(z, x, y))
-            # altitude = R × 256 + G + B / 256 − 32768
-            self.grids[key] = [
-                [r[i] * 256 + r[i + 1] + r[i + 2] / 256 - 32768 for i in range(0, len(r), 3)]
-                for r in rows
-            ]
+            self.grids[key] = terrarium_grid(await self.raw(z, x, y))
         return self.grids[key]
 
     async def at(self, z: int, lon: float, lat: float) -> float:

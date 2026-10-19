@@ -30,6 +30,7 @@
 // dans l'API de cache donnait une carte téléchargée, annoncée « hors ligne ✓ »,
 // et noire une fois dehors.
 
+import { TERRAIN_ZOOM, terrainTileUrl } from './engine/environment'
 import { store } from './engine/store'
 import { load, save } from './storage'
 
@@ -67,6 +68,15 @@ const GUESS_BYTES = 150 * 1024
 // Marge autour du parcours, en tuiles. Une seule suffit : à ce zoom une tuile
 // couvre plus de deux kilomètres, donc le tour est largement pris.
 const MARGIN = 1
+
+// Le relief garde une tuile de plus tout autour du parcours : au zoom 12, elle
+// couvre six kilomètres et demi, de quoi chercher d'autres boucles alentour
+// sans réseau (une recherche de quinze kilomètres en lit six). Mesuré le 19
+// octobre 2026 : une centaine de kilooctets la tuile, un mégaoctet la zone —
+// hors du plafond des fonds de carte, qu'il ne mérite pas d'entamer. Au-delà de
+// ce nombre, un parcours aberrant ou continental, on s'en passe.
+const RELIEF_MARGIN = 1
+const MAX_RELIEF_TILES = 100
 
 // Plages de glyphes à prendre. 0–255 couvre l'ASCII et le latin-1 — donc les
 // accents français ; 256–511 le latin étendu, pour les œ et les noms d'ailleurs.
@@ -329,11 +339,12 @@ export async function download(route, mapStyle, onProgress) {
   if (!templates.length) throw new Error("Ce fond de carte ne peut pas être gardé hors ligne.")
 
   const { levels } = tilePlan(route.geometry, templates.length)
+  const relief = reliefTiles(route.geometry)
 
   // En série plutôt qu'en rafale : ce sont des serveurs publics et gratuits, et
   // cinquante requêtes simultanées depuis chaque utilisateur seraient un abus.
   const planned =
-    shared.length + levels.reduce((n, l) => n + l.tiles.length * templates.length, 0)
+    shared.length + relief.length + levels.reduce((n, l) => n + l.tiles.length * templates.length, 0)
   let done = 0
 
   async function take(urls) {
@@ -376,6 +387,11 @@ export async function download(route, mapStyle, onProgress) {
       maxZoom = level.z
     }
   }
+
+  // Le relief, pour que le D+ d'une boucle cherchée ici sans réseau reste connu :
+  // le moteur lit ces tuiles dans le même magasin (`environment.js`).
+  bytes += (await take(relief)).bytes
+  urls.push(...relief)
   onProgress?.(1)
 
   const journal = load().offlineMaps || {}
@@ -394,6 +410,18 @@ export async function download(route, mapStyle, onProgress) {
   forgetStored()
 
   return { bytes, maxZoom }
+}
+
+/** Les tuiles d'altitude (Terrain Tiles, zoom 12) autour d'un parcours. */
+export function reliefTiles(geometry) {
+  if (!geometry?.length) return []
+  const r = rangeAt(boundsOf(geometry), TERRAIN_ZOOM, RELIEF_MARGIN)
+  if (countAt(r) > MAX_RELIEF_TILES) return []
+  const urls = []
+  for (let x = r.x0; x <= r.x1; x += 1) {
+    for (let y = r.y0; y <= r.y1; y += 1) urls.push(mapKey(terrainTileUrl(x, y)))
+  }
+  return urls
 }
 
 const entryFor = (route) => (load().offlineMaps || {})[keyOf(route)] || null

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { Wind, isNight } from './environment'
+import { Wind, isNight, terrainValues } from './environment'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { pymod, pySum } from './py'
@@ -144,6 +144,25 @@ describe('le calcul jour / nuit', () => {
   it('bascule aux mêmes heures que Python, partout sur le globe', () => {
     const faux = expected.solar.filter(([lat, lon, iso, night]) => isNight(lat, lon, new Date(iso)) !== night)
     expect(faux.slice(0, 5)).toEqual([])
+  })
+})
+
+describe('l’altitude lue dans les tuiles gardées', () => {
+  // Même tuile artificielle que `fake_tile` en Python : des entiers, exacts.
+  const fakeTile = (z, x, y) => {
+    const grid = new Float64Array(256 * 256)
+    for (let j = 0; j < 256; j += 1) {
+      for (let i = 0; i < 256; i += 1) grid[j * 256 + i] = pymod((x * 256 + i) * 37 + (y * 256 + j) * 101, 997) * 0.25 + 150
+    }
+    return grid
+  }
+
+  it('projette et interpole comme Python, même à cheval sur quatre tuiles', () => {
+    const got = terrainValues(
+      expected.terrain.map(([lon, lat]) => [lon, lat]),
+      fakeTile,
+    )
+    expect(firstDifference(got, expected.terrain.map(([, , z]) => z), 'terrain')).toBeNull()
   })
 })
 
