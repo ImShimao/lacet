@@ -1,143 +1,157 @@
-<p align="center">
-  <img src="docs/images/icone.png" width="104" alt="">
-</p>
+<div align="center">
 
-<h1 align="center">Lacet</h1>
+<img src="docs/images/icone.png" width="104" alt="Icône de Lacet : un lacet violet qui fait une boucle">
 
-<p align="center">
-  <b>Des boucles de course qui reviennent à ta porte — sans longer la nationale.</b>
-</p>
+# Lacet
 
-<p align="center">
-  <a href="https://github.com/ImShimao/lacet/actions/workflows/tests.yml"><img src="https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests"></a>
-  <a href="https://github.com/ImShimao/lacet/actions/workflows/ios.yml"><img src="https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main" alt="Compilation de l'IPA"></a>
-  <a href="https://github.com/ImShimao/lacet/releases/latest"><img src="https://img.shields.io/badge/derni%C3%A8re_version-t%C3%A9l%C3%A9charger-8B5CF6?logo=apple&logoColor=white" alt="Dernière version"></a>
-  <img src="https://img.shields.io/badge/iOS-16.2%2B-1F1B2E?logo=apple&logoColor=white" alt="iOS 16.2 ou plus">
-  <img src="https://img.shields.io/badge/installation-AltStore-1F1B2E" alt="Installation par AltStore">
-</p>
+[![Télécharger l'IPA](https://img.shields.io/badge/T%C3%A9l%C3%A9charger-derni%C3%A8re%20IPA-7c3aed?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa)
+[![Installer avec AltStore](https://img.shields.io/badge/Installer-AltStore-1F1B2E?style=for-the-badge)](#installation-)
 
-<p align="center">
-  <a href="https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa"><b>Télécharger l'IPA</b></a>
-  ·
-  <a href="#linstaller">Guide d'installation</a>
-  ·
-  <a href="docs/README.md">Documentation</a>
-</p>
+[![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
+[![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
+[![1068 tests](https://img.shields.io/badge/tests-1068%20%E2%9C%93-4ade80)](#tests-)
+[![Capacitor 8](https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+[![MapLibre 5](https://img.shields.io/badge/MapLibre_GL-5-396CB2)](https://maplibre.org/)
+[![iOS 15+](https://img.shields.io/badge/iPhone-iOS%2015%2B-1F1B2E?logo=apple&logoColor=white)](#limitations-connues-)
+[![Sans serveur](https://img.shields.io/badge/serveur-aucun-lightgrey)](#comment-ça-marche-)
 
-<br>
+**Des boucles de course qui reviennent à ta porte — sans longer la nationale.**
+Tu donnes une distance, Lacet propose des boucles notées A, B ou C sur leur
+sécurité, puis te guide à la voix, écran verrouillé.
 
-<p align="center">
-  <img src="docs/images/1-depart.png" width="190" alt="Le départ choisi à Annecy, au bord du lac, les rues du coin prêtes">
-  &nbsp;
-  <img src="docs/images/2-boucles.png" width="190" alt="Une boucle de 9,6 km notée A, dessinée sur la carte">
-  &nbsp;
-  <img src="docs/images/3-detail.png" width="190" alt="Le détail de la boucle : profil de dénivelé, part protégée, exposition au trafic">
-  &nbsp;
-  <img src="docs/images/4-filtres.png" width="190" alt="Les filtres : course ou vélo, distance ou durée, allure">
-</p>
+[**⬇️ Télécharger**](https://github.com/ImShimao/lacet/releases/latest) ·
+[**📖 Documentation**](docs/README.md) ·
+[**🐛 Signaler un bug**](https://github.com/ImShimao/lacet/issues/new)
 
-<p align="center"><sub>Choisir le départ · recevoir des boucles notées · lire le détail · régler la sortie</sub></p>
+</div>
 
-<br>
+---
 
-Tu sors courir 10 km. Tu ne veux pas réfléchir à l'itinéraire, tu ne veux pas
-finir sur un bas-côté à 80 km/h, et tu veux revenir chez toi. Lacet fait ça :
-tu donnes une distance, il propose des boucles, il te dit lesquelles sont sûres,
-et il te guide à la voix pendant que tu cours.
+## Aperçu 📸
 
-## Ce qu'il fait
+<div align="center">
 
-- **Des boucles, pas des allers-retours.** Jusqu'à douze propositions par
-  recherche, dans des directions différentes, à la distance demandée — 10 km,
-  un semi au mètre près, ou une durée.
-- **Une note de sécurité, A, B ou C.** Chaque tronçon est jugé : vitesse de la
-  voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées. Ce
-  qui ne passe pas le contrôle est écarté, et l'app dit pourquoi.
-- **Un guidage comme un GPS.** La carte suit ta course, le prochain virage
-  s'affiche en grand, et la voix l'annonce en baissant ta musique — écran
-  verrouillé aussi, avec une activité en direct.
-- **Un nouveau chemin si tu t'écartes.** Un virage raté, une rue barrée : il
-  recalcule depuis là où tu es, sur le téléphone, en tenant la distance prévue.
-- **Sans réseau.** Les rues d'Alsace sont livrées avec l'app ; ailleurs, elles
-  se téléchargent une fois et restent, comme le fond de carte de tes parcours.
-- **Ce que tu as couru.** Distance, allure, temps au kilomètre, dénivelé, ta
-  trace réelle — exportable en GPX pour une montre ou Strava.
-- **Course ou vélo**, pause automatique aux feux, points d'eau le long du
-  tracé, départs enregistrés, bouton SOS qui prépare un SMS avec ta position.
-- **Rien ne part.** Pas de compte, pas de serveur, pas de suivi : tout se
-  calcule et se garde sur le téléphone.
+| Les boucles proposées | En course |
+| :---: | :---: |
+| <img src="docs/images/1-boucles.png" width="300" alt="Une boucle de 10,2 km au départ d'Annecy, notée A, tracée en vert sur la carte sombre, les autres propositions en pointillés"> | <img src="docs/images/2-course.png" width="300" alt="Pendant la sortie : « 190 m, tourne à gauche dans la rue de la République » en bandeau violet, la carte inclinée, le chrono et l'allure en bas"> |
 
-Le détail, et le pourquoi de chaque choix : [Ce que fait Lacet](docs/fonctionnalites.md).
+| Le détail | Le survol 3D | Les filtres | Les réglages |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/images/3-detail.png" width="200" alt="Le détail d'une boucle : revêtement, profil de dénivelé coloré par sécurité, feuille de route de 57 consignes"> | <img src="docs/images/4-survol.png" width="200" alt="Le survol 3D : une pastille violette court sur la boucle inclinée, avec 3,6 km et 519 m d'altitude en haut"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Pendant la sortie : pause automatique, écran toujours allumé, ce que dit la voix à chaque kilomètre"> |
 
-## L'installer
+</div>
 
-Lacet n'est pas sur l'App Store : il se compile tout seul sur GitHub, à chaque
-envoi sur `main` et chaque lundi avec les rues de la semaine, et s'installe avec
-[AltStore](https://altstore.io) — pas besoin de Mac.
+---
 
-**Ce qu'il faut :** un iPhone sous iOS 16.2 ou plus, un PC sur le même Wi-Fi, et
-un identifiant Apple — un compte gratuit suffit.
+<a id="linstaller"></a>
 
-1. **AltServer sur le PC.** Télécharge-le sur [altstore.io](https://altstore.io).
-   Sous Windows, iTunes et iCloud doivent venir du site d'Apple, pas du
-   Microsoft Store.
-2. **AltStore sur l'iPhone.** iPhone branché au PC, clique sur l'icône
-   d'AltServer dans la barre des tâches → *Install AltStore* → ton iPhone.
-3. **La dernière version de Lacet**, posée à la racine du dépôt :
+## Installation ⬇️
+
+Lacet n'est pas sur l'App Store. Un Mac de GitHub compile l'IPA à chaque envoi
+sur `main` qui touche l'app, et chaque lundi avec les rues de la semaine ; elle
+s'installe avec [AltStore](https://altstore.io), sans Mac.
+
+**Ce qu'il faut :** un iPhone sous iOS 15 ou plus (16.2 pour l'écran de
+verrouillage), un PC Windows sur le même Wi-Fi, et un identifiant Apple — un
+compte gratuit suffit.
+
+1. **AltServer sur le PC**, depuis [altstore.io](https://altstore.io). iTunes et
+   iCloud doivent venir du site d'Apple, pas du Microsoft Store.
+2. **AltStore sur l'iPhone.** iPhone branché, icône d'AltServer dans la barre des
+   tâches → *Install AltStore* → ton iPhone.
+3. **La dernière IPA**, posée à la racine du dépôt :
 
    ```bash
    gh release download --repo ImShimao/lacet --pattern Lacet.ipa --clobber
    ```
 
-   Ou le lien [Télécharger l'IPA](https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa),
-   et chaque version a sa page dans [Releases](https://github.com/ImShimao/lacet/releases).
-4. **La source AltStore.** Le PC prépare le dossier `altstore/`, puis le sert sur
-   le réseau local — ce dossier-là seulement :
+4. **La source AltStore.** Le script prépare le dossier `altstore/` (source, IPA
+   versionnée, icône), et `--autostart` le fait servir sur le port 8765 à chaque
+   ouverture de session Windows, sans fenêtre :
 
    ```bash
    python scripts/altstore_source.py
    ```
 
    ```bash
-   python -m http.server 8765 --directory altstore
+   python scripts/altstore_source.py --autostart
    ```
 
    Sur l'iPhone : **AltStore → Sources → +** → l'adresse que le script affiche
-   (`http://<adresse du PC>:8765/source.json`) → **Lacet → Installer**. Pour que
-   le PC la serve tout seul à chaque démarrage :
+   (`http://<adresse du PC>:8765/source.json`) → **Lacet → Installer**.
+5. **Faire confiance au profil** : **Réglages → Général → VPN et gestion de
+   l'appareil** → ton identifiant → **Faire confiance**, puis **Confidentialité
+   et sécurité → Mode développeur** → activer, et redémarrer.
 
-   ```bash
-   python scripts/altstore_source.py --autostart
-   ```
-5. **Faire confiance au profil.** **Réglages → Général → VPN et gestion de
-   l'appareil** → ton identifiant → **Faire confiance**, puis **Confidentialité et
-   sécurité → Mode développeur** → activer, et redémarrer.
+Au premier lancement, accepte la position — **« Toujours »** quand iOS le
+propose : c'est elle qui suit la sortie écran verrouillé — et les mouvements,
+pour que le baromètre mesure le dénivelé.
 
-Au premier lancement, accepte la position — **« Toujours »** si iOS le propose :
-c'est elle qui suit la sortie écran verrouillé — et les mouvements, pour que le
-baromètre mesure le dénivelé.
+**Mettre à jour :** refais l'étape 3, puis `python scripts/altstore_source.py`,
+et AltStore propose **Mettre à jour**.
 
-**Mettre à jour.** Une nouvelle version remplace `Lacet.ipa` (étape 3), le
-script refait la source (étape 4), et AltStore propose **Mettre à jour**.
+> [!NOTE]
+> L'IPA n'est pas signée. C'est AltStore qui la signe, avec ton identifiant
+> Apple, au moment de l'installer. Elle est compilée sur GitHub depuis ce dépôt,
+> par `.github/workflows/ios.yml`, et rien d'autre.
 
-**Bon à savoir**
+> [!IMPORTANT]
+> **AltStore, pas Sideloadly.** Sideloadly signe l'app mais pas son extension, qui
+> dessine l'écran de verrouillage : iOS l'ignore, et l'écran reste noir, sans un
+> message. **Mon compte → Pendant la sortie** vérifie les cinq conditions d'une
+> activité en direct et dit laquelle manque.
 
-- Avec un compte Apple gratuit, l'app expire au bout de **7 jours** ; AltStore la
-  renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi.
-- Trois apps actives au plus, et l'écran de verrouillage en compte une : Lacet en
-  prend deux.
-- **AltStore, pas Sideloadly** : Sideloadly ne signe pas l'extension qui dessine
-  l'écran de verrouillage, et celui-ci reste noir, sans un message.
-- Écran de verrouillage vide ? **Mon compte → Pendant la sortie** vérifie les
-  cinq conditions et dit laquelle manque.
+Le détail : [L'app iPhone](docs/app-iphone.md).
 
-Tout le détail : [L'app iPhone](docs/app-iphone.md).
+---
 
-## Comment ça marche
+## Fonctionnalités ✨
 
-Tout tourne sur le téléphone : une interface React et MapLibre emballée par
-Capacitor, et un moteur JavaScript qui s'exécute dans un *worker*. Rien à
-héberger, rien à payer, aucune clé d'API.
+| | |
+| --- | --- |
+| 🔁 **Des boucles** | Jusqu'à douze propositions qui partent dans des directions différentes et reviennent à la porte : 10 km, un semi au mètre près, ou une durée |
+| 🛡️ **Note A, B ou C** | Chaque tronçon est jugé : vitesse de la voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées. Ce qui ne passe pas est écarté, et l'app dit pourquoi |
+| 📈 **Bande de parcours** | Profil et sécurité sur le même axe : savoir qu'il y a 200 m d'exposition ne sert à rien tant qu'on ignore *où* |
+| 🗣️ **Guidage vocal** | Chaque virage annoncé deux fois, à l'avance puis au moment d'agir, en baissant la musique le temps de parler — écran verrouillé aussi |
+| 🔒 **Écran de verrouillage** | Une activité en direct garde la consigne, sa distance et l'heure d'arrivée lisibles, Dynamic Island comprise |
+| 🧭 **Recalcul** | Vingt secondes hors du tracé, et un nouveau chemin part d'où tu es, calculé sur le téléphone, en tenant la distance prévue plutôt qu'en ramenant au plus près |
+| 📴 **Sans réseau** | Les rues d'Alsace sont livrées avec l'app ; ailleurs, elles se téléchargent une fois et restent. Le fond de carte se garde parcours par parcours |
+| 🌳 **Parcs et bords de l'eau** | À sécurité égale, les boucles préfèrent les parcs, les bois, l'eau et les sentiers balisés — sans rien céder sur la note |
+| 🌬️ **Vent et relief** | Le dernier tiers se court vent dans le dos quand il souffle à plus de 12 km/h ; plat, vallonné, côtes ou un D+ précis se choisit dans les filtres, et le moteur va chercher le bon terrain |
+| 📍 **Passer par un point** | Un parc, une fontaine : toutes les boucles y passent, notées comme les autres |
+| 🚫 **Zone à éviter** | Un cercle de 100 m à 2 km que les boucles et le recalcul contournent, gardé d'une recherche à l'autre |
+| 🎥 **Survol 3D** | La boucle survolée sur le relief avant de partir, dix-sept secondes pour 10 km |
+| 🏁 **Ce que tu as couru** | Distance, allure, dénivelé, ta trace réelle, exportée en GPX horodaté pour une montre ou Strava |
+| 💧 **Points d'eau** | Ceux qui bordent la boucle s'affichent, et la voix prévient cent mètres avant |
+| 🆘 **SOS** | Un bouton prépare un SMS avec ta position ; un proche peut recevoir l'heure prévue du retour |
+| 🚴 **Course ou vélo** | Allure en min/km ou vitesse en km/h, pause automatique aux feux ; à vélo, la voix donne les kilomètres tous les 5 km |
+| 🙈 **Rien ne part** | Pas de compte, pas de serveur, pas de suivi : favoris, sorties et réglages restent sur le téléphone |
+
+### Les gestes sur la carte 👆
+
+La carte occupe tout l'écran ; presque tout se fait au doigt, dessus.
+
+| Geste | Effet |
+| --- | --- |
+| Glisser le repère violet | Déplacer le départ |
+| Appui long | Poser un fanion : les boucles passent par ce point |
+| Cercle hachuré, puis toucher | Poser le centre d'une zone à éviter ; glisser sa poignée la déplace |
+| Toucher une boucle en pointillés | La mettre en avant |
+| Toucher la carte de parcours | Déplier le détail ; la poignée grise le replie |
+| Parcourir la bande du doigt | Allumer le point correspondant sur la carte |
+| En course : tourner ou déplacer la carte | La libérer du suivi ; **Recentrer** la reprend, pincer ne libère rien |
+| Pendant le survol 3D : toucher | Pause, puis reprise ; glisser l'arrête |
+
+**Terminer** n'apparaît qu'en pause : un doigt qui glisse n'arrête pas la sortie.
+
+---
+
+## Comment ça marche 🔧
+
+**Tout tourne sur le téléphone.** L'interface est une page React et MapLibre
+emballée par Capacitor ; le moteur, en JavaScript, s'exécute dans un *worker*
+pour ne pas figer la carte. Il va chercher lui-même les rues, l'altitude à
+l'IGN et le vent chez Open-Meteo. Rien à héberger, aucune clé d'API.
 
 ```mermaid
 flowchart LR
@@ -149,48 +163,200 @@ flowchart LR
   E --> G["Guidage vocal<br/>écran verrouillé · recalcul"]
 ```
 
-Le moteur JavaScript est le portage d'une **référence en Python** (`backend/`),
-où chaque seuil est justifié et testé. À chaque envoi, la CI exige des deux le
-même graphe, les mêmes candidats arête par arête et la même réponse, à 1e-9
-près : un portage subtilement faux proposerait un « A » là où il faudrait un
-« C », et rien à l'écran ne le montrerait.
+**Un moteur de référence en Python** (`backend/`) garde la justification et le
+test de chaque seuil. Le moteur JavaScript en est le portage, et la CI exige des
+deux, sur 13 cas figés, le même graphe, les mêmes candidats arête par arête et
+la même réponse, à 1e-9 près. Un portage subtilement faux proposerait un « A »
+là où il faudrait un « C », et rien à l'écran ne le montrerait. D'où
+`engine/py.js`, qui reproduit l'arithmétique de CPython jusqu'au modulo flottant
+et à l'arrondi au pair.
+
+**L'IPA se compile sur un Mac de GitHub**, parce que Xcode n'existe que sur
+macOS. Le dossier `ios/` n'est pas versionné : il est régénéré à chaque fois,
+et tout ce qui distingue Lacet d'un projet Capacitor vierge tient dans
+`frontend/ios-overlay/`. L'IPA part dans une publication `v1.0.<n>` plutôt
+qu'en artefact : sur un dépôt privé, ceux-ci ont un quota de 500 Mo que six
+compilations remplissaient.
+
+<details>
+<summary><b>Architecture du code</b></summary>
 
 ```
-frontend/              l'app : React + MapLibre, et le moteur (src/engine/)
-frontend/ios-overlay/  ce qui distingue Lacet d'un projet Capacitor vierge
-backend/               le moteur de référence, en Python
-docs/                  la documentation, section par section
-.github/workflows/     les tests sur Linux, l'IPA sur un Mac de GitHub
+frontend/
+├── src/                     L'interface React, à plat : écrans, hooks use*.js
+│   ├── App.jsx              Le départ, les propositions, les onglets
+│   ├── MapView.jsx          La carte : tracés, zones à éviter, survol 3D
+│   ├── LiveRun.jsx          La sortie : consignes, voix, hors-parcours
+│   ├── native.js            Le pont vers l'iPhone : GPS, voix, activité en direct
+│   ├── styles/NN-*.css
+│   └── engine/              Le moteur, dans un worker (worker.js, appelé par client.js)
+│       ├── overpass.js, archive.js, tilestore.js, region.js   Les rues
+│       ├── graph.js, weights.js, dijkstra.js                  Le graphe et son coût
+│       ├── loops.js, safety.js, service.js                    Les boucles, leur note (planLoops)
+│       ├── reroute.js, navigation.js, matcher.js              Recalcul, consignes, suivi
+│       ├── py.js                                              L'arithmétique de CPython
+│       └── parity.test.js                                     Le JS face à la référence
+├── ios-overlay/
+│   ├── customize.py         Autorisations, GPS et voix en arrière-plan, session audio
+│   ├── add_live_activity.rb Greffe l'extension de l'écran verrouillé au projet Xcode
+│   └── live-activity/       L'extension, et les plugins Swift : voix, baromètre, boussole
+└── scripts/                 Rues de la région, mesure des boucles, icônes
+backend/
+├── app/                     Le moteur de référence : osm/, routing/, safety/,
+│                            elevation.py, wind.py, solar.py, service.py (plan_loops)
+├── tests/                   368 tests sur des damiers synthétiques
+└── scripts/                 parity_dump.py (l'oracle), smoke.py (essai réel)
+scripts/altstore_source.py   Prépare et fait servir la source AltStore
+docs/                        La documentation, un fichier par thème
+.github/workflows/           tests.yml (Linux, à chaque envoi) · ios.yml (l'IPA, sur macOS)
 ```
 
-Plus de détails : [Comment c'est fait](docs/architecture.md),
+Le détail : [Comment c'est fait](docs/architecture.md),
 [La sécurité](docs/securite.md), [La génération des boucles](docs/generation.md).
 
-## Développer
+</details>
+
+---
+
+## Limitations connues ⚠️
+
+* **L'app ne garantit pas la sécurité.** Elle privilégie les voies protégées
+  d'après OpenStreetMap, dont les données peuvent être incomplètes ou dépassées,
+  et un chantier peut apparaître. L'interface le dit, et doit continuer à le dire.
+* **iPhone seulement, en portrait.** Sur iPad, iOS l'ouvre en mode iPhone. Rien
+  pour Android.
+* **Avec un compte Apple gratuit, l'app expire au bout de 7 jours.** AltStore la
+  renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi. Trois apps
+  actives au plus, et l'extension en compte une : Lacet en prend deux. Seul un
+  compte développeur payant (99 € par an) supprimerait le renouvellement.
+* **Pas d'Apple Santé.** AltStore ne signe l'app qu'avec les autorisations de son
+  profil, et HealthKit refuserait tout sans erreur visible. L'envoi direct vers
+  Strava a été retiré : exporte la sortie en GPX, puis importe-la sur le site de
+  Strava (« Téléverser une activité »).
+* **Les rues livrées ne couvrent que l'Alsace et ses abords.** Les archives en
+  ligne couvrent la France, la Suisse, le Benelux, l'Autriche, le Portugal et
+  des régions d'Allemagne, d'Italie et d'Espagne ; ailleurs, les rues viennent
+  d'Overpass, une ressource publique partagée. Dans tous les cas, la première
+  recherche d'une zone demande du réseau.
+* **Une carte hors ligne pèse lourd en ville** : une quinzaine de mégaoctets pour
+  une boucle de 10 km en plein centre, contre un ou deux à la campagne. Un
+  plafond de 40 Mo par parcours empêche que ça dérape.
+* **Les fonds CARTO** sont gratuits pour un usage raisonnable, pas pour une app
+  distribuée à grande échelle. Les fonds Mapbox demandent une clé publique
+  (`VITE_MAPBOX_TOKEN`).
+* **L'aperçu dans un navigateur n'a ni GPS, ni voix, ni baromètre**, ni écran de
+  verrouillage : ils n'existent que dans l'app installée.
+
+La liste complète, et ce qui vient ensuite : [Limites et suite](docs/limites.md).
+
+---
+
+## Développement 🚀
+
+Prérequis : [Node.js](https://nodejs.org/) 22 (Capacitor 8 l'exige) et
+Python 3.13. Les commandes sont écrites pour Git Bash sous Windows, depuis la
+racine du dépôt.
 
 ```bash
+git clone https://github.com/ImShimao/lacet.git
+cd lacet
 (cd frontend && npm install)
+(cd backend && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements-dev.txt)
 (cd frontend && npm run dev)
-(cd frontend && npm test)
-(cd backend && .venv/Scripts/python.exe -m pytest)
 ```
 
-L'aperçu tourne sur http://127.0.0.1:5173, à taille de téléphone — sans GPS ni
-voix, qui n'existent que dans l'app. Node 22 ou plus. L'environnement Python,
-l'aperçu dans VS Code et la parité des deux moteurs : [Développer](docs/developper.md).
+L'aperçu tourne sur http://127.0.0.1:5173. Ouvre-le à taille de téléphone
+(390 × 844) : l'app n'a qu'une mise en page, celle de l'iPhone tenu droit.
 
-## Documentation
+### Tests 🧪
 
-- [Ce que fait Lacet](docs/fonctionnalites.md) · [L'interface et les réglages](docs/interface.md) — ce qui se voit, et ce qui se règle
-- [La sécurité](docs/securite.md) · [La génération des boucles](docs/generation.md) — comment un tronçon est jugé, comment les boucles naissent
-- [Le guidage et la sortie](docs/guidage.md) · [L'app iPhone](docs/app-iphone.md) — les consignes, le hors-parcours, ce que le natif ajoute
-- [Comment c'est fait](docs/architecture.md) · [Performances](docs/performances.md) — l'architecture, et ce qu'elle coûte
-- [Développer](docs/developper.md) · [Limites et suite](docs/limites.md) — travailler sur le projet, et ce qu'il ne sait pas faire
+Les tests sont à côté du code (`foo.js` → `foo.test.js`) côté app, dans
+`backend/tests/` côté Python. GitHub relance les deux suites, l'oracle de parité
+et le build à chaque envoi (`.github/workflows/tests.yml`).
 
-## Données et crédits
+| Commande | Couverture |
+| --- | --- |
+| `(cd frontend && npm test)` | 700 tests, 64 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
+| `(cd frontend && npx vitest run src/engine/parity.test.js)` | Le JavaScript face à Python sur 13 cas figés : même graphe, mêmes candidats, même réponse à 1e-9 près |
+| `(cd backend && .venv/Scripts/python.exe -m pytest)` | 368 tests, 15 fichiers, hors ligne et déterministes |
+| `(cd backend && .venv/Scripts/python.exe scripts/parity_dump.py --check)` | Dit, sans rien écrire, si l'oracle de parité est à jour |
+| `(cd backend && .venv/Scripts/python.exe -X utf8 scripts/smoke.py annecy 8)` | Essai réel : appelle OpenStreetMap, montre les boucles retenues **et** celles écartées, avec leur motif |
 
-Rues © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright)
-(ODbL), servies par Overpass et les archives de
-[lacet-data](https://github.com/ImShimao/lacet-data) · fonds de carte © CARTO,
-© OpenFreeMap, © Esri, © OpenTopoMap · altitudes IGN RGE ALTI et Valhalla
-(FOSSGIS) · recherche de lieux Photon (Komoot) et Nominatim · vent Open-Meteo.
+Changer un calcul partagé, c'est modifier Python **et** JavaScript, relancer
+`scripts/parity_dump.py` (sans `--check`) pour refaire l'oracle, puis
+`parity.test.js`. Un oracle oublié fait échouer la CI.
+
+### Compiler 📦
+
+```bash
+(cd frontend && npm run build)
+```
+
+Le dossier `frontend/dist/`, que Capacitor emballe. L'IPA, elle, ne se compile
+que sur GitHub — à chaque envoi sur `main` qui touche `frontend/`, ou à la
+demande :
+
+```bash
+gh workflow run ios.yml
+```
+
+```bash
+gh run list --workflow ios.yml
+```
+
+Une compilation prend de trois à dix minutes, tests compris, et pose l'IPA dans
+la publication `v1.0.<numéro de compilation>`.
+
+<details>
+<summary><b>Pièges connus</b></summary>
+
+* **Servir `altstore/`, jamais la racine du dépôt.** Servie telle quelle, elle
+  livrait à tout le Wi-Fi le dossier `.git` et le moindre `.env`. Si
+  `--autostart` n'est pas posé, sers le dossier à la main :
+  `python -m http.server 8765 --directory altstore`.
+* **Un serveur lancé depuis un terminal meurt avec lui**, et « Mettre à jour »
+  échoue alors sur une simple erreur réseau. C'est pour ça que `--autostart`
+  pose un lanceur dans le dossier Démarrage de Windows.
+* **« The downloaded version does not match the version specified by the
+  source »** : la version annoncée doit être exactement le
+  `CFBundleShortVersionString` de l'IPA. Le script la lit dans le paquet ; ne la
+  retouche pas à la main.
+* **L'aperçu lit d'autres rues que l'app** quand `frontend/public/region/` manque
+  ou date : ce dossier n'est pas versionné. Reprends celui de la dernière IPA :
+  `unzip -o -j Lacet.ipa 'Payload/Lacet.app/public/region/*' -d frontend/public/region`
+* **`smoke.py` plante sous Git Bash** sur `UnicodeEncodeError` sans `-X utf8` :
+  sa sortie contient des caractères que la page de code de Windows ne connaît pas.
+* **Une compilation verte ne prouve pas l'écran de verrouillage.** `ios.yml`
+  vérifie donc sur le paquet construit que l'extension est rattachée à l'app,
+  porte sa version, et que l'Info.plist déclare les activités en direct.
+
+</details>
+
+---
+
+## Contribuer 🤝
+
+Le dépôt est privé : les retours passent par une
+[issue](https://github.com/ImShimao/lacet/issues) ou une pull request, pour qui y
+a accès.
+
+Avant de proposer une PR, vérifie que `npm test`, `pytest` et
+`parity_dump.py --check` passent. Les commentaires, les tests et les messages
+de commit sont en français, les identifiants en anglais ; un message de commit
+dit l'effet visible (« La voix dit « troisième kilomètre », pas « ce
+kilomètre » »).
+
+---
+
+<div align="center">
+
+Sans licence publiée : tous droits réservés · Fait avec React, MapLibre et
+[Capacitor](https://capacitorjs.com/) par [**ImShimao**](https://github.com/ImShimao)
+
+<sub>Rues © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL),
+servies par Overpass et [lacet-data](https://github.com/ImShimao/lacet-data) ·
+fonds de carte © CARTO, © OpenFreeMap, © Esri, © OpenTopoMap · altitudes IGN RGE ALTI
+et Valhalla (FOSSGIS) · relief Mapzen / Copernicus EU-DEM · recherche de lieux Photon
+(Komoot) et Nominatim · vent Open-Meteo</sub>
+
+</div>
