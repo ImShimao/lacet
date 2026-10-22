@@ -156,8 +156,9 @@ export function MapTools({
  * Poser une zone à éviter : toucher la carte au centre, régler le rayon, la nommer.
  *
  * La carte reste libre sous la carte de réglage — on la déplace et on zoome pour
- * viser —, et chaque toucher déplace le centre : se tromper ne coûte qu'un
- * autre toucher. Pourquoi un cercle plutôt qu'un contour : voir `zones.js`.
+ * viser —, et chaque toucher déplace le centre, tout comme glisser sa poignée :
+ * se tromper ne coûte qu'un autre geste. Pourquoi un cercle plutôt qu'un
+ * contour : voir `zones.js`.
  */
 export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
   const placed = Number.isFinite(draft.lon)
@@ -192,6 +193,7 @@ export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
             value={draft.name}
             onChange={(e) => onChange({ ...draft, name: e.target.value })}
           />
+          <p className="muted small">Fais glisser le rond du centre pour la déplacer.</p>
         </>
       ) : (
         <p className="muted small">Touche la carte au centre de ce que les boucles doivent contourner.</p>

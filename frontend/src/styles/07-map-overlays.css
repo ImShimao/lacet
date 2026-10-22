@@ -353,6 +353,27 @@
   display: block;
 }
 
+/* Le centre de la zone à éviter qu'on pose : une poignée à saisir, du rouge
+   des hachures. 34 px, la taille d'un pouce qui vise. */
+.zonepin {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #f0605a;
+  border: 2px solid #f0605a;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  cursor: grab;
+}
+.zonepin:active {
+  cursor: grabbing;
+}
+.zonepin svg {
+  display: block;
+}
+
 /* « Par ce point » : sous la recherche, ou sous la pastille d'activité quand
    elle est là. Le ✕ le retire. */
 .viapill {

@@ -63,7 +63,8 @@ des boucles qui y passent toutes. Le fanion se fait glisser ; la pastille
 « Par ce point », sous la recherche, le retire d'un ✕.
 
 **La zone à éviter** : le cercle hachuré des outils de carte efface la feuille,
-un toucher sur la carte pose le centre (un autre le déplace), un curseur règle
+un toucher sur la carte pose le centre (un autre toucher, ou glisser la poignée
+du centre, le déplace), un curseur règle
 le rayon de 100 m à 2 km, un champ la nomme. Un cercle plutôt qu'un contour
 tracé au doigt, qui se battrait avec le déplacement de la carte — voir
 `zones.js`. Ses rues pèsent comme un signalement (`engine/blocked.js`) : un mur,

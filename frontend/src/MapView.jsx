@@ -44,6 +44,9 @@ const svg = (inner) =>
   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`
 const FLAG_SVG =
   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V3.5"/><path d="M6 4.5h12l-2.6 4 2.6 4H6"/></svg>'
+// Quatre flèches : ce qu'on glisse, dans tous les sens.
+const MOVE_SVG =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>'
 const POI_SVG = {
   water: svg('<path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z"/>'),
   toilets: svg(
@@ -93,7 +96,7 @@ export default function MapView({
   const handlers = useRef({})
   handlers.current = {
     onPlace, onPickRoute, onUserMove, onFlyoverEnd, onVia, placing, placingVia, compassRef, navigate,
-    drawingZone: Boolean(zoneDraft), onZoneCenter,
+    drawingZone: Boolean(zoneDraft), onZoneCenter, zones, zoneDraft,
   }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
@@ -278,6 +281,8 @@ export default function MapView({
       startMarker.current = null
       viaMarker.current?.remove()
       viaMarker.current = null
+      zoneMarker.current?.remove()
+      zoneMarker.current = null
       liveMarker.current?.remove()
       liveMarker.current = null
       lastFocus.current = 0
@@ -391,21 +396,43 @@ export default function MapView({
   useEffect(() => {
     const m = map.current
     if (!m || !revision) return
-    const shown = navigate ? zones.filter((z) => z.on !== false) : zones
-    const features = shown.map((z) => ({
-      type: 'Feature',
-      properties: { on: z.on !== false },
-      geometry: circlePolygon([z.lon, z.lat], z.radius_m),
-    }))
-    if (zoneDraft && Number.isFinite(zoneDraft.lon)) {
-      features.push({
-        type: 'Feature',
-        properties: { on: true, draft: true },
-        geometry: circlePolygon([zoneDraft.lon, zoneDraft.lat], zoneDraft.radius_m),
-      })
-    }
-    m.getSource('zones')?.setData({ type: 'FeatureCollection', features })
+    drawZones(m, navigate ? zones.filter((z) => z.on !== false) : zones, zoneDraft)
   }, [zones, zoneDraft, navigate, revision])
+
+  // Le centre de la zone qu'on pose, à faire glisser. Une poignée plutôt que le
+  // disque entier : un disque de 2 km couvre l'écran, et le saisir empêcherait
+  // de déplacer la carte pour viser. Le cercle suit le doigt sans passer par
+  // React — un rendu de toute l'app à chaque image saccadait le glissé — et
+  // n'est confié à l'état qu'au lâcher.
+  const zoneMarker = useRef(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m || !revision) return
+    if (!zoneDraft || !Number.isFinite(zoneDraft.lon)) {
+      zoneMarker.current?.remove()
+      zoneMarker.current = null
+      return
+    }
+    if (!zoneMarker.current) {
+      const el = document.createElement('div')
+      el.className = 'zonepin'
+      el.setAttribute('role', 'img')
+      el.setAttribute('aria-label', 'Centre de la zone — fais-le glisser pour la déplacer')
+      el.innerHTML = MOVE_SVG
+      const marker = new maplibregl.Marker({ element: el, draggable: true })
+      marker.on('drag', () => {
+        const { lng, lat } = marker.getLngLat()
+        drawZones(m, handlers.current.zones, { ...handlers.current.zoneDraft, lon: lng, lat })
+      })
+      marker.on('dragend', () => {
+        const { lng, lat } = marker.getLngLat()
+        handlers.current.onZoneCenter?.({ lat, lon: lng })
+      })
+      zoneMarker.current = marker.setLngLat([zoneDraft.lon, zoneDraft.lat]).addTo(m)
+    } else {
+      zoneMarker.current.setLngLat([zoneDraft.lon, zoneDraft.lat])
+    }
+  }, [zoneDraft, revision])
 
   // --- position en direct + cercle de précision -------------------------------
   const liveMarker = useRef(null)
@@ -1090,6 +1117,23 @@ function addLayers(m) {
 }
 
 const empty = () => ({ type: 'FeatureCollection', features: [] })
+
+/** Les zones gardées, et celle qu'on pose quand son centre est choisi. */
+function drawZones(m, zones, draft) {
+  const features = zones.map((z) => ({
+    type: 'Feature',
+    properties: { on: z.on !== false },
+    geometry: circlePolygon([z.lon, z.lat], z.radius_m),
+  }))
+  if (draft && Number.isFinite(draft.lon)) {
+    features.push({
+      type: 'Feature',
+      properties: { on: true, draft: true },
+      geometry: circlePolygon([draft.lon, draft.lat], draft.radius_m),
+    })
+  }
+  m.getSource('zones')?.setData({ type: 'FeatureCollection', features })
+}
 
 // Le relief du survol : les Terrain Tiles d'AWS (Mapzen), libres et sans clé.
 // Au-delà du zoom 12, elles n'apportent rien en France (mesuré le 19 octobre
