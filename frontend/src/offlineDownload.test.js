@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MAX_BYTES, download, isStored, storedBytes, storedZoom, totalBytes } from './offlineMaps'
+import {
+  MAX_BYTES,
+  download,
+  isStored,
+  keepForRun,
+  storedBytes,
+  storedZoom,
+  totalBytes,
+} from './offlineMaps'
 
 /**
  * Le téléchargement d'une carte, et son plafond de place.
@@ -183,10 +191,89 @@ describe('quand des fichiers manquent', () => {
     expect(maxZoom).toBe(13)
   })
 
+  it('n’annonce pas une carte dont aucune tuile n’est arrivée', async () => {
+    // Sinon : « hors ligne ✓ 0 o » dans « Mes parcours », et du noir dehors.
+    reseau({ 10: 0, 11: 0, 12: 0, 13: 0, 14: 0 })
+    await expect(download(PARCOURS, STYLE)).rejects.toThrow(/Aucune tuile/)
+    expect(isStored(PARCOURS)).toBe(false)
+  })
+
   it('ne prétend pas avoir gardé un fond qu’il ne sait pas lire', async () => {
     reseau({ 10: 5e3 })
     const sansTuiles = { key: 'x', label: 'X', style: { sources: {}, layers: [] } }
     await expect(download(PARCOURS, sansTuiles)).rejects.toThrow(/ne peut pas être gardé/)
+  })
+})
+
+describe('au départ d’une sortie', () => {
+  // Le réseau tombe en forêt, là où l'on n'a jamais regardé la carte de près :
+  // le départ la garde, mais sans remplir le téléphone pour autant.
+  const PETIT = { 10: 5e3, 11: 5e3, 12: 5e3, 13: 5e3, 14: 5e3 }
+  const JOUR = 24 * 60 * 60 * 1000
+  const boucle = (n) => ({ ...PARCOURS, name: `Boucle ${n}` })
+  const requetes = () => globalThis.fetch.mock.calls.length
+
+  it('garde la carte du parcours', async () => {
+    reseau(PETIT)
+    await keepForRun(PARCOURS, STYLE)
+    expect(isStored(PARCOURS)).toBe(true)
+  })
+
+  it('ne la reprend pas tant qu’elle a moins de deux mois', async () => {
+    reseau(PETIT)
+    await keepForRun(PARCOURS, STYLE)
+    const avant = requetes()
+    await keepForRun(PARCOURS, STYLE, Date.now() + 30 * JOUR)
+    expect(requetes()).toBe(avant)
+  })
+
+  it('la reprend passé deux mois, ou sous un autre fond', async () => {
+    reseau(PETIT)
+    await keepForRun(PARCOURS, STYLE)
+    let avant = requetes()
+    await keepForRun(PARCOURS, STYLE, Date.now() + 61 * JOUR)
+    expect(requetes()).toBeGreaterThan(avant)
+
+    avant = requetes()
+    await keepForRun(PARCOURS, { ...STYLE, key: 'light', label: 'Clair' })
+    expect(requetes()).toBeGreaterThan(avant)
+  })
+
+  it('ne garde que les cinq dernières sorties', async () => {
+    reseau(PETIT)
+    for (let n = 1; n <= 6; n += 1) await keepForRun(boucle(n), STYLE, Date.now() + n * 1000)
+    expect(isStored(boucle(1))).toBe(false)
+    for (let n = 2; n <= 6; n += 1) expect(isStored(boucle(n))).toBe(true)
+  })
+
+  it('compte le rang à la dernière sortie, pas au téléchargement', async () => {
+    // La boucle courue chaque semaine ne doit pas partir avant celle d'un seul jour.
+    reseau(PETIT)
+    const t = Date.now()
+    for (let n = 1; n <= 5; n += 1) await keepForRun(boucle(n), STYLE, t + n * 1000)
+    await keepForRun(boucle(1), STYLE, t + 6000)
+    await keepForRun(boucle(6), STYLE, t + 7000)
+    expect(isStored(boucle(1))).toBe(true)
+    expect(isStored(boucle(2))).toBe(false)
+  })
+
+  it('ne retire jamais une carte gardée à la main', async () => {
+    reseau(PETIT)
+    await download(boucle(0), STYLE)
+    await keepForRun(boucle(0), STYLE)
+    for (let n = 1; n <= 6; n += 1) await keepForRun(boucle(n), STYLE, Date.now() + n * 1000)
+    expect(isStored(boucle(0))).toBe(true)
+  })
+
+  it('sans réseau, ne garde rien et laisse partir la sortie', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+    await expect(keepForRun(PARCOURS, STYLE)).resolves.toBeUndefined()
+    expect(isStored(PARCOURS)).toBe(false)
   })
 })
 

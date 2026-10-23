@@ -238,6 +238,19 @@ geste est **explicite, parcours par parcours** : garder automatiquement les
 quarante favoris remplirait le téléphone à l'insu de tout le monde, souvent sur
 des données mobiles.
 
+**Le départ d'une sortie, lui, garde la carte de son parcours tout seul**, en
+fond pendant le compte à rebours. Le réseau tombe souvent là où l'on n'a jamais
+regardé la carte de près — en forêt, en montagne — et c'est là qu'un trou noir
+gêne le plus. Pour ne pas remplir le téléphone, seules les **cinq dernières
+sorties** gardent la leur ainsi ; la sixième chasse celle qu'on a courue le
+moins récemment. Une boucle de campagne pèse moins d'un mégaoctet : autour de
+chez soi, quelques mégaoctets en tout. Les cartes gardées à la main ne partent
+jamais. Une carte gardée se reprend au départ suivant **passé deux mois** — une
+rue change rarement, la reprendre à chaque retour du réseau coûterait du forfait
+pour rien — ou si l'on a changé de fond. Et un téléchargement dont aucune tuile
+n'est arrivée n'est plus enregistré : il affichait « ✓ 0 o » sur une carte
+noire.
+
 **Le relief part avec la carte.** Sans réseau, l'IGN ne répond plus, et une
 boucle cherchée dehors n'avait plus de D+. Garder la carte d'un parcours garde
 aussi ses tuiles d'altitude (Terrain Tiles d'AWS, Mapzen / Copernicus EU-DEM, au

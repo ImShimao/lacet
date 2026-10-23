@@ -25,7 +25,7 @@ import usePois from './usePois'
 import { askedOf, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
 import { blockedPoints } from './reports'
 import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
-import { DEFAULT_STYLE, styleByKey } from './mapStyles'
+import { DEFAULT_STYLE, offlineStyleFor, styleByKey } from './mapStyles'
 import { km } from './format'
 import { load, save } from './storage'
 import { haptic } from './platform'
@@ -251,6 +251,9 @@ export default function App() {
   // Le départ s'annonce au proche, si on l'a demandé : Messages s'ouvre avec
   // le message prêt, et le compte à rebours part au retour dans l'app.
   const beginRun = async (kind) => {
+    // La carte du parcours se garde en fond pendant le compte à rebours : si le
+    // réseau tombe en forêt, elle reste là — voir `keepForRun`.
+    if (kind === 'route' && selected) offline.keepForRun(selected, offlineStyleFor(mapStyle)).catch(() => {})
     if (announcing()) {
       await announceDeparture({
         route: kind === 'route' ? selected : null,

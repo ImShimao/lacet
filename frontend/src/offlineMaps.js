@@ -331,8 +331,12 @@ async function describeStyle(source) {
  * une tuile de bordure absente laisse une carte imparfaite, ce qui vaut
  * infiniment mieux qu'un écran noir parce qu'un fichier sur cinquante n'a pas
  * répondu.
+ *
+ * `auto` marque une carte prise d'elle-même au départ d'une sortie
+ * (`keepForRun`) : elle cédera sa place aux suivantes, pas une carte gardée à
+ * la main.
  */
-export async function download(route, mapStyle, onProgress) {
+export async function download(route, mapStyle, onProgress, { auto = false } = {}) {
   if (!isAvailable()) throw new Error("Le stockage de l'appareil ne répond pas : impossible de garder la carte.")
 
   const { templates, shared } = await describeStyle(mapStyle.style)
@@ -388,6 +392,14 @@ export async function download(route, mapStyle, onProgress) {
     }
   }
 
+  // Pas une seule tuile — le réseau est tombé, ou n'était pas là : garder ce
+  // parcours afficherait « hors ligne ✓ » sur une carte noire. Mieux vaut le
+  // dire, et ne rien laisser derrière soi.
+  if (maxZoom === null) {
+    await dropUnused(urls, load().offlineMaps || {})
+    throw new Error("Aucune tuile n'est arrivée : la carte n'a pas pu être gardée.")
+  }
+
   // Le relief, pour que le D+ d'une boucle cherchée ici sans réseau reste connu :
   // le moteur lit ces tuiles dans le même magasin (`environment.js`).
   bytes += (await take(relief)).bytes
@@ -395,6 +407,7 @@ export async function download(route, mapStyle, onProgress) {
   onProgress?.(1)
 
   const journal = load().offlineMaps || {}
+  const previous = journal[keyOf(route)]
   journal[keyOf(route)] = {
     urls,
     bytes,
@@ -405,11 +418,60 @@ export async function download(route, mapStyle, onProgress) {
     // donnerait un écran vide alors que l'app affiche « hors ligne ✓ ».
     styleKey: mapStyle.key,
     styleLabel: mapStyle.label,
+    ...(auto && { auto: true }),
   }
+  // Une carte reprise sous un autre fond laissait les tuiles de l'ancien sur
+  // l'appareil, sans qu'aucun parcours ne les compte : de la place prise pour
+  // rien, et invisible dans « Mon compte ».
+  if (previous) await dropUnused(previous.urls, journal)
   save({ offlineMaps: journal })
   forgetStored()
 
   return { bytes, maxZoom }
+}
+
+// --- gardée au départ d'une sortie ------------------------------------------
+
+// Le réseau tombe souvent là où l'on n'a jamais regardé la carte de près : en
+// forêt, en montagne, au fond d'une vallée. Le départ garde donc la carte du
+// parcours — mais seulement pour les cinq dernières sorties, la plus ancienne
+// laissant sa place. Une boucle de campagne pèse moins d'un mégaoctet : autour
+// de chez soi, quelques mégaoctets en tout. Les cartes gardées à la main, elles,
+// ne partent jamais.
+const AUTO_KEEP = 5
+
+// Une rue change rarement : passé deux mois, la carte se reprend au départ
+// suivant, pas avant. La reprendre à chaque retour du réseau coûterait du
+// forfait pour rien.
+const STALE_MS = 60 * 24 * 60 * 60 * 1000
+
+/**
+ * Garde la carte d'un parcours qu'on s'apprête à courir, sans rien demander.
+ *
+ * Rien ne part si la carte est déjà là, au même fond, depuis moins de deux mois.
+ * Sans réseau, le téléchargement échoue sans toucher à ce qui était gardé : on
+ * court avec ce qu'on avait.
+ */
+export async function keepForRun(route, mapStyle, now = Date.now()) {
+  if (!isAvailable() || !route.geometry?.length) return
+  const before = entryFor(route)
+  const fresh = before && before.styleKey === mapStyle.key && now - Date.parse(before.at) < STALE_MS
+  if (!fresh) {
+    await download(route, mapStyle, undefined, { auto: before ? Boolean(before.auto) : true }).catch(() => null)
+  }
+
+  const journal = load().offlineMaps || {}
+  const entry = journal[keyOf(route)]
+  if (!entry?.auto) return
+  // Le rang se compte à la dernière sortie, pas au téléchargement : la boucle
+  // qu'on court chaque semaine ne doit pas partir avant celle d'un seul jour.
+  entry.ranAt = new Date(now).toISOString()
+  save({ offlineMaps: journal })
+
+  const autos = Object.entries(journal)
+    .filter(([, e]) => e.auto)
+    .sort(([, a], [, b]) => (b.ranAt || b.at).localeCompare(a.ranAt || a.at))
+  for (const [key] of autos.slice(AUTO_KEEP)) await removeKey(key)
 }
 
 /** Les tuiles d'altitude (Terrain Tiles, zoom 12) autour d'un parcours. */
@@ -450,20 +512,25 @@ export function totalBytes() {
  * Deux boucles d'une même ville partagent leurs tuiles, et toutes partagent le
  * style et les polices. On n'efface donc que ce dont plus personne n'a besoin.
  */
-export async function remove(route) {
+export const remove = (route) => removeKey(keyOf(route))
+
+async function removeKey(key) {
   const journal = load().offlineMaps || {}
-  const entry = journal[keyOf(route)]
+  const entry = journal[key]
   if (!entry) return
 
-  delete journal[keyOf(route)]
-  const encoreUtiles = new Set(Object.values(journal).flatMap((e) => e.urls || []))
-
-  for (const url of entry.urls || []) {
-    if (!encoreUtiles.has(url)) await deviceFiles.delete(url)
-  }
-
+  delete journal[key]
+  await dropUnused(entry.urls, journal)
   save({ offlineMaps: journal })
   forgetStored()
+}
+
+/** Efface ceux de ces fichiers dont plus aucun parcours du journal n'a besoin. */
+async function dropUnused(urls, journal) {
+  const encoreUtiles = new Set(Object.values(journal).flatMap((e) => e.urls || []))
+  for (const url of urls || []) {
+    if (!encoreUtiles.has(url)) await deviceFiles.delete(url)
+  }
 }
 
 /** Vide tout — appelé par l'effacement des données. */

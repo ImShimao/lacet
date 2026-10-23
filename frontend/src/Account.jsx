@@ -767,9 +767,11 @@ function OfflineStorage() {
         <Row label="Espace occupé" value={offline.formatBytes(total)} />
       </div>
       <p className="muted small">
-        Les tuiles sont partagées : deux boucles de la même ville ne se paient
-        qu'une fois. Le détail va jusqu'au zoom {offline.TILE_ZOOM} — au-delà,
-        Relief et Satellite restent vides hors ligne.
+        Chaque sortie garde d'elle-même la carte de son parcours, pour les cinq
+        dernières : si le réseau tombe en route, elle reste là. Les tuiles sont
+        partagées : deux boucles de la même ville ne se paient qu'une fois. Le
+        détail va jusqu'au zoom {offline.TILE_ZOOM} — au-delà, Relief et
+        Satellite restent vides hors ligne.
       </p>
       {count > 0 &&
         (confirm ? (
