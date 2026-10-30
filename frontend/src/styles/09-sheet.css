@@ -203,15 +203,28 @@
   transform: translateY(var(--sheet-drag, 0px));
   transition: transform 0.18s cubic-bezier(0.4, 0, 1, 1);
 }
+/* Le doigt parcourt la bande de parcours : la feuille s'efface autour d'elle,
+   et toute la carte reparaît, le point qui court sur le tracé compris. La
+   bande, elle, reste où elle est. Replier la feuille ou la baisser à mi-hauteur
+   l'aurait fait glisser sous le doigt en plein geste ; recadrer la carte au-
+   dessus d'elle l'aurait fait sauter. Voilée plutôt qu'opaque : quand le point
+   passe derrière, on le voit encore. */
+.shell[data-sheet='full']:has(.strip--live) .side {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.shell[data-sheet='full']:has(.strip--live) .side > :not(.side__body),
+.shell[data-sheet='full']:has(.strip--live) .panel > :not(.strip) {
+  opacity: 0;
+}
+.shell[data-sheet='full'] .strip--live {
+  background: rgba(19, 17, 26, 0.55);
+}
 /* L'en-tête est la zone de préhension : le doigt doit y glisser sans que la
    page tente de défiler. */
 .shell[data-sheet='full'] .side__head {
   touch-action: none;
-}
-/* Détail ouvert, l'activité s'efface : c'est le parcours qu'on regarde, et
-   la pastille se retrouverait posée sur la bande de carte qui reste. */
-.shell[data-sheet='full'] .sportpill {
-  display: none;
 }
 /* Les pages de liste prennent tout l'écran. La bande de carte qui restait
    au-dessus ne servait à rien — on y lit un historique, pas un itinéraire —

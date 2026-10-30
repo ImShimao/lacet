@@ -76,13 +76,19 @@ export function useSheetDrag(mode, setSheet, shellRef) {
       if (e.target instanceof Element && e.target.closest('input, textarea, select')) return
       const scroller = fromBody ? e.currentTarget : null
       if (scroller && scroller.scrollTop > 0) return
+      // Un bouton de l'en-tête — la pastille d'activité, qui ouvre les filtres —
+      // doit recevoir son toucher : capturé d'emblée, le doigt n'arrivait
+      // qu'à l'en-tête, et le bouton restait mort. On attend, comme depuis le
+      // contenu, d'être sûr que le doigt tire vers le bas.
+      const pressed = !fromBody && e.target instanceof Element && Boolean(e.target.closest('button:not(.grabber)'))
+      const live = !fromBody && !pressed
       drag.current = {
         y: e.clientY,
         scroller,
-        live: !fromBody,
+        live,
         grip: e.target instanceof Element && Boolean(e.target.closest('.grabber')),
       }
-      if (!fromBody) e.currentTarget.setPointerCapture?.(e.pointerId)
+      if (live) e.currentTarget.setPointerCapture?.(e.pointerId)
     },
     onPointerMove: (e) => {
       if (!drag.current) return

@@ -138,6 +138,16 @@ export default function useStart(geo, { onMoved }) {
     if (geo.following) geo.setFollowing(false)
   }
 
+  /**
+   * Amène la carte sur un point sans toucher au départ — une consigne de la
+   * feuille de route qu'on veut voir. Plus près que pour un départ : c'est le
+   * carrefour qu'on regarde, pas le quartier.
+   */
+  const look = (point) => {
+    release()
+    setFocus({ ...point, zoom: 16, at: Date.now() })
+  }
+
   // Résultat d'une demande explicite : on recadre — ou on pose le départ —
   // même si la position n'avait pas changé de valeur.
   useEffect(() => {
@@ -165,5 +175,6 @@ export default function useStart(geo, { onMoved }) {
     centerOnMe,
     startFromHere,
     release,
+    look,
   }
 }

@@ -59,7 +59,10 @@ export default function RouteStrip({ route, onScrub }) {
   const readout = cursor === null ? null : describe(model, cursor)
 
   return (
-    <div className="strip">
+    // `strip--live` pendant le geste : la feuille dépliée couvre la carte, et
+    // s'efface alors autour de la bande pour laisser voir le point (voir
+    // `09-sheet.css`).
+    <div className={`strip ${cursor === null ? '' : 'strip--live'}`}>
       <div className="strip__head">
         <span className="strip__title">Parcours</span>
         <span className="mono strip__read">
@@ -82,6 +85,9 @@ export default function RouteStrip({ route, onScrub }) {
         onTouchStart={(e) => locate(e.touches[0].clientX)}
         onTouchMove={(e) => locate(e.touches[0].clientX)}
         onTouchEnd={clear}
+        // Un geste repris par iOS — un appel, le centre de contrôle — ne finit
+        // pas par `touchend` : sans ça, la feuille resterait effacée.
+        onTouchCancel={clear}
         role="img"
         aria-label={`Profil du parcours sur ${km(model.total, 1)} kilomètres`}
       >

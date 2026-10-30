@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import Explore from './Explore.jsx'
 
@@ -113,6 +113,37 @@ describe('les avertissements de l’écran', () => {
     const message = "Les rues de ce coin ne sont pas encore arrivées : ces boucles viennent d'un calculateur public."
     afficher({ routes: [boucle({ grade: null, safety: null, remote: true })], meta: { remote: 'valhalla', message }, detail: false })
     expect(screen.getByText(message)).toBeInTheDocument()
+  })
+})
+
+describe('pendant la recherche', () => {
+  it('propose d’abandonner', () => {
+    const onCancel = vi.fn()
+    afficher({ busy: 'search', result: null, onCancel })
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+    expect(onCancel).toHaveBeenCalled()
+  })
+
+  it('ne propose rien quand l’attente ne s’abandonne pas', () => {
+    afficher({ busy: 'work', result: null, onCancel: null })
+    expect(screen.queryByRole('button', { name: 'Annuler' })).not.toBeInTheDocument()
+  })
+})
+
+describe('la feuille de route', () => {
+  it('montre sur la carte la consigne touchée', () => {
+    // Le point s'allumait sous la feuille dépliée, sans que rien ne bouge : la
+    // consigne passe maintenant son point à `App`, qui replie la feuille et y
+    // amène la carte.
+    const onShowStep = vi.fn()
+    const instructions = [
+      { text: 'Départ', dist_m: 0, turn: 'start', lon: 7.2, lat: 47.9 },
+      { text: 'Tourne à droite sur Brunleweg', dist_m: 1200, turn: 'right', lon: 7.205, lat: 47.903 },
+      { text: 'Te voilà rentré au départ.', dist_m: 9900, turn: 'finish', lon: 7.2, lat: 47.9 },
+    ]
+    afficher({ routes: [boucle({ instructions })], onShowStep })
+    fireEvent.click(screen.getByRole('button', { name: /Brunleweg.*montrer sur la carte/ }))
+    expect(onShowStep).toHaveBeenCalledWith([7.205, 47.903])
   })
 })
 

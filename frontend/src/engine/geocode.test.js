@@ -127,6 +127,35 @@ describe('le classement', () => {
     ]
     expect(rankPlaces(places, GUEBWILLER)).toHaveLength(1)
   })
+
+  it('ne montre qu’une fois une ville et le canton qui porte son nom', () => {
+    // Ce que Photon répond à « Guebwiller » : la ville, puis le canton, dont le
+    // point est le centre de la surface, à 1,9 km du bourg. Deux lignes
+    // « Guebwiller » se suivaient, et rien ne disait laquelle choisir.
+    const lieux = () => [
+      fromPhoton(feature('Guebwiller', [7.2113271, 47.9094629], { osm_key: 'place', osm_value: 'town', type: 'city', state: 'Grand Est' })),
+      fromPhoton(feature('Guebwiller', [7.1876573, 47.9155244], { osm_key: 'boundary', osm_value: 'political', type: 'other', state: 'Grand Est' })),
+    ]
+    // Depuis la forêt à l'ouest, le centre du canton est plus proche que la
+    // ville : c'est quand même la ville, le point précis, qui reste.
+    for (const near of [GUEBWILLER, { lat: 47.92, lon: 7.17 }, null]) {
+      const ranked = rankPlaces(lieux(), near, 'Guebwiller')
+      expect(ranked).toHaveLength(1)
+      expect(ranked[0].kind).toBe('Ville')
+      expect(ranked[0].lon).toBeCloseTo(7.2113, 4)
+      expect(ranked[0]).not.toHaveProperty('area')
+    }
+  })
+
+  it('garde deux lieux distincts du même nom', () => {
+    // Deux points visés, pas une surface : un village et un lieu-dit homonyme à
+    // 15 km sont deux endroits, et l'on doit pouvoir choisir.
+    const places = [
+      fromPhoton(feature('Buhl', [7.1867, 47.9286], { osm_key: 'place', osm_value: 'village' })),
+      fromPhoton(feature('Buhl', [7.39, 47.92], { osm_key: 'place', osm_value: 'locality' })),
+    ]
+    expect(rankPlaces(places, GUEBWILLER, 'Buhl')).toHaveLength(2)
+  })
 })
 
 describe('la recherche', () => {

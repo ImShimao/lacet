@@ -555,7 +555,9 @@ export default function App() {
                 que le favori, l'export, la régénération et « Démarrer ». Avant la
                 recherche, le bouton « Filtres » est juste là, sous les yeux, et
                 deux entrées pour le même réglage encombraient le haut de l'écran
-                pour rien. Elle revient donc avec les propositions. */}
+                pour rien. Elle revient donc avec les propositions — et reste,
+                détail ouvert, en tête de la feuille : effacée, rien n'ouvrait
+                plus les filtres sans replier d'abord la feuille. */}
             {tab === 'explore' && result && (
               <button className="sportpill" onClick={() => setFiltersOpen(true)}>
                 <Icon name={sport?.icon} size={19} />
@@ -717,6 +719,7 @@ export default function App() {
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
+              onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}
               // Le moteur ne retourne que ce qu'il vient de calculer : un favori
@@ -737,6 +740,14 @@ export default function App() {
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
               onScrub={setScrub}
+              // Une consigne touchée dans la feuille de route : dépliée, la
+              // feuille couvrait le point, qui s'allumait dessous sans que la
+              // carte bouge. On la replie, et la carte vient au carrefour.
+              onShowStep={([lon, lat]) => {
+                setScrub([lon, lat])
+                setSheet('peek')
+                here.look({ lat, lon })
+              }}
               onOpenDetail={() => setSheet('full')}
               stops={stops}
               poiPrefs={poiPrefs}

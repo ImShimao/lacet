@@ -36,6 +36,8 @@ const VISIBLE_SNAP_M = 50
 export default function useSearch() {
   const [result, setResult] = useState(null)
   const [selected, setSelected] = useState(null)
+  // Ce qui occupe : `'search'`, une recherche — qu'on peut abandonner —, ou
+  // `'work'`, la reconnaissance d'un fichier importé, qui ne s'abandonne pas.
   const [busy, setBusy] = useState(false)
   // L'étape en cours et son avancement. Sans indication, une première recherche
   // dans une grande ville ressemblerait à une app bloquée.
@@ -46,6 +48,33 @@ export default function useSearch() {
   // La position lue sur le profil d'altitude, montrée sur la carte.
   const [scrub, setScrub] = useState(null)
   const token = useRef(0)
+
+  /**
+   * Oublie les propositions : le départ a bougé, et elles ne répondent plus à
+   * la question posée. Elles restaient pourtant à l'écran — on choisissait un
+   * village suisse et la carte montrait le Valais sous une carte intitulée
+   * « Boucle sud-ouest · avenue des Gobelins ».
+   */
+  const forget = () => {
+    setResult(null)
+    setSelected(null)
+    setScrub(null)
+    setSnapped(null)
+  }
+
+  /**
+   * Abandonne la recherche en cours et revient à l'accueil. Hors des archives,
+   * l'attente peut durer une minute, et l'écran le dit lui-même : sans ce
+   * geste, il ne restait qu'à fermer l'app. Le calcul, lui, continue dans le
+   * worker, que rien n'interrompt ; mais le jeton change, et sa réponse, quand
+   * elle arrive, ne trouve plus personne pour l'afficher.
+   */
+  const cancel = () => {
+    token.current += 1
+    setBusy(false)
+    setProgress(null)
+    forget()
+  }
 
   return {
     result,
@@ -58,6 +87,10 @@ export default function useSearch() {
 
     setSelected,
     setScrub,
+    forget,
+    // Seulement pendant une recherche : la reconnaissance d'un fichier finit,
+    // elle, par l'ouvrir, abandonnée ou non.
+    cancel: busy === 'search' ? cancel : null,
 
     /** Montre un parcours seul — un favori rouvert, un fichier importé. */
     show(route) {
@@ -72,18 +105,6 @@ export default function useSearch() {
       setResult((r) => (r ? { ...r, routes: r.routes.map((x) => (x.id === id ? route : x)) } : r))
       setSelected(route)
     },
-    /**
-     * Oublie les propositions : le départ a bougé, et elles ne répondent plus à
-     * la question posée. Elles restaient pourtant à l'écran — on choisissait un
-     * village suisse et la carte montrait le Valais sous une carte intitulée
-     * « Boucle sud-ouest · avenue des Gobelins ».
-     */
-    forget() {
-      setResult(null)
-      setSelected(null)
-      setScrub(null)
-      setSnapped(null)
-    },
     fail(message, offline = false) {
       setError({ message, offline })
     },
@@ -92,7 +113,7 @@ export default function useSearch() {
      * fichier importé. Même barre d'attente, mêmes étapes.
      */
     async working(tache) {
-      setBusy(true)
+      setBusy('work')
       setProgress({ stage: 'data', fraction: 0 })
       try {
         return await tache((stage, fraction) => setProgress({ stage, fraction }))
@@ -110,7 +131,7 @@ export default function useSearch() {
      * main entre-temps.
      */
     async run(request, { from = null, onStart = null } = {}) {
-      setBusy(true)
+      setBusy('search')
       setProgress(null)
       setError(null)
       setResult(null)
