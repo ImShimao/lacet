@@ -4,12 +4,12 @@
 
 # Lacet
 
-[![Télécharger l'IPA](https://img.shields.io/badge/T%C3%A9l%C3%A9charger-derni%C3%A8re%20IPA-7c3aed?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa)
+[![Télécharger l'IPA](https://img.shields.io/badge/T%C3%A9l%C3%A9charger-derni%C3%A8re%20IPA-2563eb?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa)
 [![Installer avec AltStore](https://img.shields.io/badge/Installer-AltStore-1F1B2E?style=for-the-badge)](#installation-)
 
 [![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
 [![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
-[![1068 tests](https://img.shields.io/badge/tests-1068%20%E2%9C%93-4ade80)](#tests-)
+[![1169 tests](https://img.shields.io/badge/tests-1169%20%E2%9C%93-4ade80)](#tests-)
 [![Capacitor 8](https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![MapLibre 5](https://img.shields.io/badge/MapLibre_GL-5-396CB2)](https://maplibre.org/)
 [![iOS 15+](https://img.shields.io/badge/iPhone-iOS%2015%2B-1F1B2E?logo=apple&logoColor=white)](#limitations-connues-)
@@ -33,11 +33,11 @@ sécurité, puis te guide à la voix, écran verrouillé.
 
 | Les boucles proposées | En course |
 | :---: | :---: |
-| <img src="docs/images/1-boucles.png" width="300" alt="Une boucle de 10,2 km au départ d'Annecy, notée A, tracée en vert sur la carte sombre, les autres propositions en pointillés"> | <img src="docs/images/2-course.png" width="300" alt="Pendant la sortie : « 190 m, tourne à gauche dans la rue de la République » en bandeau violet, la carte inclinée, le chrono et l'allure en bas"> |
+| <img src="docs/images/1-boucles.png" width="300" alt="Une boucle de 10,4 km au départ de la vieille ville d'Annecy, notée A, tracée en vert sur la carte sombre, les autres propositions en pointillés, la barre Favori, GPX, Sens, Autres et Démarrer en bas"> | <img src="docs/images/2-course.png" width="300" alt="Pendant la sortie : « 30 m, tourne franchement à gauche sur le quai des Clarisses » en bandeau bleu, la carte inclinée, le chrono, la distance restante et le bouton pause en bas"> |
 
-| Le détail | Le survol 3D | Les filtres | Les réglages |
+| Le détail | Le survol 3D | Les filtres | L'apparence |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/images/3-detail.png" width="200" alt="Le détail d'une boucle : revêtement, profil de dénivelé coloré par sécurité, feuille de route de 57 consignes"> | <img src="docs/images/4-survol.png" width="200" alt="Le survol 3D : une pastille violette court sur la boucle inclinée, avec 3,6 km et 519 m d'altitude en haut"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Pendant la sortie : pause automatique, écran toujours allumé, ce que dit la voix à chaque kilomètre"> |
+| <img src="docs/images/3-detail.png" width="200" alt="Le détail d'une boucle : revêtement, profil de dénivelé coloré par sécurité, feuille de route repliée"> | <img src="docs/images/4-survol.png" width="200" alt="Le survol 3D : une pastille court sur la boucle inclinée, la part déjà survolée en blanc, la distance et l'altitude en haut"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Apparence : thème auto, sombre ou clair, couleur d'accent bleu, violet, framboise ou graphite, taille du texte"> |
 
 </div>
 
@@ -109,7 +109,9 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 
 | | |
 | --- | --- |
-| 🔁 **Des boucles** | Jusqu'à douze propositions qui partent dans des directions différentes et reviennent à la porte : 10 km, un semi au mètre près, ou une durée |
+| 🔁 **Des boucles** | Jusqu'à douze propositions qui partent dans des directions différentes et reviennent à la porte : 10 km, un semi au mètre près, ou une durée. Chaque recherche en tire d'autres, dans un autre ordre |
+| ➰ **La forme au choix** | Une boucle entière, deux boucles en « 8 » qui repassent à la porte, ou plusieurs tours d'une même boucle — ou laisser Lacet choisir |
+| 🚸 **Le bon côté** | Au rond-point, on fait le tour du côté où l'on court : à gauche face aux voitures par défaut, comme le veut le code de la route ; la voix le dit en une phrase |
 | 🛡️ **Note A, B ou C** | Chaque tronçon est jugé : vitesse de la voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées. Ce qui ne passe pas est écarté, et l'app dit pourquoi |
 | 📈 **Bande de parcours** | Profil et sécurité sur le même axe : savoir qu'il y a 200 m d'exposition ne sert à rien tant qu'on ignore *où* |
 | 🗣️ **Guidage vocal** | Chaque virage annoncé deux fois, à l'avance puis au moment d'agir, en baissant la musique le temps de parler — écran verrouillé aussi |
@@ -125,6 +127,7 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 | 💧 **Points d'eau** | Ceux qui bordent la boucle s'affichent, et la voix prévient cent mètres avant |
 | 🆘 **SOS** | Un bouton prépare un SMS avec ta position ; un proche peut recevoir l'heure prévue du retour |
 | 🚴 **Course ou vélo** | Allure en min/km ou vitesse en km/h, pause automatique aux feux ; à vélo, la voix donne les kilomètres tous les 5 km |
+| 🎨 **Apparence** | Thème sombre, clair ou celui de l'iPhone, quatre couleurs d'accent, texte agrandi |
 | 🙈 **Rien ne part** | Pas de compte, pas de serveur, pas de suivi : favoris, sorties et réglages restent sur le téléphone |
 
 ### Les gestes sur la carte 👆
@@ -133,12 +136,14 @@ La carte occupe tout l'écran ; presque tout se fait au doigt, dessus.
 
 | Geste | Effet |
 | --- | --- |
-| Glisser le repère violet | Déplacer le départ |
+| Glisser le repère | Déplacer le départ |
 | Appui long | Poser un fanion : les boucles passent par ce point |
 | Cercle hachuré, puis toucher | Poser le centre d'une zone à éviter ; glisser sa poignée la déplace |
 | Toucher une boucle en pointillés | La mettre en avant |
 | Toucher la carte de parcours | Déplier le détail ; la poignée grise le replie |
-| Parcourir la bande du doigt | Allumer le point correspondant sur la carte |
+| Parcourir la bande du doigt | Allumer le point correspondant sur la carte, le détail s'effaçant le temps du geste |
+| Toucher une consigne de la feuille de route | Replier le détail et amener la carte sur le virage |
+| Glisser une ligne de « Mes parcours » vers la gauche | Renommer ou retirer un favori ou une sortie |
 | En course : tourner ou déplacer la carte | La libérer du suivi ; **Recentrer** la reprend, pincer ne libère rien |
 | Pendant le survol 3D : toucher | Pause, puis reprise ; glisser l'arrête |
 
@@ -165,7 +170,7 @@ flowchart LR
 
 **Un moteur de référence en Python** (`backend/`) garde la justification et le
 test de chaque seuil. Le moteur JavaScript en est le portage, et la CI exige des
-deux, sur 13 cas figés, le même graphe, les mêmes candidats arête par arête et
+deux, sur 19 cas figés, le même graphe, les mêmes candidats arête par arête et
 la même réponse, à 1e-9 près. Un portage subtilement faux proposerait un « A »
 là où il faudrait un « C », et rien à l'écran ne le montrerait. D'où
 `engine/py.js`, qui reproduit l'arithmétique de CPython jusqu'au modulo flottant
@@ -204,7 +209,7 @@ frontend/
 backend/
 ├── app/                     Le moteur de référence : osm/, routing/, safety/,
 │                            elevation.py, wind.py, solar.py, service.py (plan_loops)
-├── tests/                   368 tests sur des damiers synthétiques
+├── tests/                   394 tests sur des damiers synthétiques
 └── scripts/                 parity_dump.py (l'oracle), smoke.py (essai réel)
 scripts/altstore_source.py   Prépare et fait servir la source AltStore
 docs/                        La documentation, un fichier par thème
@@ -276,9 +281,9 @@ et le build à chaque envoi (`.github/workflows/tests.yml`).
 
 | Commande | Couverture |
 | --- | --- |
-| `(cd frontend && npm test)` | 700 tests, 64 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
-| `(cd frontend && npx vitest run src/engine/parity.test.js)` | Le JavaScript face à Python sur 13 cas figés : même graphe, mêmes candidats, même réponse à 1e-9 près |
-| `(cd backend && .venv/Scripts/python.exe -m pytest)` | 368 tests, 15 fichiers, hors ligne et déterministes |
+| `(cd frontend && npm test)` | 775 tests, 67 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
+| `(cd frontend && npx vitest run src/engine/parity.test.js)` | Le JavaScript face à Python sur 19 cas figés : même graphe, mêmes candidats, même réponse à 1e-9 près |
+| `(cd backend && .venv/Scripts/python.exe -m pytest)` | 394 tests, 16 fichiers, hors ligne et déterministes |
 | `(cd backend && .venv/Scripts/python.exe scripts/parity_dump.py --check)` | Dit, sans rien écrire, si l'oracle de parité est à jour |
 | `(cd backend && .venv/Scripts/python.exe -X utf8 scripts/smoke.py annecy 8)` | Essai réel : appelle OpenStreetMap, montre les boucles retenues **et** celles écartées, avec leur motif |
 
