@@ -213,3 +213,43 @@ class TestTraversees:
 
     def test_deux_traversees_eloignees_comptent_deux_fois(self):
         assert len(self.crossed(0.0014)) == 2  # environ 100 m
+
+
+class TestEpingles:
+    """Un retour au même carrefour en moins de `SPUR_MAX_M` est rogné, même par une autre voie."""
+
+    def _payload(self):
+        # A—B—C sur une ligne (~55 m par pas), une seconde voie de B à C, et B—D.
+        def at(x, y):
+            return {"lat": 48.8 + y * 0.0005, "lon": 2.3 + x * 0.0005}
+
+        way = lambda wid, ids, pts: {  # noqa: E731
+            "type": "way", "id": wid, "tags": {"highway": "residential"}, "nodes": ids,
+            "geometry": [at(*p) for p in pts],
+        }
+        return {"elements": [
+            way(1, [1, 2, 3], [(0, 0), (1, 0), (2, 0)]),
+            way(2, [2, 5, 3], [(1, 0), (1.5, 0.1), (2, 0)]),
+            way(3, [2, 4], [(1, 0), (1, 1)]),
+        ]}
+
+    def test_aller_par_une_voie_retour_par_l_autre(self):
+        from app.routing.loops import _trim_spurs
+
+        graph = build_graph(self._payload())
+        a, b, c, d = (graph.nearest_node(2.3 + x * 0.0005, 48.8 + y * 0.0005) for x, y in [(0, 0), (1, 0), (2, 0), (1, 1)])
+        edge = lambda u, v, way=None: next(  # noqa: E731
+            e for e in graph.adj[u]
+            if graph.edges[e].other(u) == v and (way is None or graph.edges[e].way_id == way)
+        )
+        route = [edge(a, b), edge(b, c, 1), edge(c, b, 2), edge(b, d)]
+        assert _trim_spurs(graph, a, route) == [edge(a, b), edge(b, d)]
+
+    def test_une_vraie_boucle_reste(self, grid, grid_center):
+        from app.routing.loops import _trim_spurs
+
+        graph = build_graph(grid)
+        start = _start(graph, grid_center)
+        loops = generate_loops(graph, start, 2000.0, build_profile(SurfacePref.mixed, SafetyMode.safe, night=False), sectors=8)
+        for cand in loops:
+            assert _trim_spurs(graph, start, cand.edges) == cand.edges

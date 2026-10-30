@@ -345,6 +345,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         req.surface, req.safety, night, req.sport,
         terrain=terrain if wants_flat(req) else None,
         nature=req.nature,
+        side=req.side,
     )
 
     # Le vent est demandé maintenant pour que l'appel réseau se déroule pendant
@@ -467,7 +468,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     routes = [
         _to_model(
             cand, score, req, profiles.get(idx), rank,
-            build_instructions(graph, start, cand), names[rank], graph,
+            build_instructions(graph, start, cand, req.sport.value), names[rank], graph,
         )
         for rank, (score, cand, idx) in enumerate(chosen)
     ]

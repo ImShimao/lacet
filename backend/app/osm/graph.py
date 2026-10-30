@@ -22,7 +22,7 @@ from typing import Any
 from ..geo import Coord, haversine_m, planar_distance, point_in_ring, ring_bbox
 from .extract import Extract, Way, read as read_extract
 from .green import green_index
-from ..safety.exclusion import is_excluded, oneway_for, tunnel_is_unprotected
+from ..safety.exclusion import RING_JUNCTIONS, is_excluded, oneway_for, tunnel_is_unprotected
 from ..safety.risk import EdgeSafety, evaluate_edge
 
 log = logging.getLogger(__name__)
@@ -53,6 +53,11 @@ class Edge:
     green: float = 0.0
     # Sur un sentier balisé : la voie fait partie d'une relation `route`.
     marked: bool = False
+    # L'anneau d'un rond-point, de `a` vers `b` dans le sens de la circulation.
+    # À pied, on n'y court pas : on en fait le tour par le trottoir, d'un côté ou
+    # de l'autre — voir `routing.loops.keep_side` et la consigne qu'en tire
+    # `navigation`.
+    ring: bool = False
 
     def other(self, node: int) -> int:
         return self.b if self.a == node else self.a
@@ -439,6 +444,7 @@ def build_graph(
         # Les arêtes suivent l'ordre des nœuds de la voie : `oneway=yes` permet
         # donc d'aller de `a` vers `b`, pas l'inverse.
         oneway = oneway_for(tags, sport)
+        ring = tags.get("junction") in RING_JUNCTIONS
 
         splits = [0]
         splits += [i for i in range(1, len(node_ids) - 1) if node_ids[i] in junctions]
@@ -469,6 +475,7 @@ def build_graph(
                     tunnel=tunnel,
                     oneway=oneway,
                     marked=way_id in extract.marked,
+                    ring=ring,
                 )
             )
             graph.adj[ra].append(idx)

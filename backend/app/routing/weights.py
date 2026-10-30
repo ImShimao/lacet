@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..elevation import Terrain
-from ..models import SafetyMode, Sport, SurfacePref
+from ..models import SafetyMode, Side, Sport, SurfacePref
 from ..osm.graph import Edge, Graph
 from ..safety.night import night_factor
 from ..safety.risk import CYCLE_FACILITY, EXPOSED_RISK
@@ -90,6 +90,9 @@ class Profile:
     # Le relief de la zone, seulement quand on demande du plat.
     terrain: Terrain | None = None
     nature: bool = True
+    # Le côté où l'on court — voir `loops.keep_side`. Il ne pèse pas sur les
+    # poids : il ne retouche qu'après coup le tour des ronds-points.
+    side: str = "right"
 
     @property
     def _factors(self) -> dict[str, float]:
@@ -145,6 +148,7 @@ def build_profile(
     sport: Sport = Sport.run,
     terrain: Terrain | None = None,
     nature: bool = True,
+    side: Side = Side.right,
 ) -> Profile:
     return Profile(
         lam=LAMBDA[safety],
@@ -153,4 +157,5 @@ def build_profile(
         sport=sport.value,
         terrain=terrain,
         nature=nature,
+        side=side.value,
     )

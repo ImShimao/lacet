@@ -700,23 +700,127 @@ def _chain_legs(
         return None
     edges.extend(closing)
 
-    return _trim_spurs(edges) or None
+    return keep_side(graph, start, _trim_spurs(graph, start, edges), profile) or None
 
 
-def _trim_spurs(edges: list[int]) -> list[int]:
-    """Supprime les allers-retours immédiats : une arête prise puis reprise.
+# Plus court que ça, un retour au même carrefour est une épingle ou un lasso :
+# un aller-retour au bout d'une rue, un tour de pâté de maisons pour rien.
+# Mesuré sur 48 boucles autour de Guebwiller, Soultz et Issenheim : onze, pour
+# 1,1 km en tout — rue du Markstein, 65 m aller par une chaussée et 65 m retour
+# par l'autre, trois fois de suite sur une boucle en tours. Le plus long faisait
+# 133 m ; une vraie petite boucle, autour d'un étang, en fait plusieurs centaines.
+SPUR_MAX_M = 150.0
+
+
+def _trim_spurs(graph: Graph, start: int, edges: list[int]) -> list[int]:
+    """Supprime les allers-retours et les détours qui ramènent au même carrefour.
 
     Ils apparaissent à la jonction de deux tronçons quand le sommet visé se
     trouve au bout d'une impasse courte. Géométriquement c'est un pic sur le
     tracé, et il compte deux fois dans la distance sans rien apporter.
+
+    Une arête prise puis reprise s'efface quelle que soit sa longueur. Mais le
+    retour ne prend pas toujours la même arête : les deux chaussées d'une
+    avenue, deux voies parallèles entre les mêmes carrefours, un tour de
+    pâté de maisons. On efface donc aussi tout ce qui ramène, en moins de
+    `SPUR_MAX_M`, à un carrefour déjà passé.
     """
     out: list[int] = []
+    nodes = [start]
+    along = [0.0]
     for eidx in edges:
         if out and out[-1] == eidx:
             out.pop()
+            nodes.pop()
+            along.pop()
+            continue
+        edge = graph.edges[eidx]
+        node = edge.other(nodes[-1])
+        reach = along[-1] + edge.length_m
+        k = len(nodes) - 1
+        while k >= 0 and reach - along[k] < SPUR_MAX_M and nodes[k] != node:
+            k -= 1
+        if k >= 0 and reach - along[k] < SPUR_MAX_M:
+            del out[k:]
+            del nodes[k + 1 :]
+            del along[k + 1 :]
         else:
             out.append(eidx)
+            nodes.append(node)
+            along.append(reach)
     return out
+
+
+# Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté.
+# « En face » sur un rond-point à quatre branches : les deux moitiés se valent
+# (1,0). La troisième sortie de cinq, en face un peu à gauche : 1,5. Tourner à
+# gauche — la deuxième de trois, la troisième de quatre — coûte deux à trois
+# fois plus du côté droit : celui qui court à droite traverse alors, plutôt que
+# de faire les trois quarts du tour.
+SIDE_RING_RATIO = 1.6
+
+
+def keep_side(graph: Graph, start: int, edges: list[int], profile: Profile) -> list[int]:
+    """Fait le tour des ronds-points du côté où l'on court.
+
+    À pied, le sens unique ne s'applique pas, et le chemin le plus court
+    prenait l'anneau dans un sens ou dans l'autre — à contresens six fois sur
+    dix autour de Guebwiller et de Soultz. Or on n'y court pas : on en fait le
+    tour par le trottoir. L'anneau est dessiné dans le sens de la circulation,
+    qui le parcourt en gardant le centre à sa gauche : le suivre, c'est rester
+    à droite des rues que l'on prend ; le remonter, c'est rester à gauche.
+
+    Pour chaque passage pris du mauvais côté, on prend l'autre moitié de
+    l'anneau quand elle n'est pas plus de `SIDE_RING_RATIO` fois plus longue.
+    À vélo, rien à faire : l'anneau est déjà à sens unique (`oneway_for`).
+    """
+    if profile.sport == "bike" or profile.side not in ("right", "left"):
+        return edges
+    forward = profile.side == "right"
+    E = graph.edges
+    out: list[int] = []
+    cursor = start
+    i = 0
+    while i < len(edges):
+        if not E[edges[i]].ring:
+            out.append(edges[i])
+            cursor = E[edges[i]].other(cursor)
+            i += 1
+            continue
+        entry = cursor
+        j = i
+        length = 0.0
+        wrong = False
+        while j < len(edges) and E[edges[j]].ring:
+            wrong |= (E[edges[j]].a == cursor) != forward
+            length += E[edges[j]].length_m
+            cursor = E[edges[j]].other(cursor)
+            j += 1
+        arc = _ring_arc(graph, entry, cursor, forward, length * SIDE_RING_RATIO) if wrong else None
+        out.extend(arc if arc is not None else edges[i:j])
+        i = j
+    return out
+
+
+def _ring_arc(graph: Graph, source: int, target: int, forward: bool, limit_m: float) -> list[int] | None:
+    """L'anneau de `source` à `target` dans un seul sens, ou None au-delà de `limit_m`."""
+    E = graph.edges
+    arc: list[int] = []
+    node = source
+    length = 0.0
+    while node != target or not arc:
+        step = next(
+            (e for e in graph.adj[node] if E[e].ring and (E[e].a if forward else E[e].b) == node),
+            None,
+        )
+        if step is None:
+            return None
+        length += E[step].length_m
+        if length > limit_m:
+            return None
+        arc.append(step)
+        node = E[step].other(node)
+    return arc
 
 
 # Les rayons de la zone centrale sont regroupés par paliers de 50 m avant d'être
@@ -817,7 +921,7 @@ def _fallback_out_and_back(
         )
         if not back_edges:
             continue
-        edges = _trim_spurs(out_edges + back_edges)
+        edges = keep_side(graph, start, _trim_spurs(graph, start, out_edges + back_edges), profile)
         if not edges:
             continue
         cand = Candidate(edges=edges, nodes=node_sequence(graph, start, edges))

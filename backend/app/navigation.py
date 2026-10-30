@@ -112,14 +112,18 @@ class Instruction:
     # fusion (voir `_merge_close`). Ils ne sortent pas du moteur.
     before: float = 0.0
     after: float = 0.0
+    # Un rond-point se dit en une phrase, et ne se fond pas dans la voisine.
+    ring: bool = False
 
 
-def build_instructions(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
+def build_instructions(
+    graph: Graph, start: int, cand: Candidate, sport: str = "run"
+) -> list[Instruction]:
     """Suite de consignes pour parcourir `cand` depuis `start`."""
     if not cand.edges:
         return []
 
-    steps = _raw_steps(graph, start, cand)
+    steps = _raw_steps(graph, start, cand, sport)
     steps = _merge_all(steps)
 
     total = cand.stats.distance_m if cand.stats else 0.0
@@ -246,7 +250,7 @@ def _finish_text(laps: int) -> str:
     return f"Dernier tour bouclé. Les {laps} tours sont terminés."
 
 
-def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
+def _raw_steps(graph: Graph, start: int, cand: Candidate, sport: str = "run") -> list[Instruction]:
     """Une consigne par intersection où il se passe quelque chose."""
     unprotected = {
         (round(c.lon, 6), round(c.lat, 6)) for c in cand.crossings if not c.protected
@@ -260,12 +264,29 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
     last_named: str | None = None
     announced: dict[str, float] = {}
     came: int | None = None
+    # Jusqu'où le rond-point déjà annoncé couvre le parcours : son anneau, et la
+    # rue par laquelle on en sort.
+    ring_until = -1
 
-    for eidx in cand.edges:
+    for idx, eidx in enumerate(cand.edges):
         edge = graph.edges[eidx]
         coords = edge.coords_from(cursor)
 
-        if out_bearing is not None and came is not None:
+        if idx <= ring_until:
+            # Dans le rond-point déjà annoncé, sortie comprise : rien à dire.
+            if idx == ring_until and edge.name:
+                announced[edge.name] = travelled
+        elif (
+            edge.ring
+            and out_bearing is not None
+            and came is not None
+            and not graph.edges[came].ring
+            and (found := _roundabout(graph, cand.edges, idx, cursor, travelled, out_bearing, sport))
+        ):
+            step, ring_until = found
+            step.caution = (step.lon, step.lat) in unprotected
+            steps.append(step)
+        elif out_bearing is not None and came is not None:
             in_bearing = _bearing_from_start(coords)
             angle = (in_bearing - out_bearing + 180.0) % 360.0 - 180.0
             turn = _classify(angle)
@@ -333,6 +354,88 @@ def _raw_steps(graph: Graph, start: int, cand: Candidate) -> list[Instruction]:
         cursor = edge.other(cursor)
 
     return steps
+
+
+# Ce qui n'est pas une sortie pour qui roule sur l'anneau.
+_NOT_AN_EXIT = {"footway", "path", "steps", "pedestrian", "cycleway", "bridleway"}
+_EXIT_ORDINALS = ("première", "deuxième", "troisième", "quatrième", "cinquième", "sixième")
+
+
+def _roundabout(
+    graph: Graph,
+    edges: list[int],
+    idx: int,
+    entry: int,
+    travelled: float,
+    before: float,
+    sport: str,
+) -> tuple[Instruction, int] | None:
+    """La consigne d'un rond-point, dite à son entrée, et l'indice de la rue où l'on en sort.
+
+    L'anneau était découpé en tronçons comme une rue : les consignes tombaient
+    sur ses nœuds. Sur 44 passages autour de Guebwiller, Soultz et Issenheim,
+    aucune ne disait « rond-point » : sept étaient muets, onze faisaient une
+    chicane — « tourne à droite puis tout de suite à gauche » pour aller en
+    face —, les autres un virage pris au milieu de l'anneau.
+
+    Une seule phrase, donc, à l'entrée, avec l'angle de la rue d'arrivée à la
+    rue de sortie. À pied, on ne compte pas les sorties : on dit où l'on va, et
+    de quel côté faire le tour — l'anneau suivi dans le sens de la circulation
+    garde à droite (voir `routing.loops.keep_side`). À vélo, on roule sur
+    l'anneau : on compte les sorties, comme au volant.
+    """
+    E = graph.edges
+    forward = E[edges[idx]].a == entry
+    node = entry
+    exits = 0
+    j = idx
+    while j < len(edges) and E[edges[j]].ring:
+        node = E[edges[j]].other(node)
+        j += 1
+        exits += any(
+            not E[x].ring
+            and E[x].safety.highway not in _NOT_AN_EXIT
+            and not (E[x].oneway and (E[x].a == node) != (E[x].oneway > 0))
+            for x in graph.adj[node]
+        )
+    if j == len(edges):
+        return None
+
+    road = E[edges[j]].name
+    after = _bearing_from_start(E[edges[j]].coords_from(node))
+    angle = (after - before + 180.0) % 360.0 - 180.0
+    turn = _classify(angle)
+    if sport == "bike" and exits:
+        rang = _EXIT_ORDINALS[exits - 1] if exits <= len(_EXIT_ORDINALS) else f"{exits}e"
+        text = f"Au rond-point, prends la {rang} sortie{_on(road)}"
+    else:
+        verb = {"straight": "continue en face", "uturn": "fais demi-tour"}.get(turn, f"prends {_short(turn)}")
+        side = "droite" if forward else "gauche"
+        if sport == "bike":
+            how = ""
+        elif turn == "straight":
+            how = f" en restant à {side}"
+        elif turn == "uturn" or forward == turn.endswith("left"):
+            how = f" en faisant le tour par la {side}"
+        else:
+            how = ""
+        text = f"Au rond-point, {verb}{how}{_on(road)}"
+
+    lon, lat = graph.nodes[entry]
+    step = Instruction(
+        dist_m=round(travelled, 1),
+        turn=turn,
+        angle=round(angle, 1),
+        road=road,
+        text=text,
+        lon=round(lon, 6),
+        lat=round(lat, 6),
+        caution=False,
+        before=before,
+        after=after,
+        ring=True,
+    )
+    return step, j
 
 
 def _fork_turn(
@@ -420,9 +523,13 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
     while i < len(steps):
         current = steps[i]
         following = steps[i + 1] if i + 1 < len(steps) else None
+        # Un rond-point garde sa phrase : fondu dans la voisine, il redevenait
+        # « tourne à droite puis tout de suite à gauche ».
         proches = (
             following is not None
             and following.dist_m - current.dist_m <= MERGE_DISTANCE_M
+            and not current.ring
+            and not following.ring
         )
         if proches:
             # **L'angle net : du cap d'arrivée au premier point au cap de départ

@@ -126,6 +126,9 @@ _ONEWAY_BACKWARD = {"-1", "reverse"}
 _CONTRAFLOW = {"opposite", "opposite_lane", "opposite_track", "opposite_share_busway"}
 _CYCLEWAY_KEYS = ("cycleway", "cycleway:left", "cycleway:right", "cycleway:both")
 _CYCLEWAY_ONEWAY_KEYS = ("cycleway:left:oneway", "cycleway:right:oneway", "cycleway:both:oneway")
+# L'anneau d'un rond-point : dessiné dans le sens de la circulation, il est à
+# sens unique sans le dire — voir `oneway_for`, et `Edge.ring`.
+RING_JUNCTIONS = {"roundabout", "circular"}
 
 
 def oneway_for(tags: dict[str, str], sport: str = "run") -> int:
@@ -149,7 +152,7 @@ def oneway_for(tags: dict[str, str], sport: str = "run") -> int:
         return 1
     if value in _ONEWAY_BACKWARD:
         return -1
-    if value is None and tags.get("junction") in {"roundabout", "circular"}:
+    if value is None and tags.get("junction") in RING_JUNCTIONS:
         return 1
     return 0
 

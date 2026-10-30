@@ -30,6 +30,7 @@ def grid_payload(
     dangerous_row: int | None = None,
     dangerous_tags: dict[str, str] | None = None,
     nature: bool = False,
+    roundabout: bool = False,
 ) -> dict:
     """Damier `size` × `size` de rues résidentielles avec trottoirs.
 
@@ -39,6 +40,10 @@ def grid_payload(
     `nature` ajoute un parc sur le quart nord-est — un multipolygone, en deux
     morceaux de contour —, une rivière qui longe la deuxième rue horizontale et
     un sentier balisé sur la première colonne.
+
+    `roundabout` remplace le carrefour central par un rond-point : un anneau de
+    quatre nœuds, à ~25 m du centre, dessiné comme OpenStreetMap le fait, dans
+    le sens de la circulation — sud, est, nord, ouest.
     """
     street = tags or {"highway": "residential", "sidewalk": "both", "maxspeed": "50"}
     # `maxspeed` explicite : le damier est couvert par un polygone `landuse`,
@@ -48,33 +53,54 @@ def grid_payload(
 
     elements: list[dict] = []
     way_id = 1
+    mid = size // 2 if roundabout else -1
+    # Les nœuds de l'anneau : sud, est, nord, ouest.
+    ring = {
+        side: (3_000_001 + k, {"lat": ORIGIN_LAT + (mid + dy) * STEP, "lon": ORIGIN_LON + (mid + dx) * STEP})
+        for k, (side, dx, dy) in enumerate(
+            [("s", 0, -0.15), ("e", 0.15, 0), ("n", 0, 0.15), ("w", -0.15, 0)]
+        )
+    }
+
+    def street_ways(tags_: dict, cells: list[tuple[int, int]], ends: tuple[str, str]) -> None:
+        """Une rue du damier — en deux, de part et d'autre de l'anneau, s'il y en a un."""
+        nonlocal way_id
+        pieces = [cells]
+        if (mid, mid) in cells:
+            cut = cells.index((mid, mid))
+            pieces = [cells[:cut] + [ends[0]], [ends[1]] + cells[cut + 1 :]]
+        for piece in pieces:
+            elements.append(
+                {
+                    "type": "way",
+                    "id": way_id,
+                    "tags": dict(tags_),
+                    "nodes": [ring[p][0] if isinstance(p, str) else _node_id(*p) for p in piece],
+                    "geometry": [ring[p][1] if isinstance(p, str) else _coord(*p) for p in piece],
+                }
+            )
+            way_id += 1
 
     # lignes horizontales
     for iy in range(size):
         row_tags = danger if iy == dangerous_row else street
-        elements.append(
-            {
-                "type": "way",
-                "id": way_id,
-                "tags": dict(row_tags),
-                "nodes": [_node_id(ix, iy) for ix in range(size)],
-                "geometry": [_coord(ix, iy) for ix in range(size)],
-            }
-        )
-        way_id += 1
+        street_ways(row_tags, [(ix, iy) for ix in range(size)], ("w", "e"))
 
     # colonnes verticales
     for ix in range(size):
+        street_ways(street, [(ix, iy) for iy in range(size)], ("s", "n"))
+
+    if roundabout:
+        loop = ["s", "e", "n", "w", "s"]
         elements.append(
             {
                 "type": "way",
-                "id": way_id,
-                "tags": dict(street),
-                "nodes": [_node_id(ix, iy) for iy in range(size)],
-                "geometry": [_coord(ix, iy) for iy in range(size)],
+                "id": 70_000,
+                "tags": {**street, "junction": "roundabout", "name": "Rond-point du Centre"},
+                "nodes": [ring[p][0] for p in loop],
+                "geometry": [ring[p][1] for p in loop],
             }
         )
-        way_id += 1
 
     # polygone de zone bâtie couvrant tout le damier
     span = (size - 1) * STEP
