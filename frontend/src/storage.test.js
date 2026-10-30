@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { exportAll, importAll, load, mirrorTo, recentPlaces, rememberPlace, restoreFrom, save, slim, wipe } from './storage'
+import { exportAll, importAll, load, mirrorTo, recentPlaces, rememberPlace, rememberShown, restoreFrom, save, shownFrom, slim, wipe } from './storage'
 
 /**
  * La persistance locale.
@@ -123,6 +123,33 @@ describe('les départs récents', () => {
     rememberPlace({ label: 'Nulle part', lat: NaN, lon: 7 })
     rememberPlace(null)
     expect(recentPlaces()).toEqual([])
+  })
+})
+
+describe('les boucles montrées', () => {
+  // Une boucle de 2 km vers l'est, en points tous les dix mètres.
+  const boucle = (dx) => ({
+    distance_m: 2000,
+    geometry: Array.from({ length: 101 }, (_, i) => [7.2106 + dx + i * 0.00013, 47.9097]),
+  })
+  const ici = { lat: 47.9097, lon: 7.2106 }
+
+  it('garde les dernières montrées depuis ce départ, les plus récentes d’abord', () => {
+    rememberShown(ici, [boucle(0), boucle(0.01)])
+    rememberShown({ lat: 47.90975, lon: 7.21065 }, [boucle(0.02)])
+    const traces = shownFrom(ici)
+    expect(traces).toHaveLength(3)
+    expect(traces[0][0][0]).toBeCloseTo(7.2306, 5)
+    // Un point tous les cent mètres, pas la géométrie entière.
+    expect(traces[0].length).toBeLessThan(25)
+    expect(shownFrom({ lat: 48.08, lon: 7.36 })).toEqual([])
+  })
+
+  it('n’en garde que dix par départ, et trois départs', () => {
+    for (let i = 0; i < 4; i += 1) rememberShown(ici, [boucle(i), boucle(i + 0.5), boucle(i + 0.7)])
+    expect(shownFrom(ici)).toHaveLength(10)
+    for (let i = 1; i <= 3; i += 1) rememberShown({ lat: 47 + i, lon: 7 }, [boucle(0)])
+    expect(shownFrom(ici)).toEqual([])
   })
 })
 

@@ -7,6 +7,7 @@ import { haversineM } from './geo'
 import { RouteStats, runGate } from './safety'
 import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute, selectVaried } from './service'
 import { Candidate, bearingGap } from './loops'
+import { familiarTo, traceOf } from '../knownRoutes'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -133,12 +134,18 @@ describe('la boucle', () => {
 
   it('cherche d’autres boucles entières avant de proposer des tours', async () => {
     // Douze propositions : le premier tirage n'en tient qu'une poignée de
-    // distinctes, et la liste se complétait de tours. À 7 km : depuis que les
-    // épingles sont rognées (`trimSpurs`), le premier tirage en tient onze ou
-    // douze de 4 à 6 km, et neuf seulement à 7.
+    // distinctes, et la liste se complétait de tours. À 7 km depuis Beaune, il
+    // en tient neuf, et les tirages en plus complètent la liste.
+    //
+    // Pas en dessous : depuis le départ devant la porte et les épingles rognées
+    // (`trimSpurs`), le premier tirage y tient déjà onze ou douze boucles,
+    // l'élargissement ne se lance pas — à raison —, et « plus qu'avant » ne
+    // pouvait plus être vrai. D'où la première vérification : sans elle, le
+    // test échouait sans dire que c'était sa prémisse qui ne tenait plus.
     const demande = { lat: 47.0245, lon: 4.8395, distance_km: 7, sport: 'run', limit: 12 }
     const entieres = (r) => r.routes.filter((route) => route.laps === 1).length
     const sans = await planLoops({ ...demande, widen: false }, deps)
+    expect(entieres(sans), 'le premier tirage remplit déjà la liste : rien à élargir').toBeLessThan(demande.limit)
     const avec = await planLoops(demande, deps)
     expect(entieres(avec)).toBeGreaterThan(entieres(sans))
   }, 60_000)
@@ -215,6 +222,69 @@ describe('la boucle', () => {
       expect(dejaVue / cand.geometry.length).toBeLessThanOrEqual(0.55)
     }
   }, 30_000)
+
+  it('tient la forme demandée, avec les réglages de l’app', async () => {
+    // La parité vérifie les formes sur le damier, sans ce que l'app ajoute :
+    // le départ devant la porte, et surtout les tirages en plus (`widen`), qui
+    // ajouteraient des boucles entières à une demande de « 8 ».
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 6, sport: 'run', limit: 4 }
+    const huits = await planLoops({ ...demande, form: 'eight' }, deps)
+    expect(huits.routes.length).toBeGreaterThan(0)
+    for (const r of huits.routes) expect(r.figure_eight).toBe(true)
+    const tours = await planLoops({ ...demande, form: 'laps', laps: 3 }, deps)
+    expect(tours.routes.length).toBeGreaterThan(0)
+    for (const r of tours.routes) expect([r.laps, r.figure_eight]).toEqual([3, false])
+    const une = await planLoops({ ...demande, form: 'loop', limit: 12 }, deps)
+    for (const r of une.routes) expect(r.laps).toBe(1)
+  }, 60_000)
+
+  it('varie d’une recherche à l’autre, et pas à graine égale', async () => {
+    // « Quand on génère des boucles deux fois, ce ne sont pas les mêmes qui
+    // sortent, qui plus est dans le même ordre » : sans graine, le moteur
+    // rendait exactement la même liste à chaque fois.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5 }
+    const liste = (r) => r.routes.map((route) => route.geometry.length + ':' + route.distance_m).join(' ')
+    const a = await planLoops({ ...demande, seed: 11 }, deps)
+    expect(liste(await planLoops({ ...demande, seed: 11 }, deps))).toBe(liste(a))
+    const autres = await Promise.all([12, 13, 14].map((seed) => planLoops({ ...demande, seed }, deps)))
+    for (const b of autres) expect(liste(b)).not.toBe(liste(a))
+    // Le hasard départage des boucles de qualité proche, jamais une note.
+    for (const r of [a, ...autres]) {
+      const notes = r.routes.map((route) => route.safety.grade)
+      expect([...notes].sort()).toEqual(notes)
+    }
+  }, 60_000)
+
+  it('ne remet pas en tête une boucle qu’on vient de montrer', async () => {
+    // En « Route », Beaune offre bien plus de cinq boucles notées A et dans la
+    // fourchette : les déjà vues passent toutes après les neuves.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5, surface: 'road', seed: 21 }
+    const avant = await planLoops(demande, deps)
+    const vues = avant.routes.map((r) => traceOf(r.geometry, r.distance_m))
+    const apres = await planLoops({ ...demande, seed: 22, familiar: vues }, deps)
+    expect(apres.routes.filter((r) => familiarTo(r.geometry, vues))).toEqual([])
+    expect(apres.routes.map((r) => r.safety.grade)).toEqual(['A', 'A', 'A', 'A', 'A'])
+  }, 60_000)
+
+  it('garde en tête une boucle déjà vue quand elle seule tient les réglages', async () => {
+    // En « Mixte », une seule boucle de 4 km a sa part de chemins : déjà vue, elle
+    // reste devant des boucles toutes goudronnées. Varier ne coûte pas un réglage.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5, seed: 21 }
+    const avant = await planLoops(demande, deps)
+    const vues = avant.routes.map((r) => traceOf(r.geometry, r.distance_m))
+    const apres = await planLoops({ ...demande, seed: 22, familiar: vues }, deps)
+    expect(apres.routes[0].score).toBe(Math.max(...apres.routes.map((r) => r.score)))
+  }, 60_000)
+
+  it('refuse tout de suite une forme aux tours trop courts', async () => {
+    await expect(planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 5, form: 'laps', laps: 5 }, deps)).rejects.toThrow(
+      /5 tours de 1,0 km : sous 1,5 km/,
+    )
+    // En durée aussi : 15 min à 6:30/km, c'est 2,3 km, deux boucles de 1,2 km.
+    await expect(planLoops({ lat: 47.0245, lon: 4.8395, duration_min: 15, form: 'eight' }, deps)).rejects.toThrow(
+      /Deux boucles de 1,2 km/,
+    )
+  })
 })
 
 describe('le relief', () => {

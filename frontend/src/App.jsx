@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import Countdown from './Countdown.jsx'
 import MapView from './MapView.jsx'
-import FiltersSheet, { DEFAULTS, SPORTS } from './FiltersSheet.jsx'
+import FiltersSheet, { DEFAULTS, SPORTS, estimateKm } from './FiltersSheet.jsx'
 import SearchBar from './SearchBar.jsx'
 import LiveRun from './LiveRun.jsx'
 import RunSummary from './RunSummary.jsx'
@@ -28,7 +28,8 @@ import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
 import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
 import { startAppearance, useAppearance } from './appearance'
 import { km } from './format'
-import { load, save } from './storage'
+import { load, rememberShown, save, shownFrom } from './storage'
+import { ranFrom } from './knownRoutes'
 import { haptic } from './platform'
 import { announceDeparture, announcing } from './contact'
 import * as offline from './offlineMaps'
@@ -178,11 +179,22 @@ export default function App() {
       // demande, elle, repart toujours du point choisi — la maison, pas le
       // trottoir —, pour que chaque recherche sorte du même côté.
       const asked = askedOf(start)
-      await found.run(
+      // Ce qu'on a déjà vu d'ici — et déjà couru, quand on demande à l'éviter —
+      // recule au choix, et une graine neuve fait varier chaque recherche : la
+      // même demande, relancée un autre jour, rendait la même liste dans le
+      // même ordre (`seed`, `familiar`, `engine/service.js`).
+      const targetM = (request.distance_km ?? estimateKm(active)) * 1000
+      const familiar = [
+        ...shownFrom(asked),
+        ...((active.avoid ?? []).includes('known') ? ranFrom(history, asked, targetM) : []),
+      ]
+      const shown = await found.run(
         {
           ...request,
           variation: variation.current,
           avoid_bearings: avoid,
+          seed: 1 + Math.floor(Math.random() * (2 ** 32 - 1)),
+          familiar,
           blocked: blockedPoints(),
           zones: avoidedZones(),
         },
@@ -191,9 +203,10 @@ export default function App() {
           onStart: (point) => here.setPoint({ ...point, asked }),
         },
       )
+      if (shown?.routes.length) rememberShown(asked, shown.routes)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params, start, result, via],
+    [params, start, result, via, history],
   )
 
   // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient

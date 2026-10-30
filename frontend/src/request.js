@@ -41,7 +41,9 @@ export function toRequest(p, start) {
   // Guebwiller : 22 m exposés en moyenne par boucle avant, 1 m après, même
   // justesse sur la distance. Une case restée cochée dans d'anciens réglages ne
   // compte plus — elle n'a plus d'interrupteur pour la décocher.
-  const avoid = (p.avoid ?? []).filter((key) => key !== 'busy')
+  // « Boucles déjà courues » ne part pas en évitement : ce sont les sorties
+  // passées, envoyées à part (`familiar`, `App.jsx`).
+  const avoid = (p.avoid ?? []).filter((key) => key !== 'busy' && key !== 'known')
   if (p.safety === 'safe') avoid.push('busy')
   if (avoid.length) body.avoid = avoid
   // Actif par défaut dans le moteur : seul le refus se dit.
@@ -54,6 +56,9 @@ export function toRequest(p, start) {
   // « Auto » ne se dit pas : sans cap, la recherche est celle d'avant.
   const direction = directionOf(p.direction)
   if (direction) body.heading = direction.deg
+  // « Auto » non plus : c'est la forme que le moteur choisit de lui-même.
+  if (p.form && p.form !== 'auto') body.form = p.form
+  if (p.form === 'laps') body.laps = p.laps ?? 2
   if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
@@ -68,9 +73,13 @@ export function toRequest(p, start) {
   return body
 }
 
-/** « 10 km · 6:30/km » — ce que dit la pastille d'activité. */
+// La forme choisie, dite sur la pastille : « Auto » ne se dit pas.
+const FORM_WORDS = { loop: 'une boucle', eight: 'deux boucles' }
+
+/** « 10 km · 3 tours · 6:30/km » — ce que dit la pastille d'activité. */
 export function summarise(p) {
-  const race = p.mode === 'distance' ? raceOf(p.distance_km) : null
+  // « Semi » se dit d'une course ; à vélo, 21,0975 km restent des kilomètres.
+  const race = p.mode === 'distance' && p.sport !== 'bike' ? raceOf(p.distance_km) : null
   const dist = race
     ? race.label
     : p.mode === 'distance'
@@ -80,7 +89,10 @@ export function summarise(p) {
     p.sport === 'bike' || p.speedUnit === 'speed'
       ? `${p.speed_kmh} km/h`
       : `${pace(p.pace_sec_per_km)}/km`
-  return `${dist} · ${speed}`
+  const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
+  // « Éviter › Boucles déjà courues » : ce qu'on cherche, ce sont des inédites.
+  const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null
+  return [dist, form, fresh, speed].filter(Boolean).join(' · ')
 }
 
 /** Entrée d'historique d'une sortie sans itinéraire. */

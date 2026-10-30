@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alreadyRun, records, sameRoute, standing } from './knownRoutes'
+import { alreadyRun, familiarTo, ranFrom, records, sameRoute, standing, traceOf } from './knownRoutes'
 
 /**
  * Reconnaître un chemin déjà parcouru.
@@ -152,5 +152,45 @@ describe('les records', () => {
   it('ne fête rien sans sortie à battre, ni une allure sur un kilomètre', () => {
     expect(records(run('2026-10-19T08:00:00Z', 5, 20), []).list).toEqual([])
     expect(records(run('2026-10-19T08:00:00Z', 1, 3), avant).list).toEqual([])
+  })
+})
+
+describe('les boucles déjà vues, pour le moteur', () => {
+  // Un anneau de 800 m de rayon : 5 km, comme une boucle proposée.
+  const boucle = anneau(7.2, 47.9, 800)
+  const distance = Math.round(longueur(800))
+
+  it('garde un tracé léger : un point tous les cent mètres, au mètre près', () => {
+    const trace = traceOf(boucle, distance)
+    expect(trace.length).toBeGreaterThan(45)
+    expect(trace.length).toBeLessThanOrEqual(52)
+    for (const [lon, lat] of trace) {
+      expect(lon).toBe(Math.round(lon * 1e5) / 1e5)
+      expect(lat).toBe(Math.round(lat * 1e5) / 1e5)
+    }
+    // Une sortie de 60 km n'en garde pas plus de cent vingt, départ et arrivée en plus.
+    expect(traceOf(anneau(7.2, 47.9, 9500, { points: 2000 }), longueur(9500)).length).toBeLessThanOrEqual(122)
+  })
+
+  it('reconnaît la même boucle dans son tracé léger, pas sa voisine', () => {
+    const vues = [traceOf(boucle, distance)]
+    expect(familiarTo(boucle, vues)).toBe(true)
+    // La même, partie d'ailleurs sur l'anneau : c'est le chemin qui compte.
+    expect(familiarTo(anneau(7.2, 47.9, 800, { depuis: 1.3 }), vues)).toBe(true)
+    // Un anneau parallèle, deux rues plus loin, n'est pas la même boucle.
+    expect(familiarTo(anneau(7.2, 47.9, 1000), vues)).toBe(false)
+    expect(familiarTo(boucle, [])).toBe(false)
+  })
+
+  it('ne retient que les sorties de ce départ, à peu près de cette longueur', () => {
+    const ici = { lon: boucle[0][0], lat: boucle[0][1] }
+    const history = [
+      sortie(boucle),
+      sortie(anneau(7.3, 47.9, 800)),
+      sortie(boucle, { distance: 15_000 }),
+    ]
+    const traces = ranFrom(history, ici, distance)
+    expect(traces).toHaveLength(1)
+    expect(familiarTo(boucle, traces)).toBe(true)
   })
 })

@@ -244,3 +244,84 @@ class TestHuit:
                 assert similarity(a, b) <= DUPLICATE_THRESHOLD
         for h in huits:
             assert run_gate(h.stats, "safe", "run").passed
+
+
+class TestFormeDemandee:
+    """« Une boucle », « Deux boucles », « 3 tours » : la forme se choisit.
+
+    Le moteur choisissait seul — une boucle entière d'abord, des tours faute de
+    mieux. Une forme demandée se tient **strictement** : plutôt aucune
+    proposition, avec un message qui le dit, qu'une autre forme que celle-là.
+    """
+
+    @pytest.fixture
+    def plan(self, monkeypatch):
+        import asyncio
+
+        from app import service
+        from app.osm.extract import read as read_extract, to_cache
+        from tests.conftest import ORIGIN_LAT, ORIGIN_LON, STEP, grid_payload
+
+        extract = read_extract(to_cache(read_extract(grid_payload(9))))
+
+        async def fake_area(lat, lon, radius_m, *, target_m=0.0):
+            return extract
+
+        async def calm(lat, lon):
+            return None
+
+        monkeypatch.setattr(service, "fetch_area", fake_area)
+        monkeypatch.setattr(service, "current_wind", calm)
+
+        def run(**extra):
+            service.graph_cache.clear()
+            req = LoopRequest(
+                lat=ORIGIN_LAT + 4 * STEP, lon=ORIGIN_LON + 4 * STEP, time_of_day="day",
+                with_elevation=False, limit=6, **extra,
+            )
+            return asyncio.run(service.plan_loops(req))
+
+        yield run
+        service.graph_cache.clear()
+
+    def test_auto_complete_de_tours_et_de_huits(self, plan):
+        """Le damier est trop petit pour 6 km d'une traite : « Auto » propose des
+        tours — c'est le cas que les formes demandées départagent."""
+        routes = plan(distance_km=6.0).routes
+        assert routes and all(r.laps > 1 for r in routes)
+
+    def test_deux_boucles_ne_rend_que_des_huits(self, plan):
+        routes = plan(distance_km=6.0, form="eight").routes
+        assert routes
+        assert all(r.figure_eight and r.laps == 2 for r in routes)
+
+    def test_des_tours_rendent_ce_nombre_de_tours(self, plan):
+        routes = plan(distance_km=6.0, form="laps", laps=3).routes
+        assert routes
+        assert all(r.laps == 3 and not r.figure_eight for r in routes)
+        # Deux tours de la même boucle, et pas un « 8 » : c'est ce qu'on a demandé.
+        two = plan(distance_km=6.0, form="laps", laps=2).routes
+        assert two and all(r.laps == 2 and not r.figure_eight for r in two)
+
+    def test_une_boucle_ne_se_complete_jamais_de_tours(self, plan):
+        """Aucune boucle entière de 6 km sur le damier : rien, et on le dit — avec
+        ce que « Auto » ferait à la place."""
+        res = plan(distance_km=6.0, form="loop")
+        assert res.routes == []
+        assert "« Auto »" in res.meta["message"]
+        # Là où une boucle entière existe, elle sort, seule de son espèce.
+        whole = plan(distance_km=2.5, form="loop").routes
+        assert whole and all(r.laps == 1 for r in whole)
+
+    def test_une_forme_trop_courte_est_refusee_avant_de_chercher(self, plan):
+        from app.service import PlanningError
+
+        with pytest.raises(PlanningError, match="5 tours de 1,0 km"):
+            plan(distance_km=5.0, form="laps", laps=5)
+        with pytest.raises(PlanningError, match="Deux boucles de 1,2 km"):
+            plan(distance_km=2.5, form="eight")
+
+    def test_la_duree_se_convertit_avant_la_forme(self, plan):
+        """40 min à 6:40/km, c'est 6 km : trois tours de 2 km."""
+        routes = plan(duration_min=40, pace_sec_per_km=400, form="laps", laps=3).routes
+        assert routes and all(r.laps == 3 for r in routes)

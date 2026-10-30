@@ -18,6 +18,7 @@ import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, pySum, sortByKey } fro
 import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
+import { familiarTo } from '../knownRoutes'
 import { ELEVATION_STEP_M, Terrain, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
 
 export const SETTINGS = {
@@ -49,6 +50,16 @@ const DUPLICATE_THRESHOLD = 0.55
 const VARIETY_OVERLAP_WEIGHT = 0.45
 const VARIETY_BEARING_WEIGHT = 0.3
 const BEARING_SPREAD_DEG = 90
+// Ce qu'une graine (`seed`) ajoute au hasard à chaque candidat, au choix des
+// propositions : de quoi changer l'ordre et le choix des boucles de qualité
+// proche, rien qui passe un cran de note (0,9) ou une fourchette de réglages
+// (2). Propre à l'app, comme `FAMILIAR_PENALTY`.
+const SEED_JITTER = 0.1
+// Ce que coûte au choix une boucle déjà vue — montrée récemment depuis ce
+// départ, ou déjà courue (`familiar`). Moins qu'un cran de note : une boucle A
+// déjà vue passe encore devant une B neuve ; plus que le hasard : elle ne
+// revient pas en tête devant une neuve de qualité proche.
+const FAMILIAR_PENALTY = 0.5
 const WIND_WEIGHT = 0.1
 const LAP_DIVISORS = [2, 3, 4]
 // Tirages supplémentaires, polygones tournés, quand il manque des boucles
@@ -128,6 +139,7 @@ const ENUMS = {
   safety: ['safe', 'standard'],
   time_of_day: ['day', 'night', 'auto'],
   side: ['left', 'right', 'any'],
+  form: ['auto', 'loop', 'eight', 'laps'],
 }
 
 function bounded(value, name, { min = -Infinity, max = Infinity, gt = -Infinity, integer = false }) {
@@ -205,6 +217,16 @@ export function normalizeRequest(input) {
     //                              par lequel toutes les boucles passent — voir
     //                              `threadVia`. Il oriente les polygones comme
     //                              une direction, qu'il remplace.
+    //   seed                       Un entier tiré au sort à chaque recherche
+    //                              (`App.jsx`) : les polygones tournent d'une
+    //                              fraction de cran, et le hasard départage les
+    //                              boucles de qualité proche — `SEED_JITTER`.
+    //                              Même graine, même réponse ; 0 (par défaut),
+    //                              la réponse de Python.
+    //   familiar                   Des tracés déjà vus, `[[lon, lat], …]` par
+    //                              boucle — montrées récemment depuis ce départ,
+    //                              ou déjà courues : une boucle qui en suit un
+    //                              recule (`FAMILIAR_PENALTY`). Vide par défaut.
     //
     // Chaque ajout ici est une divergence de plus : elle se paie en tests JS
     // propres, puisque la parité ne la verra pas.
@@ -222,9 +244,15 @@ export function normalizeRequest(input) {
     // Le côté où l'on court : à gauche par défaut, face aux voitures — partagé
     // avec Python (`LoopRequest.side`), donc vu par la parité.
     side: input.side ?? 'left',
+    // La forme de la sortie, et le nombre de tours — partagés avec Python
+    // (`LoopRequest.form`, `laps`), donc vus par la parité.
+    form: input.form ?? 'auto',
+    laps: input.laps ?? 2,
     widen: input.widen !== false,
     heading: input.heading ?? null,
     via: input.via ?? null,
+    seed: input.seed ?? 0,
+    familiar: input.familiar ?? [],
   }
   for (const [key, values] of Object.entries(ENUMS)) {
     if (!values.includes(req[key])) throw new PlanningError(`Paramètre ${key} invalide.`)
@@ -238,12 +266,24 @@ export function normalizeRequest(input) {
   req.pace_sec_per_km = bounded(req.pace_sec_per_km, 'pace_sec_per_km', { min: 150, max: 1200, integer: true })
   req.speed_kmh = bounded(req.speed_kmh, 'speed_kmh', { min: 5, max: 60 })
   req.limit = bounded(req.limit, 'limit', { min: 1, max: 12, integer: true })
+  req.laps = bounded(req.laps, 'laps', { min: 2, max: 10, integer: true })
   req.variation = bounded(req.variation, 'variation', { min: 0, max: 1000, integer: true })
   if (!Array.isArray(req.avoid_bearings) || req.avoid_bearings.length > 24) {
     throw new PlanningError('Paramètre avoid_bearings invalide.')
   }
   req.avoid_bearings = req.avoid_bearings.map((b) => bounded(b, 'avoid_bearings', { min: 0, max: 360 }))
   if (req.heading !== null) req.heading = bounded(req.heading, 'heading', { min: 0, max: 360 })
+  req.seed = bounded(req.seed, 'seed', { min: 0, max: 2 ** 32 - 1, integer: true })
+  // Une trentaine de tracés au plus — dix montrés, vingt courus — de cent vingt
+  // points : le double, pour la marge, pas davantage.
+  if (!Array.isArray(req.familiar) || req.familiar.length > 60) throw new PlanningError('Paramètre familiar invalide.')
+  req.familiar = req.familiar.map((trace) => {
+    if (!Array.isArray(trace) || trace.length > 300) throw new PlanningError('Paramètre familiar invalide.')
+    return trace.map((p) => [
+      bounded(p?.[0], 'familiar', { min: -180, max: 180 }),
+      bounded(p?.[1], 'familiar', { min: -90, max: 90 }),
+    ])
+  })
   if (req.via !== null) {
     req.via = {
       lat: bounded(req.via?.lat, 'via', { min: -90, max: 90 }),
@@ -363,8 +403,16 @@ export async function planLoops(input, deps) {
   }
 
   let req = normalizeRequest(input)
+  // La graine ajoute un tirage, polygones tournés d'une fraction de cran tirée
+  // au sort (`collect`), et départage au hasard les boucles de qualité proche.
+  const draw = req.seed ? seeded(req.seed) : null
+  const seedTurn = draw ? draw() / GOLDEN : null
   const args = graphArgs(req)
   const { targetM } = args
+  // Une forme trop courte pour ses tours se refuse avant tout téléchargement —
+  // voir `_form_refusal`.
+  const refusal = formRefusal(req, targetM)
+  if (refusal) throw new PlanningError(refusal)
   onProgress('data', 0)
   // Le relief de la zone, pour tracer vers le terrain demandé — voir `Terrain`.
   const terrainTask = req.with_elevation ? fetchTerrain(req.lat, req.lon, args.radiusM, fetchElevations) : null
@@ -464,8 +512,11 @@ export async function planLoops(input, deps) {
   const deadline = performance.now() + (settings.widenBudgetMs ?? WIDEN_BUDGET_MS)
   // Ce que le premier tirage laisse aux suivants — voir `reuse` (`loops.js`).
   let reuse = {}
-  const generate = () =>
-    generateLoops(graph, start, targetM, profile, {
+  // Un « 8 » ou des tours n'ont que faire des boucles de toute la distance :
+  // on ne les trace pas — voir `plan_loops`.
+  const generate = () => {
+    if (!wholeLoops(req)) return []
+    const batch = generateLoops(graph, start, targetM, profile, {
       reuse: (reuse = {}),
       sectors: settings.sectors,
       maxCandidates: settings.maxCandidates,
@@ -476,14 +527,16 @@ export async function planLoops(input, deps) {
       heading: req.heading,
       via,
     })
+    trace.raw?.(start, targetM, batch)
+    return batch
+  }
   let raw = generate()
-  trace.raw?.(start, targetM, raw)
   lap('routing')
 
   const lo = targetM * (1 - req.tolerance)
   const hi = targetM * (1 + req.tolerance)
 
-  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
+  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
 
   // **Rien de ce côté.** Une rivière sans pont, une voie ferrée, une frontière :
   // la direction demandée n'offre aucune boucle qui tienne les seuils. On le dit,
@@ -494,13 +547,13 @@ export async function planLoops(input, deps) {
     missedHeading = req.heading
     req = { ...req, heading: null }
     raw = generate()
-    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
+    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
   }
 
   let relaxed = false
   let salvaged = null
   if (!unique.length && req.safety === 'safe') {
-    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via })
+    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
     relaxed = unique.length > 0
   }
 
@@ -530,7 +583,11 @@ export async function planLoops(input, deps) {
 
   // La réserve se choisit d'abord sur les réglages : seule elle reçoit son
   // altitude — voir `shortlistKey`.
-  sortByKey(unique, (c) => -shortlistKey(c, targetM, req, terrain))
+  // Une boucle déjà vue recule dès la réserve : sinon les neuves n'y entraient
+  // pas, faute de place, et ne pouvaient plus passer devant au choix final.
+  const known = req.familiar.length ? new Set(unique.filter((c) => familiarTo(c.geometry, req.familiar))) : null
+  const familiarCost = (c) => (known?.has(c) ? FAMILIAR_PENALTY : 0)
+  sortByKey(unique, (c) => -(shortlistKey(c, targetM, req, terrain) - familiarCost(c)))
   if (shown.length) unique = freshFirst(unique, shown, req.limit)
   const shortlist = unique.slice(0, shortlistSize(req.limit))
 
@@ -567,7 +624,14 @@ export async function planLoops(input, deps) {
     return [finalScore(cand, targetM, req, gain, wind), cand, i]
   })
   sortByKey(scored, (t) => -t[0])
-  const chosen = selectVaried(scored, req.limit, req.avoid_bearings)
+  // Le hasard de la graine, et le recul des boucles déjà vues : ils pèsent sur
+  // le choix, pas sur la note rendue.
+  const adjust = new Map()
+  for (const [, cand] of scored) {
+    const delta = (draw ? SEED_JITTER * draw() : 0) - familiarCost(cand)
+    if (delta) adjust.set(cand, delta)
+  }
+  const chosen = selectVaried(scored, req.limit, req.avoid_bearings, adjust)
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
@@ -622,7 +686,7 @@ export async function planLoops(input, deps) {
   } else if (!routes.length) {
     meta.message = via
       ? `Aucune boucle de ${pyFixed(req.distance_km, 1).replace('.', ',')} km ne passe par ce point en tenant les seuils. Essaie une autre distance, ou déplace le point de passage.`
-      : noResultMessage(req, rejected, offTarget)
+      : formMessage(req, targetM, noResultMessage(req, rejected, offTarget))
   }
   if (missedHeading !== null) {
     meta.heading_missed = directionOf(missedHeading)
@@ -662,7 +726,10 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
-function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null, { deadline = Infinity, reuse = {}, via = null } = {}) {
+function collect(
+  raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null,
+  { deadline = Infinity, reuse = {}, via = null, seedTurn = null } = {},
+) {
   const [passed, rejected, offTarget] = applyGate(raw, lo, hi, mode, req.sport)
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
 
@@ -682,17 +749,12 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
   // appel repart de ce qu'a laissé le premier tirage : relâché en Standard, un
   // polygone écarté en Sûr mérite d'être retracé.
   const shared = { scale: reuse.scale, seen: new Set(reuse.seen) }
-  for (let round = 1; req.widen && round <= WIDEN_ROUNDS && unique.length < req.limit; round += 1) {
-    if (round > WIDEN_MIN_ROUNDS && performance.now() > deadline) break
+  const draw = (variation) => {
     const more = generateLoops(graph, start, targetM, profile, {
       sectors: SETTINGS.sectors,
       maxCandidates: SETTINGS.maxCandidates,
       tolerance: req.tolerance,
-      // Une rotation fractionnaire : jamais celle d'un « Régénérer », qui
-      // tourne d'un cran entier à chaque fois. Divisée par le nombre d'or, que
-      // `generateLoops` remultiplie : chaque tirage tombe au milieu du plus
-      // grand écart laissé par les précédents — voir `WIDEN_PHASES`.
-      variation: req.variation + WIDEN_PHASES[round - 1] / GOLDEN,
+      variation,
       reuse: shared,
       terrain,
       climbFit: climbFit(req),
@@ -705,10 +767,40 @@ function collect(raw, lo, hi, mode, req, graph, start, profile, targetM, trace, 
     keep(extra)
   }
 
-  if (unique.length < req.limit) {
+  // La graine **ajoute** un tirage, polygones tournés d'une fraction de cran
+  // tirée au sort, au lieu de remplacer le premier : remplacé, le lot changeait
+  // du tout au tout, et sur trois recherches autour de Guebwiller sa meilleure
+  // boucle tombait parfois d'une fourchette de relief — note moyenne de −1,73 à
+  // −2,58 à 5 km. Ajouté, il ne retire rien : la meilleure boucle du tirage
+  // ordinaire reste là, et d'autres de qualité proche s'y mêlent.
+  if (seedTurn !== null && wholeLoops(req)) draw(req.variation + seedTurn)
+
+  for (let round = 1; req.widen && wholeLoops(req) && round <= WIDEN_ROUNDS && unique.length < req.limit; round += 1) {
+    if (round > WIDEN_MIN_ROUNDS && performance.now() > deadline) break
+    // Une rotation fractionnaire : jamais celle d'un « Régénérer », qui tourne
+    // d'un cran entier à chaque fois. Divisée par le nombre d'or, que
+    // `generateLoops` remultiplie : chaque tirage tombe au milieu du plus grand
+    // écart laissé par les précédents — voir `WIDEN_PHASES`.
+    draw(req.variation + WIDEN_PHASES[round - 1] / GOLDEN)
+  }
+
+  // « Une boucle » ne se complète jamais de tours — voir `_collect`.
+  if (unique.length < req.limit && req.form !== 'loop') {
     unique.push(...lapOptions(graph, start, req, profile, targetM, mode, req.limit - unique.length, trace, terrain, via))
   }
   return [unique, rejected, offTarget]
+}
+
+/** Une suite de tirages reproductible : même graine, même suite (mulberry32). */
+function seeded(seed) {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
 
 /** La clé d'un point de tracé : les sommets viennent du graphe, au bit près. */
@@ -742,7 +834,7 @@ function freshFirst(unique, shown, limit) {
 
 function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, terrain = null, via = null) {
   const out = []
-  for (const laps of LAP_DIVISORS) {
+  for (const laps of lapDivisors(req)) {
     if (out.length >= needed) break
     const lapTarget = targetM / laps
     if (lapTarget < MIN_LAP_M) break
@@ -765,7 +857,10 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
     const [passed] = applyGate(raw, lo, hi, mode, req.sport)
     sortByKey(passed, (c) => -preliminaryScore(c, lapTarget, req.tolerance))
 
-    if (laps === 2) out.push(...figureEights(graph, start, passed, mode, req, needed - out.length))
+    // Un « 8 » quand on veut deux boucles, ou que le moteur choisit seul ;
+    // jamais quand on a demandé deux tours de la même.
+    if (laps === 2 && req.form !== 'laps') out.push(...figureEights(graph, start, passed, mode, req, needed - out.length))
+    if (req.form === 'eight') continue
 
     for (const cand of passed) {
       if (out.length >= needed) break
@@ -776,6 +871,57 @@ function lapOptions(graph, start, req, profile, targetM, mode, needed, trace, te
     }
   }
   return out
+}
+
+/** Les boucles de toute la distance : en « Auto » et pour « Une boucle » seulement. */
+const wholeLoops = (req) => req.form === 'auto' || req.form === 'loop'
+
+/** Les nombres de tours à essayer — voir `_lap_divisors`. */
+function lapDivisors(req) {
+  if (req.form === 'eight') return [2]
+  if (req.form === 'laps') return [req.laps]
+  return LAP_DIVISORS
+}
+
+const kmText = (m) => pyFixed(m / 1000, 1).replace('.', ',')
+
+/** Pourquoi la forme demandée ne peut pas faire cette distance, ou `null` — voir `_form_refusal`. */
+function formRefusal(req, targetM) {
+  const floor = kmText(MIN_LAP_M)
+  if (req.form === 'eight' && targetM / 2 < MIN_LAP_M) {
+    return (
+      `Deux boucles de ${kmText(targetM / 2)} km : sous ${floor} km, une boucle n'est plus qu'un tour ` +
+      `de pâté de maisons. Vise au moins ${pyFixed((2 * MIN_LAP_M) / 1000, 0)} km, ou choisis une seule boucle.`
+    )
+  }
+  if (req.form === 'laps' && targetM / req.laps < MIN_LAP_M) {
+    return (
+      `${req.laps} tours de ${kmText(targetM / req.laps)} km : sous ${floor} km, un tour n'est plus une boucle ` +
+      'mais une séance de piste. Choisis moins de tours, ou une distance plus longue.'
+    )
+  }
+  return null
+}
+
+/** Ce qu'on dit quand la forme demandée ne donne rien — voir `_form_message`. */
+function formMessage(req, targetM, fallback) {
+  if (req.form === 'eight') {
+    return (
+      `Pas de « 8 » de ${kmText(targetM)} km d'ici : il faut deux boucles d'environ ${kmText(targetM / 2)} km, ` +
+      'de deux côtés du départ, qui tiennent chacune les seuils, et le réseau ne les offre pas. ' +
+      'Choisis « Auto », ou une autre distance.'
+    )
+  }
+  if (req.form === 'laps') {
+    return (
+      `Pas de boucle d'environ ${kmText(targetM / req.laps)} km à faire ${req.laps} fois d'ici qui tienne les ` +
+      'seuils. Choisis « Auto », un autre nombre de tours ou une autre distance.'
+    )
+  }
+  if (req.form === 'loop') {
+    return `${fallback} En « Auto », Lacet peut proposer à la place une boucle plus courte, à faire plusieurs fois.`
+  }
+  return fallback
 }
 
 /**
@@ -972,7 +1118,11 @@ export function finalScore(cand, targetM, req, ascentM, wind = null) {
   return quality - gradePenalty(cand) - preferencePenalty(cand, req, perKm) - LAP_PENALTY * (cand.laps - 1)
 }
 
-export function selectVaried(scored, limit, avoidBearings = []) {
+/**
+ * `adjust` : ce que le hasard et le déjà-vu ajoutent ou retirent à chaque
+ * candidat, au choix seulement — voir `SEED_JITTER`, `FAMILIAR_PENALTY`.
+ */
+export function selectVaried(scored, limit, avoidBearings = [], adjust = null) {
   const remaining = [...scored]
   const chosen = []
   while (remaining.length && chosen.length < limit) {
@@ -983,7 +1133,7 @@ export function selectVaried(scored, limit, avoidBearings = []) {
       // Les boucles entières d'abord, toutes : les tours ne font que compléter
       // la liste — voir `LAP_PENALTY` en Python.
       const whole = cand.laps === 1
-      const value = score - varietyPenalty(cand, chosen, avoidBearings)
+      const value = score + (adjust?.get(cand) ?? 0) - varietyPenalty(cand, chosen, avoidBearings)
       if ((whole && !bestWhole) || (whole === bestWhole && value > bestValue)) {
         bestWhole = whole
         bestValue = value

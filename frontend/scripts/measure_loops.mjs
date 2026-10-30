@@ -15,6 +15,12 @@
  *   (cd frontend && npx vite-node scripts/measure_loops.mjs)
  *   … -- --region <dossier des tuiles> --out mesure.json --only soultz --heading
  *
+ * `--seed` mesure deux recherches identiques qui se suivent, comme dans l'app :
+ * chacune sa graine, la seconde connaissant les boucles montrées par la première
+ * (`familiar`). Combien de boucles neuves, la première changée ou non, et ce que
+ * ça coûte en note. `--forms` demande chaque forme — 1 boucle, 2 boucles, 2 et 3
+ * tours — et compte les propositions hors de la forme et les refus.
+ *
  * `--climb` mesure plutôt le D+ visé (« environ 150 m ») : combien de boucles
  * tombent à ±20 % du D+ demandé, avec la préférence la plus proche (Plat,
  * Vallonné, Côtes) puis avec le D+ lui-même. Le dénivelé y est celui de l'app,
@@ -157,7 +163,7 @@ function fineElevations(grid) {
 
 // --- une recherche -------------------------------------------------------------
 
-async function run(name, distanceKm, limit, elevation, safety, extra = {}) {
+async function run(name, distanceKm, limit, elevation, safety, extra = {}, keep = false) {
   const { lat, lon } = STARTS[name]
   const input = { lat, lon, distance_km: distanceKm, limit, elevation, safety, time_of_day: 'day', ...extra }
   const a = graphRequest(input)
@@ -202,7 +208,93 @@ async function run(name, distanceKm, limit, elevation, safety, extra = {}) {
     shapes: whole.map((r) => r.shape),
     ascents: result.routes.map((r) => r.ascent_m),
     routeGrades: result.routes.map((r) => r.safety.grade),
+    message: result.meta.message ?? null,
+    full: keep ? result.routes : undefined,
   }
+}
+
+// --- deux recherches qui se suivent ------------------------------------------------
+
+if (flag('seed')) {
+  const { familiarTo, traceOf } = await import('../src/knownRoutes.js')
+  const traces = (row) => row.full.map((r) => traceOf(r.geometry, r.distance_m))
+  const fresh = (row, before) => row.full.filter((r) => !familiarTo(r.geometry, traces(before))).length
+  const mean = (row) => row.full.reduce((t, r) => t + r.score, 0) / Math.max(1, row.full.length)
+  const a = (row) => row.routeGrades.filter((g) => g === 'A').length
+  const lines = []
+  let k = 0
+  for (const name of option('only')?.split(',') ?? Object.keys(STARTS)) {
+    for (const km of DISTANCES) {
+      k += 1
+      const base = await run(name, km, 5, 'rolling', 'safe', {}, true)
+      const first = await run(name, km, 5, 'rolling', 'safe', { seed: 1000 + k }, true)
+      const alone = await run(name, km, 5, 'rolling', 'safe', { seed: 2000 + k }, true)
+      const second = await run(name, km, 5, 'rolling', 'safe', { seed: 2000 + k, familiar: traces(first) }, true)
+      const row = {
+        name, km,
+        routes: [base.routes, first.routes, second.routes],
+        // Les boucles de la seconde recherche qu'on n'a pas vues à la première.
+        freshAlone: fresh(alone, first),
+        fresh: fresh(second, first),
+        firstAgain: familiarTo(second.full[0].geometry, traces(first)),
+        // La même boucle en tête que la fois d'avant.
+        sameFirst: familiarTo(second.full[0].geometry, [traces(first)[0]]),
+        sameOrder: second.full.every((r, i) => first.full[i] && familiarTo(r.geometry, [traces(first)[i]])),
+        score: [mean(base), mean(first), mean(second)],
+        a: [a(base), a(first), a(second)],
+        whole: [base.whole, first.whole, second.whole],
+        seconds: [base.seconds, first.seconds, second.seconds],
+      }
+      lines.push(row)
+      process.stderr.write(
+        `${name} ${km} km : ${row.fresh}/${second.routes} neuves (${row.freshAlone} sans mémoire), 1re ${row.firstAgain ? 'déjà vue' : 'neuve'}, ` +
+          `note ${row.score.map((x) => x.toFixed(3)).join(' → ')}, A ${row.a.join(' → ')}
+`,
+      )
+    }
+  }
+  const total = (key, i) => lines.reduce((t, r) => t + (i === undefined ? Number(r[key]) : r[key][i]), 0)
+  const n = lines.length
+  console.log('\n| | Sans graine | 1ʳᵉ recherche | 2ᵉ recherche |')
+  console.log('|---|---|---|---|')
+  console.log(`| Propositions | ${total('routes', 0)} | ${total('routes', 1)} | ${total('routes', 2)} |`)
+  console.log(`| … boucles entières | ${total('whole', 0)} | ${total('whole', 1)} | ${total('whole', 2)} |`)
+  console.log(`| … notées A | ${total('a', 0)} | ${total('a', 1)} | ${total('a', 2)} |`)
+  console.log(`| Note moyenne | ${(total('score', 0) / n).toFixed(3)} | ${(total('score', 1) / n).toFixed(3)} | ${(total('score', 2) / n).toFixed(3)} |`)
+  console.log(`\nBoucles neuves à la 2ᵉ recherche : ${total('fresh')} / ${total('routes', 2)} (graine seule : ${total('freshAlone')}) ; ` +
+    `première proposition déjà vue : ${total('firstAgain')} / ${n}, la même qu'avant : ${total('sameFirst')} / ${n} ; liste identique dans le même ordre : ${total('sameOrder')} / ${n}.`)
+  if (OUT) writeFileSync(OUT, JSON.stringify(lines, null, 1))
+  process.exit(0)
+}
+
+// --- la forme demandée -------------------------------------------------------------
+
+if (flag('forms')) {
+  const FORMS = [{ form: 'loop' }, { form: 'eight' }, { form: 'laps', laps: 2 }, { form: 'laps', laps: 3 }]
+  const fits = (r, f) => (f.form === 'loop' ? r.laps === 1 : f.form === 'eight' ? r.figure_eight : r.laps === f.laps && !r.figure_eight)
+  console.log('\n| Forme | Recherches servies | Propositions | Hors forme | Refus annoncés |')
+  console.log('|---|---|---|---|---|')
+  for (const f of FORMS) {
+    let served = 0, routes = 0, outside = 0, refused = 0, total = 0
+    for (const name of option('only')?.split(',') ?? Object.keys(STARTS)) {
+      for (const km of DISTANCES) {
+        total += 1
+        try {
+          const row = await run(name, km, 5, 'rolling', 'safe', f, true)
+          routes += row.routes
+          outside += row.full.filter((r) => !fits(r, f)).length
+          if (row.routes) served += 1
+          else if (row.message) refused += 1
+        } catch (err) {
+          refused += 1
+          process.stderr.write(`${name} ${km} km ${JSON.stringify(f)} : ${err.message}
+`)
+        }
+      }
+    }
+    console.log(`| ${f.form}${f.laps ? ` ×${f.laps}` : ''} | ${served} / ${total} | ${routes} | ${outside} | ${refused} |`)
+  }
+  process.exit(0)
 }
 
 // --- « environ 150 m » -------------------------------------------------------------

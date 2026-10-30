@@ -77,6 +77,14 @@ CASES = [
      "req": {"lat": 48.803, "lon": 2.303, "distance_km": 3.0, "limit": 8, "sport": "bike"}},
     {"name": "damier-tours", "extract": "grid9",
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6}},
+    # La forme demandée, sur le même damier : que des « 8 », que des tours —
+    # trois, quand « Auto » commence par deux —, ou une boucle et rien d'autre.
+    {"name": "damier-deux-boucles", "extract": "grid9",
+     "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6, "form": "eight"}},
+    {"name": "damier-trois-tours", "extract": "grid9",
+     "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6, "form": "laps", "laps": 3}},
+    {"name": "damier-une-boucle", "extract": "grid9",
+     "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6, "form": "loop"}},
     {"name": "beaune-course", "extract": "beaune",
      "req": {"lat": 47.0245, "lon": 4.8395, "distance_km": 4.0, "with_elevation": True}, "wind": True},
     {"name": "beaune-sentier-nuit", "extract": "beaune",

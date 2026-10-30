@@ -310,7 +310,8 @@ export default function Explore({
                 boucles entières et des parcours à tours, et prétendre alors
                 qu'aucune boucle entière n'existe serait démenti par la
                 proposition d'à côté. */}
-            {routes.some((r) => r.laps === 1)
+            {/* Ni quand on a demandé des tours : c'est la forme choisie. */}
+            {routes.some((r) => r.laps === 1) || (params.form ?? 'auto') !== 'auto'
               ? '.'
               : " — aucune boucle entière de cette longueur ne tient le contrôle par ici."}
           </span>

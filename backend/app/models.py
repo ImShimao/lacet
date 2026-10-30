@@ -55,6 +55,20 @@ class TimeOfDay(str, Enum):
     auto = "auto"
 
 
+class LoopForm(str, Enum):
+    """La forme de la sortie — voir `service._collect`.
+
+    En « auto », le moteur choisit : une boucle entière d'abord, des tours
+    seulement faute de mieux. Les trois autres sont des demandes, tenues
+    strictement : plutôt rien, et le dire, qu'une autre forme que celle choisie.
+    """
+
+    auto = "auto"
+    loop = "loop"  # une seule boucle, jamais de tours
+    eight = "eight"  # deux boucles différentes, enchaînées au départ — un « 8 »
+    laps = "laps"  # la même boucle, `laps` fois
+
+
 class LoopRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
@@ -94,6 +108,12 @@ class LoopRequest(BaseModel):
     # effet : on roule à droite et l'anneau se prend dans le sens de la
     # circulation.
     side: Side = Side.left
+    # La forme de la sortie, et le nombre de tours quand on en demande. Dix
+    # tours suffisent : au-delà, la longueur minimale d'un tour
+    # (`service.MIN_LAP_M`) refuserait de toute façon presque toutes les
+    # distances qu'on court.
+    form: LoopForm = LoopForm.auto
+    laps: int = Field(default=2, ge=2, le=10)
 
     @property
     def seconds_per_km(self) -> float:
