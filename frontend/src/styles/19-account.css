@@ -41,10 +41,8 @@
   gap: 14px;
   padding: 16px;
   border-radius: 20px;
-  border: 1px solid var(--accent-line);
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--accent-soft), transparent 60%),
-    var(--surface-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
 }
 .acct__who {
   display: flex;
@@ -59,13 +57,12 @@
   place-items: center;
   flex: none;
   color: var(--on-accent);
-  background: var(--accent-grad);
-  box-shadow: 0 10px 24px -12px var(--accent-glow);
+  background: var(--accent);
 }
 .acct__who b {
   display: block;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.025em;
 }
 .acct__who em {
@@ -88,7 +85,7 @@
 .acct__stats b {
   display: block;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

@@ -108,7 +108,7 @@
   height: 168px;
   border-radius: 50%;
   border: 3px solid var(--accent);
-  background: radial-gradient(circle at 50% 45%, var(--accent-soft), transparent 70%);
+  background: var(--accent-soft);
   /* Une clé qui change à chaque chiffre relance l'animation : le cercle enfle
      et s'efface, comme un battement. */
   animation: countdown-beat 900ms cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -116,11 +116,10 @@
 
 .countdown__n {
   font-size: 84px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1;
   color: var(--text);
-  text-shadow: 0 4px 24px var(--accent-glow);
 }
 
 /* « Partez ! » tient en toutes lettres : il lui faut moins de place par lettre

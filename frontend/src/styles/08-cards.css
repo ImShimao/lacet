@@ -52,10 +52,7 @@
 .rcard--on {
   opacity: 1;
   border-color: var(--accent);
-  background:
-    linear-gradient(155deg, var(--accent-line), transparent 62%),
-    var(--surface-2);
-  box-shadow: 0 16px 34px -18px var(--accent-glow);
+  background: var(--surface-2);
 }
 .rcard__top {
   display: flex;
@@ -102,8 +99,8 @@
 }
 .rcard__km b {
   font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -0.05em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   margin-right: 1px;

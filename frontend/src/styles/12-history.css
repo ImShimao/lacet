@@ -153,7 +153,7 @@
 /* La semaine en cours : plus dense, parce qu'elle est en train de se remplir.
    Son libellé la nomme — la teinte seule ne dirait pas laquelle. */
 .weeks__col i[data-now] {
-  background: var(--accent-grad);
+  background: var(--accent);
   border-color: transparent;
 }
 .weeks__axis {
@@ -383,9 +383,9 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--accent-grad);
+  background: var(--accent);
   color: var(--on-accent);
-  box-shadow: 0 12px 30px -10px var(--accent-glow);
+  box-shadow: 0 12px 30px -12px var(--shadow);
 }
 .runctl__main--paused {
   background: var(--safe-fill);

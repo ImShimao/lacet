@@ -1,115 +1,171 @@
 /* Les couleurs, la typographie, et l'ossature : la carte en plein écran, le panneau posé dessus. */
 
 :root {
-  /* Noir à peine teinté de violet plutôt que gris neutre : les surfaces
-     s'accordent à l'accent au lieu de le faire ressortir comme un corps
-     étranger. */
-  --bg: #0a0910;
-  --surface: #13111a;
-  --surface-2: #1b1824;
-  --surface-3: #272233;
-  --line: #2e2939;
-  --line-soft: #221e2c;
-  --text: #f2f0f7;
-  --text-2: #a39eb4;
-  /* Mesuré : 4,5:1 au moins sur les trois fonds de l'app, le minimum de la
-     norme pour du petit texte. L'ancien gris (#767089) tombait à 3,4:1 sur les
-     panneaux — la moitié des explications de l'app étaient sous le seuil. */
-  --text-3: #8a849d;
+  /* Sombre par défaut : des gris ardoise neutres, à peine froids. Les surfaces
+     ne prennent plus la teinte de l'accent : l'accent se change dans
+     « Apparence », et c'est à lui seul de ressortir. Contrastes mesurés
+     (WCAG) : --text-3 tient 5,2:1 sur la surface la plus claire (--surface-3),
+     --text plus de 13:1 partout, au-delà du 7:1 voulu pour les chiffres de course. */
+  --bg: #0b0d10;
+  --surface: #121519;
+  --surface-2: #1a1e23;
+  --surface-3: #252a31;
+  --line: #2f353d;
+  --line-soft: #20252b;
+  --text: #f3f5f7;
+  --text-2: #b6bfc9;
+  --text-3: #929ca8;
 
-  /* Deux violets, pas un : le soutenu pour les aplats (le blanc dessus reste
-     lisible), le clair pour le texte et les icônes posés sur le noir — le
-     soutenu y tomberait à 3:1, sous le seuil de lecture. */
-  --accent: #7c3aed;
-  --accent-press: #6d28d9;
-  --accent-text: #b79dff;
-  --accent-soft: rgba(139, 92, 246, 0.16);
-  --accent-line: rgba(139, 92, 246, 0.38);
-  --accent-glow: rgba(124, 58, 237, 0.6);
-  --accent-grad: linear-gradient(135deg, #9061f9 0%, #6d28d9 100%);
-  /* L'accent sur la carte, qui ne suit pas le thème mais le fond : clair sur
-     un fond sombre, soutenu sur un fond clair. */
-  --accent-light: #b79dff;
-  --accent-deep: #6d28d9;
-  /* Le texte posé sur un aplat d'accent, ou d'une couleur de sécurité. */
+  /* L'accent : un aplat qui porte du blanc à 4,5:1 au moins, une variante
+     claire pour le texte sur fond sombre, une soutenue pour le texte sur fond
+     clair. Bleu par défaut : il ne se confond avec aucune couleur de sécurité. */
+  --accent: #2563eb;
+  --accent-press: #1d4ed8;
+  --accent-light: #7cb0ff;
+  --accent-deep: #1d4ed8;
+  --accent-text: var(--accent-light);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent-text) 42%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
   --on-accent: #fff;
   --on-color: #fff;
 
   /* Les couleurs de sécurité. `--safe`… se lisent comme texte sur les
-     surfaces de l'app ; `--…-vivid` sont les aplats et les traits — barres,
-     bandes, tracé — qui n'ont pas à porter de texte. Les fonds doux et les
-     filets en dérivent, pour qu'une teinte ne se règle qu'à un endroit. */
-  --safe: #32d74b;
+     surfaces de l'app ; `--…-vivid` sont les aplats et les traits. Choisies
+     pour rester distinctes en deutéranopie et en protanopie (écart ΔE ≥ 28
+     entre chaque paire, simulation de Viénot) : le vert tire vers le bleu, le
+     jaune reste le plus clair, le rouge le plus sombre. */
+  --safe: #2ed38a;
   --caution: #ffd426;
-  --risk: #ff6a45;
-  --info: #4a9eff;
+  --risk: #ff5c57;
+  --info: #5aa9ff;
   --safe-vivid: var(--safe);
   --caution-vivid: var(--caution);
   --risk-vivid: var(--risk);
   --safe-soft: color-mix(in srgb, var(--safe-vivid) 13%, transparent);
-  --safe-line: color-mix(in srgb, var(--safe-vivid) 32%, transparent);
+  --safe-line: color-mix(in srgb, var(--safe-vivid) 34%, transparent);
   --caution-soft: color-mix(in srgb, var(--caution-vivid) 12%, transparent);
-  --caution-line: color-mix(in srgb, var(--caution-vivid) 32%, transparent);
-  --risk-soft: color-mix(in srgb, var(--risk-vivid) 11%, transparent);
-  --risk-line: color-mix(in srgb, var(--risk-vivid) 30%, transparent);
-  /* Un aplat assez sombre pour porter du blanc : le bandeau « hors parcours »,
-     le bouton de reprise. */
-  --risk-fill: #e2452a;
-  --safe-fill: #1fb13b;
-  /* Le chemin de terre, l'eau, les toilettes : des repères, pas des avis. */
+  --caution-line: color-mix(in srgb, var(--caution-vivid) 34%, transparent);
+  --risk-soft: color-mix(in srgb, var(--risk-vivid) 12%, transparent);
+  --risk-line: color-mix(in srgb, var(--risk-vivid) 34%, transparent);
+  /* Des aplats assez sombres pour porter du blanc (4,8:1 et 5,4:1). */
+  --risk-fill: #d92d20;
+  --safe-fill: #0f7a45;
   --trail: #c58b4a;
   --water: #5ab8ff;
   --toilets: #c9a8ff;
 
-  /* Ce qui flotte sur la carte : une surface presque opaque, floutée. */
-  --glass: rgba(19, 17, 26, 0.94);
-  /* Le voile derrière une feuille modale, et celui, plus dense, du compte à
-     rebours. */
+  --glass: rgba(18, 21, 25, 0.94);
   --scrim: rgba(0, 0, 0, 0.6);
-  --scrim-strong: rgba(10, 9, 14, 0.82);
-  /* Deux ombres : franche sous ce qui flotte, douce sous les repères. */
-  --shadow: rgba(0, 0, 0, 0.9);
-  --shadow-soft: rgba(0, 0, 0, 0.55);
-  /* Le cerne blanc des repères de carte : il les détache de n'importe quel
-     fond, sombre, clair ou satellite. */
+  --scrim-strong: rgba(11, 13, 16, 0.86);
+  --shadow: rgba(0, 0, 0, 0.85);
+  --shadow-soft: rgba(0, 0, 0, 0.5);
   --marker-ring: #fff;
-  /* Le petit mot posé sur le bandeau de consigne, en couleur d'accent. */
-  --runbar-note: #ffe38a;
+  --runbar-note: #fff2b3;
   --attrib-icon: invert(1) opacity(0.62);
+  /* Les propositions voisines, posées sur la carte, s'effacent ainsi. */
+  --dim: brightness(0.6);
 
   /* La carte. MapLibre ne lit pas le CSS : `MapView.jsx` relit ces jetons
-     (`mapToken`) et les repose quand l'apparence change. Ils restent donc des
-     couleurs littérales. Le tracé dépend du **fond** — sombre ou clair — et pas
-     du thème de l'app : un fond clair reste clair sous un thème sombre. */
-  --map-dark-halo: #0a0910;
-  --map-dark-safe: #32d74b;
+     (`mapToken`). Le tracé dépend du **fond** — sombre ou clair — et pas du
+     thème : un fond clair reste clair sous un thème sombre. Sur fond clair, le
+     tracé est cerné de sombre : le jaune s'y lit, et les trois niveaux se
+     distinguent aussi par leur clarté. */
+  --map-dark-halo: #0b0d10;
+  --map-dark-safe: #2ed38a;
   --map-dark-caution: #ffd426;
-  --map-dark-risk: #ff6a45;
+  --map-dark-risk: #ff5c57;
   --map-dark-ghost: #a8b2bc;
-  --map-light-safe: #0f8a2e;
-  --map-light-caution: #b37400;
-  --map-light-risk: #c42d0b;
+  --map-light-halo: #1b1f24;
+  --map-light-safe: #0e9f6e;
+  --map-light-caution: #f5c000;
+  --map-light-risk: #d92d20;
   --map-light-ghost: #3a4550;
-  --map-light-halo: #ffffff;
   --map-ink: #ffffff;
-  --map-flown: #f2f0f7;
-  --map-accuracy: #4a9eff;
+  --map-flown: #f3f5f7;
+  --map-accuracy: #5aa9ff;
   --map-zone: #f0605a;
   --map-arrow-casing: rgba(11, 13, 16, 0.85);
   --map-relief-shadow: rgba(0, 0, 0, 0.7);
-  --map-relief-light: rgba(183, 157, 255, 0.22);
-  --map-relief-accent: rgba(10, 9, 16, 0.2);
-  /* La teinte que prend le fond « Nuit » au chargement, l'eau à part. */
-  --map-night-hue: 262;
-  --map-water-hue: 244;
-  --map-night-chroma: 1;
+  --map-relief-light: rgba(255, 255, 255, 0.16);
+  --map-relief-accent: rgba(11, 13, 16, 0.2);
+  /* Le fond « Nuit » prend l'ardoise des surfaces, à faible dose : il ne vire
+     plus à la couleur de l'accent. */
+  --map-night-hue: 214;
+  --map-water-hue: 205;
+  --map-night-chroma: 0.6;
 
-  --display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --display: 'Inter Variable', 'Inter', -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif;
+  /* Les chiffres : la même police, en chasse fixe (`.mono`). */
+  --mono: var(--display);
 
   --r: 14px;
   --side: 400px;
   color-scheme: dark;
+}
+
+/* Le thème clair : le plus lisible en plein soleil. Surfaces blanches sur un
+   fond gris très pâle ; les couleurs de sécurité prennent une version foncée
+   pour le texte (4,5:1 au moins sur --surface-3), et gardent leurs aplats vifs. */
+:root[data-theme='light'] {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --surface-2: #f4f6f8;
+  --surface-3: #e7eaee;
+  --line: #d3d9e0;
+  --line-soft: #e4e8ec;
+  --text: #0f1419;
+  --text-2: #3c4653;
+  --text-3: #586270;
+  --accent-text: var(--accent-deep);
+  --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+  --safe: #08704b;
+  --caution: #8f5f00;
+  --risk: #c8231b;
+  --info: #1b62c2;
+  --safe-vivid: #0e9f6e;
+  --caution-vivid: #f5c000;
+  --risk-vivid: #d92d20;
+  --trail: #a8692b;
+  --water: #1b6fc2;
+  --toilets: #7a4fd0;
+  --glass: rgba(255, 255, 255, 0.94);
+  --scrim: rgba(15, 20, 25, 0.4);
+  --scrim-strong: rgba(244, 246, 248, 0.92);
+  --shadow: rgba(16, 24, 40, 0.22);
+  --shadow-soft: rgba(16, 24, 40, 0.18);
+  --attrib-icon: opacity(0.7);
+  --dim: brightness(0.94) contrast(0.8);
+  color-scheme: light;
+}
+
+/* Les accents qu'on peut choisir. Le violet d'origine reste là pour qui l'aime. */
+:root[data-accent='violet'] {
+  --accent: #7c3aed;
+  --accent-press: #6d28d9;
+  --accent-light: #b79dff;
+  --accent-deep: #6d28d9;
+}
+:root[data-accent='rose'] {
+  --accent: #d61f69;
+  --accent-press: #be185d;
+  --accent-light: #ff7eb0;
+  --accent-deep: #be185d;
+}
+/* Graphite : sans couleur. Clair sur le thème sombre, noir sur le clair. */
+:root[data-accent='graphite'] {
+  --accent: #e6e9ed;
+  --accent-press: #c9ced5;
+  --accent-light: #e6e9ed;
+  --accent-deep: #1f2329;
+  --on-accent: #0b0d10;
+  --runbar-note: #8f5f00;
+}
+:root[data-theme='light'][data-accent='graphite'] {
+  --accent: #1f2329;
+  --accent-press: #000;
+  --on-accent: #fff;
+  --runbar-note: #fff2b3;
 }
 
 * {
@@ -136,6 +192,10 @@ body {
   font-family: var(--display);
   font-size: 14.5px;
   line-height: 1.45;
+  /* Chiffres à chasse fixe partout : une distance, une allure ou une heure qui
+     changent ne font plus danser la ligne, et les colonnes s'alignent sans
+     police mono. */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
@@ -311,7 +371,7 @@ input:focus-visible {
   display: none;
   margin: 0;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.1;
 }

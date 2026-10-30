@@ -18,9 +18,9 @@
   min-height: 88px;
   padding: 12px 14px;
   border-radius: 20px;
-  background: var(--accent-grad);
+  background: var(--accent);
   color: var(--on-accent);
-  box-shadow: 0 16px 36px -14px var(--shadow), 0 10px 30px -18px var(--accent-glow);
+  box-shadow: 0 16px 36px -14px var(--shadow);
 }
 .runbar__turn {
   flex: none;
@@ -40,7 +40,7 @@
 }
 .runbar__text b {
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
@@ -93,7 +93,7 @@
   border-radius: 12px;
   background: var(--on-color);
   color: var(--risk-fill);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 13.5px;
 }
 .runbar--idle {
@@ -139,7 +139,7 @@
 .live__clock {
   text-align: center;
   font-size: 54px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -167,7 +167,7 @@
   width: 100%;
   transform-origin: left;
   border-radius: 999px;
-  background: var(--accent-grad);
+  background: var(--accent);
   transition: transform 0.25s ease;
 }
 .gauge--tight i {

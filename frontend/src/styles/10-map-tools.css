@@ -45,7 +45,7 @@
   position: absolute;
   bottom: 2px;
   font-size: 8px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-2);
 }
@@ -110,7 +110,7 @@
 /* Le survol 3D : « 3D » en toutes lettres, plus parlant qu'un pictogramme. */
 .tool__text {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 /* Pendant le survol, la carte seule : le panneau, la recherche et les autres
@@ -194,7 +194,7 @@
 .flyhud__km b {
   font-family: var(--display);
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .flyhud__ele {

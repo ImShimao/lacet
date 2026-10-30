@@ -155,12 +155,10 @@
   box-shadow: 0 16px 34px -16px var(--shadow);
 }
 .shell[data-sheet='peek'] .rcard:not(.rcard--on) {
-  filter: brightness(0.6);
+  filter: var(--dim);
 }
 .shell[data-sheet='peek'] .rcard--on {
-  box-shadow:
-    0 16px 34px -16px var(--shadow),
-    0 14px 34px -20px var(--accent-glow);
+  box-shadow: 0 16px 34px -16px var(--shadow);
 }
 .shell[data-sheet='peek'] .rcard__more {
   display: inline-flex;
