@@ -758,6 +758,12 @@ def _trim_spurs(graph: Graph, start: int, edges: list[int]) -> list[int]:
 # fois plus en restant de son côté : on traverse alors, plutôt que de faire les
 # trois quarts du tour.
 SIDE_RING_RATIO = 1.6
+# Sur un petit rond-point, le rapport trompe : « en face » y prend souvent 12 m
+# d'un côté et 27 m de l'autre. Mesuré autour de Soultz et d'Issenheim, les
+# cinq « en face » restés à droite malgré la préférence étaient tous là, de 2,0
+# à 2,3 fois plus longs mais de 14 à 24 m seulement. Quelques pas de plus
+# restent acceptables quel que soit le rapport.
+SIDE_RING_EXTRA_M = 20.0
 
 
 def keep_side(graph: Graph, start: int, edges: list[int], profile: Profile) -> list[int]:
@@ -773,7 +779,8 @@ def keep_side(graph: Graph, start: int, edges: list[int], profile: Profile) -> l
     aux voitures — le côté par défaut (`LoopRequest.side`).
 
     Pour chaque passage pris du mauvais côté, on prend l'autre moitié de
-    l'anneau quand elle n'est pas plus de `SIDE_RING_RATIO` fois plus longue.
+    l'anneau quand elle n'est pas plus de `SIDE_RING_RATIO` fois plus longue,
+    ou pas plus de `SIDE_RING_EXTRA_M` mètres.
     À vélo, rien à faire : l'anneau est déjà à sens unique (`oneway_for`).
     """
     if profile.sport == "bike" or profile.side not in ("right", "left"):
@@ -798,7 +805,8 @@ def keep_side(graph: Graph, start: int, edges: list[int], profile: Profile) -> l
             length += E[edges[j]].length_m
             cursor = E[edges[j]].other(cursor)
             j += 1
-        arc = _ring_arc(graph, entry, cursor, forward, length * SIDE_RING_RATIO) if wrong else None
+        limit = max(length * SIDE_RING_RATIO, length + SIDE_RING_EXTRA_M)
+        arc = _ring_arc(graph, entry, cursor, forward, limit) if wrong else None
         out.extend(arc if arc is not None else edges[i:j])
         i = j
     return out

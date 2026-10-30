@@ -537,6 +537,8 @@ export function trimSpurs(graph, start, edges, keep = null) {
 // Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté —
 // voir `SIDE_RING_RATIO` en Python.
 const SIDE_RING_RATIO = 1.6
+// …ou de quelques pas, sur un petit rond-point — voir `SIDE_RING_EXTRA_M`.
+const SIDE_RING_EXTRA_M = 20
 
 /**
  * Fait le tour des ronds-points du côté où l'on court — voir `keep_side`.
@@ -566,7 +568,7 @@ export function keepSide(graph, start, edges, profile) {
       cursor = graph.other(edges[j], cursor)
       j += 1
     }
-    const arc = wrong ? ringArc(graph, entry, cursor, forward, length * SIDE_RING_RATIO) : null
+    const arc = wrong ? ringArc(graph, entry, cursor, forward, pyMax([length * SIDE_RING_RATIO, length + SIDE_RING_EXTRA_M])) : null
     out.push(...(arc ?? edges.slice(i, j)))
     i = j
   }
