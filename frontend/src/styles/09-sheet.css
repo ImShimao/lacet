@@ -226,11 +226,6 @@
 .shell[data-sheet='full'] .side__head {
   touch-action: none;
 }
-/* Détail ouvert, l'activité s'efface : c'est le parcours qu'on regarde, et
-   la pastille se retrouverait posée sur la bande de carte qui reste. */
-.shell[data-sheet='full'] .sportpill {
-  display: none;
-}
 /* Les pages de liste prennent tout l'écran. La bande de carte qui restait
    au-dessus ne servait à rien — on y lit un historique, pas un itinéraire —
    et elle coûtait les deux centimètres qui obligeaient à faire défiler pour

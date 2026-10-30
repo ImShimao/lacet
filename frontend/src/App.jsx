@@ -555,7 +555,9 @@ export default function App() {
                 que le favori, l'export, la régénération et « Démarrer ». Avant la
                 recherche, le bouton « Filtres » est juste là, sous les yeux, et
                 deux entrées pour le même réglage encombraient le haut de l'écran
-                pour rien. Elle revient donc avec les propositions. */}
+                pour rien. Elle revient donc avec les propositions — et reste,
+                détail ouvert, en tête de la feuille : effacée, rien n'ouvrait
+                plus les filtres sans replier d'abord la feuille. */}
             {tab === 'explore' && result && (
               <button className="sportpill" onClick={() => setFiltersOpen(true)}>
                 <Icon name={sport?.icon} size={19} />
