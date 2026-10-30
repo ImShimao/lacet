@@ -9,7 +9,7 @@ import { km } from './format'
 export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
   return (
     <div className="banner banner--resume">
-      <Icon name="refresh" size={16} />
+      <Icon name="pause" size={16} />
       <span>
         <b>Sortie interrompue</b> · {km(pending.covered, 1)} km en {Math.round(pending.elapsed / 60)} min,{' '}
         {ago(Date.now() - pending.at)}.

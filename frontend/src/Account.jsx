@@ -44,7 +44,7 @@ export const SECTIONS = [
   { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
   { key: 'appearance', group: 'Paramètres', icon: 'appearance', title: 'Apparence' },
   { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
-  { key: 'backup', group: 'Données', icon: 'download', title: 'Sauvegarde' },
+  { key: 'backup', group: 'Données', icon: 'archive', title: 'Sauvegarde' },
   { key: 'about', group: 'Infos', icon: 'info', title: 'À propos' },
 ]
 
@@ -1174,11 +1174,11 @@ function BackupRows({ onRestored }) {
       </p>
       <div className="row">
         <button className="btn" onClick={backup}>
-          <Icon name="download" size={15} />
+          <Icon name="fileExport" size={15} />
           Sauvegarder
         </button>
         <label className="btn">
-          <Icon name="refresh" size={15} />
+          <Icon name="fileImport" size={15} />
           Restaurer
           <input
             type="file"

@@ -89,7 +89,7 @@
   flex: 1;
 }
 
-/* La sortie interrompue, retrouvée au lancement : violette et non rouge — ce
+/* La sortie interrompue, retrouvée au lancement : à l'accent et non en rouge — ce
    n'est pas une panne, c'est quelque chose à récupérer. */
 .banner--resume {
   background: var(--accent-soft);

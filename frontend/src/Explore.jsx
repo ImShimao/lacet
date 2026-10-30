@@ -147,7 +147,7 @@ export default function Explore({
         ) : (
           streetsLoading && (
             <p className="ready ready--busy small">
-              <Icon name="download" size={14} />
+              <Icon name="spinner" size={14} />
               Préparation des rues de ce coin…
             </p>
           )
@@ -284,7 +284,7 @@ export default function Explore({
 
       {selected.laps > 1 && (
         <div className="laps">
-          <Icon name="refresh" size={15} />
+          <Icon name="repeat" size={15} />
           <span>
             {selected.figure_eight ? (
               <>
@@ -358,7 +358,11 @@ export default function Explore({
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
           que soit l'endroit où l'on a fait défiler le détail. Elle était tout en
-          bas, sous la note, et il fallait la chercher. */}
+          bas, sous la note, et il fallait la chercher.
+
+          Chaque icône porte son mot dessous : seules, quatre icônes en rang
+          se devinaient — le cœur, oui ; la flèche, le demi-tour, le cercle,
+          non. Le libellé complet reste celui que lit VoiceOver. */}
       <div className="actionbar">
         <button
           className={`btn btn--icon ${isFavorite ? 'btn--on' : ''}`}
@@ -368,6 +372,7 @@ export default function Explore({
           aria-pressed={isFavorite}
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
+          <span className="btn__cap">Favori</span>
         </button>
         <button
           className="btn btn--icon"
@@ -376,7 +381,8 @@ export default function Explore({
           title="Exporter en GPX"
           aria-label="Exporter en GPX"
         >
-          <Icon name="download" size={19} />
+          <Icon name="fileExport" size={19} />
+          <span className="btn__cap">GPX</span>
         </button>
         {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend en
             montant, du vent qu'on a dans le dos à la fin, et de chaque consigne
@@ -391,6 +397,7 @@ export default function Explore({
             aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
           >
             <Icon name="uturn" size={19} />
+            <span className="btn__cap">Sens</span>
           </button>
         )}
         <button
@@ -399,7 +406,8 @@ export default function Explore({
           title="Régénérer d'autres boucles"
           aria-label="Régénérer d'autres boucles"
         >
-          <Icon name="refresh" size={19} />
+          <Icon name="shuffle" size={19} />
+          <span className="btn__cap">Autres</span>
         </button>
         <button className="btn btn--primary" onClick={onStart}>
           <Icon name="play" size={17} />
@@ -620,7 +628,7 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     deux cas, il vaut mieux le savoir avant de partir. */}
                 {known?.has(r.id) && !on && (
                   <span className="rcard__seen" title="Déjà couru">
-                    <Icon name="refresh" size={13} />
+                    <Icon name="history" size={14} />
                   </span>
                 )}
                 {on && (

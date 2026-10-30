@@ -131,7 +131,7 @@
 
 /* ══ survol 3D ══════════════════════════════════════════════════════════ */
 
-/* La pastille qui court sur la boucle : le violet de l'app cerclé de blanc,
+/* La pastille qui court sur la boucle : l'accent de l'app cerclé de blanc,
    et une onde qui bat derrière elle pour qu'on la trouve d'un coup d'œil sur
    le relief. `.flypin` est l'élément du marqueur, placé par MapLibre : sans
    `position`, qui écraserait la sienne. */

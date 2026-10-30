@@ -169,7 +169,9 @@
   background: linear-gradient(to bottom, transparent, var(--surface) 16px);
 }
 .actionbar .btn--primary {
-  font-size: calc(15.5px * var(--text-scale));
+  /* Déjà grand : agrandi avec le texte, il ne tenait plus à côté des quatre
+     boutons sur un petit écran. */
+  font-size: 15.5px;
 }
 /* La barre fait déjà office de fin de zone : le fondu du bas la voilerait. */
 .side__body:has(.actionbar) {
@@ -230,4 +232,40 @@
   font-weight: 700;
   color: var(--accent-text);
   white-space: nowrap;
+}
+
+/* L'icône et son mot dessous, dans la barre d'action. Le mot reste court
+   (« GPX », « Sens ») : à 320 px de large, « Démarrer » doit encore tenir. */
+.actionbar .btn--icon {
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 0 5px;
+}
+.btn__cap {
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.btn--on .btn__cap {
+  color: var(--accent-text);
+}
+
+/* Petit écran (SE) : quatre boutons et « Démarrer » sur 296 px. Les boutons
+   cèdent quatre pixels chacun, et « Démarrer » son triangle — le mot suffit. */
+@container lacet (max-width: 380px) {
+  .actionbar {
+    gap: 6px;
+  }
+  .actionbar .btn--icon {
+    width: 44px;
+  }
+  .actionbar .btn--primary {
+    padding-inline: 8px;
+  }
+  .actionbar .btn--primary .icon {
+    display: none;
+  }
 }

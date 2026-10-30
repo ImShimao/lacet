@@ -180,7 +180,7 @@ function ImportRow({ onImport }) {
         hidden
       />
       <button className="btn" onClick={() => champ.current?.click()}>
-        <Icon name="download" size={17} />
+        <Icon name="fileImport" size={17} />
         Importer un GPX
       </button>
       {erreur ? (

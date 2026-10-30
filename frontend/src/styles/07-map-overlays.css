@@ -172,22 +172,18 @@
   font-size: calc(12.5px * var(--text-scale));
 }
 
-/* Pendant qu'elles arrivent : la même ligne, en violet et non en vert — ce
-   n'est pas encore une bonne nouvelle, c'est une nouvelle. L'icône respire
-   doucement pour dire que quelque chose travaille. */
+/* Pendant qu'elles arrivent : la même ligne, à l'accent et non en vert — ce
+   n'est pas encore une bonne nouvelle, c'est une nouvelle. L'arc tourne pour
+   dire que quelque chose travaille ; immobile si l'on demande moins de mouvement. */
 .ready--busy {
   color: var(--accent-text);
 }
 .ready--busy .icon {
-  animation: ready-pulse 1.6s ease-in-out infinite;
+  animation: ready-spin 1s linear infinite;
 }
-@keyframes ready-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
+@keyframes ready-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {

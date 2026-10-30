@@ -142,7 +142,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
       <div className="row">
         {entry.track?.length > 1 && (
           <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
-            <Icon name="download" size={16} />
+            <Icon name="fileExport" size={16} />
             Exporter
           </button>
         )}

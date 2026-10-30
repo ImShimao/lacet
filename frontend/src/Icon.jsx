@@ -130,6 +130,11 @@ const PATHS = {
   heart: (
     <path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5C2 10.8 3.5 12.5 5 14l7 7z" />
   ),
+  // Une icône, un sens. `download` servait à cinq choses — exporter un GPX,
+  // l'importer, garder une carte, préparer les rues — et `refresh` à trois :
+  // on ne savait plus ce qu'un bouton ferait avant de l'avoir touché.
+  //
+  // Garder sur le téléphone, pour s'en servir hors ligne.
   download: (
     <>
       <path d="M12 3v12" />
@@ -137,13 +142,64 @@ const PATHS = {
       <path d="M4 20.5h16" />
     </>
   ),
-  upload: (
+  // Partager : le carré d'où sort une flèche, celui d'iOS.
+  share: (
     <>
-      <path d="M12 16V4" />
-      <path d="m7 8.5 5-5 5 5" />
-      <path d="M4 20.5h16" />
+      <path d="M12 14.5V3.5" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M8.5 10.5H6.5a1.5 1.5 0 0 0-1.5 1.5v7.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V12a1.5 1.5 0 0 0-1.5-1.5h-2" />
     </>
   ),
+  // Un fichier qui sort de l'app (GPX, sauvegarde) ou qui y entre.
+  fileExport: (
+    <>
+      <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
+      <path d="M13.5 3v5.5H19" />
+      <path d="M12 18v-6.5M9.5 14l2.5-2.5 2.5 2.5" />
+    </>
+  ),
+  fileImport: (
+    <>
+      <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
+      <path d="M13.5 3v5.5H19" />
+      <path d="M12 11.5V18M9.5 15.5 12 18l2.5-2.5" />
+    </>
+  ),
+  // La boîte des sauvegardes.
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="5" rx="1.5" />
+      <path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9" />
+      <path d="M10 13h4" />
+    </>
+  ),
+  // D'autres boucles : les deux flèches qui se croisent, comme un tirage.
+  shuffle: (
+    <>
+      <path d="M3.5 7h3.2c1.6 0 3.1.8 4 2.1l2.6 3.8c.9 1.3 2.4 2.1 4 2.1h3.2" />
+      <path d="M3.5 17h3.2c1.6 0 3.1-.8 4-2.1M13.3 9.1c.9-1.3 2.4-2.1 4-2.1h3.2" />
+      <path d="m18 4.5 2.5 2.5-2.5 2.5M18 14.5l2.5 2.5-2.5 2.5" />
+    </>
+  ),
+  // Des tours : la boucle fermée qu'on reprend.
+  repeat: (
+    <>
+      <path d="M4 11.5V10a3 3 0 0 1 3-3h13" />
+      <path d="m16.5 3.5 3.5 3.5-3.5 3.5" />
+      <path d="M20 12.5V14a3 3 0 0 1-3 3H4" />
+      <path d="m7.5 20.5-3.5-3.5 3.5-3.5" />
+    </>
+  ),
+  // Déjà fait : l'horloge qu'on remonte.
+  history: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+      <path d="M3.5 3.5V8H8" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // En cours : un arc qui tourne (`.ready--busy`), sans promettre de résultat.
+  spinner: <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />,
   // Un point d'eau : une goutte. Des toilettes : les deux silhouettes, en
   // traits, comme sur les panneaux.
   water: <path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z" />,
