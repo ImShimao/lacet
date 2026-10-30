@@ -647,6 +647,8 @@ export default function App() {
               mapStyle={mapStyle}
               onOpen={openRoute}
               onOpenRun={setViewing}
+              onRename={library.rename}
+              onForget={library.forget}
               onExplore={() => setTab('explore')}
             />
           ) : tab === 'account' ? (

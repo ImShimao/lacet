@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { downloadRun } from './api'
 import AscentNote from './AscentNote.jsx'
@@ -23,8 +23,6 @@ import { standing } from './knownRoutes'
  */
 export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
-  // Le nom en cours d'édition, ou `null` quand on ne le modifie pas.
-  const [nom, setNom] = useState(null)
   // Où cette sortie se situe parmi celles qui ont emprunté le même chemin.
   // Calculé à l'ouverture d'une sortie, pas à chaque rendu : c'est une
   // comparaison de tracés point à point sur tout l'historique.
@@ -48,24 +46,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
           {/* Un champ, pas un bouton « renommer » : le nom se corrige là où on
               le lit. Il reprend sa forme de titre dès qu'on le quitte. */}
           {onRename ? (
-            <input
-              value={nom ?? entry.name}
-              aria-label="Nom de la sortie"
-              maxLength={60}
-              onChange={(e) => setNom(e.target.value)}
-              onFocus={(e) => e.target.select()}
-              onBlur={() => {
-                if (nom !== null) onRename(entry, nom)
-                setNom(null)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') {
-                  setNom(null)
-                  e.currentTarget.blur()
-                }
-              }}
-            />
+            <RenameField name={entry.name} label="Nom de la sortie" onRename={(nom) => onRename(entry, nom)} />
           ) : (
             <b>{entry.name}</b>
           )}
@@ -173,6 +154,43 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Un nom qu'on corrige là où on le lit : ici, et dans la liste de « Mes
+ * parcours ». Entrée valide, Échap renonce, quitter le champ garde.
+ *
+ * Échap gardait pourtant le nom tapé : le champ, quitté aussitôt, enregistrait
+ * avec l'état d'avant l'annulation — React n'avait pas encore rendu le `null`.
+ * Le renoncement passe donc par une référence, lue sur-le-champ.
+ */
+export function RenameField({ name, label, onRename, onDone, autoFocus = false }) {
+  // Le nom en cours d'édition, ou `null` quand on ne le modifie pas.
+  const [nom, setNom] = useState(null)
+  const renonce = useRef(false)
+  return (
+    <input
+      value={nom ?? name}
+      aria-label={label}
+      maxLength={60}
+      autoFocus={autoFocus}
+      onChange={(e) => setNom(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={() => {
+        if (nom !== null && !renonce.current) onRename(nom)
+        renonce.current = false
+        setNom(null)
+        onDone?.()
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          renonce.current = true
+          e.currentTarget.blur()
+        }
+      }}
+    />
   )
 }
 

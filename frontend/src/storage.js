@@ -260,6 +260,9 @@ export function slim(route) {
   return {
     id: route.id,
     name: route.name,
+    // La clé d'un parcours renommé, qui le relie encore à sa carte hors ligne
+    // et à son cœur — voir `keyOf`.
+    key: route.key,
     distance_m: route.distance_m,
     duration_s: route.duration_s,
     ascent_m: route.ascent_m,

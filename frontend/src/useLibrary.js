@@ -89,22 +89,32 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
     },
 
     /**
-     * Renomme une sortie.
+     * Renomme une sortie, ou un favori.
      *
      * Vingt lignes « Sortie libre » ne se distinguent que par leur date. Le nom
      * est ce qu'on lit d'abord dans la liste, et c'est le seul champ qu'on
      * puisse vouloir corriger après coup — « Course du club », « Le tour du
-     * lac », « Reconnaissance du parcours ».
+     * lac », « Reconnaissance du parcours ». Un favori gardait à vie son nom
+     * automatique, « Boucle est · Orschwihrerweg ».
+     *
+     * Une sortie a une heure de départ, un favori n'en a pas : c'est ce qui dit
+     * dans quelle liste chercher. Le renommé garde sa clé d'avant (`keyOf`), sans
+     * quoi il perdait sa carte hors ligne et son cœur.
      */
     rename(entry, nom) {
       const propre = String(nom ?? '').trim().slice(0, 60)
-      if (!propre || propre === entry.name) return history
-      return put('history', history.map((s) => (meme(s, entry) ? { ...s, name: propre } : s)), setHistory)
+      if (!propre || propre === entry.name) return
+      const renomme = (r) => ({ ...r, name: propre, key: keyOf(r) })
+      if (entry.ranAt) return put('history', history.map((s) => (meme(s, entry) ? renomme(s) : s)), setHistory)
+      const cle = keyOf(entry)
+      return put('favorites', saved.map((r) => (keyOf(r) === cle ? renomme(r) : r)), setSaved)
     },
 
-    /** Retire une sortie — un test, un départ déclenché dans la poche. */
+    /** Retire une sortie — un test, un départ déclenché dans la poche — ou un favori. */
     forget(entry) {
-      return put('history', history.filter((sortie) => !meme(sortie, entry)), setHistory)
+      if (entry.ranAt) return put('history', history.filter((sortie) => !meme(sortie, entry)), setHistory)
+      const cle = keyOf(entry)
+      return put('favorites', saved.filter((r) => keyOf(r) !== cle), setSaved)
     },
 
     /** Garde un départ sous un nom : « chez moi », « le club ». */

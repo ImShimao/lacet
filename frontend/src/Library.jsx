@@ -13,8 +13,9 @@ import { duration, km, pace } from './format'
 import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 import { sketch } from './routeDraw'
+import { RenameField } from './RunDetail.jsx'
 
-export default function Library({ saved, history, onOpen, onOpenRun, onImport, onExplore, profile, mapStyle }) {
+export default function Library({ saved, history, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
   const [view, setView] = useState(() =>
@@ -106,38 +107,183 @@ export default function Library({ saved, history, onOpen, onOpenRun, onImport, o
           </p>
           <div className="list">
             {rows.map((r, i) => (
-              <div key={i} className="list__group">
+              // Une clé qui suit la ligne, pas sa place : retirer une ligne
+              // faisait sinon hériter la suivante de sa confirmation ouverte.
+              <div key={r.ranAt || offline.keyOf(r)} className="list__group">
               {view === 'history' && monthKey(r.ranAt) !== monthKey(rows[i - 1]?.ranAt) && (
                 <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={rows.filter((x) => monthKey(x.ranAt) === monthKey(r.ranAt))} />
               )}
-              <div className="list__item">
-                {/* Une sortie ouvre son bilan — ce qu'on a fait —, un favori
-                    ouvre le parcours sur la carte. Longtemps les deux menaient
-                    au même écran, qui montrait le plan : relire une sortie
-                    passée y était impossible. */}
-                <button className="list__row" onClick={() => (view === 'history' ? onOpenRun(r) : onOpen(r))}>
-                  <Thumb line={view === 'history' ? r.track : r.geometry} sport={view === 'history' ? r.sport : null} />
-                  <span>
-                    {r.name}
-                    <em>
-                      {view === 'history'
-                        ? `${dayLabel(r.ranAt)} · ${km(r.actual_distance_m)} km · ${duration(r.actual_duration_s)} · ${paceOf(r)}/km`
-                        : `${km(r.distance_m)} km · D+ ${Math.round(r.ascent_m || 0)} m`}
-                    </em>
-                  </span>
-                  {r.grade ? (
-                    <span className={`grade grade--${r.grade}`}>{r.grade}</span>
-                  ) : (
-                    <span className="grade grade--free">libre</span>
-                  )}
-                </button>
-                <OfflineControl route={r} mapStyle={mapStyle} />
-              </div>
+              <Item
+                route={r}
+                run={view === 'history'}
+                kept={[...saved, ...history]}
+                mapStyle={mapStyle}
+                // Une sortie ouvre son bilan — ce qu'on a fait —, un favori
+                // ouvre le parcours sur la carte. Longtemps les deux menaient
+                // au même écran, qui montrait le plan : relire une sortie
+                // passée y était impossible.
+                onOpen={() => (view === 'history' ? onOpenRun(r) : onOpen(r))}
+                onRename={onRename}
+                onForget={onForget}
+              />
               </div>
             ))}
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * Une ligne de la liste, qu'on glisse vers la gauche pour la renommer ou la
+ * retirer.
+ *
+ * Un favori gardait à vie son nom automatique, et le retirer demandait de
+ * l'ouvrir sur la carte pour décocher son cœur. Le geste est celui de Mail ou
+ * de Rappels, et c'est le **défilement natif** qui le fait : la ligne est un
+ * ruban plus large qu'elle, aimanté sur ses deux bords (`scroll-snap`). L'élan,
+ * le seuil et le retour en place sont ceux d'iOS, sans une ligne pour les
+ * imiter, et les deux boutons sont de vrais boutons, que VoiceOver et le
+ * clavier atteignent sans glisser.
+ *
+ * Une sortie reçoit le même geste : la supprimer obligeait à ouvrir son bilan
+ * et à descendre jusqu'en bas.
+ */
+function Item({ route, run, kept, mapStyle, onOpen, onRename, onForget }) {
+  const [naming, setNaming] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const ruban = useRef(null)
+  // `scrollTo` manque à certains environnements (jsdom) : la ligne reste
+  // alors ouverte, sans casser le geste suivant.
+  const refermer = () => ruban.current?.scrollTo?.({ left: 0, behavior: 'smooth' })
+  // La carte hors ligne suit la clé du parcours (`keyOf`) : un favori et les
+  // sorties faites dessus la partagent. Elle ne part qu'avec la dernière
+  // ligne qui la montre.
+  const partagee = kept.some((x) => x !== route && offline.keyOf(x) === offline.keyOf(route))
+
+  if (asking) {
+    return (
+      <Forget
+        route={route}
+        run={run}
+        shared={partagee}
+        onCancel={() => setAsking(false)}
+        onConfirm={() => {
+          const carte = offline.isStored(route) && !partagee
+          onForget(route)
+          if (carte) offline.remove(route).catch(() => {})
+        }}
+      />
+    )
+  }
+
+  const contenu = (
+    <>
+      <Thumb line={run ? route.track : route.geometry} sport={run ? route.sport : null} />
+      <span>
+        {naming ? (
+          <RenameField
+            name={route.name}
+            label={run ? 'Nom de la sortie' : 'Nom du favori'}
+            autoFocus
+            onRename={(nom) => onRename(route, nom)}
+            onDone={() => setNaming(false)}
+          />
+        ) : (
+          route.name
+        )}
+        <em>
+          {run
+            ? `${dayLabel(route.ranAt)} · ${km(route.actual_distance_m)} km · ${duration(route.actual_duration_s)} · ${paceOf(route)}/km`
+            : `${km(route.distance_m)} km · D+ ${Math.round(route.ascent_m || 0)} m`}
+        </em>
+      </span>
+      {route.grade ? (
+        <span className={`grade grade--${route.grade}`}>{route.grade}</span>
+      ) : (
+        <span className="grade grade--free">libre</span>
+      )}
+    </>
+  )
+
+  return (
+    <div className="list__item" ref={ruban}>
+      <div className="list__main">
+        {/* Le champ ne peut pas vivre dans un bouton : un toucher pour placer
+            le curseur ouvrirait le parcours. */}
+        {naming ? (
+          <div className="list__row list__row--naming">{contenu}</div>
+        ) : (
+          // Ouverte, la ligne se referme au toucher au lieu de s'ouvrir : on
+          // touche à côté des boutons, pas pour partir ailleurs.
+          <button className="list__row" onClick={() => (ruban.current?.scrollLeft > 4 ? refermer() : onOpen())}>
+            {contenu}
+          </button>
+        )}
+        <OfflineControl route={route} mapStyle={mapStyle} />
+      </div>
+      {onRename && onForget && (
+        <div className="list__acts">
+          <button
+            className="list__act"
+            onClick={() => {
+              refermer()
+              setNaming(true)
+            }}
+          >
+            Renommer
+          </button>
+          <button
+            className="list__act list__act--warn"
+            onClick={() => {
+              refermer()
+              setAsking(true)
+            }}
+          >
+            {run ? 'Supprimer' : 'Retirer'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Le retrait, confirmé : un favori retiré ne se retrouve qu'en refaisant la
+ * recherche qui l'avait trouvé, une sortie supprimée plus du tout.
+ *
+ * La carte hors ligne y est nommée. Partie sans un mot, elle manquerait le jour
+ * où l'on n'a plus de réseau pour la reprendre ; restée sans un mot, elle
+ * occuperait des mégaoctets qu'aucune ligne ne permet plus de libérer.
+ */
+function Forget({ route, run, shared, onCancel, onConfirm }) {
+  const stored = offline.isStored(route)
+  return (
+    <div className="list__confirm" role="group" aria-label={run ? 'Supprimer la sortie' : 'Retirer le favori'}>
+      <p>
+        {run ? (
+          <>
+            Supprimer <b>{route.name}</b>, la sortie du {dayLabel(route.ranAt)} ? Ses kilomètres quittent les totaux.
+          </>
+        ) : (
+          <>
+            Retirer <b>{route.name}</b> des favoris ?
+          </>
+        )}
+        {stored &&
+          (shared
+            ? ' Sa carte hors ligne reste : une autre ligne de Mes parcours la montre.'
+            : ` Sa carte hors ligne (${offline.formatBytes(offline.storedBytes(route))}) part avec.`)}
+      </p>
+      <div className="row">
+        <button className="btn" onClick={onCancel}>
+          Annuler
+        </button>
+        <button className="btn btn--primary" onClick={onConfirm}>
+          {run ? 'Supprimer' : 'Retirer'}
+        </button>
+      </div>
     </div>
   )
 }

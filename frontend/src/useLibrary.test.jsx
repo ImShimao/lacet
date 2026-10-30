@@ -89,6 +89,29 @@ describe('ce que l’app garde', () => {
     expect(load().history[0].id).toBe('h2')
   })
 
+  it('renomme un favori sans le détacher de sa carte ni de son cœur', () => {
+    // La clé d'une carte hors ligne est faite du nom : renommé, le favori
+    // perdait sa carte, et la même boucle retrouvée par une recherche n'avait
+    // plus le cœur plein.
+    monter({ favorites: [parcours(1), parcours(2)], history: [], places: [] })
+    act(() => api.rename(parcours(1), 'Tour du Bollenberg'))
+    expect(load().favorites.map((r) => r.name)).toEqual(['Tour du Bollenberg', 'Boucle 2'])
+    expect(api.isFavorite(parcours(1))).toBe(true)
+    // Et le renommé se retire encore, sous son nouveau nom.
+    act(() => api.forget(load().favorites[0]))
+    expect(load().favorites.map((r) => r.id)).toEqual(['r2'])
+  })
+
+  it('renomme une sortie sans toucher au favori du même parcours', () => {
+    // Une sortie faite sur un favori en partage la clé : seule l'heure de
+    // départ dit lequel des deux on renomme.
+    const une = { ...parcours(1), ranAt: '2026-09-01T08:00:00Z' }
+    monter({ favorites: [parcours(1)], history: [une], places: [] })
+    act(() => api.rename(une, 'Course du club'))
+    expect(load().history[0].name).toBe('Course du club')
+    expect(api.saved[0].name).toBe('Boucle 1')
+  })
+
   it('refuse un nom vide et borne sa longueur', () => {
     const une = sortie(1)
     monter({ favorites: [], history: [une], places: [] })
