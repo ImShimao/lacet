@@ -717,6 +717,7 @@ export default function App() {
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
+              onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}
               // Le moteur ne retourne que ce qu'il vient de calculer : un favori

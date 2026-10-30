@@ -116,6 +116,20 @@ describe('les avertissements de l’écran', () => {
   })
 })
 
+describe('pendant la recherche', () => {
+  it('propose d’abandonner', () => {
+    const onCancel = vi.fn()
+    afficher({ busy: 'search', result: null, onCancel })
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+    expect(onCancel).toHaveBeenCalled()
+  })
+
+  it('ne propose rien quand l’attente ne s’abandonne pas', () => {
+    afficher({ busy: 'work', result: null, onCancel: null })
+    expect(screen.queryByRole('button', { name: 'Annuler' })).not.toBeInTheDocument()
+  })
+})
+
 describe('la feuille de route', () => {
   it('montre sur la carte la consigne touchée', () => {
     // Le point s'allumait sous la feuille dépliée, sans que rien ne bouge : la

@@ -44,6 +44,7 @@ export default function Explore({
   onSelect,
   onToggleDetail,
   onSearch,
+  onCancel = null,
   onRegenerate,
   onReverse,
   reversing = false,
@@ -78,6 +79,13 @@ export default function Explore({
         <div className="skeleton skeleton--card" />
         <div className="skeleton skeleton--line" />
         <SearchProgress progress={progress} />
+        {/* Hors des archives, l'écran annonce lui-même jusqu'à une minute
+            d'attente : il faut pouvoir en sortir sans fermer l'app. */}
+        {onCancel && (
+          <button className="btn btn--ghost" onClick={onCancel}>
+            Annuler
+          </button>
+        )}
       </div>
     )
   }

@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 let repondre = null
 vi.mock('./api', () => ({
-  generateLoops: (request) => repondre(request),
+  generateLoops: (request, onProgress) => repondre(request, onProgress),
 }))
 vi.mock('./engine/client', () => ({ prefetchOnDevice: vi.fn() }))
 
@@ -112,6 +112,82 @@ describe('la recherche', () => {
       await api.run({ distance_km: 5 })
     })
     expect(api.error).toEqual({ message: 'Pas de réseau', offline: true })
+    expect(api.busy).toBe(false)
+  })
+
+  it('s’abandonne, et sa réponse tardive ne s’affiche jamais', async () => {
+    // Hors des archives, l'attente peut durer une minute. « Annuler » revient à
+    // l'accueil tout de suite ; le calcul, lui, finit dans le worker, et ni sa
+    // progression ni sa réponse ne doivent ressurgir à l'écran.
+    render(<Sonde />)
+    let finir
+    let avancer
+    repondre = (request, onProgress) => {
+      avancer = onProgress
+      return new Promise((resolve) => (finir = resolve))
+    }
+    let abandonnee
+    await act(async () => {
+      abandonnee = api.run({ distance_km: 10 }, { onStart: () => { throw new Error('le repère ne doit pas bouger') } })
+    })
+    expect(api.busy).toBe('search')
+    act(() => api.cancel())
+    expect(api.busy).toBe(false)
+    expect(api.cancel).toBeNull()
+
+    await act(async () => {
+      avancer('download', 0.5)
+      finir(reponse([boucle('tardive', [[7.21, 47.9]])]))
+      expect(await abandonnee).toBeNull()
+    })
+    expect(api.result).toBeNull()
+    expect(api.selected).toBeNull()
+    expect(api.progress).toBeNull()
+    expect(api.error).toBeNull()
+    expect(api.busy).toBe(false)
+  })
+
+  it('laisse la recherche suivante en paix quand l’abandonnée finit', async () => {
+    render(<Sonde />)
+    const attentes = []
+    repondre = () => new Promise((resolve, reject) => attentes.push({ resolve, reject }))
+    let suivante
+    await act(async () => {
+      api.run({ distance_km: 10 })
+    })
+    act(() => api.cancel())
+    await act(async () => {
+      suivante = api.run({ distance_km: 12 })
+    })
+    // L'abandonnée échoue pendant que la suivante calcule : ni erreur, ni fin
+    // d'attente — c'est la suivante qui décide.
+    await act(async () => {
+      attentes[0].reject(new Error('Overpass sature'))
+    })
+    expect(api.busy).toBe('search')
+    expect(api.error).toBeNull()
+
+    await act(async () => {
+      attentes[1].resolve(reponse([boucle('suivante')]))
+      await suivante
+    })
+    expect(api.result.routes[0].id).toBe('suivante')
+    expect(api.busy).toBe(false)
+  })
+
+  it('ne propose pas d’abandonner la reconnaissance d’un fichier', async () => {
+    render(<Sonde />)
+    let finir
+    let travail
+    await act(async () => {
+      travail = api.working(() => new Promise((resolve) => (finir = resolve)))
+    })
+    expect(api.busy).toBeTruthy()
+    expect(api.cancel).toBeNull()
+    await act(async () => {
+      finir()
+      await travail
+    })
     expect(api.busy).toBe(false)
   })
 
