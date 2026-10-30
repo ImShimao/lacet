@@ -67,3 +67,28 @@ export function GeoBanner({ onPlace, onClose }) {
     </div>
   )
 }
+
+/**
+ * Ce qu'un plafond de « Mes parcours » vient de refuser ou de retirer — voir
+ * `useLibrary`. Le favori le plus ancien, le départ nommé de trop, la sortie
+ * la plus ancienne partaient sans un mot : on ne l'apprenait qu'en les
+ * cherchant. `onAct` mène là où l'on fait de la place, quand il y en a un.
+ */
+export function LibraryNotice({ notice, onAct, onClose }) {
+  return (
+    <div className="banner banner--notice" role="status">
+      <Icon name="warning" size={16} />
+      <span>{notice.text}</span>
+      <button className="banner__close" onClick={onClose} aria-label="Masquer">
+        <Icon name="close" size={15} />
+      </button>
+      {onAct && (
+        <div className="banner__acts">
+          <button className="banner__act" onClick={onAct}>
+            Mes favoris
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

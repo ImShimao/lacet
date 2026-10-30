@@ -163,15 +163,18 @@ describe('load et save', () => {
     expect(load()).toEqual({ favorites: [], history: [], params: null, recentPlaces: [], reports: [] })
   })
 
-  it('sacrifie l’historique quand le quota est atteint', () => {
+  it('allège l’historique quand le quota est atteint', () => {
     // La règle : les sorties les plus anciennes ont le moins de valeur, ce sont
-    // elles qui partent — pas les favoris, que l'on a choisis exprès.
-    const historique = Array.from({ length: 40 }, (_, i) => ({ id: i, bourrage: 'x'.repeat(200) }))
+    // elles qui paient — pas les favoris, que l'on a choisis exprès. Et elles
+    // perdent leur poids avant d'être supprimées : leurs chiffres restent.
+    const historique = Array.from({ length: 40 }, (_, i) => ({ id: i, actual_distance_m: 5000, bourrage: 'x'.repeat(200) }))
     vi.stubGlobal('localStorage', fauxStockage({ quota: 4000 }))
 
     const apres = save({ favorites: [{ id: 'garde-moi' }], history: historique })
     expect(apres.favorites).toHaveLength(1)
-    expect(apres.history.length).toBeLessThan(40)
+    expect(apres.history).toHaveLength(40)
+    expect(apres.history[4].bourrage).toBeDefined()
+    expect(apres.history[5]).toEqual({ id: 5, actual_distance_m: 5000 })
   })
 
   it('renonce plutôt que de perdre les données déjà en place', () => {
@@ -227,6 +230,17 @@ describe('la sauvegarde', () => {
     save({ offlineMaps: { ici: { bytes: 2, urls: [] } } })
     importAll(copie)
     expect(Object.keys(load().offlineMaps)).toEqual(['ici'])
+  })
+
+  it('dit ce que les plafonds laissent dehors, au lieu de l’annoncer restauré', () => {
+    const fav = (i) => ({ id: 'f' + i, name: 'Boucle ' + i, distance_m: 10_000 + i, geometry: [] })
+    save({ favorites: Array.from({ length: 30 }, (_, i) => fav(i)) })
+    const copie = exportAll()
+    save({ favorites: Array.from({ length: 15 }, (_, i) => fav(100 + i)) })
+    const { favorites, left } = importAll(copie)
+    expect(favorites).toBe(40)
+    expect(left).toEqual({ favorites: 5, history: 0, places: 0 })
+    expect(load().favorites).toHaveLength(40)
   })
 
   it('refuse un fichier qui n’en est pas une', () => {

@@ -43,30 +43,67 @@ describe('ce que l’app garde', () => {
     expect(api.isFavorite(null)).toBe(false)
   })
 
-  it('ne garde les traces que des vingt-cinq dernières sorties', () => {
-    // C'est par elles que le stockage du navigateur se remplit.
-    monter({ favorites: [], history: Array.from({ length: 30 }, (_, i) => sortie(i)), places: [] })
-    act(() => api.remember(sortie(99)))
+  it('réduit à leur résumé les sorties d’avant les vingt-cinq dernières', () => {
+    // La trace, la voix et le parcours prévu : 63 Ko sur 64 d'une sortie, et
+    // c'est par eux que le stockage du navigateur se remplit.
+    const entiere = (i) => ({ ...sortie(i), ...parcours(i), ranAt: sortie(i).ranAt, spoken: [{ text: 'Tourne à gauche' }], actual_distance_m: 10_000 })
+    monter({ favorites: [], history: Array.from({ length: 30 }, (_, i) => entiere(i)), places: [] })
+    act(() => api.remember(entiere(99)))
     const gardees = load().history
-    expect(gardees[0].track).not.toBeNull()
-    expect(gardees[24].track).not.toBeNull()
-    expect(gardees[25].track).toBeNull()
+    expect(gardees).toHaveLength(31)
+    expect(gardees[24].track).toBeTruthy()
+    expect(gardees[24].geometry).toBeTruthy()
+    expect(gardees[25]).toEqual({ id: 'r24', name: 'Boucle 24', ranAt: gardees[25].ranAt, distance_m: 10_024, actual_distance_m: 10_000 })
   })
 
-  it('borne les trois listes', () => {
-    monter({
-      favorites: Array.from({ length: 40 }, (_, i) => parcours(i)),
-      history: Array.from({ length: 200 }, (_, i) => sortie(i)),
-      places: Array.from({ length: 8 }, (_, i) => ({ id: 'p' + i, name: 'Lieu ' + i })),
-    })
-    act(() => api.keepRoute(parcours(500)))
-    act(() => api.remember(sortie(500)))
-    act(() => api.keepPlace({ id: 'p500', name: 'Chez moi' }))
-    expect(load().favorites).toHaveLength(40)
-    expect(load().history).toHaveLength(200)
-    expect(load().places).toHaveLength(8)
-    // Et c'est bien le nouveau qui est en tête.
-    expect(load().places[0].name).toBe('Chez moi')
+  it('garde mille sorties, et dit laquelle laisse sa place au-delà', () => {
+    // Deux cents effaçaient en un an, à quatre sorties par semaine, les
+    // totaux mensuels de l'année d'avant — et sans un mot.
+    const vieilles = Array.from({ length: 1000 }, (_, i) => ({ id: 'h' + i, name: 'S', ranAt: new Date(Date.UTC(2026, 9, 1) - i * 864e5 * 2).toISOString() }))
+    monter({ favorites: [], history: vieilles, places: [] })
+    expect(api.notice).toBeNull()
+    act(() => api.remember(sortie(1000)))
+    expect(load().history).toHaveLength(1000)
+    expect(load().history[0].id).toBe('h1000')
+    expect(load().history.at(-1).id).toBe('h998')
+    expect(api.notice.list).toBe('history')
+    expect(api.notice.text).toMatch(/celle du \d+ \S+ 2021, la plus ancienne, a laissé sa place/)
+    act(() => api.dismiss())
+    expect(api.notice).toBeNull()
+  })
+
+  it('refuse le quarante et unième favori au lieu d’effacer le plus ancien', () => {
+    // Le plus ancien est souvent le premier gardé : celui qu'on refait le plus.
+    monter({ favorites: Array.from({ length: 40 }, (_, i) => parcours(i)), history: [], places: [] })
+    act(() => api.toggleFavorite(parcours(500)))
+    expect(api.saved).toHaveLength(40)
+    expect(api.saved.at(-1).id).toBe('r39')
+    expect(api.isFavorite(parcours(500))).toBe(false)
+    expect(api.notice.list).toBe('favorites')
+    expect(api.notice.text).toMatch(/« Boucle 500 » n'est pas gardé/)
+    // Un import refusé de même ; remplacer un favori déjà là, non.
+    act(() => api.keepRoute(parcours(501)))
+    expect(api.saved).toHaveLength(40)
+    act(() => api.keepRoute({ ...parcours(3), name: 'Boucle 3 (corrigée)' }))
+    expect(api.saved[0].name).toBe('Boucle 3 (corrigée)')
+    expect(api.notice).toBeNull()
+    // Une place faite, il passe.
+    act(() => api.forget(parcours(0)))
+    act(() => api.toggleFavorite(parcours(500)))
+    expect(api.isFavorite(parcours(500))).toBe(true)
+  })
+
+  it('refuse le neuvième départ nommé au lieu d’oublier « Chez moi »', () => {
+    const lieux = Array.from({ length: 8 }, (_, i) => ({ id: 'p' + i, name: i === 7 ? 'Chez moi' : 'Lieu ' + i }))
+    monter({ favorites: [], history: [], places: lieux })
+    act(() => api.keepPlace({ id: 'p500', name: 'Le club' }))
+    expect(api.places.map((p) => p.name)).toContain('Chez moi')
+    expect(api.places).toHaveLength(8)
+    expect(api.notice.list).toBe('places')
+    expect(api.notice.text).toMatch(/« Le club » n'est pas gardé/)
+    act(() => api.dropPlace('p0'))
+    act(() => api.keepPlace({ id: 'p500', name: 'Le club' }))
+    expect(api.places[0].name).toBe('Le club')
   })
 
   it('remplace un parcours rouvert au lieu de le doubler', () => {
@@ -87,6 +124,29 @@ describe('ce que l’app garde', () => {
     act(() => api.forget(copie))
     expect(load().history).toHaveLength(1)
     expect(load().history[0].id).toBe('h2')
+  })
+
+  it('renomme un favori sans le détacher de sa carte ni de son cœur', () => {
+    // La clé d'une carte hors ligne est faite du nom : renommé, le favori
+    // perdait sa carte, et la même boucle retrouvée par une recherche n'avait
+    // plus le cœur plein.
+    monter({ favorites: [parcours(1), parcours(2)], history: [], places: [] })
+    act(() => api.rename(parcours(1), 'Tour du Bollenberg'))
+    expect(load().favorites.map((r) => r.name)).toEqual(['Tour du Bollenberg', 'Boucle 2'])
+    expect(api.isFavorite(parcours(1))).toBe(true)
+    // Et le renommé se retire encore, sous son nouveau nom.
+    act(() => api.forget(load().favorites[0]))
+    expect(load().favorites.map((r) => r.id)).toEqual(['r2'])
+  })
+
+  it('renomme une sortie sans toucher au favori du même parcours', () => {
+    // Une sortie faite sur un favori en partage la clé : seule l'heure de
+    // départ dit lequel des deux on renomme.
+    const une = { ...parcours(1), ranAt: '2026-09-01T08:00:00Z' }
+    monter({ favorites: [parcours(1)], history: [une], places: [] })
+    act(() => api.rename(une, 'Course du club'))
+    expect(load().history[0].name).toBe('Course du club')
+    expect(api.saved[0].name).toBe('Boucle 1')
   })
 
   it('refuse un nom vide et borne sa longueur', () => {

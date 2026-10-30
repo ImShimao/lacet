@@ -117,8 +117,16 @@ async function keepFile(url, response) {
   return bytes.byteLength
 }
 
-/** Clé d'un parcours dans le journal des cartes gardées. */
-export const keyOf = (route) => `${route.name}|${Math.round(route.distance_m)}`
+/**
+ * Clé d'un parcours dans le journal des cartes gardées — et celle qui dit qu'un
+ * parcours est en favori.
+ *
+ * Faite du nom et de la longueur, elle changeait avec le nom : un favori
+ * renommé perdait sa carte hors ligne, et la même boucle retrouvée par une
+ * recherche n'avait plus le cœur plein. Un parcours renommé garde donc dans
+ * `key` la clé qu'il avait (`useLibrary.rename`).
+ */
+export const keyOf = (route) => route.key ?? `${route.name}|${Math.round(route.distance_m)}`
 
 // --- géométrie des tuiles --------------------------------------------------
 

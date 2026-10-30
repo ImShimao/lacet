@@ -54,20 +54,67 @@ export function load() {
   }
 }
 
+// --- ce qui tient dans cinq mégaoctets ----------------------------------------
+//
+// Les plafonds des listes gardées sont ici, à côté du quota qui les dicte
+// (`QUOTA_BYTES`) : `useLibrary` les applique au fil des gestes, `importAll` à
+// la restauration d'une sauvegarde — qui les recopiait en dur.
+
+// Quarante favoris : au-delà, la liste ne se parcourt plus. Un favori pèse
+// une soixantaine de kilooctets (mesure ci-dessous) : quarante font déjà
+// 2,5 Mo, la moitié du stockage.
+export const MAX_FAVORITES = 40
+// Les vingt-cinq dernières sorties gardent tout : trace, phrases de la voix,
+// parcours prévu. C'est la partie lourde, et celle qu'on rouvre.
+export const MAX_TRACKS = 25
+// Mille sorties résumées. Mesuré le 30 octobre 2026 sur une boucle de 10,4 km
+// au départ de Guebwiller : une sortie sans sa trace pesait encore 31 400
+// caractères — 63 Ko, chaque caractère comptant double —, car elle gardait son
+// parcours prévu (profil 10 000, tracé 9 700, consignes 6 400, tronçons 4 000).
+// Le plafond de deux cents n'était donc jamais atteint : vers la
+// quatre-vingtième, le stockage plein coupait l'historique en deux (`save`).
+// Son résumé (`brief`) en pèse 555, soit 1,1 Ko : mille tiennent dans 1,1 Mo,
+// un cinquième du quota. Cinq ans à quatre sorties par semaine, et la place des
+// favoris et des sorties complètes reste entière.
+export const MAX_HISTORY = 1000
+// Chez soi, le bureau, le club, deux coins de vacances : huit suffit, et une
+// liste plus longue ne se lirait plus d'un coup d'œil.
+export const MAX_PLACES = 8
+
+// Ce que garde une sortie ancienne : ce que lisent la liste, les totaux, les
+// records et son bilan. Partent la trace, la voix et le parcours prévu — donc
+// « Refaire ce parcours » et la comparaison aux passages d'avant (`knownRoutes`).
+const BRIEF = [
+  'id', 'key', 'name', 'ranAt', 'sport', 'free', 'grade', 'distance_m', 'ascent_m',
+  'actual_distance_m', 'actual_duration_s', 'actual_ascent_m', 'actual_ascent_source',
+  'splits', 'paused_s', 'rerouted', 'arrived',
+]
+
+/** Le résumé d'une sortie : ses chiffres, sans trace ni parcours prévu. */
+export const brief = (entry) => Object.fromEntries(BRIEF.filter((k) => entry[k] !== undefined).map((k) => [k, entry[k]]))
+
+/** La sortie garde-t-elle plus que son résumé ? */
+const whole = (entry) => Object.keys(entry).some((k) => !BRIEF.includes(k))
+
+// Ce qu'un stockage plein laisse entier : les cinq dernières sorties, celles
+// qu'on rouvre pour se comparer ou refaire le parcours.
+const KEEP_WHOLE = 5
+
 /**
  * Écrit dans le stockage local, en faisant de la place si nécessaire.
  *
  * Le quota du navigateur (~5 Mo) finit par être atteint : chaque parcours
  * conservé pèse quelques dizaines de kilooctets, et l'historique s'accumule.
  * Échouer en silence ferait disparaître un favori sans que personne le sache —
- * on préfère sacrifier les sorties les plus anciennes, qui ont le moins de
- * valeur, et prévenir seulement si même ça ne suffit pas.
+ * on préfère alléger puis sacrifier les sorties les plus anciennes, qui ont le
+ * moins de valeur, et prévenir seulement si même ça ne suffit pas.
  */
 export function save(patch) {
   let next = { ...load(), ...patch }
   const avant = (next.history || []).length
+  let briefed = 0
 
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const text = JSON.stringify(next)
       localStorage.setItem(KEY, text)
@@ -75,18 +122,27 @@ export function save(patch) {
       return next
     } catch {
       const history = next.history || []
-      if (history.length <= 5) break
+      // D'abord **alléger**. La trace et le parcours prévu d'une sortie pèsent
+      // cent fois son résumé : les retirer des plus anciennes garde tous les
+      // chiffres — distance, temps, tours, totaux du mois. Couper l'historique
+      // en deux d'emblée effaçait des années de résumés qui ne pesaient presque
+      // rien, pour faire de la place à un seul favori.
+      const lourdes = history.slice(KEEP_WHOLE).filter(whole).length
+      if (lourdes) {
+        briefed += lourdes
+        next = { ...next, history: history.map((s, i) => (i < KEEP_WHOLE ? s : brief(s))) }
+      } else if (history.length > 5) {
+        next = { ...next, history: history.slice(0, Math.floor(history.length / 2)) }
+      } else {
+        break
+      }
       // **Et on le note.** Sacrifier des sorties pour faire de la place est
       // défendable ; le faire sans que personne l'apprenne ne l'est pas. Le
       // seul signal était un message dans une console que personne n'ouvre sur
       // un téléphone, et l'on découvrait le trou des semaines plus tard, sans
       // pouvoir le relier à quoi que ce soit. La trace de l'élagage part avec
       // l'écriture suivante — celle qui, elle, passera.
-      next = {
-        ...next,
-        history: history.slice(0, Math.floor(history.length / 2)),
-        trimmed: { at: Date.now(), from: avant, to: Math.floor(history.length / 2) },
-      }
+      next.trimmed = { at: Date.now(), from: avant, to: next.history.length, briefed }
     }
   }
 
@@ -260,6 +316,9 @@ export function slim(route) {
   return {
     id: route.id,
     name: route.name,
+    // La clé d'un parcours renommé, qui le relie encore à sa carte hors ligne
+    // et à son cœur — voir `keyOf`.
+    key: route.key,
     distance_m: route.distance_m,
     duration_s: route.duration_s,
     ascent_m: route.ascent_m,
@@ -354,14 +413,22 @@ export function importAll(text) {
   const places = merge(current.places, data.places, (p) => p.id ?? `${p.name}|${p.lat}|${p.lon}`)
   history.sort((a, b) => String(b.ranAt || '').localeCompare(String(a.ranAt || '')))
 
-  save({
-    ...data,
-    favorites: favorites.slice(0, 40),
-    history: history.slice(0, 200),
-    reports: reports.slice(0, 200),
-    zones: zones.slice(0, 30),
-    places: places.slice(0, 8),
-  })
-  return { favorites: favorites.length, history: history.length }
+  const kept = {
+    favorites: favorites.slice(0, MAX_FAVORITES),
+    history: history.slice(0, MAX_HISTORY).map((s, i) => (i < MAX_TRACKS ? s : brief(s))),
+    places: places.slice(0, MAX_PLACES),
+  }
+  save({ ...data, ...kept, reports: reports.slice(0, 200), zones: zones.slice(0, 30) })
+  return {
+    favorites: kept.favorites.length,
+    history: kept.history.length,
+    // Ce que les plafonds ont laissé dehors : la restauration annonçait les
+    // parcours du fichier, même ceux qui n'avaient pas trouvé de place.
+    left: {
+      favorites: favorites.length - kept.favorites.length,
+      history: history.length - kept.history.length,
+      places: places.length - kept.places.length,
+    },
+  }
 }
 
