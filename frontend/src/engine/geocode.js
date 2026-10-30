@@ -67,6 +67,11 @@ const CACHE_MAX = 500
 // Deux résultats du même nom à moins de ça sont le même lieu : la gare et son
 // quai, le bâtiment et le commerce qu'il abrite.
 const SAME_PLACE_M = 150
+// Une frontière — canton, arrondissement — porte le nom de sa ville, mais son
+// point est le centre d'une surface, loin du bourg : « Guebwiller » sortait deux
+// fois, la ville et son canton à 1,9 km ; Cernay, son canton à 14 km. À moins
+// de ça d'un lieu du même nom, elle n'est qu'une autre façon de le nommer.
+const SAME_AREA_M = 20_000
 
 // Quatre secondes : c'est déjà très long quand on tape un nom de rue, et c'est
 // plus que ce que Photon met dans 99 % des cas (mesuré entre 120 et 900 ms).
@@ -582,6 +587,9 @@ export function fromPhoton(feature) {
     // le même lieu vu par deux sources ne se reconnaîtrait pas : « salle de
     // sport » d'un côté, « bâtiment » de l'autre.
     group: `${fold(short)}|${place ? 'lieu' : 'poi'}`,
+    // Le centre d'une surface, et non un point qu'on vise : le moins précis
+    // des doublons (voir `SAME_AREA_M`).
+    area: p.osm_key === 'boundary',
   }
 }
 
@@ -615,7 +623,8 @@ const PLACE_BONUS = 1.12
  * Sans `query`, l'ordre reçu est gardé — seules la distance, à nom et genre
  * égaux, et la fusion des doublons s'appliquent.
  *
- * Et les doublons partent : même nom, à moins de 150 m.
+ * Et les doublons partent : même nom, à moins de 150 m — à moins de 20 km pour
+ * une frontière, qui cède toujours la place au lieu précis.
  */
 export function rankPlaces(places, near, query = null) {
   const scored = places.map((place, index) => ({
@@ -632,9 +641,11 @@ export function rankPlaces(places, near, query = null) {
   }
   const kept = []
   for (const members of groups.values()) {
-    if (near) members.sort((a, b) => a.distance_m - b.distance_m)
+    // Les frontières en dernier : c'est le lieu précis qui reste.
+    members.sort((a, b) => (a.area ? 1 : 0) - (b.area ? 1 : 0) || (near ? a.distance_m - b.distance_m : 0))
     for (const place of members) {
-      const twin = kept.some((other) => fold(other.short) === fold(place.short) && metres(other, place) < SAME_PLACE_M)
+      const reach = place.area ? SAME_AREA_M : SAME_PLACE_M
+      const twin = kept.some((other) => fold(other.short) === fold(place.short) && metres(other, place) < reach)
       if (!twin) kept.push(place)
     }
   }
@@ -649,7 +660,7 @@ export function rankPlaces(places, near, query = null) {
     // l'ordre d'arrivée tranche : il est stable d'une frappe à l'autre.
     kept.sort((a, b) => b.score - a.score || a.index - b.index)
   }
-  return kept.map(({ group, index, match, score, ...place }) => place)
+  return kept.map(({ group, area, index, match, score, ...place }) => place)
 }
 
 // Le genre d'un lieu, en mots de tous les jours. Ce qui manque ici reste sans
