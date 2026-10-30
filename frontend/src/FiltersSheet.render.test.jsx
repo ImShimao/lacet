@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import FiltersSheet, { DEFAULTS } from './FiltersSheet.jsx'
 
@@ -158,6 +158,24 @@ describe('le panneau des filtres', () => {
   it('prévient quand les tours seraient trop courts', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 5, form: 'laps', laps: 4 })
     expect(screen.getByText(/4 tours de 1,3 km : trop courts/)).toBeInTheDocument()
+  })
+
+  it('propose à vélo des distances et des durées de cycliste', () => {
+    ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', mode: 'distance', distance_km: 40 })
+    expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
+    const usuelles = within(screen.getByRole('group', { name: 'Distances usuelles' }))
+    fireEvent.click(usuelles.getByRole('button', { name: '75 km' }))
+    expect(usuelles.getByRole('button', { name: '75 km' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Durée' }))
+    expect(screen.getByRole('button', { name: '3 h' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '30 min' })).not.toBeInTheDocument()
+  })
+
+  it('peut faire passer les boucles déjà courues après les autres', () => {
+    const { onApply } = ouvrir()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Boucles déjà courues/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0].avoid).toEqual(['known'])
   })
 
   it('réinitialise les filtres sans réafficher ceux qu’on a masqués', () => {

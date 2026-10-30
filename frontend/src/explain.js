@@ -198,6 +198,11 @@ const AVOID = {
       text: "Les voies explicitement données comme non éclairées (`lit=no`). Celles qui ne disent rien ne sont pas pénalisées : la moitié des rues d'un village n'ont simplement pas l'information, et les écarter viderait la carte.",
     },
     {
+      icon: 'refresh',
+      label: 'Boucles déjà courues',
+      text: "Les sorties passées depuis ce départ, à peu près de cette longueur : une proposition qui suit l'une d'elles sur les deux tiers passe après celles jamais courues d'ici. Après seulement — si c'est la seule sûre, ou la seule qui tient les réglages, elle reste proposée.",
+    },
+    {
       icon: 'shield',
       label: 'Et la circulation ?',
       text: "C'est le réglage « Sécurité » qui s'en charge : en « Sûr », chaque bout de route rapide sans trottoir est contourné. Il n'y a rien à cocher en plus.",

@@ -66,6 +66,16 @@ describe('la pastille d’activité', () => {
     expect(summarise({ ...DEFAULTS, mode: 'duration', duration_min: 60, form: 'eight' })).toBe('≈9 km · deux boucles · 6:30/km')
     expect(summarise({ ...DEFAULTS, form: 'loop' })).toContain('une boucle')
   })
+
+  it('dit « inédites » quand on écarte les boucles déjà courues', () => {
+    expect(summarise({ ...DEFAULTS, mode: 'distance', distance_km: 10, avoid: ['known'] })).toBe('10 km · inédites · 6:30/km')
+    // Ce ne sont pas des rues : elles ne partent pas en évitement au moteur.
+    expect(toRequest({ ...DEFAULTS, safety: 'standard', avoid: ['known', 'steps'] }, start).avoid).toEqual(['steps'])
+  })
+
+  it('ne parle pas de « Semi » à vélo', () => {
+    expect(summarise({ ...DEFAULTS, sport: 'bike', mode: 'distance', distance_km: 21.0975 })).toBe('21,098 km · 20 km/h')
+  })
 })
 
 describe('l’entrée d’historique', () => {

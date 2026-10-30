@@ -111,15 +111,24 @@ export const RACES = [
   { key: 'marathon', km: 42.195, label: 'Marathon', detail: '42,195 km' },
 ]
 
+/**
+ * À vélo, les distances qu'on se donne : la sortie courte, la demi-journée, la
+ * centaine. Le panneau proposait les distances de course — un « Semi » à vélo.
+ * Ce ne sont pas des épreuves au mètre près : elles ne resserrent pas la
+ * tolérance.
+ */
+export const RIDES = [25, 50, 75, 100]
+
 /** La distance de course qui correspond, à dix mètres près. */
 export const raceOf = (km) => RACES.find((r) => Math.abs(r.km - km) < 0.01) ?? null
 
 /**
  * Les durées qu'on se donne vraiment : la demi-heure de semaine, les
  * trois quarts d'heure, l'heure, et la sortie longue. Composer 1 h 30 au pas de
- * cinq minutes demandait dix-huit appuis.
+ * cinq minutes demandait dix-huit appuis. À vélo, on part plus longtemps : une
+ * demi-heure n'y fait pas une sortie, et trois heures demandaient douze appuis.
  */
-export const DURATIONS = [30, 45, 60, 90]
+export const DURATIONS = { run: [30, 45, 60, 90], bike: [60, 90, 120, 180] }
 
 /**
  * Ce qu'on peut refuser de croiser.
@@ -127,7 +136,8 @@ export const DURATIONS = [30, 45, 60, 90]
  * Deux cases, et pas dix : chacune doit répondre à une gêne qu'on a vraiment
  * eue — les cent mètres de dénivelé avalés dans un escalier, le chemin noir à
  * dix-huit heures en décembre. Les clés sont celles de `AVOIDS`, dans
- * `engine/weights.js`.
+ * `engine/weights.js` — sauf la dernière, « Boucles déjà courues », qui n'est
+ * pas une rue : on la demandait pour changer de chemin sans changer de départ.
  *
  * Il y en avait une troisième, « Grands axes » : la départementale sans
  * trottoir. Elle disait la même chose que « Sûr », avec le même critère — une
@@ -141,6 +151,9 @@ export const DURATIONS = [30, 45, 60, 90]
 export const AVOIDABLE = [
   { key: 'steps', label: 'Escaliers', hint: 'Les volées de marches', sport: 'run' },
   { key: 'unlit', label: 'Rues non éclairées', hint: 'Seulement celles données comme telles' },
+  // Pas une rue mais un souvenir : les sorties passées depuis ce départ, à
+  // peu près de cette longueur, passent après les boucles neuves (`ranFrom`).
+  { key: 'known', label: 'Boucles déjà courues', hint: 'Elles passent après celles jamais courues d’ici' },
 ]
 
 export const DEFAULTS = {
@@ -236,7 +249,7 @@ export const OPTIONAL_FILTERS = [
   {
     key: 'avoid',
     label: 'Éviter',
-    hint: 'Escaliers, rues non éclairées.',
+    hint: 'Escaliers, rues non éclairées, boucles déjà courues.',
     fixed: 'Rien n’est évité.',
     reset: { avoid: [] },
   },
@@ -358,7 +371,24 @@ export default function FiltersSheet({ value, onApply, onClose }) {
               value={draft.mode}
               onChange={(mode) => set({ mode })}
             />
-            {draft.mode === 'distance' && (
+            {draft.mode === 'distance' && isBike && (
+              <div className="races" role="group" aria-label="Distances usuelles">
+                {RIDES.map((ride) => {
+                  const on = Math.abs(draft.distance_km - ride) < 0.01
+                  return (
+                    <button
+                      key={ride}
+                      className={`chip ${on ? 'chip--on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => set({ distance_km: ride })}
+                    >
+                      {ride} km
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {draft.mode === 'distance' && !isBike && (
               <div className="races" role="group" aria-label="Distances de course">
                 {RACES.map((race) => {
                   const on = Math.abs(draft.distance_km - race.km) < 0.01
@@ -401,7 +431,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             ) : (
               <>
               <div className="races" role="group" aria-label="Durées courantes">
-                {DURATIONS.map((minutes) => {
+                {(DURATIONS[draft.sport] ?? DURATIONS.run).map((minutes) => {
                   const on = draft.duration_min === minutes
                   return (
                     <button
