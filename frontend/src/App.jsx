@@ -737,6 +737,14 @@ export default function App() {
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
               onScrub={setScrub}
+              // Une consigne touchée dans la feuille de route : dépliée, la
+              // feuille couvrait le point, qui s'allumait dessous sans que la
+              // carte bouge. On la replie, et la carte vient au carrefour.
+              onShowStep={([lon, lat]) => {
+                setScrub([lon, lat])
+                setSheet('peek')
+                here.look({ lat, lon })
+              }}
               onOpenDetail={() => setSheet('full')}
               stops={stops}
               poiPrefs={poiPrefs}

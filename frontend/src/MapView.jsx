@@ -717,6 +717,13 @@ export default function MapView({
     m.getSource('cursor')?.setData(
       cursor ? { type: 'Point', coordinates: cursor } : empty(),
     )
+    // Hors de l'écran — la carte restée zoomée sur une consigne, ou déplacée à
+    // la main —, le point parcouru sur la bande ne se voyait plus du tout : la
+    // carte va le chercher. Pas pendant un recadrage en cours : c'est celui
+    // d'une consigne touchée, qui l'amène déjà sous les yeux.
+    if (cursor && !m.isMoving() && !m.getBounds().contains(cursor)) {
+      m.easeTo({ center: cursor, offset: visibleCentre(m), duration: 300 })
+    }
   }, [cursor, revision])
 
   // --- tracés -------------------------------------------------------------------

@@ -53,6 +53,7 @@ export default function Explore({
   onFreeRun,
   onOpenSaved,
   onScrub,
+  onShowStep,
   onOpenDetail,
   stops = { stops: [], loading: false, complete: true },
   poiPrefs = null,
@@ -316,7 +317,7 @@ export default function Explore({
 
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 
-      {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onScrub={onScrub} />}
+      {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}
 
       <button className="disclose" onClick={onToggleDetail} aria-expanded={detail}>
         {detail ? 'Masquer le détail' : 'Voir le détail de la note'}
@@ -703,9 +704,10 @@ function WindNote({ wind }) {
 /**
  * La feuille de route : chaque consigne, à son kilomètre. On la lit avant de
  * partir — repérer le virage qui piège, la rue qu'on ne connaît pas — et un
- * toucher montre l'endroit sur la carte. Repliée : la voix la dira en courant.
+ * toucher montre l'endroit sur la carte (`App` replie la feuille pour ça).
+ * Repliée : la voix la dira en courant.
  */
-function RouteSteps({ steps, onScrub }) {
+function RouteSteps({ steps, onShow }) {
   return (
     <details className="steps">
       <summary>
@@ -716,7 +718,7 @@ function RouteSteps({ steps, onScrub }) {
         {steps.map((s, i) => (
           <li key={i}>
             <button
-              onClick={() => onScrub?.(s.lon != null ? [s.lon, s.lat] : null)}
+              onClick={() => s.lon != null && onShow?.([s.lon, s.lat])}
               aria-label={`${s.text}, à ${km(s.dist_m, 1)} km — montrer sur la carte`}
             >
               <Icon name={turnIcon(s.turn)} size={17} />
