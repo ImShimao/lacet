@@ -24,6 +24,13 @@ describe('la demande au moteur', () => {
     expect(toRequest({ ...DEFAULTS, safety: 'safe', avoid: ['busy', 'steps'] }, start).avoid).toEqual(['steps', 'busy'])
   })
 
+  it('court à gauche par défaut, face aux voitures, et ne dit que l’autre choix', () => {
+    expect(toRequest(DEFAULTS, start)).not.toHaveProperty('side')
+    expect(toRequest({ ...DEFAULTS, side: 'left' }, start)).not.toHaveProperty('side')
+    expect(toRequest({ ...DEFAULTS, side: 'right' }, start).side).toBe('right')
+    expect(toRequest({ ...DEFAULTS, side: 'any' }, start).side).toBe('any')
+  })
+
   it('envoie le cap de la direction choisie, et rien en « Auto »', () => {
     // Sans cap, le moteur fait la recherche d'avant, à l'identique.
     expect(toRequest(DEFAULTS, start)).not.toHaveProperty('heading')

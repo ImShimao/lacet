@@ -179,6 +179,8 @@ function summaryOf(key, { params, poiPrefs }) {
         // « proposées » tombe quand un filtre est masqué : la ligne débordait.
         `${params.count ?? 5} boucles${hidden ? '' : ' proposées'}`,
         hidden ? `${hidden} filtre${hidden > 1 ? 's' : ''} masqué${hidden > 1 ? 's' : ''}` : null,
+        // Seul l'écart à la règle se dit : la gauche va sans dire.
+        params.side === 'right' ? 'Côté droit' : params.side === 'any' ? 'Côté indifférent' : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -427,6 +429,14 @@ function ClearData({ onClearData }) {
  * qui convertit une durée en distance, et on veut voir l'effet du réglage au
  * moment où on le touche.
  */
+// Le côté de la route où l'on court — `side` dans le moteur, voir `keepSide`.
+// La gauche d'abord : c'est ce que demande le code de la route.
+const SIDES = [
+  { key: 'left', label: 'Gauche' },
+  { key: 'right', label: 'Droite' },
+  { key: 'any', label: 'Indifférent' },
+]
+
 function SearchSettings({ params, onProfile }) {
   return (
     <div className="fields">
@@ -440,6 +450,17 @@ function SearchSettings({ params, onProfile }) {
         <p className="field__hint">
           La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
           quand ils rallongent. « Auto » choisit selon l'heure du coucher du soleil au départ.
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="label">Côté de la route</span>
+        <Segmented options={SIDES} value={params.side ?? 'left'} onChange={(side) => onProfile({ side })} />
+        <p className="field__hint">
+          Le côté par lequel la boucle fait le tour des ronds-points, et que la voix y rappelle. Le
+          code de la route (article R412-36) demande au piéton, hors agglomération et sans trottoir
+          ni accotement, de marcher à gauche, face aux voitures : on voit venir ce qui arrive. À
+          vélo, ce réglage ne change rien : on roule à droite.
         </p>
       </div>
 
