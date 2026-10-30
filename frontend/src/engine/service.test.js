@@ -134,10 +134,18 @@ describe('la boucle', () => {
 
   it('cherche d’autres boucles entières avant de proposer des tours', async () => {
     // Douze propositions : le premier tirage n'en tient qu'une poignée de
-    // distinctes, et la liste se complétait de tours.
-    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 12 }
+    // distinctes, et la liste se complétait de tours. À 5 km depuis Beaune, il
+    // en tient neuf, et les tirages en plus complètent la liste.
+    //
+    // Pas à 4 km, où ce test tombait jusqu'ici : depuis le départ devant la
+    // porte, le premier tirage y tient déjà les douze, l'élargissement ne se
+    // lance pas — à raison —, et « plus qu'avant » ne pouvait plus être vrai.
+    // D'où la première vérification : sans elle, le test échouait sans dire
+    // que c'était sa prémisse qui ne tenait plus.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 12 }
     const entieres = (r) => r.routes.filter((route) => route.laps === 1).length
     const sans = await planLoops({ ...demande, widen: false }, deps)
+    expect(entieres(sans), 'le premier tirage remplit déjà la liste : rien à élargir').toBeLessThan(demande.limit)
     const avec = await planLoops(demande, deps)
     expect(entieres(avec)).toBeGreaterThan(entieres(sans))
   }, 60_000)
