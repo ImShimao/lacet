@@ -753,10 +753,10 @@ def _trim_spurs(graph: Graph, start: int, edges: list[int]) -> list[int]:
 
 # Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté.
 # « En face » sur un rond-point à quatre branches : les deux moitiés se valent
-# (1,0). La troisième sortie de cinq, en face un peu à gauche : 1,5. Tourner à
-# gauche — la deuxième de trois, la troisième de quatre — coûte deux à trois
-# fois plus du côté droit : celui qui court à droite traverse alors, plutôt que
-# de faire les trois quarts du tour.
+# (1,0). La troisième sortie de cinq, en face un peu de biais : 1,5. Tourner du
+# côté opposé au sien — à droite pour qui court à gauche — coûte deux à trois
+# fois plus en restant de son côté : on traverse alors, plutôt que de faire les
+# trois quarts du tour.
 SIDE_RING_RATIO = 1.6
 
 
@@ -764,11 +764,13 @@ def keep_side(graph: Graph, start: int, edges: list[int], profile: Profile) -> l
     """Fait le tour des ronds-points du côté où l'on court.
 
     À pied, le sens unique ne s'applique pas, et le chemin le plus court
-    prenait l'anneau dans un sens ou dans l'autre — à contresens six fois sur
-    dix autour de Guebwiller et de Soultz. Or on n'y court pas : on en fait le
-    tour par le trottoir. L'anneau est dessiné dans le sens de la circulation,
-    qui le parcourt en gardant le centre à sa gauche : le suivre, c'est rester
-    à droite des rues que l'on prend ; le remonter, c'est rester à gauche.
+    prenait l'anneau dans un sens ou dans l'autre, au hasard des longueurs —
+    autour de Guebwiller et de Soultz, 59 % des mètres d'anneau à contresens,
+    41 % dans le sens. Or on n'y court pas : on en fait le tour par le
+    trottoir. L'anneau est dessiné dans le sens de la circulation, qui le
+    parcourt en gardant le centre à sa gauche : le suivre, c'est rester à
+    droite des rues que l'on prend ; le remonter, c'est rester à gauche, face
+    aux voitures — le côté par défaut (`LoopRequest.side`).
 
     Pour chaque passage pris du mauvais côté, on prend l'autre moitié de
     l'anneau quand elle n'est pas plus de `SIDE_RING_RATIO` fois plus longue.

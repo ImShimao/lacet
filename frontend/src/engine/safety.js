@@ -103,6 +103,8 @@ const ONEWAY_BACKWARD = new Set(['-1', 'reverse'])
 const CONTRAFLOW = new Set(['opposite', 'opposite_lane', 'opposite_track', 'opposite_share_busway'])
 const CYCLEWAY_KEYS = ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both']
 const CYCLEWAY_ONEWAY_KEYS = ['cycleway:left:oneway', 'cycleway:right:oneway', 'cycleway:both:oneway']
+// L'anneau d'un rond-point, dessiné dans le sens de la circulation — `RING_JUNCTIONS`.
+export const RING_JUNCTIONS = new Set(['roundabout', 'circular'])
 
 /** Le sens permis : 1 dans le sens de la voie, -1 à rebours, 0 les deux — `oneway_for`. */
 export function onewayFor(tags, sport = 'run') {
@@ -115,7 +117,7 @@ export function onewayFor(tags, sport = 'run') {
   const value = own !== undefined ? own : tags.oneway
   if (has(ONEWAY_FORWARD, value)) return 1
   if (has(ONEWAY_BACKWARD, value)) return -1
-  if (value === undefined && (tags.junction === 'roundabout' || tags.junction === 'circular')) return 1
+  if (value === undefined && has(RING_JUNCTIONS, tags.junction)) return 1
   return 0
 }
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import SafetyMode, Side, Sport, SurfacePref
+from app.models import LoopRequest, SafetyMode, Side, Sport, SurfacePref
 from app.navigation import build_instructions
 from app.osm.graph import build_graph
 from app.routing.dijkstra import node_sequence
@@ -22,8 +22,9 @@ from tests.conftest import ORIGIN_LAT, ORIGIN_LON, STEP, grid_payload
 MID = 4
 
 
-def _profile(side: Side = Side.right, sport: Sport = Sport.run):
-    return build_profile(SurfacePref.mixed, SafetyMode.safe, night=False, sport=sport, side=side)
+def _profile(side: Side | None = None, sport: Sport = Sport.run):
+    extra = {"side": side} if side is not None else {}
+    return build_profile(SurfacePref.mixed, SafetyMode.safe, night=False, sport=sport, **extra)
 
 
 def _node(graph, fx: float, fy: float) -> int:
@@ -73,6 +74,18 @@ class TestGraph:
 
 
 class TestKeepSide:
+    def test_par_defaut_on_court_a_gauche_face_aux_voitures(self, graph):
+        # R412-36 : hors agglomération sans trottoir, le piéton marche à gauche.
+        assert LoopRequest(lat=48.8, lon=2.3, distance_km=5).side is Side.left
+        start, edges = _path(graph, SOUTH, RS, RE, RN, NORTH)
+        kept = keep_side(graph, start, edges, _profile())
+        assert _forward(graph, start, kept) == [False, False]
+
+    def test_a_droite_par_defaut_on_traverse(self, graph):
+        # Le miroir de `test_a_gauche_on_traverse_…` pour qui court à gauche.
+        start, edges = _path(graph, SOUTH, RS, RE, EAST)
+        assert keep_side(graph, start, edges, _profile()) == edges
+
     def test_en_face_a_droite_fait_le_tour_dans_le_sens_de_la_circulation(self, graph):
         start, edges = _path(graph, SOUTH, RS, RW, RN, NORTH)
         assert _forward(graph, start, edges) == [False, False]
@@ -102,7 +115,7 @@ class TestKeepSide:
 
     def test_a_velo_rien_ne_change(self, graph):
         start, edges = _path(graph, SOUTH, RS, RW, RN, NORTH)
-        assert keep_side(graph, start, edges, _profile(Side.right, Sport.bike)) == edges
+        assert keep_side(graph, start, edges, _profile(sport=Sport.bike)) == edges
 
 
 def _says(graph, start: int, edges: list[int], sport: str = "run") -> list[str]:

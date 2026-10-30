@@ -97,6 +97,7 @@ export class Profile {
     carfree = false,
     terrain = null,
     nature = true,
+    side = 'left',
   }) {
     this.lam = lam
     this.surface = surface
@@ -104,6 +105,9 @@ export class Profile {
     this.sport = sport
     this.carfree = carfree
     this.nature = nature
+    // Le côté où l'on court — voir `keepSide` (`loops.js`). Il ne pèse pas sur
+    // les poids : il ne retouche qu'après coup le tour des ronds-points.
+    this.side = side
     this.factors = (sport === 'bike' ? SURFACE_FACTOR_BIKE : SURFACE_FACTOR)[surface]
     this.avoid = avoid.filter((key) => key in AVOIDS).map((key) => AVOIDS[key])
     this.blocked = blocked
@@ -161,7 +165,7 @@ export function buildProfile(
   safety,
   night,
   sport = 'run',
-  { avoid = [], blocked = null, carfree = false, terrain = null, nature = true } = {},
+  { avoid = [], blocked = null, carfree = false, terrain = null, nature = true, side = 'left' } = {},
 ) {
-  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree, terrain, nature })
+  return new Profile({ lam: LAMBDA[safety], surface, night, sport, avoid, blocked, carfree, terrain, nature, side })
 }

@@ -325,6 +325,8 @@ export function openDoor(
   // Les morceaux de la rue coupée, et le bout de trottoir, en gardent la verdure.
   g.edgeGreen = grow(Float64Array, graph.edgeGreen, edges.map((x) => graph.edgeGreen[x.like]))
   g.edgeMarked = grow(Uint8Array, graph.edgeMarked, edges.map((x) => graph.edgeMarked[x.like]))
+  // Le bout de trottoir n'est pas l'anneau d'un rond-point, même branché dessus.
+  g.edgeRing = grow(Uint8Array, graph.edgeRing, edges.map((x, k) => (m0 + k === connector ? 0 : graph.edgeRing[x.like])))
   g.edgeSafety = graph.edgeSafety.concat(edges.map((x) => x.safety))
   g.edgeName = graph.edgeName.concat(edges.map((x) => x.name))
   if (shapes.has(e)) {

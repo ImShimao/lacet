@@ -66,6 +66,15 @@ CASES = [
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 2.5}},
     {"name": "damier-sans-nature", "extract": "grid9-nature",
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 2.5, "nature": False}},
+    # Un rond-point au centre : le tour par la gauche (par défaut), par la
+    # droite, et à vélo, sur l'anneau à sens unique — voir `loops.keep_side` et
+    # `navigation._roundabout`.
+    {"name": "damier-rond-point", "extract": "grid9-ring",
+     "req": {"lat": 48.803, "lon": 2.303, "distance_km": 2.5, "limit": 8}},
+    {"name": "damier-rond-point-droite", "extract": "grid9-ring",
+     "req": {"lat": 48.803, "lon": 2.303, "distance_km": 2.5, "limit": 8, "side": "right"}},
+    {"name": "damier-rond-point-velo", "extract": "grid9-ring",
+     "req": {"lat": 48.803, "lon": 2.303, "distance_km": 3.0, "limit": 8, "sport": "bike"}},
     {"name": "damier-tours", "extract": "grid9",
      "req": {"lat": 48.806, "lon": 2.306, "distance_km": 6.0, "limit": 6}},
     {"name": "beaune-course", "extract": "beaune",
@@ -127,6 +136,8 @@ def load_extract(name: str) -> dict:
         return to_cache(read_extract(grid_payload(9, dangerous_row=4)))
     if name == "grid9-nature":
         return to_cache(read_extract(grid_payload(9, nature=True)))
+    if name == "grid9-ring":
+        return to_cache(read_extract(grid_payload(9, roundabout=True)))
     if name == "grid15":
         return to_cache(read_extract(grid_payload(15)))
     with gzip.open(extract_path(name), "rt", encoding="utf-8") as fh:
@@ -268,7 +279,7 @@ async def main() -> None:
         await fetch_real()
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for name in () if check else ("grid9", "grid9-danger", "grid9-nature", "grid15"):
+    for name in () if check else ("grid9", "grid9-danger", "grid9-nature", "grid9-ring", "grid15"):
         write_gz(extract_path(name), load_extract(name))
 
     results = []

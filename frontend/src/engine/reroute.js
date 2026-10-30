@@ -90,7 +90,7 @@ export function planRejoin(
   const source = door.start
   const lead = haversineM(position, graph.node(source))
   if (lead > MAX_LEAD_M) return null
-  if (home) return towardHome(area, graph, weights, source, home, { position, heading, geometry, lead })
+  if (home) return towardHome(area, graph, weights, source, home, { position, heading, geometry, lead, sport })
   const threshold = graph.door?.node ?? source
 
   const cumulative = new Float64Array(geometry.length)
@@ -143,7 +143,7 @@ export function planRejoin(
       .slice(0, -1)
       .some((n) => (visits.get(n) ?? []).some((a) => a > best.along && a - best.along <= SPUR_M))
     if (spur) continue
-    return connection(graph, source, edges, best, { position, heading, geometry, lead })
+    return connection(graph, source, edges, best, { position, heading, geometry, lead, sport })
   }
   return null
 }
@@ -161,7 +161,7 @@ const MAX_LEAD_M = 400
  * la porte pour aller au coin, puis revenir. On vise le point de la rue
  * lui-même, par celui de ses deux bouts qui coûte le moins.
  */
-function towardHome(area, graph, weights, source, home, { position, heading, geometry, lead }) {
+function towardHome(area, graph, weights, source, home, { position, heading, geometry, lead, sport }) {
   const spot = nearestSpot(area, home[0], home[1])
   if (!spot) return null
   // La position a pu couper la même rue : la porte tombe alors sur l'une des
@@ -191,7 +191,7 @@ function towardHome(area, graph, weights, source, home, { position, heading, geo
   if (onStreet) edges.push(e)
   const best = { index: geometry.length - 1, connectM: tree.dist[end] + (onStreet ? lastM : 0) }
   return connection(graph, source, edges, best, {
-    position, heading, geometry, lead, home: true, lastM: onStreet ? lastM : null,
+    position, heading, geometry, lead, sport, home: true, lastM: onStreet ? lastM : null,
   })
 }
 
@@ -262,7 +262,7 @@ const OBSTACLE_BEHIND_M = 150
  * `lastM` : la dernière arête ne se prend que sur ce nombre de mètres — la rue
  * de la porte, jusqu'au seuil.
  */
-function connection(graph, source, edges, best, { position, heading, geometry, lead, home = false, lastM = null }) {
+function connection(graph, source, edges, best, { position, heading, geometry, lead, sport = 'run', home = false, lastM = null }) {
   const coords = [position]
   const sourceCoord = graph.node(source)
   if (lead > 1) coords.push(sourceCoord)
@@ -296,7 +296,7 @@ function connection(graph, source, edges, best, { position, heading, geometry, l
     // Le virage sur la rue, au bout de l'allée, est celui que la première
     // consigne vient de dire : pas de seconde annonce trois mètres plus loin.
     const quiet = onStreet !== coords ? graph.door.node : null
-    for (const s of pathSteps(graph, source, edges, quiet)) steps.push({ ...s, dist_m: Math.round((s.dist_m + lead) * 10) / 10 })
+    for (const s of pathSteps(graph, source, edges, quiet, sport)) steps.push({ ...s, dist_m: Math.round((s.dist_m + lead) * 10) / 10 })
   }
 
   // La jonction elle-même : dans quel sens repartir sur la boucle.

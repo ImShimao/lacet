@@ -92,7 +92,7 @@ class Profile:
     nature: bool = True
     # Le côté où l'on court — voir `loops.keep_side`. Il ne pèse pas sur les
     # poids : il ne retouche qu'après coup le tour des ronds-points.
-    side: str = "right"
+    side: str = "left"
 
     @property
     def _factors(self) -> dict[str, float]:
@@ -148,7 +148,7 @@ def build_profile(
     sport: Sport = Sport.run,
     terrain: Terrain | None = None,
     nature: bool = True,
-    side: Side = Side.right,
+    side: Side = Side.left,
 ) -> Profile:
     return Profile(
         lam=LAMBDA[safety],

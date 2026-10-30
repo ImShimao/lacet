@@ -127,6 +127,7 @@ const ENUMS = {
   elevation: ['flat', 'rolling', 'hilly'],
   safety: ['safe', 'standard'],
   time_of_day: ['day', 'night', 'auto'],
+  side: ['left', 'right', 'any'],
 }
 
 function bounded(value, name, { min = -Infinity, max = Infinity, gt = -Infinity, integer = false }) {
@@ -218,6 +219,9 @@ export function normalizeRequest(input) {
     // Préférer parcs, bois, eau et sentiers balisés — partagé avec Python
     // (`LoopRequest.nature`), donc vu par la parité.
     nature: input.nature !== false,
+    // Le côté où l'on court : à gauche par défaut, face aux voitures — partagé
+    // avec Python (`LoopRequest.side`), donc vu par la parité.
+    side: input.side ?? 'left',
     widen: input.widen !== false,
     heading: input.heading ?? null,
     via: input.via ?? null,
@@ -450,6 +454,7 @@ export async function planLoops(input, deps) {
     blocked,
     carfree: req.carfree,
     nature: req.nature,
+    side: req.side,
     terrain: wantsFlat(req) ? terrain : null,
   })
 
@@ -566,7 +571,7 @@ export async function planLoops(input, deps) {
 
   const names = nameRoutes(chosen.map(([, cand]) => cand))
   const routes = chosen.map(([score, cand, idx], rank) =>
-    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand), names[rank], graph),
+    toModel(cand, score, req, profiles.get(idx) ?? null, rank, buildInstructions(graph, start, cand, req.sport), names[rank], graph),
   )
   // De quoi retourner une boucle sans tout recalculer : le graphe, le nœud de
   // départ, et ce qui a servi à décrire chaque proposition. Passé par un rappel
@@ -652,6 +657,7 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
     blocked: withZones(graph, blockedEdges(graph, req.blocked), req.zones),
     carfree: req.carfree,
     nature: req.nature,
+    side: req.side,
   })
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
@@ -1129,7 +1135,7 @@ export function matchedRoute(graph, start, matched, { req, name, elev = null, ni
   // seulement ici qu'on a la géométrie définitive. Sans ce calcul, le dénivelé
   // s'affichait bien et la courbe restait vide.
   const relief = elev && !elev[1] ? [elev[0], profilePoints(cand, elev[0], elev[3]), elev[2], elev[3]] : elev
-  const route = toModel(cand, 0, req, relief, 0, buildInstructions(graph, start, cand), name, graph)
+  const route = toModel(cand, 0, req, relief, 0, buildInstructions(graph, start, cand, req.sport), name, graph)
   return { ...route, imported: true, matched: true }
 }
 
@@ -1146,7 +1152,7 @@ export function reverseRoute(graph, start, cand, { req, elev, score, rank, night
     ? [[...elev[0]].reverse(), profilePoints(flipped, [...elev[0]].reverse(), elev[3]), elev[2], elev[3]]
     : null
   const [name] = nameRoutes([flipped])
-  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped), name, graph)
+  const route = toModel(flipped, score, req, mirrored, rank, buildInstructions(graph, start, flipped, req.sport), name, graph)
   // Le nom ne dit pas le sens — le cap moyen d'une boucle est le même dans les
   // deux — et la carte le montre par ses chevrons. L'écran, lui, a besoin de le
   // savoir : c'est ce drapeau qui fait du bouton une bascule.

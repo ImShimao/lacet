@@ -483,7 +483,7 @@ function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, 
   if (!closing || !closing.length) return null
   edges.push(...closing)
 
-  const trimmed = trimSpurs(edges)
+  const trimmed = keepSide(graph, start, trimSpurs(graph, start, edges, viaNode), profile)
   return trimmed.length ? trimmed : null
 }
 
@@ -497,13 +497,103 @@ export function passesBy(graph, cand, node) {
   return cand.nodes.some((n) => n === node || haversineM(graph.node(n), target) <= VIA_NEAR_M)
 }
 
-export function trimSpurs(edges) {
+// Plus court que ça, un retour au même carrefour est une épingle ou un lasso —
+// voir `SPUR_MAX_M` en Python.
+const SPUR_MAX_M = 150
+
+/**
+ * Supprime les allers-retours et les détours qui ramènent au même carrefour en
+ * moins de `SPUR_MAX_M` — voir `_trim_spurs`. `keep` : un nœud à ne pas rogner,
+ * le point par lequel l'utilisateur a demandé de passer (propre à l'app).
+ */
+export function trimSpurs(graph, start, edges, keep = null) {
   const out = []
+  const nodes = [start]
+  const along = [0]
   for (const e of edges) {
-    if (out.length && out[out.length - 1] === e) out.pop()
-    else out.push(e)
+    if (out.length && out[out.length - 1] === e) {
+      out.pop()
+      nodes.pop()
+      along.pop()
+      continue
+    }
+    const node = graph.other(e, nodes[nodes.length - 1])
+    const reach = along[along.length - 1] + graph.edgeLen[e]
+    let k = nodes.length - 1
+    while (k >= 0 && reach - along[k] < SPUR_MAX_M && nodes[k] !== node) k -= 1
+    if (k >= 0 && reach - along[k] < SPUR_MAX_M && (keep === null || !nodes.slice(k + 1).includes(keep))) {
+      out.length = k
+      nodes.length = k + 1
+      along.length = k + 1
+    } else {
+      out.push(e)
+      nodes.push(node)
+      along.push(reach)
+    }
   }
   return out
+}
+
+// Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté —
+// voir `SIDE_RING_RATIO` en Python.
+const SIDE_RING_RATIO = 1.6
+
+/**
+ * Fait le tour des ronds-points du côté où l'on court — voir `keep_side`.
+ * L'anneau suivi dans son sens garde à droite, remonté il garde à gauche.
+ */
+export function keepSide(graph, start, edges, profile) {
+  if (profile.sport === 'bike' || (profile.side !== 'right' && profile.side !== 'left')) return edges
+  const forward = profile.side === 'right'
+  const ring = graph.edgeRing
+  const out = []
+  let cursor = start
+  let i = 0
+  while (i < edges.length) {
+    if (!ring[edges[i]]) {
+      out.push(edges[i])
+      cursor = graph.other(edges[i], cursor)
+      i += 1
+      continue
+    }
+    const entry = cursor
+    let j = i
+    let length = 0
+    let wrong = false
+    while (j < edges.length && ring[edges[j]]) {
+      if ((graph.edgeA[edges[j]] === cursor) !== forward) wrong = true
+      length += graph.edgeLen[edges[j]]
+      cursor = graph.other(edges[j], cursor)
+      j += 1
+    }
+    const arc = wrong ? ringArc(graph, entry, cursor, forward, length * SIDE_RING_RATIO) : null
+    out.push(...(arc ?? edges.slice(i, j)))
+    i = j
+  }
+  return out
+}
+
+/** L'anneau de `source` à `target` dans un seul sens, ou `null` au-delà de `limitM`. */
+function ringArc(graph, source, target, forward, limitM) {
+  const arc = []
+  let node = source
+  let length = 0
+  while (node !== target || !arc.length) {
+    let step = -1
+    for (let k = graph.adjOffset[node]; k < graph.adjOffset[node + 1]; k += 1) {
+      const e = graph.adjEdges[k]
+      if (graph.edgeRing[e] && (forward ? graph.edgeA[e] : graph.edgeB[e]) === node) {
+        step = e
+        break
+      }
+    }
+    if (step < 0) return null
+    length += graph.edgeLen[step]
+    if (length > limitM) return null
+    arc.push(step)
+    node = graph.other(step, node)
+  }
+  return arc
 }
 
 function coreNodes(outbound, radiusM, memo) {
@@ -553,7 +643,7 @@ function fallbackOutAndBack(graph, start, outbound, weights, profile, targetM, s
     for (const e of outEdges) penalties.set(e, RETURN_PENALTY)
     const backEdges = runLeg(graph, node, start, weights, profile, targetM * 0.8, penalties, null, null, null)
     if (!backEdges || !backEdges.length) continue
-    const edges = trimSpurs([...outEdges, ...backEdges])
+    const edges = keepSide(graph, start, trimSpurs(graph, start, [...outEdges, ...backEdges]), profile)
     if (!edges.length) continue
     const cand = new Candidate(edges, nodeSequence(graph, start, edges))
     measure(graph, start, cand, { night: profile.night })
