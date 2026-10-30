@@ -88,9 +88,9 @@
   width: auto;
   align-self: flex-start;
   padding: 8px 13px;
-  background: rgba(27, 24, 36, 0.94);
+  background: var(--glass);
   backdrop-filter: blur(12px);
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 10px 26px -12px var(--shadow);
 }
 .shell[data-sheet='peek'] .side__head {
   padding-bottom: 0;
@@ -103,8 +103,8 @@
 }
 .shell[data-sheet='peek'] .banner {
   margin: 0 12px 8px;
-  background: #24161f;
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  background: color-mix(in srgb, var(--risk-vivid) 8%, var(--surface));
+  box-shadow: 0 10px 26px -12px var(--shadow);
 }
 .shell[data-sheet='peek'] .panel {
   padding: 0 0 2px;
@@ -118,7 +118,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 22px;
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 18px 40px -18px var(--shadow);
 }
 .shell[data-sheet='peek'] .panel:not(.panel--results) .origin {
   padding: 0;
@@ -152,15 +152,13 @@
    assombrit à la place. */
 .shell[data-sheet='peek'] .rcard {
   opacity: 1;
-  box-shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 16px 34px -16px var(--shadow);
 }
 .shell[data-sheet='peek'] .rcard:not(.rcard--on) {
-  filter: brightness(0.6);
+  filter: var(--dim);
 }
 .shell[data-sheet='peek'] .rcard--on {
-  box-shadow:
-    0 16px 34px -16px rgba(0, 0, 0, 0.95),
-    0 14px 34px -20px var(--accent-glow);
+  box-shadow: 0 16px 34px -16px var(--shadow);
 }
 .shell[data-sheet='peek'] .rcard__more {
   display: inline-flex;
@@ -172,7 +170,7 @@
   background: none;
 }
 .shell[data-sheet='peek'] .actionbar .btn--icon {
-  background: rgba(27, 24, 36, 0.94);
+  background: var(--glass);
   backdrop-filter: blur(12px);
 }
 
@@ -184,7 +182,7 @@
   border: 1px solid var(--line);
   border-bottom: none;
   border-radius: 22px 22px 0 0;
-  box-shadow: 0 -14px 44px -14px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 -14px 44px -14px var(--shadow);
 }
 .shell[data-sheet='full'] .side {
   height: 88cqh;
@@ -285,7 +283,7 @@
   z-index: 3;
   margin: 0 -18px -18px;
   padding: 18px 18px 14px;
-  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+  background: linear-gradient(to bottom, transparent, var(--surface) 16px);
 }
 .side__body:has(.live__controls) {
   mask-image: none;
@@ -312,10 +310,10 @@
     padding-right: 2px;
   }
   .stats b {
-    font-size: 15px;
+    font-size: calc(15px * var(--text-scale));
   }
   .stats span {
-    font-size: 9.5px;
+    font-size: calc(9.5px * var(--text-scale));
   }
   .sheet {
     padding: 10px;

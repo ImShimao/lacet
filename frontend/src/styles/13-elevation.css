@@ -12,16 +12,16 @@
 }
 .elevsheet__tick {
   fill: var(--text-3);
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   font-family: var(--mono);
 }
 .elevsheet__here {
-  stroke: #fff;
+  stroke: var(--text);
   stroke-width: 1.5;
   stroke-dasharray: 3 3;
 }
 .elevsheet__dot {
-  fill: #fff;
+  fill: var(--marker-ring);
   stroke: var(--accent);
   stroke-width: 3;
 }
@@ -40,11 +40,11 @@
   border: 1px solid var(--line);
 }
 .elevsheet__stats span {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
 }
 .elevsheet__stats b {
-  font-size: 18px;
+  font-size: calc(18px * var(--text-scale));
   font-variant-numeric: tabular-nums;
 }
 
@@ -73,7 +73,7 @@
   padding: 7px 12px;
 }
 .live__paused span {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
 }
 .signal {
   padding: 7px;

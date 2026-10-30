@@ -10,13 +10,20 @@ import { haversine, km, profileRange, surfaceLabel } from './format'
  * bande, le point correspondant s'allume sur la carte.
  */
 
+// Les jetons de `styles/01-base.css` : posés en `style`, pas en attribut — un
+// attribut SVG `fill` ne lit pas `var()`.
 const SURFACE_COLORS = {
-  paved: '#4A9EFF',
-  gravel: '#FFD426',
-  trail: '#C58B4A',
-  unknown: '#6B747D',
+  paved: 'var(--info)',
+  gravel: 'var(--caution-vivid)',
+  trail: 'var(--trail)',
+  unknown: 'var(--text-3)',
 }
-const LEVEL_COLORS = { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', unknown: '#9B7BF0' }
+const LEVEL_COLORS = {
+  safe: 'var(--safe-vivid)',
+  caution: 'var(--caution-vivid)',
+  risk: 'var(--risk-vivid)',
+  unknown: 'var(--accent-text)',
+}
 // Le vert couvre aussi les rues calmes, à 30 ou à 50 avec un trottoir probable :
 // « voie protégée » contredisait le pourcentage de la carte de parcours, qui ne
 // compte que les trottoirs et chemins connus d'OpenStreetMap.
@@ -112,7 +119,7 @@ export default function RouteStrip({ route, onScrub }) {
               <path
                 key={i}
                 d={area.d}
-                fill={SURFACE_COLORS[area.surface] || SURFACE_COLORS.unknown}
+                style={{ fill: SURFACE_COLORS[area.surface] || SURFACE_COLORS.unknown }}
                 opacity="0.2"
               />
             ))}
@@ -128,7 +135,7 @@ export default function RouteStrip({ route, onScrub }) {
             y={H_ELEV + 8}
             width={Math.max(1, band.x1 - band.x0)}
             height={H_BAND}
-            fill={LEVEL_COLORS[band.level]}
+            style={{ fill: LEVEL_COLORS[band.level] }}
             rx="1.5"
           />
         ))}
@@ -140,7 +147,7 @@ export default function RouteStrip({ route, onScrub }) {
               x2={c.x}
               y1={H_ELEV + 4}
               y2={H_ELEV + 8 + H_BAND + 4}
-              stroke={c.protected ? LEVEL_COLORS.caution : LEVEL_COLORS.risk}
+              style={{ stroke: c.protected ? LEVEL_COLORS.caution : LEVEL_COLORS.risk }}
               strokeWidth="2"
             />
           </g>

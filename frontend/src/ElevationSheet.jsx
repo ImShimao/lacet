@@ -51,8 +51,8 @@ export default function ElevationSheet({ route, along, onClose }) {
           <svg className="elevsheet__chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Profil altimétrique">
             <defs>
               <linearGradient id="elev-fill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.55" />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.04" />
+                <stop offset="0%" style={{ stopColor: 'var(--accent)' }} stopOpacity="0.55" />
+                <stop offset="100%" style={{ stopColor: 'var(--accent)' }} stopOpacity="0.04" />
               </linearGradient>
             </defs>
             {model.ticks.map((t) => (
@@ -64,7 +64,7 @@ export default function ElevationSheet({ route, along, onClose }) {
               </g>
             ))}
             <path d={model.area} fill="url(#elev-fill)" />
-            <path d={model.line} fill="none" stroke="#b79dff" strokeWidth="2" strokeLinejoin="round" />
+            <path d={model.line} fill="none" style={{ stroke: 'var(--accent-text)' }} strokeWidth="2" strokeLinejoin="round" />
             <line x1={hereX} x2={hereX} y1={PAD.top} y2={H - PAD.bottom} className="elevsheet__here" />
             <circle cx={hereX} cy={y(model, hereEle)} r="5" className="elevsheet__dot" />
             <text x={PAD.left} y={H - 5} className="elevsheet__tick">0</text>

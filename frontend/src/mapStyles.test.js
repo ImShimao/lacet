@@ -40,7 +40,7 @@ describe('tintNight', () => {
       { id: 'no-paint', type: 'symbol', layout: {} },
     ],
   }
-  const out = tintNight(style)
+  const out = tintNight(style, { hue: 262, water: 244 })
   const paint = (id) => out.layers.find((l) => l.id === id).paint
 
   it('garde la clarté de chaque couleur et ne change que la teinte', () => {

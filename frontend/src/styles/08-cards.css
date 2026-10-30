@@ -51,11 +51,8 @@
 }
 .rcard--on {
   opacity: 1;
-  border-color: #8b5cf6;
-  background:
-    linear-gradient(155deg, rgba(139, 92, 246, 0.24), rgba(139, 92, 246, 0.03) 62%),
-    var(--surface-2);
-  box-shadow: 0 16px 34px -18px var(--accent-glow);
+  border-color: var(--accent);
+  background: var(--surface-2);
 }
 .rcard__top {
   display: flex;
@@ -71,19 +68,19 @@
   display: grid;
   place-items: center;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   font-weight: 600;
   flex: none;
 }
 .rcard--on .rcard__n {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .rcard__dir {
   flex: 1;
   min-width: 0;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -95,22 +92,22 @@
   color: var(--accent-text);
 }
 .rcard__km {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 700;
   color: var(--text-2);
   line-height: 1;
 }
 .rcard__km b {
   font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -0.05em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   margin-right: 1px;
 }
 .rcard__name {
   margin-top: 5px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
   overflow: hidden;
@@ -123,7 +120,7 @@
   margin-top: 10px;
   padding-top: 9px;
   border-top: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -152,7 +149,7 @@
 }
 
 .route-meta {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   color: var(--text-3);
 }
@@ -169,9 +166,11 @@
   margin: 0 -18px -22px;
   padding: 18px 18px 14px;
   /* Le contenu qui défile dessous s'efface au lieu d'être coupé net. */
-  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+  background: linear-gradient(to bottom, transparent, var(--surface) 16px);
 }
 .actionbar .btn--primary {
+  /* Déjà grand : agrandi avec le texte, il ne tenait plus à côté des quatre
+     boutons sur un petit écran. */
   font-size: 15.5px;
 }
 /* La barre fait déjà office de fin de zone : le fondu du bas la voilerait. */
@@ -201,7 +200,7 @@
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--text);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -215,7 +214,7 @@
    comme les questions qu'ils posent (« Terrain ? ») plutôt que comme les
    étiquettes d'un formulaire administratif. */
 .label {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.01em;
   text-transform: none;
@@ -229,8 +228,44 @@
   align-items: center;
   gap: 2px;
   margin-left: 2px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   font-weight: 700;
   color: var(--accent-text);
   white-space: nowrap;
+}
+
+/* L'icône et son mot dessous, dans la barre d'action. Le mot reste court
+   (« GPX », « Sens ») : à 320 px de large, « Démarrer » doit encore tenir. */
+.actionbar .btn--icon {
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 0 5px;
+}
+.btn__cap {
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.btn--on .btn__cap {
+  color: var(--accent-text);
+}
+
+/* Petit écran (SE) : quatre boutons et « Démarrer » sur 296 px. Les boutons
+   cèdent quatre pixels chacun, et « Démarrer » son triangle — le mot suffit. */
+@container lacet (max-width: 380px) {
+  .actionbar {
+    gap: 6px;
+  }
+  .actionbar .btn--icon {
+    width: 44px;
+  }
+  .actionbar .btn--primary {
+    padding-inline: 8px;
+  }
+  .actionbar .btn--primary .icon {
+    display: none;
+  }
 }

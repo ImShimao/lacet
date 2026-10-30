@@ -21,7 +21,7 @@
   padding: 0 10px 0 4px;
   border-radius: 10px;
   color: var(--accent-text);
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--text-scale));
   font-weight: 600;
 }
 .side__back:active {
@@ -41,10 +41,8 @@
   gap: 14px;
   padding: 16px;
   border-radius: 20px;
-  border: 1px solid var(--accent-line);
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgba(144, 97, 249, 0.28), transparent 60%),
-    var(--surface-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
 }
 .acct__who {
   display: flex;
@@ -58,20 +56,19 @@
   display: grid;
   place-items: center;
   flex: none;
-  color: #fff;
-  background: var(--accent-grad);
-  box-shadow: 0 10px 24px -12px var(--accent-glow);
+  color: var(--on-accent);
+  background: var(--accent);
 }
 .acct__who b {
   display: block;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: calc(18px * var(--text-scale));
+  font-weight: 700;
   letter-spacing: -0.025em;
 }
 .acct__who em {
   display: block;
   font-style: normal;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   color: var(--text-2);
 }
 .acct__stats {
@@ -83,12 +80,12 @@
   min-width: 0;
   padding: 9px 11px;
   border-radius: 12px;
-  background: rgba(10, 9, 16, 0.42);
+  background: color-mix(in srgb, var(--bg) 42%, transparent);
 }
 .acct__stats b {
   display: block;
-  font-size: 17px;
-  font-weight: 800;
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -97,7 +94,7 @@
 }
 .acct__stats span {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -109,7 +106,7 @@
 }
 .acct__label {
   margin: 0 0 0 4px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -149,7 +146,7 @@
   color: var(--accent-text);
 }
 .menu__icon--risk {
-  background: rgba(255, 106, 69, 0.14);
+  background: var(--risk-soft);
   color: var(--risk);
 }
 .menu__text {
@@ -158,7 +155,7 @@
 }
 .menu__text b {
   display: block;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.015em;
 }
@@ -166,7 +163,7 @@
   display: block;
   margin-top: 1px;
   font-style: normal;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -194,4 +191,46 @@
    qu'elle ne se décoche pas avant même d'avoir essayé. */
 .check:disabled {
   opacity: 0.6;
+}
+
+/* Les accents d'« Apparence » : deux par ligne, la pastille et son nom côte à
+   côte — sur quatre colonnes, « Framboise » ne tenait pas en texte agrandi. */
+.swatches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: left;
+}
+.swatch i {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 20%, transparent);
+}
+.swatch[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* Petit écran, texte agrandi : « kilomètres » débordait de sa case de
+   quatre pixels. Les cases rendent un peu de leur marge intérieure. */
+@container lacet (max-width: 380px) {
+  .acct__stats > div {
+    padding-inline: 7px;
+  }
 }

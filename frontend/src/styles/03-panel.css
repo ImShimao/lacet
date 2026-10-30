@@ -22,7 +22,7 @@
   color: var(--accent-text);
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   flex: none;
 }
 .origin b {
@@ -32,13 +32,13 @@
 }
 .origin em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
 }
 
 .grade {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 7px;
@@ -46,27 +46,27 @@
   border: 1px solid transparent;
 }
 .grade--A {
-  background: rgba(50, 215, 75, 0.13);
+  background: var(--safe-soft);
   color: var(--safe);
-  border-color: rgba(50, 215, 75, 0.28);
+  border-color: var(--safe-line);
 }
 .grade--B {
-  background: rgba(255, 212, 38, 0.13);
+  background: var(--caution-soft);
   color: var(--caution);
-  border-color: rgba(255, 212, 38, 0.28);
+  border-color: var(--caution-line);
 }
 .grade--free {
   background: var(--surface-3);
   color: var(--text-3);
 }
 .grade--C {
-  background: rgba(255, 106, 69, 0.13);
+  background: var(--risk-soft);
   color: var(--risk);
-  border-color: rgba(255, 106, 69, 0.28);
+  border-color: var(--risk-line);
 }
 
 /* Pas de note du tout : un tracé de secours, que Lacet n'a pas pu juger. En
-   violet, la couleur de l'app — ni encouragement ni avertissement. */
+   couleur d'accent de l'app — ni encouragement ni avertissement. */
 .grade--unknown {
   background: var(--accent-soft);
   color: var(--accent-text);
@@ -94,13 +94,13 @@
 }
 .stats b {
   display: block;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 .stats span {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -119,14 +119,14 @@
   margin-bottom: 4px;
 }
 .strip__title {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-3);
 }
 .strip__read {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-2);
 }
 .strip__svg {
@@ -144,7 +144,7 @@
    moitié de sa taille. Les 8,5 d'avant donnaient des altitudes de quatre pixels. */
 .strip__tick {
   font-family: var(--mono);
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   fill: var(--text-3);
   text-anchor: end;
 }
@@ -162,7 +162,7 @@
   flex-wrap: wrap;
   gap: 4px 12px;
   margin-top: 7px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
 }
 .strip__key {
@@ -182,7 +182,7 @@
   padding: 9px;
   border: 1px dashed var(--line);
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-2);
   display: flex;
   align-items: center;
@@ -211,7 +211,7 @@
   padding: 10px 13px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--surface-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
 }
 .safety__row:last-child,
 .rows__row:last-child {
@@ -220,13 +220,13 @@
 .safety__row em {
   display: block;
   font-style: normal;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
   margin-top: 1px;
 }
 .rows__row span:last-child {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -257,7 +257,7 @@
   color: var(--text);
   font: inherit;
   /* Seize pixels : voir `.search input`. */
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -271,7 +271,7 @@
 }
 .safety__value {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-weight: 600;
   white-space: nowrap;
   color: var(--text-2);
@@ -287,7 +287,7 @@
 }
 .safety__note {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.45;
   color: var(--text-2);
 }
@@ -303,7 +303,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
 }
 .bar__key {
@@ -323,7 +323,7 @@
   background: var(--caution);
 }
 .s--trail {
-  background: #c58b4a;
+  background: var(--trail);
 }
 .s--unknown {
   background: var(--text-3);
@@ -341,7 +341,7 @@
   gap: 7px;
 }
 .rejected__title {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -351,12 +351,12 @@
   display: grid;
   grid-template-columns: 52px 1fr;
   gap: 9px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-2);
 }
 .rejected__row .mono {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
 }
 
 .list {
@@ -374,7 +374,7 @@
   padding: 10px 12px;
   width: 100%;
   text-align: left;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--text-scale));
 }
 .list__row > span:not(.list__sport):not(.grade) {
   min-width: 0;
@@ -386,7 +386,7 @@
   display: block;
   font-style: normal;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
   margin-top: 2px;
 }
@@ -418,14 +418,14 @@
   border-radius: var(--r);
   color: var(--text-3);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   transition:
     color 0.12s ease,
     border-color 0.12s ease;
 }
 .offline--on {
   color: var(--safe);
-  border-color: rgba(50, 215, 75, 0.34);
+  border-color: var(--safe-line);
 }
 /* Carte gardée sous un autre fond que celui affiché : disponible, mais pas
    pour ce que l'on regarde. Ni vert rassurant, ni rouge alarmant. */
@@ -435,7 +435,7 @@
 }
 .offline--warn {
   color: var(--caution);
-  border-color: rgba(255, 212, 38, 0.34);
+  border-color: var(--caution-line);
 }
 .offline--busy {
   position: relative;
@@ -458,7 +458,7 @@
   gap: 12px;
   text-align: center;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   padding: 26px 12px 18px;
   line-height: 1.5;
 }
@@ -483,18 +483,18 @@
 .notice {
   border-radius: var(--r);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   line-height: 1.45;
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.24);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
 }
 .notice--error {
-  background: rgba(255, 106, 69, 0.1);
-  border-color: rgba(255, 106, 69, 0.28);
+  background: var(--risk-soft);
+  border-color: var(--risk-line);
 }
 .disclaimer {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   line-height: 1.45;
   color: var(--text-3);
 }
@@ -510,7 +510,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--text-scale));
   font-weight: 700;
   cursor: pointer;
   list-style: none;
@@ -537,7 +537,7 @@
   padding: 8px;
   border-radius: 10px;
   text-align: left;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   line-height: 1.35;
 }
 .steps li button:active {
@@ -549,7 +549,7 @@
 .steps li em {
   font-style: normal;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
 }
 .steps li span {

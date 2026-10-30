@@ -157,7 +157,7 @@ export default function RunSummary({ entry, history = [], weightKg = 70, onClose
 
       <div className="summary__actions">
         <button className="btn btn--icon" onClick={share} aria-label="Partager la sortie" title="Partager">
-          <Icon name="upload" size={18} />
+          <Icon name="share" size={18} />
         </button>
         {entry.track?.length > 1 && (
           <button
@@ -166,7 +166,7 @@ export default function RunSummary({ entry, history = [], weightKg = 70, onClose
             aria-label="Exporter la trace en GPX"
             title="Exporter en GPX"
           >
-            <Icon name="download" size={18} />
+            <Icon name="fileExport" size={18} />
           </button>
         )}
         {onKeep && (

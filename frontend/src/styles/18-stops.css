@@ -14,7 +14,7 @@
   border-radius: var(--r);
   background: var(--surface-2);
   border: 1px solid var(--line-soft);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   line-height: 1.4;
   color: var(--text-2);
 }
@@ -25,7 +25,7 @@
   align-items: start;
 }
 .stops__row .icon {
-  color: #5ab8ff;
+  color: var(--water);
   margin-top: 1px;
 }
 .stops__row b {
@@ -40,14 +40,14 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(19, 17, 26, 0.92);
-  border: 1.5px solid #5ab8ff;
-  color: #5ab8ff;
-  box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.8);
+  background: var(--glass);
+  border: 1.5px solid var(--water);
+  color: var(--water);
+  box-shadow: 0 3px 10px -3px var(--shadow);
 }
 .poi--toilets {
-  border-color: #c9a8ff;
-  color: #c9a8ff;
+  border-color: var(--toilets);
+  color: var(--toilets);
 }
 
 .nextstops {
@@ -55,7 +55,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px 14px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-2);
 }
 .nextstops span {
@@ -64,7 +64,7 @@
   gap: 5px;
 }
 .nextstops .icon {
-  color: #5ab8ff;
+  color: var(--water);
 }
 .nextstops b {
   color: var(--text);

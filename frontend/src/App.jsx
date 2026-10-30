@@ -25,7 +25,8 @@ import usePois from './usePois'
 import { askedOf, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
 import { blockedPoints } from './reports'
 import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
-import { DEFAULT_STYLE, offlineStyleFor, styleByKey } from './mapStyles'
+import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
+import { startAppearance, useAppearance } from './appearance'
 import { km } from './format'
 import { load, save } from './storage'
 import { haptic } from './platform'
@@ -37,7 +38,11 @@ export default function App() {
   const stored = useMemo(() => load(), [])
 
   const [params, setParams] = useState({ ...DEFAULTS, ...(stored.params || {}) })
-  const [mapStyle, setMapStyle] = useState(stored.mapStyle || DEFAULT_STYLE)
+  // Le fond choisi ; tant qu'on n'en a pas choisi, celui qui va avec le thème —
+  // clair sur le thème clair, « Nuit » sur le sombre.
+  const look = useAppearance()
+  const [chosenMap, setMapStyle] = useState(stored.mapStyle || null)
+  const mapStyle = chosenMap || (look.resolved === 'light' ? LIGHT_STYLE : DEFAULT_STYLE)
   // Les points d'eau et toilettes à montrer le long des boucles — voir `pois.js`.
   const [poiPrefs, setPoiPrefs] = useState(stored.pois || { water: false, toilets: false })
 
@@ -346,7 +351,6 @@ export default function App() {
   }, [viewing, summary, running, freeRun, liveRoute, selected])
 
   const sport = SPORTS.find((s) => s.key === params.sport)
-  const theme = styleByKey(mapStyle).contrast
   // L'état que lit la CSS : la sortie et les pages de liste imposent le leur.
   const sheetMode = running
     ? 'live'
@@ -385,7 +389,6 @@ export default function App() {
   return (
     <div
       className="shell"
-      data-map={theme}
       data-sheet={sheetMode}
       data-flying={flying || undefined}
       data-zoning={(zoneDraft && !running) || undefined}
@@ -709,10 +712,12 @@ export default function App() {
                 // Les rues et altitudes gardées pour calculer hors ligne aussi.
                 await clearEngineData()
                 library.clear()
+                // L'apparence aussi revient à celle du premier jour.
+                startAppearance()
                 // Et les réglages que tient l'écran : laissés tels quels, le
                 // prochain `save` les aurait réécrits dans le magasin vidé.
                 setParams({ ...DEFAULTS })
-                setMapStyle(DEFAULT_STYLE)
+                setMapStyle(null)
                 setPoiPrefs({ water: false, toilets: false })
                 setRunView('heading')
                 setVia(null)
@@ -720,6 +725,7 @@ export default function App() {
               }}
               onRestored={() => {
                 library.reload()
+                startAppearance()
                 const restored = load().params
                 if (restored) setParams({ ...DEFAULTS, ...restored })
               }}

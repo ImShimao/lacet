@@ -1,32 +1,38 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-// Les polices sont livrées avec l'app plutôt que demandées à Google à chaque
+// La police est livrée avec l'app plutôt que demandée à Google à chaque
 // ouverture : dehors, sans réseau, l'app gardait ses écrans mais perdait sa
 // typographie — et chaque lancement signalait l'appareil à un tiers.
 //
-// La police mono n'est prise qu'en latin, qui couvre le français jusqu'à « œ ».
-// Ses fichiers par jeu de caractères ne déclarent pas leur plage : en ajouter un
-// second, le latin étendu, le faisait passer devant le premier pour *tous* les
-// caractères, chiffres compris.
-import '@fontsource-variable/bricolage-grotesque/opsz.css'
-import '@fontsource/ibm-plex-mono/latin-400.css'
-import '@fontsource/ibm-plex-mono/latin-500.css'
-import '@fontsource/ibm-plex-mono/latin-600.css'
+// Inter, une seule famille pour tout : ses chiffres à chasse fixe alignent
+// les colonnes sans recourir à une police mono, et son axe de taille optique
+// resserre d'elle-même les grands chiffres de course. Les fichiers déclarent
+// leur jeu de caractères : seul le latin se charge.
+import '@fontsource-variable/inter/opsz.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './styles/index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { isNative } from './platform'
 import { mirrorTo, restoreFrom } from './storage'
+import { getAppearance, onAppearance, startAppearance } from './appearance'
+
+// Le thème, l'accent et la taille du texte, posés avant tout rendu : l'app
+// s'ouvre dans ses couleurs, sans passer d'abord par celles d'origine.
+startAppearance()
 
 async function start() {
   const native = isNative() ? await import('./native').catch(() => null) : null
   if (native) {
     // Avant le premier rendu : `App` lit le magasin en se créant, et doit y
     // trouver ce que la copie a gardé si iOS a vidé le stockage — voir
-    // `storage.js`. Le fichier n'est lu que dans ce cas-là.
-    await restoreFrom(native.readStoreCopy)
+    // `storage.js`. Le fichier n'est lu que dans ce cas-là — et l'apparence se
+    // relit quand il l'a été.
+    if (await restoreFrom(native.readStoreCopy)) startAppearance()
     mirrorTo(native.writeStoreCopy)
+    // La barre d'état d'iOS suit le thème : texte clair sur le sombre, et l'inverse.
+    native.setStatusBarTheme(getAppearance().resolved)
+    onAppearance((look) => native.setStatusBarTheme(look.resolved))
   }
 
   createRoot(document.getElementById('root')).render(

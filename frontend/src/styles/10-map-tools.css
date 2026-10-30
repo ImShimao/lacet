@@ -44,8 +44,8 @@
 .tool--compass small {
   position: absolute;
   bottom: 2px;
-  font-size: 8px;
-  font-weight: 800;
+  font-size: calc(8px * var(--text-scale));
+  font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-2);
 }
@@ -72,13 +72,13 @@
   padding: 6px;
   border-radius: var(--r);
   border: 1px solid var(--line);
-  background: rgba(19, 17, 26, 0.97);
+  background: var(--glass);
   backdrop-filter: blur(12px);
-  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 14px 34px -12px var(--shadow);
 }
 .startmenu b {
   padding: 6px 10px 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -91,7 +91,7 @@
   padding: 11px 10px;
   border-radius: 10px;
   text-align: left;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 600;
 }
 .startmenu button .icon {
@@ -109,8 +109,8 @@
 
 /* Le survol 3D : « 3D » en toutes lettres, plus parlant qu'un pictogramme. */
 .tool__text {
-  font-size: 13px;
-  font-weight: 800;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 /* Pendant le survol, la carte seule : le panneau, la recherche et les autres
@@ -131,7 +131,7 @@
 
 /* ══ survol 3D ══════════════════════════════════════════════════════════ */
 
-/* La pastille qui court sur la boucle : le violet de l'app cerclé de blanc,
+/* La pastille qui court sur la boucle : l'accent de l'app cerclé de blanc,
    et une onde qui bat derrière elle pour qu'on la trouve d'un coup d'œil sur
    le relief. `.flypin` est l'élément du marqueur, placé par MapLibre : sans
    `position`, qui écraserait la sienne. */
@@ -148,8 +148,8 @@
 }
 .flypin__dot {
   background: var(--accent);
-  border: 4px solid #fff;
-  box-shadow: 0 0 0 2px rgba(10, 9, 16, 0.5), 0 3px 12px var(--accent-glow);
+  border: 4px solid var(--marker-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 50%, transparent), 0 3px 12px var(--accent-glow);
 }
 .flypin__pulse {
   background: var(--accent-glow);
@@ -181,20 +181,20 @@
   gap: 2px 12px;
   padding: 9px 18px;
   border-radius: 22px;
-  background: rgba(19, 17, 26, 0.86);
+  background: var(--glass);
   border: 1px solid var(--accent-line);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 20px var(--shadow-soft);
   color: var(--text);
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   white-space: nowrap;
   pointer-events: none;
   animation: fade 0.3s ease-out;
 }
 .flyhud__km b {
   font-family: var(--display);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: calc(22px * var(--text-scale));
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .flyhud__ele {
@@ -209,7 +209,7 @@
   text-align: center;
   color: var(--text-2);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
 }
 .flyhud[data-paused='true'] .flyhud__hint {
   display: block;
@@ -245,9 +245,9 @@
   padding: 14px;
   border-radius: var(--r);
   border: 1px solid var(--line);
-  background: rgba(19, 17, 26, 0.96);
+  background: var(--glass);
   backdrop-filter: blur(12px);
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 10px 26px -12px var(--shadow);
 }
 .zonedraft p {
   margin: 0;
@@ -256,7 +256,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
 }
 .zonedraft__radius em {
   font-style: normal;
@@ -284,7 +284,7 @@
   color: var(--text);
   font: inherit;
   /* Seize pixels : voir `.search input`. */
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
 }
 .zonerow__name:focus {
   outline: none;

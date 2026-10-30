@@ -20,7 +20,7 @@
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
 }
@@ -37,7 +37,7 @@
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
 }
 .monthhead {
   display: flex;
@@ -47,10 +47,10 @@
   padding: 14px 2px 6px;
 }
 .monthhead b {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
 }
 .monthhead span {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
