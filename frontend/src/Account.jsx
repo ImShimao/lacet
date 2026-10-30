@@ -20,7 +20,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
 import { surfaceLabel } from './format'
-import { dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
+import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
 import { isNative, saveTextFile } from './platform'
@@ -589,8 +589,17 @@ function StoredData() {
       {info.trimmed && (
         <div className="notice notice--warn">
           <b>De la place a dû être faite le {dayOf(info.trimmed.at)}.</b> Le stockage était plein :{' '}
-          {info.trimmed.from - info.trimmed.to} sorties parmi les plus anciennes ont été supprimées pour
-          que la suite puisse s'enregistrer. Les plus récentes, elles, sont intactes.
+          {/* Alléger d'abord, supprimer ensuite (`save`) : l'un, l'autre ou
+              les deux, et chacun se dit autrement. */}
+          {[
+            info.trimmed.briefed > 0 &&
+              `${info.trimmed.briefed} sorties ont perdu leur trace et leur parcours prévu, pas leurs chiffres`,
+            info.trimmed.from > info.trimmed.to &&
+              `${info.trimmed.from - info.trimmed.to} sorties parmi les plus anciennes ont été supprimées`,
+          ]
+            .filter(Boolean)
+            .join(', et ')}{' '}
+          pour que la suite puisse s'enregistrer. Les plus récentes, elles, sont intactes.
           <button
             className="linkish"
             onClick={() => {
@@ -1083,11 +1092,20 @@ function BackupRows({ onRestored }) {
   const restore = async (file) => {
     if (!file) return
     try {
-      const { favorites, history } = importAll(await file.text())
+      const { favorites, history, left } = importAll(await file.text())
       // L'écran relit tout de suite ce qui vient d'être écrit : laissé à ses
       // listes d'avant, il les aurait réécrites par-dessus à la première occasion.
       onRestored?.()
-      setMessage(`Restauré : ${favorites} parcours en favori, ${history} sorties.`)
+      // Ce que les plafonds ont laissé dehors se dit, au lieu de disparaître.
+      const dehors = [
+        left.favorites > 0 && `${left.favorites} favori${left.favorites > 1 ? 's' : ''} (plafond de ${MAX_FAVORITES})`,
+        left.history > 0 && `${left.history} sortie${left.history > 1 ? 's' : ''} (plafond de ${MAX_HISTORY})`,
+        left.places > 0 && `${left.places} départ${left.places > 1 ? 's' : ''} nommé${left.places > 1 ? 's' : ''} (plafond de ${MAX_PLACES})`,
+      ].filter(Boolean)
+      setMessage(
+        `Restauré : ${favorites} parcours en favori, ${history} sorties.` +
+          (dehors.length ? ` Pas de place pour ${dehors.join(', ')}.` : ''),
+      )
     } catch (error) {
       setMessage(error.message)
     }

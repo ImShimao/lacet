@@ -14,7 +14,7 @@ import Account, { sectionTitle } from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
-import { GeoBanner, ResumeBanner } from './Banners.jsx'
+import { GeoBanner, LibraryNotice, ResumeBanner } from './Banners.jsx'
 import { SheetGrabber, useSheetCover, useSheetDrag } from './Sheet.jsx'
 import useLibrary from './useLibrary'
 import useRunSession from './useRunSession'
@@ -100,6 +100,8 @@ export default function App() {
   // `summary` — celle qu'on vient de terminer — parce qu'on n'y fait pas les
   // mêmes gestes : l'une se referme, l'autre se rejoue ou se supprime.
   const [viewing, setViewing] = useState(null)
+  // La vue où s'ouvre « Mes parcours » quand un avis y mène (`LibraryNotice`).
+  const [routesView, setRoutesView] = useState(null)
   const [geoNoticeOpen, setGeoNoticeOpen] = useState(true)
 
   // Les commandes de la carte en course : la voix, l'orientation — dans le sens
@@ -597,6 +599,26 @@ export default function App() {
               onClose={() => setGeoNoticeOpen(false)}
             />
           )}
+          {/* Un favori refusé, une sortie ancienne partie : dit là où le geste
+              vient d'être fait, quel que soit l'onglet. Le favori refusé mène
+              à la liste où l'on en retire un. */}
+          {library.notice && !running && (
+            <LibraryNotice
+              notice={library.notice}
+              onClose={library.dismiss}
+              onAct={
+                library.notice.list === 'favorites'
+                  ? () => {
+                      library.dismiss()
+                      setViewing(null)
+                      run.closeSummary()
+                      setRoutesView('saved')
+                      setTab('routes')
+                    }
+                  : null
+              }
+            />
+          )}
           {viewing ? (
             <RunDetail
               entry={viewing}
@@ -640,6 +662,7 @@ export default function App() {
             />
           ) : tab === 'routes' ? (
             <Library
+              initialView={routesView}
               onImport={importGpx}
               saved={saved}
               history={history}
@@ -759,6 +782,7 @@ export default function App() {
               run.closeSummary()
               // Toucher « Mon compte » ramène à son sommaire, d'où qu'on vienne.
               setAccountPage(null)
+              setRoutesView(null)
               setTab(key)
               if (key === 'explore') setSheet('peek')
             }}

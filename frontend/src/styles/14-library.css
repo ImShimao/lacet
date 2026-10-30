@@ -139,6 +139,21 @@
   color: var(--text);
 }
 
+/* Ce qu'un plafond vient de refuser ou de retirer (`LibraryNotice`) : en jaune,
+   ce qu'il faut savoir, pas en rouge d'erreur — rien n'a échoué. Le bouton
+   passe sous le texte, comme pour la sortie interrompue. */
+.banner--notice {
+  flex-wrap: wrap;
+  background: rgba(255, 212, 38, 0.11);
+  border-color: rgba(255, 212, 38, 0.3);
+}
+.banner--notice > .icon {
+  color: var(--caution);
+}
+.shell[data-sheet='peek'] .banner--notice {
+  background: #221f12;
+}
+
 /* Un mois et ses sorties : l'en-tête, puis les lignes, espacées comme la liste. */
 .list__group {
   display: flex;

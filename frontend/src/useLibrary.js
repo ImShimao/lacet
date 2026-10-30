@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { keyOf } from './offlineMaps'
-import { load, save, slim, wipe } from './storage'
+import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, MAX_TRACKS, brief, load, save, slim, wipe } from './storage'
 
 /**
  * Ce que l'app garde de toi : les favoris, les sorties, les départs nommés.
@@ -12,25 +12,22 @@ import { load, save, slim, wipe } from './storage'
  *
  * Elles sont ici parce qu'elles partagent une contrainte que le reste de
  * l'app n'a pas : **la place**. Le navigateur n'accorde que cinq mégaoctets à
- * toute l'app, un parcours gardé en pèse cinquante kilooctets, et c'est ce qui
- * dicte les trois plafonds ci-dessous. Les garder au même endroit que les
- * listes qu'ils bornent est la seule façon qu'ils restent cohérents.
+ * toute l'app, et c'est ce qui dicte leurs plafonds — définis dans
+ * `storage.js`, à côté du quota et de leur mesure.
+ *
+ * Un plafond atteint ne retire plus rien en silence. Le favori le plus ancien
+ * et le départ nommé de trop partaient sans un mot — souvent le premier gardé,
+ * « Chez moi », celui qu'on refait le plus : on refuse donc le nouveau, et on
+ * dit où faire de la place. Une sortie, elle, se garde toujours ; c'est la plus
+ * ancienne qui part, et l'app le dit. Ce qu'elle dit attend dans `notice`.
  */
-
-// Quarante favoris, deux cents sorties : au-delà, la liste ne se parcourt plus
-// et la place manque. Les traces, elles, ne suivent que les vingt-cinq
-// dernières sorties — c'est la partie lourde, et celle qu'on ne rouvre pas.
-const MAX_FAVORITES = 40
-const MAX_HISTORY = 200
-const MAX_TRACKS = 25
-// Chez soi, le bureau, le club, deux coins de vacances : huit suffit, et une
-// liste plus longue ne se lirait plus d'un coup d'œil.
-const MAX_PLACES = 8
 
 export default function useLibrary(stored = load()) {
   const [saved, setSaved] = useState(stored.favorites || [])
   const [history, setHistory] = useState(stored.history || [])
   const [places, setPlaces] = useState(stored.places || [])
+  // Ce qu'un plafond vient de refuser ou de retirer, à dire : `{ list, text }`.
+  const [notice, setNotice] = useState(null)
 
 /**
  * Reconnaître une sortie dans la liste.
@@ -41,17 +38,34 @@ export default function useLibrary(stored = load()) {
  */
 const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
 
-/** Pose une liste **et** l'écrit : les deux ne doivent jamais se séparer. */
+/**
+ * Pose une liste **et** l'écrit : les deux ne doivent jamais se séparer. Ce
+ * qu'un plafond avait dit auparavant ne vaut plus : la liste a bougé.
+ */
   const put = (cle, valeur, poser) => {
     poser(valeur)
     save({ [cle]: valeur })
+    setNotice(null)
     return valeur
+  }
+
+  /** Le favori de trop : refusé, et l'on dit où faire de la place. */
+  const favoritesFull = (route) => {
+    setNotice({
+      list: 'favorites',
+      text: `${MAX_FAVORITES} favoris, c'est le plafond : « ${route.name} » n'est pas gardé. Retire d'abord un favori — glisse sa ligne vers la gauche.`,
+    })
+    return saved
   }
 
   return {
     saved,
     history,
     places,
+    notice,
+
+    /** L'avis lu, ou devenu sans objet. */
+    dismiss: () => setNotice(null),
 
     /** Ce parcours est-il en favori ? Comparé par emprise, pas par identifiant. */
     isFavorite: (route) => Boolean(route) && saved.some((r) => keyOf(r) === keyOf(route)),
@@ -60,31 +74,38 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
     toggleFavorite(route) {
       if (!route) return saved
       const cle = keyOf(route)
-      const existe = saved.some((r) => keyOf(r) === cle)
-      const suite = existe
-        ? saved.filter((r) => keyOf(r) !== cle)
-        : [slim(route), ...saved].slice(0, MAX_FAVORITES)
-      return put('favorites', suite, setSaved)
+      if (saved.some((r) => keyOf(r) === cle)) return put('favorites', saved.filter((r) => keyOf(r) !== cle), setSaved)
+      if (saved.length >= MAX_FAVORITES) return favoritesFull(route)
+      return put('favorites', [slim(route), ...saved], setSaved)
     },
 
     /** Garde un parcours en favori, en remplaçant sa version précédente. */
     keepRoute(route) {
-      const suite = [slim(route), ...saved.filter((r) => r.id !== route.id)].slice(0, MAX_FAVORITES)
-      return put('favorites', suite, setSaved)
+      const autres = saved.filter((r) => r.id !== route.id)
+      if (autres.length >= MAX_FAVORITES) return favoritesFull(route)
+      return put('favorites', [slim(route), ...autres], setSaved)
     },
 
     /**
      * Range une sortie terminée, et rend l'entrée telle qu'elle a été gardée.
      *
-     * Les traces des sorties anciennes tombent : une trace pèse quelques
-     * dizaines de kilooctets, et c'est par elles que le stockage se remplit.
-     * Le journal de la voix part avec : il sert à relire une sortie récente.
+     * Au-delà des vingt-cinq dernières, une sortie n'est plus que son résumé
+     * (`brief`) : la trace, la voix et le parcours prévu en faisaient l'essentiel
+     * du poids. Au plafond, la plus ancienne laisse sa place — jamais la
+     * nouvelle, qu'on vient de courir —, et l'app le dit.
      */
     remember(entry) {
-      const suite = [entry, ...history]
-        .map((sortie, i) => (i < MAX_TRACKS ? sortie : { ...sortie, track: null, spoken: null }))
-        .slice(0, MAX_HISTORY)
+      const toutes = [entry, ...history]
+      const suite = toutes.slice(0, MAX_HISTORY).map((sortie, i) => (i < MAX_TRACKS ? sortie : brief(sortie)))
       put('history', suite, setHistory)
+      const partie = toutes[MAX_HISTORY]
+      if (partie) {
+        const jour = new Date(partie.ranAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+        setNotice({
+          list: 'history',
+          text: `Lacet garde les ${MAX_HISTORY.toLocaleString('fr-FR')} dernières sorties : celle du ${jour}, la plus ancienne, a laissé sa place à celle-ci.`,
+        })
+      }
       return entry
     },
 
@@ -119,7 +140,14 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
 
     /** Garde un départ sous un nom : « chez moi », « le club ». */
     keepPlace(place) {
-      return put('places', [place, ...places].slice(0, MAX_PLACES), setPlaces)
+      if (places.length >= MAX_PLACES) {
+        setNotice({
+          list: 'places',
+          text: `${MAX_PLACES} départs nommés, c'est le plafond : « ${place.name} » n'est pas gardé. Oublie d'abord un départ, avec la croix à côté de son nom dans le menu du départ.`,
+        })
+        return places
+      }
+      return put('places', [place, ...places], setPlaces)
     },
 
     dropPlace(id) {
@@ -132,6 +160,7 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       setSaved([])
       setHistory([])
       setPlaces([])
+      setNotice(null)
     },
 
     /**

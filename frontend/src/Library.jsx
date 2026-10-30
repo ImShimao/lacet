@@ -15,11 +15,12 @@ import * as offline from './offlineMaps'
 import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
 
-export default function Library({ saved, history, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
+export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
-  // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu.
-  const [view, setView] = useState(() =>
-    history.length === 0 && saved.length > 0 ? 'saved' : 'history',
+  // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu. Un avis
+  // qui y mène (« 40 favoris, c'est le plafond ») ouvre là où il le dit.
+  const [view, setView] = useState(
+    () => initialView ?? (history.length === 0 && saved.length > 0 ? 'saved' : 'history'),
   )
   // Les filtres de l'historique : quelle activité, quel mois. Les totaux
   // suivent — « combien ai-je couru en août » est la question qu'on se pose.
@@ -380,8 +381,10 @@ function OfflineControl({ route, mapStyle }) {
       label: offline.storedStyleLabel(route),
     })
 
-  // Une sortie libre n'a pas de tracé : il n'y a pas de carte à délimiter.
-  if (!offline.isAvailable() || !route.geometry?.length) return null
+  // Une sortie libre n'a pas de tracé : il n'y a pas de carte à délimiter. Une
+  // sortie ancienne réduite à son résumé n'en a plus, mais sa carte peut être
+  // restée : on la montre encore, pour pouvoir la retirer.
+  if (!offline.isAvailable() || (!route.geometry?.length && !entry.stored)) return null
 
   async function start() {
     setFailed(null)

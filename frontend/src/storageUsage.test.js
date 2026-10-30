@@ -67,15 +67,27 @@ describe('le poids de ce qui est gardé', () => {
     const vrai = globalThis.localStorage
     Object.defineProperty(globalThis, 'localStorage', { value: petit, configurable: true })
     try {
+      // D'abord alléger : les traces des plus anciennes partent, pas une sortie.
       save({ history: Array.from({ length: 40 }, (_, i) => sortie(i)) })
-      const u = usage()
-      expect(u.trimmed).not.toBeNull()
-      expect(u.trimmed.from).toBe(40)
-      expect(u.trimmed.to).toBeLessThan(40)
+      let u = usage()
+      expect(u.trimmed).toMatchObject({ from: 40, to: 40, briefed: 35 })
+      expect(load().history).toHaveLength(40)
+      expect(load().history[4].track).toHaveLength(200)
+      expect(load().history[5].track).toBeUndefined()
+      expect(load().history[39].actual_distance_m).toBe(10_000)
+      forgetTrim()
+      expect(usage().trimmed).toBeNull()
+
+      // Des résumés seulement, trop nombreux : là, il faut supprimer — les
+      // plus anciens, et le dire.
+      save({ history: Array.from({ length: 400 }, (_, i) => sortie(i, false)).map(({ track, ...s }) => s) })
+      u = usage()
+      expect(u.trimmed.from).toBe(400)
+      expect(u.trimmed.to).toBeLessThan(400)
+      expect(u.trimmed.briefed).toBe(0)
       // Les plus récentes sont celles qui restent.
       expect(load().history[0].id).toBe('h0')
       forgetTrim()
-      expect(usage().trimmed).toBeNull()
 
       // Et quand même l'élagage ne suffit pas, il n'y a plus de disque où
       // noter quoi que ce soit : l'échec se garde alors en mémoire, sans quoi

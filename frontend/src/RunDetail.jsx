@@ -116,7 +116,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
       {!entry.track?.length && (
         <p className="muted small">
           La trace de cette sortie n'est plus gardée — seules les vingt-cinq dernières le sont,
-          pour laisser de la place. Les chiffres, eux, restent.
+          avec leur parcours prévu, pour laisser de la place. Les chiffres, eux, restent.
         </p>
       )}
 
