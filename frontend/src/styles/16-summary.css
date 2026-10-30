@@ -20,7 +20,7 @@
   font-variant-numeric: tabular-nums;
 }
 .summary__big span {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   letter-spacing: 0.08em;
   color: var(--text-3);
 }
@@ -44,13 +44,13 @@
   margin-bottom: 4px;
 }
 .summary__hero b {
-  font-size: 22px;
+  font-size: calc(22px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 .summary__hero em {
   font-style: normal;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -66,7 +66,7 @@
   gap: 8px;
   padding: 9px 12px;
   border-radius: var(--r);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 700;
   color: var(--caution);
   background: var(--caution-soft);

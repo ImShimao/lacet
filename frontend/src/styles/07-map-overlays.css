@@ -169,7 +169,7 @@
   gap: 6px;
   margin: 0;
   color: var(--safe);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
 }
 
 /* Pendant qu'elles arrivent : la même ligne, en violet et non en vert — ce
@@ -214,10 +214,10 @@
 }
 .live__paused b {
   color: var(--text);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
 }
 .live__paused span {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-2);
 }
 /* « Rentrer au départ » : dans le bandeau de pause, à droite — on abandonne à
@@ -229,7 +229,7 @@
   border-radius: 12px;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 700;
 }
 .live__home:disabled {
@@ -257,7 +257,7 @@
   color: var(--text);
   font: inherit;
   font-weight: 700;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   box-shadow: 0 8px 24px -8px var(--shadow);
 }
 .recenter .icon {
@@ -265,7 +265,7 @@
 }
 
 .maplibregl-ctrl-attrib {
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   background: var(--glass) !important;
 }
 .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
@@ -304,7 +304,7 @@
 }
 .crash h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--text-scale));
   letter-spacing: -0.02em;
 }
 .crash p {
@@ -318,7 +318,7 @@
   padding: 12px;
   overflow-x: auto;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--risk);
   margin: 0;
 }
@@ -379,7 +379,7 @@
   background: var(--glass);
   backdrop-filter: blur(12px);
   box-shadow: 0 10px 26px -12px var(--shadow);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--accent-text);
 }
@@ -412,7 +412,7 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent-line);
   color: var(--accent-text);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   animation: rise 0.25s ease-out;

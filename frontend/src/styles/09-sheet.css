@@ -297,10 +297,10 @@
     padding-right: 2px;
   }
   .stats b {
-    font-size: 15px;
+    font-size: calc(15px * var(--text-scale));
   }
   .stats span {
-    font-size: 9.5px;
+    font-size: calc(9.5px * var(--text-scale));
   }
   .sheet {
     padding: 10px;

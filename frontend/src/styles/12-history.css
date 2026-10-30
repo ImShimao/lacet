@@ -16,7 +16,7 @@
   display: block;
   width: 100%;
   font-family: var(--display);
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -42,7 +42,7 @@
 .rundet__head em {
   display: block;
   font-style: normal;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-3);
   margin-top: 2px;
 }
@@ -72,7 +72,7 @@
 .rundet__big span {
   display: block;
   margin-top: 6px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   letter-spacing: 0.14em;
   color: var(--text-3);
 }
@@ -87,13 +87,13 @@
 }
 .rundet__plan span {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
 }
 .rundet__plan b {
   display: block;
   margin-top: 3px;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-variant-numeric: tabular-nums;
 }
 .rundet__plan .grade {
@@ -122,7 +122,7 @@
 }
 .weeks__head em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
 }
 .weeks__plot {
@@ -160,7 +160,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -178,7 +178,7 @@
 }
 .standing__head b {
   display: block;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--text-scale));
 }
 .standing--record .standing__head b {
   color: var(--safe);
@@ -186,7 +186,7 @@
 .standing__head em {
   display: block;
   font-style: normal;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
   margin-top: 3px;
 }
@@ -198,13 +198,13 @@
 }
 .standing__gaps span {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-3);
 }
 .standing__gaps b {
   display: block;
   margin-top: 2px;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-variant-numeric: tabular-nums;
 }
 .standing__up {
@@ -226,7 +226,7 @@
 }
 .splits__head em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
 }
 .splits__row {
@@ -236,7 +236,7 @@
   gap: 9px;
 }
 .splits__row span {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -252,7 +252,7 @@
   border-color: var(--safe-line);
 }
 .splits__row b {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
@@ -260,7 +260,7 @@
 /* Ce que la voix a dit : une ligne par phrase, l'heure et le kilomètre en
    colonne, pour retrouver d'un coup d'œil où elle s'est tue. */
 .spoken summary {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   color: var(--text-2);
   cursor: pointer;
 }
@@ -275,7 +275,7 @@
   display: grid;
   grid-template-columns: auto auto 1fr;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   line-height: 1.35;
 }
 .spoken time,
@@ -301,7 +301,7 @@
   border: 1px dashed var(--line);
   background: none;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-weight: 600;
 }
 .signal:disabled {
@@ -324,7 +324,7 @@
   border: 1px solid var(--caution-line);
   background: var(--caution-soft);
   color: var(--text);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   font-weight: 650;
 }
 .signal__kind .icon {
@@ -359,7 +359,7 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
 }

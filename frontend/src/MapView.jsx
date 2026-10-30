@@ -7,6 +7,7 @@ import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
 import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt } from './routeDraw'
 import { km } from './format'
+import { useAppearance } from './appearance'
 
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
@@ -113,6 +114,8 @@ export default function MapView({
   const navZoom = useRef(NAV_ZOOM)
 
   const theme = styleByKey(styleKey).contrast
+  // L'accent et le thème : la carte se repeint quand ils changent.
+  const look = useAppearance()
 
   // --- création ------------------------------------------------------------
   useEffect(() => {
@@ -304,12 +307,12 @@ export default function MapView({
     m.setStyle(next.style, loadOptions(next))
   }, [styleKey])
 
-  // --- couleurs du tracé selon le fond --------------------------------------
+  // --- couleurs du tracé selon le fond et l'apparence -------------------------
   useEffect(() => {
     const m = map.current
     if (!m || !revision || !m.getLayer('route-line')) return
     paintLayers(m, theme)
-  }, [theme, revision])
+  }, [theme, revision, look])
 
   // --- recadrage explicite --------------------------------------------------
   // Volontairement piloté par un jeton (`focus.at`) plutôt que par la position

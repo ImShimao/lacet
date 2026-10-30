@@ -14,7 +14,7 @@
   padding: 13px 15px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,7 +33,7 @@
   color: var(--on-accent);
 }
 .btn--big {
-  font-size: 15.5px;
+  font-size: calc(15.5px * var(--text-scale));
 }
 /* Le geste secondaire d'une rangée prend la place de son mot, pas la moitié :
    à parts égales, « Refaire ce parcours » passait sur deux lignes. */
@@ -62,7 +62,7 @@
 .seg button {
   padding: 13px 8px;
   border-radius: 11px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
 }
@@ -114,7 +114,7 @@ html.native textarea {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--text-scale));
   color: var(--text-2);
 }
 .progress__label b {
@@ -174,7 +174,7 @@ html.native textarea {
 }
 .btn--stack em {
   font-style: normal;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 600;
   color: var(--text-3);
   white-space: nowrap;

@@ -28,6 +28,7 @@ import * as offline from './offlineMaps'
 import { StopsSetting } from './Stops.jsx'
 import { KINDS } from './pois'
 import { voiceSettings } from './voice'
+import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
 /** Les familles du sommaire, dans leur ordre. */
 const GROUPS = ['Paramètres', 'Données', 'Infos']
@@ -41,6 +42,7 @@ export const SECTIONS = [
   { key: 'search', group: 'Paramètres', icon: 'sliders', title: 'Recherche' },
   { key: 'run', group: 'Paramètres', icon: 'play', title: 'Pendant la sortie' },
   { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
+  { key: 'appearance', group: 'Paramètres', icon: 'appearance', title: 'Apparence' },
   { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
   { key: 'backup', group: 'Données', icon: 'download', title: 'Sauvegarde' },
   { key: 'about', group: 'Infos', icon: 'info', title: 'À propos' },
@@ -205,6 +207,10 @@ function summaryOf(key, { params, poiPrefs }) {
         .filter(Boolean)
         .join(' · ')
     }
+    case 'appearance': {
+      const { accent, theme, text } = appearanceLabels()
+      return `${accent} · Thème ${theme.toLowerCase()} · Texte ${text === 'large' ? 'agrandi' : 'normal'}`
+    }
     case 'storage': {
       const info = usage()
       if (!info) return 'Sorties, cartes et rues gardées'
@@ -274,6 +280,8 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
           <MyReports />
         </>
       )
+    case 'appearance':
+      return <AppearanceSettings />
     case 'storage':
       return (
         <>
@@ -412,6 +420,71 @@ function ClearData({ onClearData }) {
       )}
       {done && <p className="muted small">Tout est effacé : l'app repart comme au premier jour.</p>}
     </>
+  )
+}
+
+/** Les libellés de l'apparence du moment, pour la ligne du sommaire. */
+function appearanceLabels() {
+  const look = getAppearance()
+  const label = (list, key) => list.find((o) => o.key === key)?.label ?? ''
+  return { accent: label(ACCENTS, look.accent), theme: label(THEMES, look.theme), text: look.text }
+}
+
+/**
+ * L'apparence : le thème, la couleur d'accent, la taille du texte. Appliqués
+ * au toucher, sans bouton « Appliquer » : l'écran change sous le doigt, et
+ * c'est ce qu'on vient voir.
+ */
+function AppearanceSettings() {
+  const look = useAppearance()
+  return (
+    <div className="fields">
+      <div className="field">
+        <span className="label">Thème</span>
+        <Segmented options={THEMES} value={look.theme} onChange={(theme) => setAppearance({ theme })} />
+        <p className="field__hint">
+          « Auto » suit le réglage de l'iPhone. Le thème clair se lit mieux en plein soleil, le
+          sombre éblouit moins le soir.
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="label">Couleur d'accent</span>
+        <div className="swatches" role="radiogroup" aria-label="Couleur d'accent">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.key}
+              role="radio"
+              aria-checked={look.accent === a.key}
+              className="swatch"
+              onClick={() => setAppearance({ accent: a.key })}
+            >
+              {/* Peinte par le jeton de l'accent lui-même : voir `styles/01-base.css`. */}
+              <i data-accent={a.key} />
+              {a.label}
+            </button>
+          ))}
+        </div>
+        <p className="field__hint">
+          Boutons, onglet actif, repère de départ. Le vert, le jaune et le rouge de la sécurité
+          ne changent pas : ce sont des avis, pas une décoration.
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="label">Taille du texte</span>
+        <Segmented options={TEXT_SIZES} value={look.text} onChange={(text) => setAppearance({ text })} />
+        <p className="field__hint">
+          Agrandit le texte des listes, des cartes et des réglages. Les chiffres de la sortie
+          sont déjà faits pour être lus à bout de bras.
+        </p>
+      </div>
+
+      <p className="muted small">
+        Le fond de carte se choisit à part, avec le bouton des calques. Tant qu'on n'en a pas
+        choisi, le thème clair part d'un fond clair.
+      </p>
+    </div>
   )
 }
 

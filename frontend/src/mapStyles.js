@@ -358,6 +358,8 @@ export const MAP_STYLES = [
 ]
 
 export const DEFAULT_STYLE = 'dark'
+// Le fond par défaut du thème clair : le plus lisible en plein soleil.
+export const LIGHT_STYLE = 'light'
 
 export function styleByKey(key) {
   return MAP_STYLES.find((s) => s.key === key) || MAP_STYLES[0]

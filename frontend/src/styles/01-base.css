@@ -19,10 +19,6 @@
   /* L'accent : un aplat qui porte du blanc à 4,5:1 au moins, une variante
      claire pour le texte sur fond sombre, une soutenue pour le texte sur fond
      clair. Bleu par défaut : il ne se confond avec aucune couleur de sécurité. */
-  --accent: #2563eb;
-  --accent-press: #1d4ed8;
-  --accent-light: #7cb0ff;
-  --accent-deep: #1d4ed8;
   --accent-text: var(--accent-light);
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-line: color-mix(in srgb, var(--accent-text) 42%, transparent);
@@ -101,7 +97,12 @@
 
   --r: 14px;
   --side: 400px;
+  /* « Taille du texte » dans Apparence : chaque taille de police s'y multiplie. */
+  --text-scale: 1;
   color-scheme: dark;
+}
+:root[data-text='large'] {
+  --text-scale: 1.15;
 }
 
 /* Le thème clair : le plus lisible en plein soleil. Surfaces blanches sur un
@@ -139,21 +140,30 @@
   color-scheme: light;
 }
 
-/* Les accents qu'on peut choisir. Le violet d'origine reste là pour qui l'aime. */
-:root[data-accent='violet'] {
+/* Les accents qu'on peut choisir. Le violet d'origine reste là pour qui l'aime.
+   Sans `:root` : la pastille de chaque accent, dans « Apparence », porte le
+   même attribut et se peint avec le vrai jeton. */
+:root,
+[data-accent='blue'] {
+  --accent: #2563eb;
+  --accent-press: #1d4ed8;
+  --accent-light: #7cb0ff;
+  --accent-deep: #1d4ed8;
+}
+[data-accent='violet'] {
   --accent: #7c3aed;
   --accent-press: #6d28d9;
   --accent-light: #b79dff;
   --accent-deep: #6d28d9;
 }
-:root[data-accent='rose'] {
+[data-accent='rose'] {
   --accent: #d61f69;
   --accent-press: #be185d;
   --accent-light: #ff7eb0;
   --accent-deep: #be185d;
 }
 /* Graphite : sans couleur. Clair sur le thème sombre, noir sur le clair. */
-:root[data-accent='graphite'] {
+[data-accent='graphite'] {
   --accent: #e6e9ed;
   --accent-press: #c9ced5;
   --accent-light: #e6e9ed;
@@ -161,7 +171,8 @@
   --on-accent: #0b0d10;
   --runbar-note: #8f5f00;
 }
-:root[data-theme='light'][data-accent='graphite'] {
+[data-theme='light'][data-accent='graphite'],
+[data-theme='light'] [data-accent='graphite'] {
   --accent: #1f2329;
   --accent-press: #000;
   --on-accent: #fff;
@@ -190,7 +201,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--display);
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--text-scale));
   line-height: 1.45;
   /* Chiffres à chasse fixe partout : une distance, une allure ou une heure qui
      changent ne font plus danser la ligne, et les colonnes s'alignent sans
@@ -242,7 +253,7 @@ input:focus-visible {
 }
 .muted {
   color: var(--text-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   margin: 0;
   line-height: 1.5;
 }
@@ -321,14 +332,14 @@ input:focus-visible {
   border-radius: var(--r);
   background: var(--risk-soft);
   border: 1px solid var(--risk-line);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.4;
   color: var(--text-2);
 }
 .banner button {
   margin-left: auto;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   line-height: 1;
   padding: 2px;
   flex: none;
@@ -353,7 +364,7 @@ input:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
 }
 .tab .icon {
@@ -370,7 +381,7 @@ input:focus-visible {
 .side__title {
   display: none;
   margin: 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.1;
@@ -393,7 +404,7 @@ input:focus-visible {
 }
 .sportpill__spec {
   margin-left: auto;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text-2);

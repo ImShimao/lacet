@@ -11,7 +11,7 @@
 .lapcount {
   text-align: center;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   color: var(--text-2);
   padding: 7px;
   border-radius: 9px;
@@ -20,7 +20,7 @@
 }
 .lapcount b {
   color: var(--text);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
 }
 
 .live__alert {
@@ -30,7 +30,7 @@
   padding: 11px 13px;
   border-radius: var(--r);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   display: flex;
   align-items: center;
   gap: 9px;
@@ -40,12 +40,12 @@
   border: 1px solid var(--risk-line);
   padding: 11px 13px;
   border-radius: var(--r);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
 }
 .live__wait {
   text-align: center;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -67,7 +67,7 @@
 .live__eta {
   margin: -2px 0 0;
   text-align: center;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   color: var(--text-3);
 }
 .live__eta b {
@@ -105,7 +105,7 @@
   position: relative;
 }
 .btn--sos__label {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -118,7 +118,7 @@
 
 .linkish {
   align-self: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -135,7 +135,7 @@
   border-radius: 10px;
   background: var(--accent-soft);
   border: 1px solid var(--accent-line);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.4;
   color: var(--text-2);
 }
@@ -156,7 +156,7 @@
   border-radius: var(--r);
   background: var(--surface-2);
   border: 1px solid var(--line);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.4;
   color: var(--text-2);
 }
@@ -195,7 +195,7 @@
 }
 .sheet__panel h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   letter-spacing: -0.02em;
 }
 
@@ -207,7 +207,7 @@ input.field {
   border-radius: var(--r);
   padding: 12px 14px;
   /* Seize pixels : voir `.search input`. */
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-family: inherit;
   color: var(--text);
   width: 100%;
@@ -219,13 +219,13 @@ input.field:focus {
 
 .section {
   margin: 8px 0 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text);
 }
 .small {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
 }
 
 .rows__num {

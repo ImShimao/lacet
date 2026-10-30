@@ -113,6 +113,13 @@ const PATHS = {
   ),
 
   // --- actions -----------------------------------------------------------
+  // L'apparence : un disque à moitié plein, le clair et le sombre.
+  appearance: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none" />
+    </>
+  ),
   sliders: (
     <>
       <path d="M3.5 7.5h9M18.5 7.5h2M3.5 16.5h3M12.5 16.5h8" />

@@ -38,10 +38,19 @@ const Compass = registerPlugin('Compass')
 
 // --- démarrage ----------------------------------------------------------------
 
+/**
+ * Le texte de la barre d'état selon le thème de l'app : `Style.Dark` désigne,
+ * chez Capacitor, un texte **clair** pour un fond sombre.
+ */
+export function setStatusBarTheme(theme) {
+  StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark }).catch(() => {
+    /* barre d'état : purement cosmétique */
+  })
+}
+
 export async function bootNative() {
   try {
     await StatusBar.setOverlaysWebView({ overlay: true })
-    await StatusBar.setStyle({ style: Style.Dark })
   } catch {
     /* barre d'état : purement cosmétique */
   }
