@@ -217,7 +217,7 @@
   opacity: 0;
 }
 .shell[data-sheet='full'] .strip--live {
-  background: rgba(19, 17, 26, 0.55);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
 }
 /* L'en-tête est la zone de préhension : le doigt doit y glisser sans que la
    page tente de défiler. */
