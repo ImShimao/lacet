@@ -41,6 +41,14 @@ class SafetyMode(str, Enum):
     standard = "standard"
 
 
+class Side(str, Enum):
+    """Le côté de la route où l'on court — voir `routing.loops.keep_side`."""
+
+    right = "right"
+    left = "left"
+    any = "any"
+
+
 class TimeOfDay(str, Enum):
     day = "day"
     night = "night"
@@ -79,6 +87,13 @@ class LoopRequest(BaseModel):
     # Préférer les rues et chemins qui longent un parc, un bois ou l'eau, et les
     # sentiers balisés — voir `routing.weights.GREEN_BONUS`.
     nature: bool = True
+    # Le côté où l'on court, à pied : à gauche par défaut, face aux voitures,
+    # comme le demande le code de la route (R412-36) hors agglomération sans
+    # trottoir ni accotement ; à droite pour qui préfère ; ou indifférent. Il
+    # décide du côté par lequel on fait le tour d'un rond-point. À vélo, sans
+    # effet : on roule à droite et l'anneau se prend dans le sens de la
+    # circulation.
+    side: Side = Side.left
 
     @property
     def seconds_per_km(self) -> float:

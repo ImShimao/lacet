@@ -133,8 +133,10 @@ describe('la boucle', () => {
 
   it('cherche d’autres boucles entières avant de proposer des tours', async () => {
     // Douze propositions : le premier tirage n'en tient qu'une poignée de
-    // distinctes, et la liste se complétait de tours.
-    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 12 }
+    // distinctes, et la liste se complétait de tours. À 7 km : depuis que les
+    // épingles sont rognées (`trimSpurs`), le premier tirage en tient onze ou
+    // douze de 4 à 6 km, et neuf seulement à 7.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 7, sport: 'run', limit: 12 }
     const entieres = (r) => r.routes.filter((route) => route.laps === 1).length
     const sans = await planLoops({ ...demande, widen: false }, deps)
     const avec = await planLoops(demande, deps)

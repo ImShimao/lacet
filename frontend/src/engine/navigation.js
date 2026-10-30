@@ -58,10 +58,10 @@ const instruction = (distM, turn, angle, road, text, lon, lat, caution) => ({
   dist_m: distM, turn, angle, road, text, lon, lat, caution,
 })
 
-export function buildInstructions(graph, start, cand) {
+export function buildInstructions(graph, start, cand, sport = 'run') {
   if (!cand.edges.length) return []
 
-  let steps = mergeAll(rawSteps(graph, start, cand))
+  let steps = mergeAll(rawSteps(graph, start, cand, null, sport))
 
   const total = cand.stats ? cand.stats.distanceM : 0
   const [lon, lat] = graph.node(start)
@@ -152,7 +152,7 @@ const finishText = (laps) =>
 const pointKey = (lon, lat) => `${pyRound(lon, 6)},${pyRound(lat, 6)}`
 
 /** `quiet` : un nœud où ne rien annoncer — le seuil, quand le départ le dit déjà. */
-function rawSteps(graph, start, cand, quiet = null) {
+function rawSteps(graph, start, cand, quiet = null, sport = 'run') {
   const unprotected = new Set()
   for (const c of cand.crossings) if (!c.protected) unprotected.add(pointKey(c.lon, c.lat))
 
@@ -163,13 +163,30 @@ function rawSteps(graph, start, cand, quiet = null) {
   let lastNamed = null
   const announced = new Map()
   let came = null
+  // Jusqu'où le rond-point déjà annoncé couvre le parcours : son anneau, et la
+  // rue par laquelle on en sort.
+  let ringUntil = -1
+  const ring = graph.edgeRing
 
-  for (const e of cand.edges) {
+  for (let idx = 0; idx < cand.edges.length; idx += 1) {
+    const e = cand.edges[idx]
     const coords = graph.coordsFrom(e, cursor)
     const name = graph.edgeName[e]
     const length = graph.edgeLen[e]
+    const found =
+      idx > ringUntil && ring[e] && outBearing !== null && came !== null && !ring[came] && cursor !== quiet
+        ? roundabout(graph, cand.edges, idx, cursor, travelled, outBearing, sport)
+        : null
 
-    if (outBearing !== null && came !== null && cursor !== quiet) {
+    if (idx <= ringUntil) {
+      // Dans le rond-point déjà annoncé, sortie comprise : rien à dire.
+      if (idx === ringUntil && name) announced.set(name, travelled)
+    } else if (found) {
+      const [step, until] = found
+      ringUntil = until
+      step.caution = unprotected.has(pointKey(step.lon, step.lat))
+      steps.push(step)
+    } else if (outBearing !== null && came !== null && cursor !== quiet) {
       const inBearing = bearingFromStart(coords)
       const angle = pymod(inBearing - outBearing + 180, 360) - 180
       let turn = classify(angle)
@@ -225,6 +242,64 @@ function rawSteps(graph, start, cand, quiet = null) {
   return steps
 }
 
+// Ce qui n'est pas une sortie pour qui roule sur l'anneau — voir `_roundabout`.
+const NOT_AN_EXIT = new Set(['footway', 'path', 'steps', 'pedestrian', 'cycleway', 'bridleway'])
+const EXIT_ORDINALS = ['première', 'deuxième', 'troisième', 'quatrième', 'cinquième', 'sixième']
+
+/**
+ * La consigne d'un rond-point, dite à son entrée, et l'indice de la rue où l'on
+ * en sort — `_roundabout`. À pied, où l'on va et de quel côté faire le tour ;
+ * à vélo, la sortie à prendre.
+ */
+function roundabout(graph, edges, idx, entry, travelled, before, sport) {
+  const ring = graph.edgeRing
+  const forward = graph.edgeA[edges[idx]] === entry
+  let node = entry
+  let exits = 0
+  let j = idx
+  while (j < edges.length && ring[edges[j]]) {
+    node = graph.other(edges[j], node)
+    j += 1
+    for (let k = graph.adjOffset[node]; k < graph.adjOffset[node + 1]; k += 1) {
+      const x = graph.adjEdges[k]
+      const sens = graph.edgeOneway[x]
+      if (ring[x] || NOT_AN_EXIT.has(graph.edgeSafety[x].highway)) continue
+      if (sens && (graph.edgeA[x] === node) !== sens > 0) continue
+      exits += 1
+      break
+    }
+  }
+  if (j === edges.length) return null
+
+  const road = graph.edgeName[edges[j]]
+  const after = bearingFromStart(graph.coordsFrom(edges[j], node))
+  const angle = pymod(after - before + 180, 360) - 180
+  const turn = classify(angle)
+  let text
+  if (sport === 'bike' && exits) {
+    const rang = exits <= EXIT_ORDINALS.length ? EXIT_ORDINALS[exits - 1] : `${exits}e`
+    text = `Au rond-point, prends la ${rang} sortie${on(road)}`
+  } else {
+    const verb = turn === 'straight' ? 'continue en face' : turn === 'uturn' ? 'fais demi-tour' : `prends ${SHORT.get(turn) ?? 'tout droit'}`
+    const side = forward ? 'droite' : 'gauche'
+    let how = ''
+    if (sport === 'bike') how = ''
+    else if (turn === 'straight') how = ` en restant à ${side}`
+    else if (turn === 'uturn' || forward === turn.endsWith('left')) how = ` en faisant le tour par la ${side}`
+    text = `Au rond-point, ${verb}${how}${on(road)}`
+  }
+
+  const [lon, lat] = graph.node(entry)
+  const step = {
+    ...instruction(pyRound(travelled, 1), turn, pyRound(angle, 1), road, text, pyRound(lon, 6), pyRound(lat, 6), false),
+    before,
+    after,
+    // Un rond-point se dit en une phrase, et ne se fond pas dans la voisine.
+    ring: true,
+  }
+  return [step, j]
+}
+
 /** La manœuvre à dire à une fourche, ou `null` quand le chemin va de soi — `_fork_turn`. */
 function forkTurn(graph, node, chosen, came, outBearing, angle, sameRoad) {
   const forward = []
@@ -256,7 +331,7 @@ function mergeAll(steps) {
   for (;;) {
     const suivant = mergeClose(out)
     // Les caps ne servaient qu'à la fusion : ils ne sortent pas du moteur.
-    if (suivant.length === out.length) return suivant.map(({ before, after, ...step }) => step)
+    if (suivant.length === out.length) return suivant.map(({ before, after, ring, ...step }) => step)
     out = suivant
   }
 }
@@ -290,7 +365,10 @@ function mergeClose(steps) {
   while (i < steps.length) {
     let current = steps[i]
     const following = i + 1 < steps.length ? steps[i + 1] : null
-    const proches = following !== null && following.dist_m - current.dist_m <= MERGE_DISTANCE_M
+    // Un rond-point garde sa phrase : fondu dans la voisine, il redevenait
+    // « tourne à droite puis tout de suite à gauche ».
+    const proches =
+      following !== null && following.dist_m - current.dist_m <= MERGE_DISTANCE_M && !current.ring && !following.ring
     if (proches) {
       // **L'angle net : du cap d'arrivée au premier point au cap de départ du
       // second.** La somme des deux angles annoncés oubliait les inflexions
@@ -410,8 +488,8 @@ function advance(coords, distanceM) {
  * `quiet` : un nœud où ne rien annoncer — le seuil de la rue, quand la
  * première consigne dit déjà de quel côté la prendre.
  */
-export function pathSteps(graph, source, edges, quiet = null) {
-  return mergeAll(rawSteps(graph, source, { edges, crossings: [] }, quiet))
+export function pathSteps(graph, source, edges, quiet = null, sport = 'run') {
+  return mergeAll(rawSteps(graph, source, { edges, crossings: [] }, quiet, sport))
 }
 
 /** Le virage que fait un angle (degrés, positif à droite), et sa phrase. */

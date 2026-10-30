@@ -148,6 +148,19 @@ moins de 25 m l'une de l'autre le long du parcours n'en font plus qu'une
 (`CROSSING_MERGE_M`, `routing/loops.py`) ; les tours d'une boucle répétée, qui
 repassent au même endroit des kilomètres plus loin, comptent toujours chacun.
 
+**Le côté de la route.** Le Code de la route (article R412-36) demande au
+piéton, hors agglomération et sans trottoir ni accotement praticable, de
+marcher **sur le bord gauche**, face aux voitures : il voit venir ce qui
+arrive et peut s'écarter. C'est le côté par défaut de l'app (`side`, réglé dans
+« Mon compte › Recherche ») ; on peut choisir la droite, ou « indifférent ».
+Là où les données le permettent, le tracé en tient compte : il fait le tour
+des ronds-points de ce côté (voir [generation.md](generation.md)), et la voix
+le rappelle à l'entrée. Ailleurs, OpenStreetMap ne dit presque jamais de quel
+côté est le trottoir : autour de Guebwiller et de Soultz, 3 à 4 % des rues ont
+un tag `sidewalk`, et les trottoirs dessinés à part se comptent par dizaines.
+Le côté se choisit alors sur place. À vélo, on roule à droite et le réglage
+ne change rien.
+
 **L4 — la nuit** (`night.py`). Un modèle distinct, qui inverse le premier. De
 jour on s'éloigne du trafic ; de nuit, un sentier isolé devient le pire choix.
 

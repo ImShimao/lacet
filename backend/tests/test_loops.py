@@ -213,3 +213,82 @@ class TestTraversees:
 
     def test_deux_traversees_eloignees_comptent_deux_fois(self):
         assert len(self.crossed(0.0014)) == 2  # environ 100 m
+
+
+class TestEpingles:
+    """Un retour au même carrefour en moins de `SPUR_MAX_M` est rogné, même par une autre voie."""
+
+    def _payload(self):
+        # A—B—C sur une ligne (~55 m par pas), une seconde voie de B à C, et B—D.
+        def at(x, y):
+            return {"lat": 48.8 + y * 0.0005, "lon": 2.3 + x * 0.0005}
+
+        way = lambda wid, ids, pts: {  # noqa: E731
+            "type": "way", "id": wid, "tags": {"highway": "residential"}, "nodes": ids,
+            "geometry": [at(*p) for p in pts],
+        }
+        return {"elements": [
+            way(1, [1, 2, 3], [(0, 0), (1, 0), (2, 0)]),
+            way(2, [2, 5, 3], [(1, 0), (1.5, 0.1), (2, 0)]),
+            way(3, [2, 4], [(1, 0), (1, 1)]),
+        ]}
+
+    def test_aller_par_une_voie_retour_par_l_autre(self):
+        from app.routing.loops import _trim_spurs
+
+        graph = build_graph(self._payload())
+        a, b, c, d = (graph.nearest_node(2.3 + x * 0.0005, 48.8 + y * 0.0005) for x, y in [(0, 0), (1, 0), (2, 0), (1, 1)])
+        edge = lambda u, v, way=None: next(  # noqa: E731
+            e for e in graph.adj[u]
+            if graph.edges[e].other(u) == v and (way is None or graph.edges[e].way_id == way)
+        )
+        route = [edge(a, b), edge(b, c, 1), edge(c, b, 2), edge(b, d)]
+        assert _trim_spurs(graph, a, route, _lengths(graph)) == [edge(a, b), edge(b, d)]
+
+    def test_une_vraie_boucle_reste(self, grid, grid_center):
+        from app.routing.loops import _trim_spurs
+
+        graph = build_graph(grid)
+        start = _start(graph, grid_center)
+        loops = generate_loops(graph, start, 2000.0, build_profile(SurfacePref.mixed, SafetyMode.safe, night=False), sectors=8)
+        for cand in loops:
+            assert _trim_spurs(graph, start, cand.edges, _lengths(graph)) == cand.edges
+
+    def _same_spot_scene(self):
+        # A—B, puis un détour de B à B2 par E (~110 m), B2 étant à 5 m de B ; B2—D.
+        def at(x, y):
+            return {"lat": 48.8 + y * 0.0005, "lon": 2.3 + x * 0.0005}
+
+        way = lambda wid, ids, pts: {  # noqa: E731
+            "type": "way", "id": wid, "tags": {"highway": "residential"}, "nodes": ids,
+            "geometry": [at(*p) for p in pts],
+        }
+        graph = build_graph({"elements": [
+            way(1, [1, 2], [(0, 0), (1, 0)]),
+            way(2, [2, 6], [(1, 0), (1, 0.09)]),
+            way(3, [2, 5, 6], [(1, 0), (2, 0.05), (1, 0.09)]),
+            way(4, [6, 4], [(1, 0.09), (1, 1)]),
+        ]})
+        by_way = {graph.edges[e].way_id: e for e in range(len(graph.edges))}
+        a = graph.nearest_node(2.3, 48.8)
+        return graph, a, by_way
+
+    def test_un_detour_qui_revient_a_deux_pas_cede_a_l_arete_qui_les_relie(self):
+        from app.routing.loops import _trim_spurs
+
+        graph, a, w = self._same_spot_scene()
+        route = [w[1], w[3], w[4]]
+        assert _trim_spurs(graph, a, route, _lengths(graph)) == [w[1], w[2], w[4]]
+
+    def test_jamais_par_un_passage_que_le_detour_contournait(self):
+        from app.routing.loops import _trim_spurs
+
+        graph, a, w = self._same_spot_scene()
+        weights = _lengths(graph)
+        weights[w[2]] *= 1000.0  # un portail fermé, une rue signalée
+        route = [w[1], w[3], w[4]]
+        assert _trim_spurs(graph, a, route, weights) == route
+
+
+def _lengths(graph):
+    return [e.length_m for e in graph.edges]

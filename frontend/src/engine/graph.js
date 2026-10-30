@@ -16,7 +16,7 @@ import { haversineM, planarDistance, pointInRing, ringBbox } from './geo'
 import { pairs, pointAt } from './extract'
 import { greenIndex } from './green'
 import { pyfloordiv, pyRound, pySum, radians } from './py'
-import { closedBarrier, evaluateEdge, isExcluded, onewayFor, tunnelIsUnprotected } from './safety'
+import { RING_JUNCTIONS, closedBarrier, evaluateEdge, isExcluded, onewayFor, tunnelIsUnprotected } from './safety'
 
 const BUILTUP_DENSITY_M = 15_000
 const DENSITY_CELL_M = 400
@@ -67,6 +67,9 @@ export class Graph {
     // balisé — voir `green.js`.
     this.edgeGreen = new Float64Array(0)
     this.edgeMarked = []
+    // L'anneau d'un rond-point, de A vers B dans le sens de la circulation —
+    // voir `keepSide` (`loops.js`) et la consigne qu'en tire `navigation.js`.
+    this.edgeRing = []
     this.coords = null
     this.adjOffset = null
     this.adjEdges = null
@@ -246,6 +249,7 @@ export class Graph {
     this.edgeTunnel = Uint8Array.from(this.edgeTunnel)
     this.edgeOneway = Int8Array.from(this.edgeOneway)
     this.edgeMarked = Uint8Array.from(this.edgeMarked)
+    this.edgeRing = Uint8Array.from(this.edgeRing)
     this.link()
   }
 
@@ -438,6 +442,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
     const tunnel = tunnelIsUnprotected(tags) ? 1 : 0
     // Les arêtes suivent l'ordre des nœuds de la voie : `oneway=yes` va de A vers B.
     const oneway = onewayFor(tags, sport)
+    const ring = RING_JUNCTIONS.has(tags.junction) ? 1 : 0
     // `tags.get("name") or tags.get("ref")` rend la dernière valeur évaluée :
     // une référence vide donne "", pas None, et la navigation fait la différence.
     const name = (tags.name || tags.ref) ?? null
@@ -473,6 +478,7 @@ export function buildGraph(extract, { allowTrail = false, sport = 'run' } = {}) 
       graph.edgeTunnel.push(tunnel)
       graph.edgeOneway.push(oneway)
       graph.edgeMarked.push(marked.has(way.id) ? 1 : 0)
+      graph.edgeRing.push(ring)
       if (gateIds.size) {
         const e = graph.edgeA.length - 1
         for (const [id, end] of [[a, i === 0], [b, j === n - 1]]) {

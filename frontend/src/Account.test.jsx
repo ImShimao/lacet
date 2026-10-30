@@ -189,4 +189,26 @@ describe('Mon compte', () => {
     expect(load().keepScreenOn).toBe(false)
     localStorage.clear()
   })
+
+  it('règle le côté de la route, à gauche par défaut, et dit pourquoi', async () => {
+    const onProfile = vi.fn()
+    render(
+      <Account
+        page="search"
+        onPage={() => {}}
+        params={DEFAULTS}
+        geo={{ status: 'idle' }}
+        history={[]}
+        poiPrefs={{}}
+        onPoiPrefs={() => {}}
+        onProfile={onProfile}
+        onClearData={async () => {}}
+        onRestored={() => {}}
+      />,
+    )
+    expect(screen.getByText(/R412-36/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Gauche' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Droite' }))
+    expect(onProfile).toHaveBeenCalledWith({ side: 'right' })
+  })
 })

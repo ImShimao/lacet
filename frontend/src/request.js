@@ -46,6 +46,9 @@ export function toRequest(p, start) {
   if (avoid.length) body.avoid = avoid
   // Actif par défaut dans le moteur : seul le refus se dit.
   if (p.carfree === false) body.carfree = false
+  // La gauche, face aux voitures, est le côté par défaut du moteur : seul
+  // l'autre choix se dit.
+  if (p.side === 'right' || p.side === 'any') body.side = p.side
   // Un D+ visé remplace Plat, Vallonné, Côtes dans le moteur.
   if (p.climb_m != null) body.climb_m = p.climb_m
   // « Auto » ne se dit pas : sans cap, la recherche est celle d'avant.

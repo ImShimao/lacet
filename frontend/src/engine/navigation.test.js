@@ -3,6 +3,9 @@ import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
+import { nodeSequence } from './dijkstra'
+import { Candidate, keepSide, measure } from './loops'
+import { buildInstructions } from './navigation'
 import { planLoops } from './service'
 
 /**
@@ -128,4 +131,44 @@ describe('les consignes de virage', () => {
       expect(vrais.length).toBeGreaterThan(3)
     }
   }, 60_000)
+})
+
+/**
+ * Le rond-point, à pied : une phrase à l'entrée, et le tour du côté où l'on
+ * court — à gauche, face aux voitures, par défaut. Même damier que la parité
+ * (`grid_payload(roundabout=True)`), même chemin que `test_roundabout.py`.
+ */
+describe('le rond-point', () => {
+  const readGz = (name) => JSON.parse(gunzipSync(readFileSync(new URL(name, dir))).toString('utf8'))
+  const graph = buildGraph(fromCompact(readGz('extract-grid9-ring.json.gz')), {})
+  const STEP = 0.0015
+  const at = (fx, fy) => graph.nearestNode(2.3 + fx * STEP, 48.8 + fy * STEP, 5)
+  const edge = (u, v) => {
+    for (let k = graph.adjOffset[u]; k < graph.adjOffset[u + 1]; k += 1) {
+      const e = graph.adjEdges[k]
+      if (graph.other(e, u) === v) return e
+    }
+    throw new Error('pas d’arête')
+  }
+  // Du sud au nord par l'est : dans le sens de la circulation.
+  const nodes = [[4, 3], [4, 3.85], [4.15, 4], [4, 4.15], [4, 5]].map(([x, y]) => at(x, y))
+  const start = nodes[0]
+  const path = nodes.slice(1).map((v, i) => edge(nodes[i], v))
+  const says = (edges) => {
+    const cand = new Candidate(edges, nodeSequence(graph, start, edges))
+    measure(graph, start, cand, { night: false })
+    return buildInstructions(graph, start, cand).filter((s) => !['start', 'finish'].includes(s.turn)).map((s) => s.text)
+  }
+
+  it('à gauche par défaut, on remonte l’anneau, face aux voitures', () => {
+    const kept = keepSide(graph, start, path, { sport: 'run', side: 'left' })
+    expect(kept).not.toEqual(path)
+    expect(says(kept)).toEqual(['Au rond-point, continue en face en restant à gauche'])
+  })
+
+  it('à droite, on le suit ; indifférent, on n’y touche pas', () => {
+    expect(keepSide(graph, start, path, { sport: 'run', side: 'right' })).toEqual(path)
+    expect(says(path)).toEqual(['Au rond-point, continue en face en restant à droite'])
+    expect(keepSide(graph, start, path, { sport: 'run', side: 'any' })).toBe(path)
+  })
 })
