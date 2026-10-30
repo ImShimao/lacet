@@ -31,7 +31,7 @@
   background: var(--accent-grad);
   border-color: transparent;
   box-shadow: 0 12px 26px -16px var(--accent-glow);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn--big {
   font-size: 15.5px;
@@ -48,7 +48,7 @@
 }
 .btn--on {
   color: var(--accent-text);
-  border-color: #8b5cf6;
+  border-color: var(--accent);
 }
 
 .seg {

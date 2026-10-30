@@ -108,28 +108,61 @@ const mapboxRaster = (id) => ({
   layers: [{ id: 'mapbox', type: 'raster', source: 'mapbox' }],
 })
 
+// --- les couleurs de la carte, lues dans les jetons de l'interface -----------
+
+/**
+ * Un jeton de `styles/01-base.css`, tel que le thème et l'accent l'ont résolu.
+ * MapLibre ne lit pas le CSS : la carte passe par ici pour prendre les mêmes
+ * couleurs que le reste de l'app, et les reprendre quand elles changent.
+ */
+export const mapToken = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+/**
+ * Les couleurs du tracé sur un fond `dark` ou `light`. Le fond décide, pas le
+ * thème de l'app : un fond clair reste clair sous un thème sombre. `unknown`,
+ * un tracé que Lacet n'a pas pu juger, prend l'accent — ni vert ni rouge, les
+ * autres couleurs sont un avis et il n'y en a pas ici.
+ */
+export function traceColors(contrast) {
+  const on = (key) => mapToken(`--map-${contrast}-${key}`)
+  return {
+    safe: on('safe'),
+    caution: on('caution'),
+    risk: on('risk'),
+    ghost: on('ghost'),
+    halo: on('halo'),
+    unknown: mapToken(contrast === 'dark' ? '--accent-light' : '--accent-deep'),
+  }
+}
+
 // --- « Nuit » : la carte sombre de CARTO, aux couleurs de l'interface --------
 
-const NIGHT_HUE = 262 // le violet de l'accent
-const WATER_HUE = 244 // l'eau tire vers l'indigo, pour se lire encore comme de l'eau
 const WATER_LAYERS = /^water/
+
+/** La teinte du fond « Nuit », et celle de son eau, prises dans les jetons. */
+const nightHues = () => ({
+  hue: Number(mapToken('--map-night-hue')),
+  water: Number(mapToken('--map-water-hue')),
+  chroma: Number(mapToken('--map-night-chroma') || 1),
+})
 
 /**
  * Chaque couleur garde sa **clarté** et ne change que de teinte : les routes
  * restent plus claires que le fond, les grands axes plus que les petites rues,
  * et toute la hiérarchie du dessin de CARTO est intacte. Seul le gris neutre
- * devient un gris violacé, qui s'accorde au panneau au lieu de le faire
- * paraître sorti d'une autre application.
+ * prend la teinte des surfaces de l'app (`--map-night-hue`), et s'accorde au
+ * panneau au lieu de le faire paraître sorti d'une autre application.
+ * `chroma` dose la saturation : 1 pour la dose d'origine.
  *
  * Le style reçu n'est pas modifié : on en rend une copie.
  */
-export function tintNight(style) {
+export function tintNight(style, { hue, water: waterHue, chroma = 1 }) {
   const layers = style.layers.map((layer) => {
     if (!layer.paint) return layer
     const water = WATER_LAYERS.test(layer.id)
     const paint = {}
     for (const [key, value] of Object.entries(layer.paint)) {
-      paint[key] = key.includes('color') ? recolor(value, water) : value
+      paint[key] = key.includes('color') ? recolor(value, water ? waterHue : hue, water, chroma) : value
     }
     return { ...layer, paint }
   })
@@ -139,18 +172,18 @@ export function tintNight(style) {
 // Descend dans les paliers (`stops`) et les expressions : une couleur peut s'y
 // trouver à n'importe quelle profondeur. Les autres chaînes — noms d'opérateurs,
 // `transparent` — ne se lisent pas comme des couleurs et passent telles quelles.
-function recolor(value, water) {
-  if (typeof value === 'string') return tint(value, water) ?? value
-  if (Array.isArray(value)) return value.map((v) => recolor(v, water))
+function recolor(value, hue, water, chroma) {
+  if (typeof value === 'string') return tint(value, hue, water, chroma) ?? value
+  if (Array.isArray(value)) return value.map((v) => recolor(v, hue, water, chroma))
   if (value && typeof value === 'object') {
     const out = {}
-    for (const [k, v] of Object.entries(value)) out[k] = recolor(v, water)
+    for (const [k, v] of Object.entries(value)) out[k] = recolor(v, hue, water, chroma)
     return out
   }
   return value
 }
 
-function tint(css, water) {
+function tint(css, hue, water, chroma) {
   const rgba = parseColor(css)
   if (!rgba) return null
   const [r, g, b, a] = rgba
@@ -158,9 +191,9 @@ function tint(css, water) {
   // Saturation dosée selon la clarté : un soupçon dans les noirs, davantage
   // dans les gris moyens (les routes), presque rien dans les clairs (les
   // libellés), qui doivent rester lisibles avant d'être jolis.
-  const sat = water ? 30 : light < 0.12 ? 24 : light < 0.5 ? 18 : 10
+  const sat = (water ? 30 : light < 0.12 ? 24 : light < 0.5 ? 18 : 10) * chroma
   const l = Math.min(1, light + (water ? 0.02 : 0))
-  return `hsla(${water ? WATER_HUE : NIGHT_HUE}, ${sat}%, ${(l * 100).toFixed(1)}%, ${a})`
+  return `hsla(${hue}, ${Math.round(sat)}%, ${(l * 100).toFixed(1)}%, ${a})`
 }
 
 function parseColor(css) {
@@ -218,7 +251,7 @@ export const MAP_STYLES = [
     contrast: 'dark',
     description: "Sombre, aux couleurs de l'app : le tracé ressort, et l'écran éblouit moins le soir.",
     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-    transform: (style) => tintNight(frenchLabels(style)),
+    transform: (style) => tintNight(frenchLabels(style), nightHues()),
   },
   {
     key: 'fiord',
@@ -341,14 +374,4 @@ export function loadOptions(entry) {
 export function offlineStyleFor(key) {
   const style = styleByKey(key)
   return style.offline === false ? styleByKey(DEFAULT_STYLE) : style
-}
-
-// Couleurs du tracé selon le niveau de risque. Le jeu « light » est plus
-// saturé : sur un fond clair, un vert pâle disparaît.
-// `unknown` : un tracé venu d'un calculateur public, que Lacet n'a pas pu
-// juger. Ni vert ni rouge — les trois autres couleurs sont un avis, et il n'y
-// en a pas ici. Le violet de l'app dit « c'est un tracé », rien de plus.
-export const TRACE_COLORS = {
-  dark: { safe: '#32D74B', caution: '#FFD426', risk: '#FF6A45', unknown: '#9B7BF0', halo: '#0A0910' },
-  light: { safe: '#0F8A2E', caution: '#B37400', risk: '#C42D0B', unknown: '#6D4FD0', halo: '#FFFFFF' },
 }

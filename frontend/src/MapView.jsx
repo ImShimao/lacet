@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import Icon from './Icon.jsx'
-import { TRACE_COLORS, loadOptions, styleByKey } from './mapStyles'
+import { loadOptions, mapToken, styleByKey, traceColors } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
@@ -308,10 +308,7 @@ export default function MapView({
   useEffect(() => {
     const m = map.current
     if (!m || !revision || !m.getLayer('route-line')) return
-    const c = TRACE_COLORS[theme]
-    m.setPaintProperty('route-line', 'line-color', colorExpression(c))
-    m.setPaintProperty('route-halo', 'line-color', c.halo)
-    m.setPaintProperty('ghost-line', 'line-color', theme === 'dark' ? '#A8B2BC' : '#3A4550')
+    paintLayers(m, theme)
   }, [theme, revision])
 
   // --- recadrage explicite --------------------------------------------------
@@ -929,8 +926,8 @@ function arrowPattern() {
     ctx.stroke()
   }
 
-  stroke(7.5, 'rgba(11, 13, 16, 0.85)')
-  stroke(3.5, '#FFFFFF')
+  stroke(7.5, mapToken('--map-arrow-casing'))
+  stroke(3.5, mapToken('--map-ink'))
   return ctx.getImageData(0, 0, width, height)
 }
 
@@ -941,9 +938,12 @@ function hatchPattern() {
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = 'rgba(240, 96, 90, 0.10)'
+  const red = mapToken('--map-zone')
+  ctx.fillStyle = red
+  ctx.globalAlpha = 0.1
   ctx.fillRect(0, 0, size, size)
-  ctx.strokeStyle = 'rgba(240, 96, 90, 0.75)'
+  ctx.globalAlpha = 0.75
+  ctx.strokeStyle = red
   ctx.lineWidth = 2.5
   ctx.beginPath()
   // Trois traits pour que la diagonale se raccorde d'une tuile à l'autre.
@@ -965,15 +965,39 @@ const colorExpression = (c) => [
   c.safe,
 ]
 
-function addLayers(m) {
-  const c = TRACE_COLORS.dark
+/**
+ * Les couleurs de tout ce que l'app dessine sur la carte, prises dans les
+ * jetons de l'interface (`styles/01-base.css`). Reposées à chaque changement
+ * de fond, de thème ou d'accent : MapLibre garde sinon celles du moment où la
+ * couche a été créée. Le tracé suit le fond (`contrast`) ; ce qui porte la
+ * couleur de l'app — la pastille du survol, sa traînée — suit l'accent.
+ */
+function paintLayers(m, contrast) {
+  const c = traceColors(contrast)
+  const accent = c.unknown
+  const set = (layer, key, value) => m.getLayer(layer) && m.setPaintProperty(layer, key, value)
+  set('accuracy-fill', 'fill-color', mapToken('--map-accuracy'))
+  set('ghost-line', 'line-color', c.ghost)
+  set('route-halo', 'line-color', c.halo)
+  set('route-line', 'line-color', colorExpression(c))
+  set('flown-glow', 'line-color', accent)
+  set('flown-line', 'line-color', mapToken('--map-flown'))
+  set('crossing-dots', 'circle-color', mapToken('--map-ink'))
+  set('crossing-dots', 'circle-stroke-color', ['case', ['get', 'protected'], c.caution, c.risk])
+  set('cursor-dot', 'circle-color', accent)
+  set('cursor-dot', 'circle-stroke-color', mapToken('--map-ink'))
+  set('zones-line', 'line-color', mapToken('--map-zone'))
+  set('zones-off', 'line-color', c.ghost)
+}
 
+// Les couleurs des couches sont posées par `paintLayers`, juste après.
+function addLayers(m) {
   m.addSource('accuracy', { type: 'geojson', data: empty() })
   m.addLayer({
     id: 'accuracy-fill',
     type: 'fill',
     source: 'accuracy',
-    paint: { 'fill-color': '#4A9EFF', 'fill-opacity': 0.12 },
+    paint: { 'fill-opacity': 0.12 },
   })
 
   m.addSource('ghost', { type: 'geojson', data: empty() })
@@ -985,7 +1009,6 @@ function addLayers(m) {
     source: 'ghost',
     layout: { 'line-cap': 'butt', 'line-join': 'round' },
     paint: {
-      'line-color': '#A8B2BC',
       'line-width': 3,
       'line-opacity': 0.8,
       'line-dasharray': [2, 1.6],
@@ -1007,14 +1030,14 @@ function addLayers(m) {
     type: 'line',
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': c.halo, 'line-width': 9, 'line-opacity': 0.85 },
+    paint: { 'line-width': 9, 'line-opacity': 0.85 },
   })
   m.addLayer({
     id: 'route-line',
     type: 'line',
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': colorExpression(c), 'line-width': 5 },
+    paint: { 'line-width': 5 },
   })
 
   // Le sens de parcours. Il n'est pas décoratif : les consignes de navigation,
@@ -1043,21 +1066,21 @@ function addLayers(m) {
   })
 
   // La traînée du survol : la part de boucle déjà parcourue par la pastille,
-  // blanche cernée de violet, au-dessus du tracé que le survol atténue.
+  // blanche cernée de l'accent, au-dessus du tracé que le survol atténue.
   m.addSource('flown', { type: 'geojson', data: empty() })
   m.addLayer({
     id: 'flown-glow',
     type: 'line',
     source: 'flown',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#8B5CF6', 'line-width': 14, 'line-opacity': 0.55, 'line-blur': 4 },
+    paint: { 'line-width': 14, 'line-opacity': 0.55, 'line-blur': 4 },
   })
   m.addLayer({
     id: 'flown-line',
     type: 'line',
     source: 'flown',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#F2F0F7', 'line-width': 5 },
+    paint: { 'line-width': 5 },
   })
 
   m.addSource('crossings', { type: 'geojson', data: empty() })
@@ -1067,9 +1090,7 @@ function addLayers(m) {
     source: 'crossings',
     paint: {
       'circle-radius': 6,
-      'circle-color': '#FFFFFF',
       'circle-stroke-width': 3,
-      'circle-stroke-color': ['case', ['get', 'protected'], c.caution, c.risk],
     },
   })
 
@@ -1080,9 +1101,7 @@ function addLayers(m) {
     source: 'cursor',
     paint: {
       'circle-radius': 7,
-      'circle-color': '#8B5CF6',
       'circle-stroke-width': 3,
-      'circle-stroke-color': '#FFFFFF',
     },
   })
 
@@ -1105,14 +1124,14 @@ function addLayers(m) {
     type: 'line',
     source: 'zones',
     filter: ['get', 'on'],
-    paint: { 'line-color': '#F0605A', 'line-width': ['case', ['has', 'draft'], 3, 2] },
+    paint: { 'line-width': ['case', ['has', 'draft'], 3, 2] },
   }, 'ghost-line')
   m.addLayer({
     id: 'zones-off',
     type: 'line',
     source: 'zones',
     filter: ['!', ['get', 'on']],
-    paint: { 'line-color': '#A8B2BC', 'line-width': 2, 'line-dasharray': [2, 2] },
+    paint: { 'line-width': 2, 'line-dasharray': [2, 2] },
   }, 'ghost-line')
 }
 
@@ -1171,7 +1190,7 @@ function relief(m) {
     m.addSource('flyover-shade-dem', DEM)
     // Sous tout ce que l'app dessine. Plus marqué que l'ombrage d'une carte
     // claire : sur le fond sombre, à 0,35, les collines de Guebwiller ne se
-    // voyaient pas ; les versants éclairés prennent le violet de l'app.
+    // voyaient pas. Couleurs : les jetons `--map-relief-…`.
     m.addLayer(
       {
         id: 'flyover-shade',
@@ -1179,9 +1198,9 @@ function relief(m) {
         source: 'flyover-shade-dem',
         paint: {
           'hillshade-exaggeration': 0.6,
-          'hillshade-shadow-color': 'rgba(0, 0, 0, 0.7)',
-          'hillshade-highlight-color': 'rgba(183, 157, 255, 0.22)',
-          'hillshade-accent-color': 'rgba(10, 9, 16, 0.2)',
+          'hillshade-shadow-color': mapToken('--map-relief-shadow'),
+          'hillshade-highlight-color': mapToken('--map-relief-light'),
+          'hillshade-accent-color': mapToken('--map-relief-accent'),
         },
       },
       'accuracy-fill',

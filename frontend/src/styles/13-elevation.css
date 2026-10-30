@@ -16,12 +16,12 @@
   font-family: var(--mono);
 }
 .elevsheet__here {
-  stroke: #fff;
+  stroke: var(--text);
   stroke-width: 1.5;
   stroke-dasharray: 3 3;
 }
 .elevsheet__dot {
-  fill: #fff;
+  fill: var(--marker-ring);
   stroke: var(--accent);
   stroke-width: 3;
 }

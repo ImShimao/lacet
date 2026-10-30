@@ -18,14 +18,14 @@
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  border: 3px solid #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  border: 3px solid var(--marker-ring);
+  box-shadow: 0 2px 8px var(--shadow-soft);
 }
 .pin__stem {
   width: 2px;
   height: 9px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  background: var(--marker-ring);
+  box-shadow: 0 1px 4px var(--shadow-soft);
 }
 /* Le repère de position : le point, et derrière lui le faisceau de la boussole.
    `.me` est l'élément du marqueur, que MapLibre place lui-même : ne pas lui
@@ -37,8 +37,8 @@
   height: 18px;
   border-radius: 50%;
   background: var(--info);
-  border: 3px solid #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  border: 3px solid var(--marker-ring);
+  box-shadow: 0 2px 8px var(--shadow-soft);
 }
 /* Le faisceau : où pointe le téléphone, comme dans Google Maps. Un quartier de
    soixante degrés qui s'efface en s'éloignant du point — assez large pour
@@ -52,7 +52,7 @@
   height: 132px;
   margin: -66px 0 0 -66px;
   border-radius: 50%;
-  background: conic-gradient(from -30deg, rgba(74, 158, 255, 0.75) 0deg 60deg, transparent 60deg);
+  background: conic-gradient(from -30deg, color-mix(in srgb, var(--info) 75%, transparent) 0deg 60deg, transparent 60deg);
   -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent);
   mask-image: radial-gradient(closest-side, #000 35%, transparent);
   pointer-events: none;
@@ -68,8 +68,8 @@
   height: 28px;
   border-width: 4px;
   box-shadow:
-    0 0 0 6px rgba(88, 166, 255, 0.18),
-    0 3px 12px rgba(0, 0, 0, 0.6);
+    0 0 0 6px color-mix(in srgb, var(--info) 18%, transparent),
+    0 3px 12px var(--shadow-soft);
 }
 /* Sans boussole, il porte une pointe dans le sens du tracé : c'est elle qu'on
    cherche du regard pour savoir où tourner, comme la flèche d'un GPS. */
@@ -82,7 +82,7 @@
   border-left: 11px solid transparent;
   border-right: 11px solid transparent;
   border-bottom: 17px solid var(--info);
-  filter: drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(0 -1.5px 0 var(--marker-ring)) drop-shadow(0 1px 3px var(--shadow-soft));
 }
 
 /* ══ le compte à rebours ══════════════════════════════════════════════════ */
@@ -96,7 +96,7 @@
   align-content: center;
   justify-items: center;
   gap: 28px;
-  background: rgba(10, 9, 14, 0.82);
+  background: var(--scrim-strong);
   backdrop-filter: blur(6px);
   animation: countdown-in 180ms ease-out;
 }
@@ -108,7 +108,7 @@
   height: 168px;
   border-radius: 50%;
   border: 3px solid var(--accent);
-  background: radial-gradient(circle at 50% 45%, rgba(139, 92, 246, 0.28), transparent 70%);
+  background: radial-gradient(circle at 50% 45%, var(--accent-soft), transparent 70%);
   /* Une clé qui change à chaque chiffre relance l'animation : le cercle enfle
      et s'efface, comme un battement. */
   animation: countdown-beat 900ms cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -119,8 +119,8 @@
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: #fff;
-  text-shadow: 0 4px 24px rgba(139, 92, 246, 0.5);
+  color: var(--text);
+  text-shadow: 0 4px 24px var(--accent-glow);
 }
 
 /* « Partez ! » tient en toutes lettres : il lui faut moins de place par lettre
@@ -229,7 +229,7 @@
   padding: 9px 12px;
   border-radius: 12px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 700;
 }
@@ -253,13 +253,13 @@
   padding: 11px 18px;
   border-radius: 999px;
   border: 1px solid var(--accent-line);
-  background: rgba(19, 17, 26, 0.94);
+  background: var(--glass);
   backdrop-filter: blur(10px);
   color: var(--text);
   font: inherit;
   font-weight: 700;
   font-size: 14px;
-  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 8px 24px -8px var(--shadow);
 }
 .recenter .icon {
   color: var(--accent-text);
@@ -267,7 +267,7 @@
 
 .maplibregl-ctrl-attrib {
   font-size: 9px;
-  background: rgba(10, 9, 16, 0.72) !important;
+  background: var(--glass) !important;
 }
 .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
   margin: 0 0 10px 12px;
@@ -279,28 +279,18 @@
   min-height: 20px;
   border-radius: 13px;
   border: 1px solid var(--line);
-  background: rgba(19, 17, 26, 0.9) !important;
+  background: var(--glass) !important;
   color: var(--text-3);
 }
+/* Le « i » est dessiné en noir par MapLibre : sur une pastille sombre, on
+   l'inverse. Elle prend la surface du thème, comme les autres boutons posés
+   sur la carte, quel que soit le fond dessous. */
 .maplibregl-ctrl-attrib-button {
   background-color: transparent !important;
-  /* Le « i » est dessiné en noir : inversé, il passe en clair sur le noir. */
-  filter: invert(1) opacity(0.62);
+  filter: var(--attrib-icon);
 }
 .maplibregl-ctrl-attrib a {
   color: var(--text-3) !important;
-}
-[data-map='light'] .maplibregl-ctrl-attrib {
-  background: rgba(255, 255, 255, 0.78) !important;
-}
-[data-map='light'] .maplibregl-ctrl-attrib a {
-  color: #444 !important;
-}
-[data-map='light'] .maplibregl-ctrl-attrib.maplibregl-compact {
-  border-color: rgba(0, 0, 0, 0.12);
-}
-[data-map='light'] .maplibregl-ctrl-attrib-button {
-  filter: opacity(0.7);
 }
 
 /* ══ écran d'erreur ════════════════════════════════════════════════════ */
@@ -343,10 +333,10 @@
   transform-origin: bottom left;
   display: grid;
   place-items: center;
-  background: #fff;
+  background: var(--marker-ring);
   color: var(--accent);
   border: 2px solid var(--accent);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 3px 10px var(--shadow-soft);
   cursor: grab;
 }
 .viapin svg {
@@ -361,10 +351,10 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #fff;
-  color: #f0605a;
-  border: 2px solid #f0605a;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  background: var(--marker-ring);
+  color: var(--map-zone);
+  border: 2px solid var(--map-zone);
+  box-shadow: 0 3px 10px var(--shadow-soft);
   cursor: grab;
 }
 .zonepin:active {
@@ -387,9 +377,9 @@
   padding: 4px 4px 4px 12px;
   border-radius: 999px;
   border: 1px solid var(--accent-line);
-  background: rgba(27, 24, 36, 0.94);
+  background: var(--glass);
   backdrop-filter: blur(12px);
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 10px 26px -12px var(--shadow);
   font-size: 13px;
   font-weight: 600;
   color: var(--accent-text);

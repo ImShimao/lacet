@@ -18,7 +18,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
 }
 .modal__panel {
@@ -30,7 +30,7 @@
   max-height: 92cqh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 30px 70px -20px var(--shadow);
   animation: sheet-up 0.22s ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -188,7 +188,7 @@
   width: 26px;
   height: 18px;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
 }
 .mapsheet__opt[aria-checked='true'] {
   background: var(--surface-3);
@@ -212,7 +212,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(5, 4, 9, 0.62);
+  background: var(--scrim);
   animation: infosheet-fade 0.18s ease-out;
 }
 .infosheet__panel {
@@ -227,7 +227,7 @@
   border: 1px solid var(--line);
   border-bottom: none;
   background: var(--surface);
-  box-shadow: 0 -18px 48px -12px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 -18px 48px -12px var(--shadow);
   animation: infosheet-rise 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .infosheet__panel h3 {
@@ -325,7 +325,7 @@
   color: var(--accent-text);
 }
 .tile--on {
-  border-color: #8b5cf6;
+  border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
 }
@@ -374,14 +374,14 @@
   color: transparent;
 }
 .check--on {
-  border-color: #8b5cf6;
+  border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
 }
 .check--on .check__box {
-  background: #8b5cf6;
-  border-color: #8b5cf6;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .stepper {

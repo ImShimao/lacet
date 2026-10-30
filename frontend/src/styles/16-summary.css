@@ -69,8 +69,8 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--caution);
-  background: rgba(255, 212, 38, 0.1);
-  border: 1px solid rgba(255, 212, 38, 0.3);
+  background: var(--caution-soft);
+  border: 1px solid var(--caution-line);
 }
 
 /* Les gestes de la fin, collés au bas comme la barre d'Explorer : « Terminer »
@@ -83,7 +83,7 @@
   gap: 8px;
   margin: 0 -18px;
   padding: 14px 18px 12px;
-  background: linear-gradient(to bottom, rgba(19, 17, 26, 0), var(--surface) 16px);
+  background: linear-gradient(to bottom, transparent, var(--surface) 16px);
 }
 .summary__actions .btn--primary {
   flex: 1;
@@ -102,7 +102,7 @@
 .banner--resume .banner__act {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .banner--resume .banner__act--soft {
   background: none;
@@ -122,7 +122,7 @@
   padding-left: 26px;
 }
 .shell[data-sheet='peek'] .banner--resume {
-  background: #1d1730;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
 /* Le croquis de la trace, qui se dessine en arrivant : départ marqué d'un point. */
@@ -143,7 +143,7 @@
 }
 .sketch circle {
   fill: var(--accent);
-  stroke: #fff;
+  stroke: var(--marker-ring);
   stroke-width: 2;
 }
 @keyframes sketch-draw {

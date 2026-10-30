@@ -24,8 +24,8 @@
 }
 
 .live__alert {
-  background: rgba(255, 212, 38, 0.13);
-  border: 1px solid rgba(255, 212, 38, 0.32);
+  background: var(--caution-soft);
+  border: 1px solid var(--caution-line);
   color: var(--caution);
   padding: 11px 13px;
   border-radius: var(--r);
@@ -36,8 +36,8 @@
   gap: 9px;
 }
 .live__error {
-  background: rgba(255, 106, 69, 0.1);
-  border: 1px solid rgba(255, 106, 69, 0.28);
+  background: var(--risk-soft);
+  border: 1px solid var(--risk-line);
   padding: 11px 13px;
   border-radius: var(--r);
   font-size: 12.5px;
@@ -87,7 +87,7 @@
 .btn--sos {
   position: relative;
   color: var(--risk);
-  border-color: rgba(255, 106, 69, 0.35);
+  border-color: var(--risk-line);
   overflow: hidden;
   touch-action: none;
 }
@@ -166,8 +166,8 @@
 }
 
 .notice--warn {
-  background: rgba(255, 212, 38, 0.11);
-  border-color: rgba(255, 212, 38, 0.3);
+  background: var(--caution-soft);
+  border-color: var(--caution-line);
 }
 
 /* Feuille modale légère — le contact d'urgence, demandé au pire moment. */
@@ -178,7 +178,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   padding: 16px;
 }
@@ -191,7 +191,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 30px 70px -20px var(--shadow);
 }
 .sheet__panel h3 {
   margin: 0;

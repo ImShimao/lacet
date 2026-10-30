@@ -46,23 +46,23 @@
   border: 1px solid transparent;
 }
 .grade--A {
-  background: rgba(50, 215, 75, 0.13);
+  background: var(--safe-soft);
   color: var(--safe);
-  border-color: rgba(50, 215, 75, 0.28);
+  border-color: var(--safe-line);
 }
 .grade--B {
-  background: rgba(255, 212, 38, 0.13);
+  background: var(--caution-soft);
   color: var(--caution);
-  border-color: rgba(255, 212, 38, 0.28);
+  border-color: var(--caution-line);
 }
 .grade--free {
   background: var(--surface-3);
   color: var(--text-3);
 }
 .grade--C {
-  background: rgba(255, 106, 69, 0.13);
+  background: var(--risk-soft);
   color: var(--risk);
-  border-color: rgba(255, 106, 69, 0.28);
+  border-color: var(--risk-line);
 }
 
 /* Pas de note du tout : un tracé de secours, que Lacet n'a pas pu juger. En
@@ -323,7 +323,7 @@
   background: var(--caution);
 }
 .s--trail {
-  background: #c58b4a;
+  background: var(--trail);
 }
 .s--unknown {
   background: var(--text-3);
@@ -425,7 +425,7 @@
 }
 .offline--on {
   color: var(--safe);
-  border-color: rgba(50, 215, 75, 0.34);
+  border-color: var(--safe-line);
 }
 /* Carte gardée sous un autre fond que celui affiché : disponible, mais pas
    pour ce que l'on regarde. Ni vert rassurant, ni rouge alarmant. */
@@ -435,7 +435,7 @@
 }
 .offline--warn {
   color: var(--caution);
-  border-color: rgba(255, 212, 38, 0.34);
+  border-color: var(--caution-line);
 }
 .offline--busy {
   position: relative;
@@ -485,12 +485,12 @@
   padding: 12px 14px;
   font-size: 13px;
   line-height: 1.45;
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.24);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
 }
 .notice--error {
-  background: rgba(255, 106, 69, 0.1);
-  border-color: rgba(255, 106, 69, 0.28);
+  background: var(--risk-soft);
+  border-color: var(--risk-line);
 }
 .disclaimer {
   margin: 0;
