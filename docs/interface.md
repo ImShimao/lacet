@@ -15,6 +15,31 @@ Le cadrage d'une boucle tient compte de tout ce qui flotte — la recherche, la
 pastille d'activité, les boutons, le panneau du bas — pour qu'aucune partie du
 tracé ne passe dessous (`dockPadding` dans `MapView.jsx`).
 
+**L'habillage** est sobre : des gris ardoise neutres, un seul accent (bleu par
+défaut), des aplats plutôt que des dégradés, et une seule police, Inter, dont
+les chiffres à chasse fixe alignent les colonnes. Contrastes mesurés selon
+WCAG : AA au moins pour tout texte, au-delà de 7:1 (AAA) pour les chiffres de
+course, dans les deux thèmes. Le vert, le jaune et le rouge de la sécurité
+restent fixes, quel que soit l'accent, et ont été choisis pour rester
+distincts en deutéranopie et en protanopie : le vert tire vers le bleu, le
+jaune reste le plus clair, le rouge le plus sombre — et la note se lit aussi
+en lettre (A, B, C).
+
+Toutes les couleurs passent par des jetons CSS (`styles/01-base.css`), carte
+comprise : MapLibre ne lisant pas le CSS, `MapView.jsx` relit les jetons
+`--map-…` (`mapToken`, `traceColors` dans `mapStyles.js`) et repeint le
+tracé, les pointillés des autres propositions, la pastille du survol et sa
+traînée quand l'accent, le thème ou le fond changent.
+
+**Une icône, un sens.** Le fichier fléché exporte (GPX, sauvegarde) ou
+importe (GPX, restauration) ; le partage d'iOS partage ; la flèche vers le bas
+ne sert plus qu'à garder une carte hors ligne ; les flèches croisées proposent
+d'autres boucles, la boucle fléchée dit les tours, l'horloge « déjà couru »,
+et l'arc qui tourne une préparation en cours. Dans la barre d'action, chaque
+icône porte son mot dessous — Favori, GPX, Sens, Autres — à côté de
+« Démarrer » ; sur un écran de 320 px, les boutons cèdent quatre pixels et
+« Démarrer » son triangle.
+
 **La bande de parcours** est l'élément central. Elle superpose le profil
 altimétrique et le niveau de sécurité sur le même axe — celui de la distance —
 parce que les deux ne se lisent pas séparément : savoir qu'il y a 200 m
@@ -23,8 +48,10 @@ doigt, le point correspondant s'allume sur la carte.
 
 **Fonds de carte** — cinq styles sans clé d'API : Nuit (le sombre de CARTO aux
 couleurs de l'app), Clair, Plan, Relief et Satellite, plus trois fonds Mapbox
-avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent
-(un vert pâle disparaîtrait sur de l'imagerie satellite).
+avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent au
+fond, pas au thème : sur un fond clair, le tracé est cerné de sombre, et le
+jaune s'y lit encore. Tant qu'on n'a pas choisi de fond, le thème clair part
+du fond Clair et le sombre de Nuit.
 
 **Le point de départ** se pose de trois façons : le bouton de position, la
 recherche d'adresse, ou directement sur la carte — le repère se fait glisser, et
@@ -93,10 +120,10 @@ suite, ni quand l'iPhone demande de réduire les animations.
 
 **Le survol 3D** : le bouton « 3D » de la colonne de droite fait voler la carte
 le long de la boucle choisie, inclinée sur le relief, de la porte à la porte —
-dix-sept secondes pour 10 km. Une pastille violette court sur le tracé,
+dix-sept secondes pour 10 km. Une pastille à la couleur d'accent court sur le tracé,
 la caméra la suit en tournant doucement aux virages, la part déjà parcourue
 s'allume en blanc, et un compteur en haut donne les kilomètres et l'altitude.
-Le relief (Terrain Tiles d'AWS, zoom 12, exagéré 1,5×, ombrage teinté violet)
+Le relief (Terrain Tiles d'AWS, zoom 12, exagéré 1,5×, ombrage neutre)
 n'est chargé que le temps du survol : hors ligne, ou si une tuile d'altitude
 échoue, le survol se fait à plat. Toucher la carte met en pause et reprend ; la
 faire glisser ou le bouton d'arrêt le termine, et la carte revient à plat sur
@@ -117,6 +144,15 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 10 km, note A » — parce que le reste de l'interface change en silence.
 
 ## Réglages
+
+**Mon compte › Apparence** règle la couleur d'accent (bleu, le violet
+d'origine, framboise, graphite), le thème — sombre, clair, ou « Auto », qui
+suit l'iPhone en direct — et la taille du texte (normale ou grande, +15 % ;
+les très grands chiffres de course ne bougent pas). Le choix se pose en
+attributs sur `<html>` avant le premier rendu (`appearance.js`, appelé par
+`main.jsx`), sans passer par les couleurs d'origine ; la barre d'état d'iOS
+suit le thème. Il est gardé dans le magasin de l'app : « Tout effacer » le
+remet à zéro, une restauration le reprend.
 
 Dans l'app, **Mon compte › Recherche** choisit les **filtres affichés** : une
 case par filtre (Activité, Terrain, Dénivelé, Direction, Sécurité, Éviter). La
@@ -154,6 +190,7 @@ tierces comme MapLibre ; la formule gratuite couvre largement un usage
 personnel. Leur feuille de style vectorielle, elle, désigne ses données par des
 adresses `mapbox://` que MapLibre ne sait pas lire.
 
-Sans jeton, le fond par défaut est **Nuit** : la carte sombre de CARTO, recolorée
-au chargement aux teintes de l'interface — gratuit, mondial, sans clé. Tous ces
+Sans jeton, le fond par défaut est **Nuit** (ou **Clair** en thème clair) : la
+carte sombre de CARTO, recolorée au chargement dans l'ardoise de l'interface —
+elle ne prend pas la couleur de l'accent — gratuit, mondial, sans clé. Tous ces
 fonds dessinent les mêmes données OpenStreetMap ; ce qui change, c'est le rendu.

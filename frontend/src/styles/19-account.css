@@ -226,3 +226,11 @@
   background: var(--accent-soft);
   color: var(--text);
 }
+
+/* Petit écran, texte agrandi : « kilomètres » débordait de sa case de
+   quatre pixels. Les cases rendent un peu de leur marge intérieure. */
+@container lacet (max-width: 380px) {
+  .acct__stats > div {
+    padding-inline: 7px;
+  }
+}

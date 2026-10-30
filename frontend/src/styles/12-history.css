@@ -389,5 +389,8 @@
 }
 .runctl__main--paused {
   background: var(--safe-fill);
+  /* Blanc sur le vert, quel que soit l'accent : en graphite, le texte
+     d'accent est sombre et se perdait sur ce vert. */
+  color: var(--on-color);
   box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--safe-fill) 60%, transparent);
 }
