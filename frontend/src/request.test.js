@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULTS } from './FiltersSheet.jsx'
-import { freeRunName, runEntry, toRequest } from './request'
+import { freeRunName, runEntry, summarise, toRequest } from './request'
 
 const start = { lat: 47.9, lon: 7.2 }
 
@@ -49,6 +49,22 @@ describe('la demande au moteur', () => {
     // Au-delà de ce que le moteur accepte, l'allure s'arrête à sa borne.
     expect(toRequest({ ...course, speed_kmh: 40 }, start).pace_sec_per_km).toBe(150)
     expect(toRequest({ ...DEFAULTS, sport: 'bike', speed_kmh: 22 }, start).speed_kmh).toBe(22)
+  })
+
+  it('envoie la forme choisie, et rien en « Auto »', () => {
+    expect(toRequest(DEFAULTS, start)).not.toHaveProperty('form')
+    expect(toRequest({ ...DEFAULTS, form: 'eight', laps: 4 }, start)).toMatchObject({ form: 'eight' })
+    expect(toRequest({ ...DEFAULTS, form: 'eight', laps: 4 }, start)).not.toHaveProperty('laps')
+    expect(toRequest({ ...DEFAULTS, form: 'laps', laps: 4 }, start)).toMatchObject({ form: 'laps', laps: 4 })
+  })
+})
+
+describe('la pastille d’activité', () => {
+  it('dit la forme choisie, et rien en « Auto »', () => {
+    expect(summarise({ ...DEFAULTS, mode: 'distance', distance_km: 10 })).toBe('10 km · 6:30/km')
+    expect(summarise({ ...DEFAULTS, mode: 'distance', distance_km: 10, form: 'laps', laps: 3 })).toBe('10 km · 3 tours · 6:30/km')
+    expect(summarise({ ...DEFAULTS, mode: 'duration', duration_min: 60, form: 'eight' })).toBe('≈9 km · deux boucles · 6:30/km')
+    expect(summarise({ ...DEFAULTS, form: 'loop' })).toContain('une boucle')
   })
 })
 

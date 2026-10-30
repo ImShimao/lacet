@@ -138,6 +138,28 @@ describe('le panneau des filtres', () => {
     expect(screen.getByText('Dénivelé')).toBeInTheDocument()
   })
 
+  it('choisit la forme, et dit la longueur de chaque tour', () => {
+    // « Une boucle, deux boucles ou plusieurs tours » : le moteur choisissait seul.
+    const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
+    expect(screen.getByRole('button', { name: 'Forme auto' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '2 boucles' }))
+    expect(screen.getByText(/Deux boucles d'environ 5 km, de deux côtés du départ/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tours' }))
+    expect(screen.getByText('2 tours')).toBeInTheDocument()
+    // Le compteur de tours vient après la distance et l'allure.
+    const plus = screen.getAllByRole('button', { name: 'Augmenter' })
+    fireEvent.click(plus[2])
+    expect(screen.getByText(/environ 3,3 km, à faire 3 fois/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0]).toMatchObject({ form: 'laps', laps: 3 })
+  })
+
+  it('prévient quand les tours seraient trop courts', () => {
+    ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 5, form: 'laps', laps: 4 })
+    expect(screen.getByText(/4 tours de 1,3 km : trop courts/)).toBeInTheDocument()
+  })
+
   it('réinitialise les filtres sans réafficher ceux qu’on a masqués', () => {
     const { onApply } = ouvrir({ ...DEFAULTS, hiddenFilters: ['avoid'], count: 12, surface: 'trail' })
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))

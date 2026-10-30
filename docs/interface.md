@@ -50,7 +50,15 @@ avec l'heure — c'est le moment où une rue sans éclairage ni trottoir devient
 dangereuse.
 
 **Avant de chercher**, le bouton « Filtres » dit ce qu'on va chercher —
-« 10 km · 6:30/km » — sans avoir à l'ouvrir.
+« 10 km · 6:30/km », « 10 km · 3 tours · 6:30/km » — sans avoir à l'ouvrir.
+
+**La forme de la sortie** se choisit dans les filtres, sous la longueur : Auto,
+1 boucle, 2 boucles (un « 8 » qui repasse au départ) ou Tours, avec le nombre de
+tours. La ligne dit ce que ça donnera à cette longueur — « Une boucle d'environ
+3,3 km, à faire 3 fois en repassant au départ » — et prévient quand un tour
+tomberait sous 1,5 km. Une forme choisie est tenue strictement : s'il n'y en a
+pas d'ici, l'app le dit au lieu d'en proposer une autre (voir
+[generation.md](generation.md#choisir-la-forme)).
 
 **Mes parcours** montre le croquis de chaque sortie et de chaque favori à la
 place d'une icône : dix « Boucle sud-ouest » se reconnaissent à leur dessin. Une
@@ -119,7 +127,7 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 ## Réglages
 
 Dans l'app, **Mon compte › Recherche** choisit les **filtres affichés** : une
-case par filtre (Activité, Terrain, Dénivelé, Direction, Sécurité, Éviter). La
+case par filtre (Activité, Forme, Terrain, Dénivelé, Direction, Sécurité, Éviter). La
 longueur et l'allure restent toujours. Un filtre masqué revient à sa valeur par
 défaut, écrite sous la case — sauf l'activité, qui garde la sienne. **Pendant la
 sortie › Écran** laisse l'écran se mettre en veille (téléphone au brassard) au

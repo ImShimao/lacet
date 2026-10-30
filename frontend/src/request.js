@@ -51,6 +51,9 @@ export function toRequest(p, start) {
   // « Auto » ne se dit pas : sans cap, la recherche est celle d'avant.
   const direction = directionOf(p.direction)
   if (direction) body.heading = direction.deg
+  // « Auto » non plus : c'est la forme que le moteur choisit de lui-même.
+  if (p.form && p.form !== 'auto') body.form = p.form
+  if (p.form === 'laps') body.laps = p.laps ?? 2
   if (point.street) body.street = point.street
   if (p.mode === 'distance') body.distance_km = p.distance_km
   else body.duration_min = p.duration_min
@@ -65,7 +68,10 @@ export function toRequest(p, start) {
   return body
 }
 
-/** « 10 km · 6:30/km » — ce que dit la pastille d'activité. */
+// La forme choisie, dite sur la pastille : « Auto » ne se dit pas.
+const FORM_WORDS = { loop: 'une boucle', eight: 'deux boucles' }
+
+/** « 10 km · 3 tours · 6:30/km » — ce que dit la pastille d'activité. */
 export function summarise(p) {
   const race = p.mode === 'distance' ? raceOf(p.distance_km) : null
   const dist = race
@@ -77,7 +83,8 @@ export function summarise(p) {
     p.sport === 'bike' || p.speedUnit === 'speed'
       ? `${p.speed_kmh} km/h`
       : `${pace(p.pace_sec_per_km)}/km`
-  return `${dist} · ${speed}`
+  const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
+  return [dist, form, speed].filter(Boolean).join(' · ')
 }
 
 /** Entrée d'historique d'une sortie sans itinéraire. */

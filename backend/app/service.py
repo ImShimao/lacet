@@ -30,6 +30,7 @@ from .models import (
     ElevationPoint,
     ElevationPref,
     Instruction,
+    LoopForm,
     LoopRequest,
     LoopResponse,
     Rejected,
@@ -267,6 +268,11 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         timings[name] = round(time.perf_counter() - started - previous, 2)
 
     target_m = req.distance_km * 1000.0
+    # Une forme demandée trop courte pour ses tours se refuse avant tout
+    # téléchargement : elle ne se trouverait nulle part.
+    refusal = _form_refusal(req, target_m)
+    if refusal:
+        raise PlanningError(refusal)
 
     # --- données ----------------------------------------------------------
     # Une boucle de longueur L ne s'éloigne jamais de plus de L/2 à vol d'oiseau,
@@ -352,6 +358,8 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     wind_task = asyncio.ensure_future(current_wind(req.lat, req.lon))
 
     # --- génération -------------------------------------------------------
+    # Un « 8 » ou des tours n'ont que faire des boucles de toute la distance :
+    # on ne les trace pas, et seuls les tours sont cherchés (`_collect`).
     raw = generate_loops(
         graph,
         start,
@@ -362,7 +370,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
         tolerance=req.tolerance,
         terrain=terrain,
         climb_fit=climb_fit,
-    )
+    ) if req.form in (LoopForm.auto, LoopForm.loop) else []
     log.info("%d candidats bruts", len(raw))
     lap("routing")
 
@@ -504,7 +512,7 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
             "détail des portions exposées — à toi de juger."
         )
     elif not routes:
-        meta["message"] = _no_result_message(req, rejected, off_target)
+        meta["message"] = _form_message(req, target_m, _no_result_message(req, rejected, off_target))
 
     return LoopResponse(routes=routes, rejected=rejected[:6], meta=meta)
 
@@ -526,6 +534,10 @@ def _collect(
     D'abord les boucles entières, dédoublonnées. Puis, s'il en manque, des
     boucles plus courtes à parcourir plusieurs fois — à seuils **identiques**,
     jamais relâchés.
+
+    Une forme demandée se tient strictement : « une boucle » ne complète jamais
+    la liste de tours, et « deux boucles » ou « tours » ne reçoivent que ça —
+    `raw` est alors vide.
     """
     passed, rejected, off_target, spurned = _apply_gate(raw, lo, hi, mode, req.sport.value)
     passed.sort(key=lambda c: -preliminary_score(c, target_m, req.tolerance))
@@ -536,7 +548,7 @@ def _collect(
             continue
         unique.append(cand)
 
-    if len(unique) < req.limit:
+    if len(unique) < req.limit and req.form is not LoopForm.loop:
         looped = _lap_options(
             graph, start, req, profile, target_m, mode, req.limit - len(unique), terrain
         )
@@ -570,7 +582,7 @@ def _lap_options(
     """
     out: list[Candidate] = []
 
-    for laps in LAP_DIVISORS:
+    for laps in _lap_divisors(req):
         if len(out) >= needed:
             break
         lap_target = target_m / laps
@@ -590,8 +602,12 @@ def _lap_options(
         passed, _rejected, _off, _spurned = _apply_gate(raw, lo, hi, mode, req.sport.value)
         passed.sort(key=lambda c: -preliminary_score(c, lap_target, req.tolerance))
 
-        if laps == 2:
+        # Un « 8 » quand on veut deux boucles, ou que le moteur choisit seul ;
+        # jamais quand on a demandé deux tours de la même.
+        if laps == 2 and req.form is not LoopForm.laps:
             out.extend(_figure_eights(graph, start, passed, mode, req, needed - len(out)))
+        if req.form is LoopForm.eight:
+            continue
 
         for cand in passed:
             if len(out) >= needed:
@@ -607,6 +623,67 @@ def _lap_options(
             out.append(repeated)
 
     return out
+
+
+def _lap_divisors(req: LoopRequest) -> tuple[int, ...]:
+    """Les nombres de tours à essayer : ceux que le moteur choisit seul, ou
+    celui de la forme demandée."""
+    if req.form is LoopForm.eight:
+        return (2,)
+    if req.form is LoopForm.laps:
+        return (req.laps,)
+    return LAP_DIVISORS
+
+
+def _form_refusal(req: LoopRequest, target_m: float) -> str | None:
+    """Pourquoi la forme demandée ne peut pas faire cette distance, ou `None`.
+
+    Un tour plus court que `MIN_LAP_M` n'est jamais proposé : chercher pour
+    finir sur « rien » laisserait croire que c'est le coin qui manque de rues.
+    """
+    floor = f"{MIN_LAP_M / 1000.0:.1f}".replace(".", ",")
+    if req.form is LoopForm.eight and target_m / 2.0 < MIN_LAP_M:
+        half = f"{target_m / 2000.0:.1f}".replace(".", ",")
+        return (
+            f"Deux boucles de {half} km : sous {floor} km, une boucle n'est plus qu'un tour "
+            f"de pâté de maisons. Vise au moins {2.0 * MIN_LAP_M / 1000.0:.0f} km, ou choisis "
+            "une seule boucle."
+        )
+    if req.form is LoopForm.laps and target_m / req.laps < MIN_LAP_M:
+        lap = f"{target_m / req.laps / 1000.0:.1f}".replace(".", ",")
+        return (
+            f"{req.laps} tours de {lap} km : sous {floor} km, un tour n'est plus une boucle "
+            "mais une séance de piste. Choisis moins de tours, ou une distance plus longue."
+        )
+    return None
+
+
+def _form_message(req: LoopRequest, target_m: float, fallback: str) -> str:
+    """Ce qu'on dit quand la forme demandée ne donne rien.
+
+    « Rien ne tient les seuils » ne dirait pas que c'est la forme qui manque,
+    ni que « Auto » trouverait peut-être autre chose.
+    """
+    if req.form is LoopForm.eight:
+        whole = f"{target_m / 1000.0:.1f}".replace(".", ",")
+        half = f"{target_m / 2000.0:.1f}".replace(".", ",")
+        return (
+            f"Pas de « 8 » de {whole} km d'ici : il faut deux boucles d'environ {half} km, "
+            "de deux côtés du départ, qui tiennent chacune les seuils, et le réseau ne les "
+            "offre pas. Choisis « Auto », ou une autre distance."
+        )
+    if req.form is LoopForm.laps:
+        lap = f"{target_m / req.laps / 1000.0:.1f}".replace(".", ",")
+        return (
+            f"Pas de boucle d'environ {lap} km à faire {req.laps} fois d'ici qui tienne les "
+            "seuils. Choisis « Auto », un autre nombre de tours ou une autre distance."
+        )
+    if req.form is LoopForm.loop:
+        return (
+            f"{fallback} En « Auto », Lacet peut proposer à la place une boucle plus "
+            "courte, à faire plusieurs fois."
+        )
+    return fallback
 
 
 def _figure_eights(

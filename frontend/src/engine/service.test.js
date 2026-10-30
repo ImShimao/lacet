@@ -213,6 +213,31 @@ describe('la boucle', () => {
       expect(dejaVue / cand.geometry.length).toBeLessThanOrEqual(0.55)
     }
   }, 30_000)
+
+  it('tient la forme demandée, avec les réglages de l’app', async () => {
+    // La parité vérifie les formes sur le damier, sans ce que l'app ajoute :
+    // le départ devant la porte, et surtout les tirages en plus (`widen`), qui
+    // ajouteraient des boucles entières à une demande de « 8 ».
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 6, sport: 'run', limit: 4 }
+    const huits = await planLoops({ ...demande, form: 'eight' }, deps)
+    expect(huits.routes.length).toBeGreaterThan(0)
+    for (const r of huits.routes) expect(r.figure_eight).toBe(true)
+    const tours = await planLoops({ ...demande, form: 'laps', laps: 3 }, deps)
+    expect(tours.routes.length).toBeGreaterThan(0)
+    for (const r of tours.routes) expect([r.laps, r.figure_eight]).toEqual([3, false])
+    const une = await planLoops({ ...demande, form: 'loop', limit: 12 }, deps)
+    for (const r of une.routes) expect(r.laps).toBe(1)
+  }, 60_000)
+
+  it('refuse tout de suite une forme aux tours trop courts', async () => {
+    await expect(planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 5, form: 'laps', laps: 5 }, deps)).rejects.toThrow(
+      /5 tours de 1,0 km : sous 1,5 km/,
+    )
+    // En durée aussi : 15 min à 6:30/km, c'est 2,3 km, deux boucles de 1,2 km.
+    await expect(planLoops({ lat: 47.0245, lon: 4.8395, duration_min: 15, form: 'eight' }, deps)).rejects.toThrow(
+      /Deux boucles de 1,2 km/,
+    )
+  })
 })
 
 describe('le relief', () => {

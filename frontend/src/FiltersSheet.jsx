@@ -59,6 +59,23 @@ export const DIRECTIONS = [
   { key: 'NO', label: 'NO', title: 'Nord-ouest', toward: 'vers le nord-ouest', deg: 315 },
 ]
 
+/**
+ * La forme de la sortie : le moteur la choisissait seul — une boucle entière, et
+ * des tours ou un « 8 » faute de mieux. Une forme choisie est tenue strictement
+ * (`LoopRequest.form`) : plutôt rien, et le dire, qu'une autre.
+ */
+export const FORMS = [
+  // Nommé pour lui-même : la direction a aussi son « Auto ».
+  { key: 'auto', label: 'Auto', title: 'Forme auto' },
+  { key: 'loop', label: '1 boucle' },
+  { key: 'eight', label: '2 boucles' },
+  { key: 'laps', label: 'Tours' },
+]
+// Le moteur accepte de deux à dix tours, d'au moins 1,5 km chacun
+// (`MIN_LAP_M`) : en dessous, ce n'est plus une boucle mais de la piste.
+export const MAX_LAPS = 10
+const MIN_LAP_KM = 1.5
+
 /** La direction choisie, ou `null` pour « Auto » et une valeur inconnue. */
 export const directionOf = (key) => DIRECTIONS.find((d) => d.key === key && d.deg !== undefined) ?? null
 
@@ -155,6 +172,9 @@ export const DEFAULTS = {
   // Tout autour du départ : imposer un côté, c'est renoncer aux meilleures
   // boucles des trois autres.
   direction: 'auto',
+  // Le moteur choisit, et le nombre de tours proposé quand on en demande.
+  form: 'auto',
+  laps: 2,
   // Sert seulement à estimer les calories d'une sortie (onglet compte).
   weight_kg: 70,
   // Les filtres retirés du panneau (`OPTIONAL_FILTERS`). Vide : tout s'affiche,
@@ -178,6 +198,13 @@ export const DEFAULTS = {
  */
 export const OPTIONAL_FILTERS = [
   { key: 'sport', label: 'Activité', hint: 'Course ou vélo.', fixed: "L'activité du moment est gardée." },
+  {
+    key: 'form',
+    label: 'Forme',
+    hint: 'Une boucle, deux boucles ou des tours.',
+    fixed: 'Auto.',
+    reset: { form: DEFAULTS.form },
+  },
   {
     key: 'terrain',
     label: 'Terrain',
@@ -482,6 +509,21 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </div>
           </Field>
 
+          {shown('form') && (
+            <Field label="Forme">
+              <Segmented options={FORMS} value={draft.form ?? 'auto'} onChange={(form) => set({ form })} />
+              {draft.form === 'laps' && (
+                <Stepper
+                  text={`${draft.laps} tours`}
+                  onStep={(d) => set({ laps: clamp(draft.laps + d, 2, MAX_LAPS) })}
+                  canDown={draft.laps > 2}
+                  canUp={draft.laps < MAX_LAPS}
+                />
+              )}
+              <p className="field__hint">{formHint(draft, km)}</p>
+            </Field>
+          )}
+
           {shown('terrain') && (
             <Field label="Terrain" info="terrain" sport={draft.sport}>
               <div className="tiles">
@@ -659,6 +701,25 @@ export default function FiltersSheet({ value, onApply, onClose }) {
       </div>
     </div>
   )
+}
+
+/** Ce que donnera la forme choisie, à cette longueur. */
+function formHint(draft, km) {
+  const about = (v) => formatKm(Math.round(v * 10) / 10)
+  switch (draft.form) {
+    case 'loop':
+      return "Une seule boucle de toute la longueur, jamais de tours. S'il n'y en a pas d'ici, Lacet le dit."
+    case 'eight':
+      return km / 2 < MIN_LAP_KM
+        ? `Deux boucles de ${about(km / 2)} km : trop courtes, Lacet n'en cherche pas sous ${formatKm(MIN_LAP_KM)} km.`
+        : `Deux boucles d'environ ${about(km / 2)} km, de deux côtés du départ : la seconde repart de la porte.`
+    case 'laps':
+      return km / draft.laps < MIN_LAP_KM
+        ? `${draft.laps} tours de ${about(km / draft.laps)} km : trop courts, Lacet n'en cherche pas sous ${formatKm(MIN_LAP_KM)} km. Choisis moins de tours.`
+        : `Une boucle d'environ ${about(km / draft.laps)} km, à faire ${draft.laps} fois en repassant au départ.`
+    default:
+      return "Une boucle entière d'abord ; s'il en manque, Lacet complète par des tours ou deux boucles, et le dit."
+  }
 }
 
 function Field({ label, info, sport, children }) {

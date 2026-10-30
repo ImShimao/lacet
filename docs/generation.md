@@ -330,6 +330,40 @@ premier tour. Dernier tour. Repars vers le sud. » La carte affiche
 change au bon endroit. Sur les 96 recherches, 20 des 61 tours sont des 8, qui
 restent derrière toutes les boucles entières.
 
+### Choisir la forme
+
+Le moteur choisissait seul : une boucle entière d'abord, des tours ou un « 8 »
+faute de mieux. Or on sait souvent ce qu'on veut faire — repasser à la porte
+pour boire au milieu de la sortie, tourner trois fois autour du parc qu'on
+connaît, ou au contraire ne jamais repasser au même endroit. Les filtres ont donc
+une ligne « Forme » : **Auto**, **1 boucle**, **2 boucles** (un « 8 » qui repasse
+au départ) ou **Tours**, avec le nombre de tours, de deux à dix
+(`LoopRequest.form`, `laps`, `models.py`). Elle marche avec une distance comme
+avec une durée, convertie en distance avant tout le reste.
+
+**Une forme demandée se tient strictement.** « 1 boucle » ne complète jamais la
+liste de tours ; « 2 boucles » ne rend que des 8, « 3 tours » que des boucles
+d'un tiers de la distance à faire trois fois — ni 8, ni deux tours. Les boucles de
+toute la distance ne sont alors même pas tracées (`_collect`, `_lap_divisors`,
+`service.py`), et l'app ne lance pas ses tirages supplémentaires (`widen`), qui
+en ajouteraient. Tout le reste ne change pas : mêmes seuils, même portail, même
+repli annoncé sur le mode Standard.
+
+**Quand la forme est impossible, l'app le dit.** Un tour de moins de 1,5 km se
+refuse avant même de télécharger les rues : « 5 tours de 1,0 km : sous 1,5 km,
+un tour n'est plus une boucle mais une séance de piste. Choisis moins de tours,
+ou une distance plus longue. » (`_form_refusal`). Les filtres préviennent dès le
+réglage. Et si le coin n'offre rien sous cette forme, le message dit laquelle
+manque — « Pas de « 8 » de 6,0 km d'ici : il faut deux boucles d'environ 3,0 km,
+de deux côtés du départ… Choisis « Auto », ou une autre distance. » — plutôt
+qu'un « rien ne tient les seuils » qui laisserait croire que c'est la sécurité
+(`_form_message`). Pour « 1 boucle », il rappelle que « Auto » proposerait des
+tours.
+
+« Auto », la forme par défaut, ne s'envoie pas : la recherche est celle d'avant.
+Les trois autres sont partagées avec Python, et la parité les compare sur le
+damier (`damier-deux-boucles`, `damier-trois-tours`, `damier-une-boucle`).
+
 ## Le vent
 
 Finir dix kilomètres face au vent est la façon la plus sûre de gâcher les deux
