@@ -16,7 +16,7 @@
 // sans rien mesurer, et la comparaison point à point seulement sur ce qui
 // reste.
 
-import { haversineM } from './engine/geo'
+import { haversineM, resample } from './engine/geo'
 
 // Vingt-cinq mètres : la largeur d'une rue avec ses deux trottoirs, et l'ordre
 // de grandeur de l'erreur d'un GPS urbain. En dessous, deux traces de la même
@@ -121,6 +121,59 @@ export function standing(entry, history, options) {
     vsBest: Math.round(mienne - allure(meilleure)),
   }
 }
+
+// Le tracé d'une boucle déjà vue, tel qu'on le garde et qu'on le passe au
+// moteur (`familiar`, `engine/service.js`) : un point tous les cent mètres, cent
+// vingt au plus, au mètre près. Une boucle de 10 km y tient en deux kilooctets,
+// contre plusieurs dizaines pour sa géométrie.
+const TRACE_STEP_M = 100
+const TRACE_POINTS = 120
+const toMeter = (v) => Math.round(v * 1e5) / 1e5
+
+/** Le tracé gardé d'une boucle de `distanceM` mètres — voir `TRACE_STEP_M`. */
+export function traceOf(geometry, distanceM = 0) {
+  if (!geometry || geometry.length < 2) return []
+  const step = Math.max(TRACE_STEP_M, distanceM / TRACE_POINTS)
+  return resample(geometry, step).map(([, [lon, lat]]) => [toMeter(lon), toMeter(lat)])
+}
+
+/**
+ * Ce chemin est-il l'un de ces tracés ? La mesure de « déjà couru », à la
+ * densité près : un tracé gardé n'a qu'un point tous les cent mètres, et le
+ * voisinage s'élargit d'autant — un point du chemin qui le suit tombe au plus
+ * à cinquante mètres de l'un des siens.
+ */
+export function familiarTo(geometry, traces) {
+  const points = sample(geometry)
+  if (points.length < 3) return false
+  return traces.some(
+    (trace) =>
+      trace.length > 1 && coverage(points, trace, Math.max(NEAR_M, 0.6 * haversineM(trace[0], trace[1]))) >= SAME_SHARE,
+  )
+}
+
+/**
+ * Les sorties déjà courues depuis ce départ, à peu près de cette longueur, en
+ * tracés gardés : « Éviter › Boucles déjà courues » les fait passer après les
+ * neuves. La plus récente d'abord, `max` au plus.
+ */
+export function ranFrom(history, start, distanceM, max = 20) {
+  const out = []
+  for (const past of history ?? []) {
+    if (out.length >= max) break
+    const trace = past.track?.length > 1 ? past.track : past.geometry
+    const length = past.actual_distance_m || past.distance_m || 0
+    if (!trace || trace.length < 2 || !length) continue
+    if (Math.abs(length - distanceM) > distanceM * RAN_LENGTH_SHARE) continue
+    if (haversineM([start.lon, start.lat], trace[0]) > START_M) continue
+    out.push(traceOf(trace, length))
+  }
+  return out
+}
+
+// Plus large que `LENGTH_TOLERANCE` : la boucle proposée tombe déjà à ±10 % de
+// la distance demandée, et celle qu'on a courue aussi.
+const RAN_LENGTH_SHARE = 0.2
 
 /** Le tri grossier : même longueur, même départ. */
 function plausible(route, past, start, trace) {

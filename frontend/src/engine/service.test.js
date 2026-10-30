@@ -7,6 +7,7 @@ import { haversineM } from './geo'
 import { RouteStats, runGate } from './safety'
 import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute, selectVaried } from './service'
 import { Candidate, bearingGap } from './loops'
+import { familiarTo, traceOf } from '../knownRoutes'
 
 /**
  * Ce qu'on télécharge autour du départ.
@@ -227,6 +228,44 @@ describe('la boucle', () => {
     for (const r of tours.routes) expect([r.laps, r.figure_eight]).toEqual([3, false])
     const une = await planLoops({ ...demande, form: 'loop', limit: 12 }, deps)
     for (const r of une.routes) expect(r.laps).toBe(1)
+  }, 60_000)
+
+  it('varie d’une recherche à l’autre, et pas à graine égale', async () => {
+    // « Quand on génère des boucles deux fois, ce ne sont pas les mêmes qui
+    // sortent, qui plus est dans le même ordre » : sans graine, le moteur
+    // rendait exactement la même liste à chaque fois.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5 }
+    const liste = (r) => r.routes.map((route) => route.geometry.length + ':' + route.distance_m).join(' ')
+    const a = await planLoops({ ...demande, seed: 11 }, deps)
+    expect(liste(await planLoops({ ...demande, seed: 11 }, deps))).toBe(liste(a))
+    const autres = await Promise.all([12, 13, 14].map((seed) => planLoops({ ...demande, seed }, deps)))
+    for (const b of autres) expect(liste(b)).not.toBe(liste(a))
+    // Le hasard départage des boucles de qualité proche, jamais une note.
+    for (const r of [a, ...autres]) {
+      const notes = r.routes.map((route) => route.safety.grade)
+      expect([...notes].sort()).toEqual(notes)
+    }
+  }, 60_000)
+
+  it('ne remet pas en tête une boucle qu’on vient de montrer', async () => {
+    // En « Route », Beaune offre bien plus de cinq boucles notées A et dans la
+    // fourchette : les déjà vues passent toutes après les neuves.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5, surface: 'road', seed: 21 }
+    const avant = await planLoops(demande, deps)
+    const vues = avant.routes.map((r) => traceOf(r.geometry, r.distance_m))
+    const apres = await planLoops({ ...demande, seed: 22, familiar: vues }, deps)
+    expect(apres.routes.filter((r) => familiarTo(r.geometry, vues))).toEqual([])
+    expect(apres.routes.map((r) => r.safety.grade)).toEqual(['A', 'A', 'A', 'A', 'A'])
+  }, 60_000)
+
+  it('garde en tête une boucle déjà vue quand elle seule tient les réglages', async () => {
+    // En « Mixte », une seule boucle de 4 km a sa part de chemins : déjà vue, elle
+    // reste devant des boucles toutes goudronnées. Varier ne coûte pas un réglage.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 4, sport: 'run', limit: 5, seed: 21 }
+    const avant = await planLoops(demande, deps)
+    const vues = avant.routes.map((r) => traceOf(r.geometry, r.distance_m))
+    const apres = await planLoops({ ...demande, seed: 22, familiar: vues }, deps)
+    expect(apres.routes[0].score).toBe(Math.max(...apres.routes.map((r) => r.score)))
   }, 60_000)
 
   it('refuse tout de suite une forme aux tours trop courts', async () => {

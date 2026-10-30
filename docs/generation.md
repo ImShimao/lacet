@@ -117,6 +117,60 @@ la main : un cran de note retire 0,9 au classement, la ressemblance au plus
 faire du neuf. Sans régénération, la réponse reste identique à celle du moteur
 Python.
 
+**Chaque recherche varie, même sans « Régénérer ».** La même demande, relancée
+un autre jour ou l'app rouverte, rendait exactement les mêmes boucles, dans le
+même ordre. L'app tire donc une graine au sort à chaque recherche (`seed`,
+`App.jsx`), et le moteur en fait deux choses (`engine/service.js`) :
+
+- un **tirage de plus**, polygones tournés d'une fraction de cran tirée au sort,
+  qui **s'ajoute** au tirage ordinaire au lieu de le remplacer. Remplacé, le lot
+  changeait du tout au tout, et sa meilleure boucle tombait parfois d'une
+  fourchette de relief : à Guebwiller, à 5 km, la note moyenne passait de −1,73
+  à −2,58. Ajouté, il ne retire rien ;
+- un **hasard** de 0 à 0,1 sur chaque candidat au choix final (`SEED_JITTER`) :
+  de quoi changer l'ordre et le choix des boucles de qualité proche, jamais un
+  cran de note (0,9) ni une fourchette de réglages (2).
+
+Et l'app **se souvient de ce qu'elle a montré** depuis chaque départ : les dix
+dernières boucles, pour trois départs, en tracés légers — un point tous les cent
+mètres, deux kilooctets pour 10 km (`rememberShown`, `storage.js` ; `traceOf`,
+`knownRoutes.js`). Une boucle qui en suit une sur les deux tiers recule de 0,5
+au choix, et dès la réserve qui reçoit l'altitude (`familiar`,
+`FAMILIAR_PENALTY`) : moins qu'un cran de note — une A déjà vue passe encore
+devant une B neuve, et une boucle déjà vue qui seule tient les réglages reste en
+tête —, mais assez pour qu'une neuve de qualité proche passe devant. À graine
+égale, la réponse est la même ; sans graine ni tracés, c'est celle de Python, et
+la parité n'en voit rien.
+
+Mesuré sur douze recherches (`measure_loops.mjs --seed`) — Soultz, Guebwiller,
+Buhl, Issenheim ; 5, 9 et 15 km ; Vallonné, Sûr, cinq propositions —, chacune
+lancée deux fois de suite comme dans l'app, la seconde connaissant ce que la
+première a montré :
+
+| | Avant (sans graine) | 1ʳᵉ recherche | 2ᵉ recherche |
+|---|---|---|---|
+| Boucles entières | 60 / 60 | 60 / 60 | 60 / 60 |
+| … notées A | 41 | 37 | 39 |
+| Note moyenne du moteur | −1,83 | −1,31 | −1,44 |
+| Boucles neuves d'une recherche à l'autre | 0 / 60 | — | **28 / 60** |
+| Même boucle en tête | 12 / 12 | — | **5 / 12** |
+| Liste identique, dans le même ordre | 12 / 12 | — | **1 / 12** |
+| Temps médian (le plus long), PC | 0,16 s (0,29) | 0,21 s (0,80) | 0,21 s (0,58) |
+
+La note moyenne monte : le lot est plus grand. Le nombre de A baisse un peu, et
+pour la même raison — le lot élargi trouve des boucles dans la fourchette de
+relief notées B, que la règle « les réglages d'abord » fait passer devant des A
+hors fourchette (Soultz, 9 km : note moyenne de −1,29 à −0,28, deux A de moins).
+La seule liste restée identique est celle d'Issenheim à 15 km, où la plaine
+n'offre que cinq boucles. Et quand la tête ne change pas, c'est que les neuves
+sont nettement moins bonnes : à Beaune en « Mixte », une seule boucle de 4 km a
+sa part de chemins, et elle reste devant, déjà vue ou non.
+
+**« Éviter › Boucles déjà courues »** applique le même recul aux sorties
+passées depuis ce départ, à ±20 % de la distance (`ranFrom`, `knownRoutes.js`) :
+la boucle du dimanche passe après celles qu'on n'a jamais courues d'ici. Décoché
+par défaut — on aime aussi refaire sa boucle.
+
 Trier sur la seule note ne marche pas : les meilleurs candidats se ressemblent,
 parce que ce qui fait une bonne note — les rues calmes, les parcs, les berges —
 se trouve toujours au même endroit. On sortait trois boucles partant du même
@@ -124,8 +178,9 @@ côté, ce qui n'est pas un choix.
 
 La sélection retient donc, à chaque tour, le candidat dont la note **diminuée de
 ce qu'il partage avec les déjà retenus** est la plus haute : arêtes communes et
-proximité de direction. Le premier choisi reste toujours le mieux noté — la
-variété ne coûte jamais la meilleure boucle, elle ne joue que sur les suivantes.
+proximité de direction. Le premier choisi reste le mieux noté, au hasard de la
+graine près (0,1, voir plus haut) — la variété ne coûte jamais la meilleure
+boucle, elle ne joue que sur les suivantes.
 
 La direction affichée est celle du **centre de gravité** de la boucle, pas celle
 des cent premiers mètres. Deux boucles qui partent par la même rue puis
@@ -359,6 +414,19 @@ de deux côtés du départ… Choisis « Auto », ou une autre distance. » — 
 qu'un « rien ne tient les seuils » qui laisserait croire que c'est la sécurité
 (`_form_message`). Pour « 1 boucle », il rappelle que « Auto » proposerait des
 tours.
+
+Mesuré sur les douze mêmes recherches (`measure_loops.mjs --forms`), cinq
+propositions demandées :
+
+| Forme | Recherches servies | Propositions | Hors de la forme |
+|---|---|---|---|
+| 1 boucle | 12 / 12 | 60 | 0 |
+| 2 boucles | 11 / 12, un refus annoncé | 27 | 0 |
+| 2 tours | 12 / 12 | 54 | 0 |
+| 3 tours | 12 / 12 | 53 | 0 |
+
+Les « 8 » sont rares par nature : une boucle ne sert qu'à un seul, et il faut
+la partenaire de l'autre côté du départ — deux ou trois par recherche.
 
 « Auto », la forme par défaut, ne s'envoie pas : la recherche est celle d'avant.
 Les trois autres sont partagées avec Python, et la parité les compare sur le

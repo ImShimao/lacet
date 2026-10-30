@@ -4,6 +4,7 @@
 // continuer de fonctionner sans.
 
 import { haversineM } from './engine/geo'
+import { traceOf } from './knownRoutes'
 
 const KEY = 'lacet.v1'
 
@@ -43,6 +44,32 @@ export function rememberPlace(place) {
 
 /** Les départs déjà choisis, du plus récent au plus ancien. */
 export const recentPlaces = () => load().recentPlaces || []
+
+// Les boucles montrées, gardées par départ pour ne pas les remettre en tête à
+// la recherche suivante — un autre jour, l'app rouverte (`familiar`,
+// `engine/service.js`). Dix par départ, deux recherches de cinq, et trois
+// départs : chez soi, le travail, le coin du dimanche. Une boucle de 10 km tient
+// en deux kilooctets (`traceOf`) : moins de soixante-dix au pire, à côté des
+// sorties qui en pèsent des centaines.
+const SHOWN_PER_START = 10
+const SHOWN_STARTS = 3
+
+/** Se souvenir des boucles qu'on vient de montrer depuis ce départ. */
+export function rememberShown(start, routes) {
+  if (!start || !routes?.length) return
+  const all = load().shown || []
+  const here = all.find((s) => haversineM([s.lon, s.lat], [start.lon, start.lat]) <= SAME_START_M)
+  const traces = routes.map((r) => traceOf(r.geometry, r.distance_m)).filter((t) => t.length > 1)
+  const kept = { lat: start.lat, lon: start.lon, at: Date.now(), traces: [...traces, ...(here?.traces ?? [])].slice(0, SHOWN_PER_START) }
+  save({ shown: [kept, ...all.filter((s) => s !== here)].slice(0, SHOWN_STARTS) })
+}
+
+/** Les tracés des boucles montrées récemment depuis ce départ, les plus récentes d'abord. */
+export function shownFrom(start) {
+  if (!start) return []
+  const here = (load().shown || []).find((s) => haversineM([s.lon, s.lat], [start.lon, start.lat]) <= SAME_START_M)
+  return here?.traces ?? []
+}
 
 
 export function load() {
