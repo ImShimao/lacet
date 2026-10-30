@@ -78,6 +78,54 @@ village, littoral) × trois distances (5, 10, 21,1 km) :
 | Temps maximum | 72 s | **19 s** |
 | Échecs Overpass | 6/24 | **0/24** |
 
+### Ni épingle, ni lasso
+
+Chaque tronçon est calculé à part, et leur jonction laissait des détours sans
+objet : un aller-retour au bout d'une rue pour toucher un sommet, revenu par
+l'autre chaussée d'une avenue ; un tour de pâté de maisons qui ramène au
+carrefour d'où l'on venait. Seul l'aller-retour sur la même arête était rogné.
+Tout ce qui ramène au même carrefour en moins de 150 m l'est désormais
+(`SPUR_MAX_M`, `_trim_spurs` dans `routing/loops.py`, `trimSpurs` dans
+`engine/loops.js`) ; une vraie petite boucle — autour d'un étang — en fait
+plusieurs centaines. Revenir à deux pas compte aussi : deux nœuds qu'une arête
+de moins de 10 m relie — la porte et sa rue, les deux chaussées d'une avenue —
+sont le même carrefour, et le détour cède la place à cette arête, pourvu
+qu'elle coûte moins cher que lui (`SAME_SPOT_M`) : un portail fermé ou une rue
+signalée que le détour contournait ne reviennent jamais. Sur les pentes de la
+Croix-Rousse, une boucle finissait ainsi par un lasso de 50 m autour d'un îlot,
+« fais demi-tour » à 80 m de l'arrivée. Le point de passage demandé, lui, n'est
+jamais rogné.
+
+Mesuré sur 48 boucles depuis Guebwiller, Soultz (rue des Primevères) et la
+plaine d'Issenheim, à 5 et 9 km : **11 épingles avant (1,1 km), aucune après**
+hors des passages au départ entre deux tours, qui, eux, sont le principe même
+d'un tour. Le plus net : rue du Markstein, à Issenheim, 65 m aller par une
+chaussée et 65 m retour par l'autre, trois fois de suite. Le recouvrement des
+48 boucles passe de 1,9 à 1,4 km.
+
+### Le tour des ronds-points
+
+À pied, le sens unique ne s'applique pas, et le chemin le plus court prenait
+l'anneau d'un rond-point dans un sens ou dans l'autre, au hasard des
+longueurs. Or on ne court pas sur l'anneau : on en fait le tour par le
+trottoir, d'un côté ou de l'autre. L'anneau étant dessiné dans le sens de la
+circulation, le suivre garde à droite des rues qu'on prend, le remonter garde
+à gauche.
+
+Le côté vient du réglage « Côté de la route » (`side`, voir
+[securite.md](securite.md)) : **à gauche par défaut**, face aux voitures. Après
+le tracé, chaque passage pris de l'autre côté prend l'autre moitié de l'anneau
+quand elle n'est pas plus de 1,6 fois plus longue — « en face » sur un
+rond-point à quatre ou cinq branches —, ou pas plus de 20 m sur un petit
+rond-point dissymétrique (`keep_side`, `keepSide`). Tourner du côté opposé au
+sien coûterait trois quarts de tour : on traverse alors, comme on le ferait.
+« Indifférent » laisse le tracé tel quel ; à vélo, l'anneau est à sens unique
+et rien ne change.
+
+Sur les mêmes 48 boucles, 44 passages de rond-point : les « en face » se font
+du côté gauche 22 fois sur 24 ; les deux autres, sur des anneaux où l'autre
+côté coûterait 2 à 8 fois plus.
+
 ### Passer par un point
 
 Un appui long sur la carte — ou « Passer par un point » dans le menu du départ

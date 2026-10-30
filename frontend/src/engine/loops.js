@@ -483,7 +483,7 @@ function chainLegs(graph, start, vertices, outbound, weights, profile, targetM, 
   if (!closing || !closing.length) return null
   edges.push(...closing)
 
-  const trimmed = keepSide(graph, start, trimSpurs(graph, start, edges, viaNode), profile)
+  const trimmed = keepSide(graph, start, trimSpurs(graph, start, edges, weights, viaNode), profile)
   return trimmed.length ? trimmed : null
 }
 
@@ -500,38 +500,76 @@ export function passesBy(graph, cand, node) {
 // Plus court que ça, un retour au même carrefour est une épingle ou un lasso —
 // voir `SPUR_MAX_M` en Python.
 const SPUR_MAX_M = 150
+// Deux nœuds qu'une arête plus courte que ça relie sont le même carrefour —
+// voir `SAME_SPOT_M` en Python.
+const SAME_SPOT_M = 10
 
 /**
- * Supprime les allers-retours et les détours qui ramènent au même carrefour en
- * moins de `SPUR_MAX_M` — voir `_trim_spurs`. `keep` : un nœud à ne pas rogner,
- * le point par lequel l'utilisateur a demandé de passer (propre à l'app).
+ * Supprime les allers-retours et les détours qui ramènent au même carrefour, ou
+ * à deux pas, en moins de `SPUR_MAX_M` — voir `_trim_spurs`. `keep` : un nœud à
+ * ne pas rogner, le point par lequel l'utilisateur a demandé de passer (propre
+ * à l'app).
  */
-export function trimSpurs(graph, start, edges, keep = null) {
+export function trimSpurs(graph, start, edges, weights, keep = null) {
   const out = []
   const nodes = [start]
   const along = [0]
+  const paid = [0]
   for (const e of edges) {
     if (out.length && out[out.length - 1] === e) {
       out.pop()
       nodes.pop()
       along.pop()
+      paid.pop()
       continue
     }
     const node = graph.other(e, nodes[nodes.length - 1])
     const reach = along[along.length - 1] + graph.edgeLen[e]
+    const cost = paid[paid.length - 1] + weights[e]
     let k = nodes.length - 1
-    while (k >= 0 && reach - along[k] < SPUR_MAX_M && nodes[k] !== node) k -= 1
+    let link = null
+    while (k >= 0 && reach - along[k] < SPUR_MAX_M && nodes[k] !== node) {
+      // L'arête prise elle-même n'est jamais moins chère qu'elle-même.
+      link = sameSpot(graph, nodes[k], node, weights, cost - paid[k])
+      if (link !== null) break
+      k -= 1
+    }
     if (k >= 0 && reach - along[k] < SPUR_MAX_M && (keep === null || !nodes.slice(k + 1).includes(keep))) {
       out.length = k
       nodes.length = k + 1
       along.length = k + 1
+      paid.length = k + 1
+      if (link !== null) {
+        out.push(link)
+        nodes.push(node)
+        along.push(along[k] + graph.edgeLen[link])
+        paid.push(paid[k] + weights[link])
+      }
     } else {
       out.push(e)
       nodes.push(node)
       along.push(reach)
+      paid.push(cost)
     }
   }
   return out
+}
+
+/** L'arête de moins de `SAME_SPOT_M` de `source` à `target`, moins chère que `detour` — `_same_spot`. */
+function sameSpot(graph, source, target, weights, detour) {
+  for (let k = graph.adjOffset[source]; k < graph.adjOffset[source + 1]; k += 1) {
+    const e = graph.adjEdges[k]
+    const sens = graph.edgeOneway[e]
+    if (
+      graph.other(e, source) === target &&
+      graph.edgeLen[e] <= SAME_SPOT_M &&
+      weights[e] < detour &&
+      !(sens && (graph.edgeA[e] === source) !== sens > 0)
+    ) {
+      return e
+    }
+  }
+  return null
 }
 
 // Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté —
@@ -645,7 +683,7 @@ function fallbackOutAndBack(graph, start, outbound, weights, profile, targetM, s
     for (const e of outEdges) penalties.set(e, RETURN_PENALTY)
     const backEdges = runLeg(graph, node, start, weights, profile, targetM * 0.8, penalties, null, null, null)
     if (!backEdges || !backEdges.length) continue
-    const edges = keepSide(graph, start, trimSpurs(graph, start, [...outEdges, ...backEdges]), profile)
+    const edges = keepSide(graph, start, trimSpurs(graph, start, [...outEdges, ...backEdges], weights), profile)
     if (!edges.length) continue
     const cand = new Candidate(edges, nodeSequence(graph, start, edges))
     measure(graph, start, cand, { night: profile.night })

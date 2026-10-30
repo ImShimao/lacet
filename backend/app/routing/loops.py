@@ -700,7 +700,7 @@ def _chain_legs(
         return None
     edges.extend(closing)
 
-    return keep_side(graph, start, _trim_spurs(graph, start, edges), profile) or None
+    return keep_side(graph, start, _trim_spurs(graph, start, edges, weights), profile) or None
 
 
 # Plus court que ça, un retour au même carrefour est une épingle ou un lasso :
@@ -711,8 +711,15 @@ def _chain_legs(
 # 133 m ; une vraie petite boucle, autour d'un étang, en fait plusieurs centaines.
 SPUR_MAX_M = 150.0
 
+# Deux nœuds qu'une arête plus courte que ça relie sont le même carrefour : la
+# porte et sa rue, les deux chaussées d'une avenue de part et d'autre d'un
+# passage. Sur les pentes de la Croix-Rousse, une boucle finissait par un lasso
+# de 50 m qui ramenait au départ par le nœud voisin, à 3 m de celui d'où il
+# partait : « fais demi-tour » à 80 m de l'arrivée, qui ne s'annonçait plus.
+SAME_SPOT_M = 10.0
 
-def _trim_spurs(graph: Graph, start: int, edges: list[int]) -> list[int]:
+
+def _trim_spurs(graph: Graph, start: int, edges: list[int], weights: list[float]) -> list[int]:
     """Supprime les allers-retours et les détours qui ramènent au même carrefour.
 
     Ils apparaissent à la jonction de deux tronçons quand le sommet visé se
@@ -723,32 +730,64 @@ def _trim_spurs(graph: Graph, start: int, edges: list[int]) -> list[int]:
     retour ne prend pas toujours la même arête : les deux chaussées d'une
     avenue, deux voies parallèles entre les mêmes carrefours, un tour de
     pâté de maisons. On efface donc aussi tout ce qui ramène, en moins de
-    `SPUR_MAX_M`, à un carrefour déjà passé.
+    `SPUR_MAX_M`, à un carrefour déjà passé — ou à deux pas de lui (voir
+    `SAME_SPOT_M`) : le détour cède alors la place à l'arête qui les relie,
+    pourvu qu'elle coûte moins cher que lui. Un portail fermé ou une rue
+    signalée, que le détour contournait, ne reviennent donc jamais.
     """
     out: list[int] = []
     nodes = [start]
     along = [0.0]
+    paid = [0.0]
     for eidx in edges:
         if out and out[-1] == eidx:
             out.pop()
             nodes.pop()
             along.pop()
+            paid.pop()
             continue
         edge = graph.edges[eidx]
         node = edge.other(nodes[-1])
         reach = along[-1] + edge.length_m
+        cost = paid[-1] + weights[eidx]
         k = len(nodes) - 1
+        link: int | None = None
         while k >= 0 and reach - along[k] < SPUR_MAX_M and nodes[k] != node:
+            # L'arête prise elle-même n'est jamais moins chère qu'elle-même.
+            link = _same_spot(graph, nodes[k], node, weights, cost - paid[k])
+            if link is not None:
+                break
             k -= 1
         if k >= 0 and reach - along[k] < SPUR_MAX_M:
             del out[k:]
             del nodes[k + 1 :]
             del along[k + 1 :]
+            del paid[k + 1 :]
+            if link is not None:
+                out.append(link)
+                nodes.append(node)
+                along.append(along[k] + graph.edges[link].length_m)
+                paid.append(paid[k] + weights[link])
         else:
             out.append(eidx)
             nodes.append(node)
             along.append(reach)
+            paid.append(cost)
     return out
+
+
+def _same_spot(graph: Graph, source: int, target: int, weights: list[float], detour: float) -> int | None:
+    """L'arête de moins de `SAME_SPOT_M` qui va de `source` à `target`, moins chère que `detour`."""
+    for e in graph.adj[source]:
+        edge = graph.edges[e]
+        if (
+            edge.other(source) == target
+            and edge.length_m <= SAME_SPOT_M
+            and weights[e] < detour
+            and not (edge.oneway and (edge.a == source) != (edge.oneway > 0))
+        ):
+            return e
+    return None
 
 
 # Jusqu'où l'on allonge le tour d'un rond-point pour le faire du bon côté.
@@ -931,7 +970,7 @@ def _fallback_out_and_back(
         )
         if not back_edges:
             continue
-        edges = keep_side(graph, start, _trim_spurs(graph, start, out_edges + back_edges), profile)
+        edges = keep_side(graph, start, _trim_spurs(graph, start, out_edges + back_edges, weights), profile)
         if not edges:
             continue
         cand = Candidate(edges=edges, nodes=node_sequence(graph, start, edges))

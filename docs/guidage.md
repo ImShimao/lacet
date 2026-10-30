@@ -30,6 +30,18 @@ cinq minutes.
   traversée faisaient dire « fais demi-tour » pour un virage à gauche. Un
   « tout droit » qui suit un virage de près nomme la voie où il mène :
   « tourne à droite sur Passerelle du Collège », une seule fois.
+- **Un rond-point se dit en une phrase**, à son entrée, avec l'angle de la
+  rue d'arrivée à la rue de sortie : « Au rond-point, continue en face en
+  restant à gauche dans la rue Pasteur ». L'anneau était découpé en tronçons
+  comme une rue, et les consignes tombaient sur ses nœuds : sur 44 passages
+  autour de Guebwiller, Soultz et Issenheim, aucune ne disait « rond-point » —
+  sept étaient muets, onze faisaient une chicane (« tourne à droite puis tout
+  de suite à gauche » pour aller en face), les autres un virage pris au milieu
+  de l'anneau. Après : 44 sur 44. À pied, on ne compte pas les sorties : on
+  dit où l'on va et, quand ça ne va pas de soi, de quel côté faire le tour —
+  « prends à droite en faisant le tour par la gauche ». À vélo, on roule sur
+  l'anneau : « Au rond-point, prends la deuxième sortie ». Le côté suit le
+  réglage « Côté de la route » (voir [generation.md](generation.md)).
 - **La voie se nomme comme on la dit** : « dans la rue Pasteur », « sur
   l'avenue Foch », « sur le chemin de Halage ». OpenStreetMap écrit « Rue
   Pasteur », sans article ; l'app disait « sur Rue Pasteur ».
