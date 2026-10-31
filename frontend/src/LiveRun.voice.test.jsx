@@ -6,7 +6,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fromCompact } from './engine/extract'
 import { buildGraph } from './engine/graph'
-import { planLoops } from './engine/service'
+import { SETTINGS, planLoops } from './engine/service'
 import { haversine } from './format'
 import { bearing, buildTrack, headingAt, locate, pointAt } from './routeTracker'
 import { save } from './storage'
@@ -181,12 +181,22 @@ const graphe = (nom) => {
   return graphes.get(nom)
 }
 
+// L'heure de chaque sortie simulée : un dimanche matin, à Lyon comme à Beaune.
+const DEBUT = '2026-10-18T08:00:00Z'
+
 // Les départs de `navigation.test.js`.
 const BEAUNE = ['extract-beaune.json.gz', 47.0043406, 4.8380759]
 const GUILLOTIERE = ['extract-lyon-centre.json.gz', 45.7502885, 4.8579479]
 const PENTES = ['extract-lyon-centre.json.gz', 45.772538, 4.8279541]
 
-/** Les boucles proposées d'un départ, avec la demande qui les a produites. */
+/**
+ * Les boucles proposées d'un départ, avec la demande qui les a produites.
+ *
+ * Figées : l'heure de la sortie simulée (`courir`), et la recherche élargie
+ * jusqu'au bout, sans son budget de temps. Sinon la boucle jugée changeait avec
+ * l'horloge — de nuit, d'autres rues — et avec la charge du PC, qui coupait
+ * l'élargissement plus tôt : le test des pentes échouait un jour sur deux.
+ */
 async function boucles([nom, lat, lon], km) {
   const demande = { lat, lon, distance_km: km, sport: 'run', limit: 12 }
   const graph = graphe(nom)
@@ -194,6 +204,8 @@ async function boucles([nom, lat, lon], km) {
     loadGraph: async () => graph,
     fetchElevations: async () => [],
     wind: async () => null,
+    now: () => new Date(DEBUT),
+    settings: { ...SETTINGS, widenBudgetMs: Infinity },
   })
   return { demande, routes: r.routes }
 }
@@ -256,7 +268,7 @@ async function courir(route, demande, { graine = 1, ecart = false } = {}) {
 
   synthese.reset()
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
-  vi.setSystemTime(new Date('2026-10-18T08:00:00Z'))
+  vi.setSystemTime(new Date(DEBUT))
   const t0 = Date.now()
   render(
     <LiveRun route={route} request={demande} sport="run" speaking stage={null} onPosition={() => {}} onStop={onStop} />,

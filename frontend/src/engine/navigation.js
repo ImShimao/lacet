@@ -326,7 +326,7 @@ function forkTurn(graph, node, chosen, came, outBearing, angle, sameRoad) {
  * compenser avec le suivant. Chaque passe qui change quelque chose raccourcit
  * la liste, donc la boucle s'arrête.
  */
-function mergeAll(steps) {
+export function mergeAll(steps) {
   let out = steps
   for (;;) {
     const suivant = mergeClose(out)
@@ -394,6 +394,33 @@ function mergeClose(steps) {
           ))
         }
         i += 2
+        continue
+      }
+      const third = i + 2 < steps.length ? steps[i + 2] : null
+      const net = third ? pymod(third.after - current.before + 180, 360) - 180 : 0
+      if (
+        tourne && !oppose && classify(somme) === 'uturn' &&
+        third !== null && third.dist_m - current.dist_m <= MERGE_DISTANCE_M && !third.ring &&
+        third.turn !== 'straight' && third.angle > 0 !== somme > 0 && Math.abs(net) >= SLIGHT_DEG
+      ) {
+        // Un demi-tour que personne ne fait : deux virages du même côté, que le
+        // suivant défait aussitôt. Quai Eustache Chappuis, à Annecy, à gauche
+        // (−57°), à gauche pour traverser le quai (−108°), à droite dans la rue
+        // Saint-Maurice (+91°) : additionnés par paires, ils disaient « fais
+        // demi-tour puis tout de suite à droite » pour un virage à gauche de
+        // −74°. Les trois n'en font qu'un, d'angle net. Quand ils ramènent tout
+        // droit, la passe suivante les tait déjà, comme une rue qui ondule.
+        const turn = classify(net)
+        const road = third.road || following.road || current.road
+        out.push({
+          ...instruction(
+            current.dist_m, turn, pyRound(net, 1), road, phrase(turn, road),
+            current.lon, current.lat, current.caution || following.caution || third.caution,
+          ),
+          before: current.before,
+          after: third.after,
+        })
+        i += 3
         continue
       }
       if (!tourne || !oppose) {

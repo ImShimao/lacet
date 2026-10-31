@@ -153,6 +153,18 @@ describe('l’arrivée et les tours', () => {
     expect(announcement(fin, 10, { stage: 'act' })).toBe(null)
   })
 
+  it('dit l’arrivée dès l’annonce du dernier virage', () => {
+    // Sur les pentes de la Croix-Rousse, la boucle passe au pied du départ, sous
+    // un escalier, puis fait demi-tour trente et un mètres avant l'arrivée : la
+    // détection d'arrivée devançait le « maintenant », seul à la dire, et l'on
+    // arrivait sans l'avoir entendue annoncer.
+    const demiTour = step(3969, 'uturn', 'Fais demi-tour dans la montée du Lieutenant Allouche')
+    const following = { index: 5, step: fin, gap: 31 }
+    expect(announcement(demiTour, 100, { stage: 'preview', following, speed: PIED })).toBe(
+      'Dans 100 mètres, fais demi-tour dans la montée du Lieutenant Allouche, puis arrivée dans 30 mètres.',
+    )
+  })
+
   it('dit la fin du tour quand on y est, pas avant', () => {
     expect(announcement(tour, 100, { stage: 'preview' })).toBe(null)
     expect(announcement(tour, 5, { stage: 'act' })).toBe(tour.text)

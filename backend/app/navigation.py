@@ -564,6 +564,45 @@ def _merge_close(steps: list[Instruction]) -> list[Instruction]:
                     )
                 i += 2
                 continue
+            third = steps[i + 2] if i + 2 < len(steps) else None
+            net = (third.after - current.before + 180.0) % 360.0 - 180.0 if third else 0.0
+            if (
+                tourne
+                and not oppose
+                and _classify(somme) == "uturn"
+                and third is not None
+                and third.dist_m - current.dist_m <= MERGE_DISTANCE_M
+                and not third.ring
+                and third.turn != "straight"
+                and (third.angle > 0) != (somme > 0)
+                and abs(net) >= SLIGHT_DEG
+            ):
+                # Un demi-tour que personne ne fait : deux virages du même côté,
+                # que le suivant défait aussitôt. Quai Eustache Chappuis, à
+                # Annecy, à gauche (−57°), à gauche pour traverser le quai
+                # (−108°), à droite dans la rue Saint-Maurice (+91°) : additionnés
+                # par paires, ils disaient « fais demi-tour puis tout de suite à
+                # droite » pour un virage à gauche de −74°. Les trois n'en font
+                # qu'un, d'angle net. Quand ils ramènent tout droit, la passe
+                # suivante les tait déjà, comme une rue qui ondule.
+                turn = _classify(net)
+                road = third.road or following.road or current.road
+                out.append(
+                    Instruction(
+                        dist_m=current.dist_m,
+                        turn=turn,
+                        angle=round(net, 1),
+                        road=road,
+                        text=_phrase(turn, road),
+                        lon=current.lon,
+                        lat=current.lat,
+                        caution=current.caution or following.caution or third.caution,
+                        before=current.before,
+                        after=third.after,
+                    )
+                )
+                i += 3
+                continue
             if not tourne or not oppose:
                 # Un seul virage, coupé en deux par un point de forme — ou nommé
                 # par le « tout droit » qui le suit.

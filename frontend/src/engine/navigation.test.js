@@ -5,7 +5,7 @@ import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { nodeSequence } from './dijkstra'
 import { Candidate, keepSide, measure } from './loops'
-import { buildInstructions } from './navigation'
+import { buildInstructions, mergeAll } from './navigation'
 import { planLoops } from './service'
 
 /**
@@ -131,6 +131,21 @@ describe('les consignes de virage', () => {
       expect(vrais.length).toBeGreaterThan(3)
     }
   }, 60_000)
+
+  it('ne dit pas de demi-tour que le virage suivant défait', () => {
+    // Quai Eustache Chappuis, à Annecy : à gauche, à gauche pour traverser le
+    // quai, à droite dans la rue Saint-Maurice, en dix-neuf mètres. L'app disait
+    // « fais demi-tour puis tout de suite à droite » pour un virage à gauche.
+    const pas = (dist_m, angle, before, road = null) => ({
+      dist_m, turn: angle < 0 ? 'left' : 'right', angle, road, text: '', lon: 0, lat: 0,
+      caution: false, before, after: (before + angle + 360) % 360,
+    })
+    const [seul, ...reste] = mergeAll([pas(37.4, -57, 327), pas(50.2, -108, 270), pas(56.4, 91, 162, 'Rue Saint-Maurice')])
+    expect(reste).toEqual([])
+    expect(seul.text).toBe('Tourne à gauche dans la rue Saint-Maurice')
+    expect(seul.angle).toBeCloseTo(-74)
+    expect(seul.dist_m).toBe(37.4)
+  })
 })
 
 /**

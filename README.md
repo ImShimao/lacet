@@ -9,7 +9,7 @@
 
 [![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
 [![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
-[![1169 tests](https://img.shields.io/badge/tests-1169%20%E2%9C%93-4ade80)](#tests-)
+[![1172 tests](https://img.shields.io/badge/tests-1172%20%E2%9C%93-4ade80)](#tests-)
 [![Capacitor 8](https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![MapLibre 5](https://img.shields.io/badge/MapLibre_GL-5-396CB2)](https://maplibre.org/)
 [![iOS 15+](https://img.shields.io/badge/iPhone-iOS%2015%2B-1F1B2E?logo=apple&logoColor=white)](#limitations-connues-)
@@ -209,7 +209,7 @@ frontend/
 backend/
 ├── app/                     Le moteur de référence : osm/, routing/, safety/,
 │                            elevation.py, wind.py, solar.py, service.py (plan_loops)
-├── tests/                   394 tests sur des damiers synthétiques
+├── tests/                   395 tests sur des damiers synthétiques
 └── scripts/                 parity_dump.py (l'oracle), smoke.py (essai réel)
 scripts/altstore_source.py   Prépare et fait servir la source AltStore
 docs/                        La documentation, un fichier par thème
@@ -281,9 +281,9 @@ et le build à chaque envoi (`.github/workflows/tests.yml`).
 
 | Commande | Couverture |
 | --- | --- |
-| `(cd frontend && npm test)` | 775 tests, 67 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
+| `(cd frontend && npm test)` | 777 tests, 67 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
 | `(cd frontend && npx vitest run src/engine/parity.test.js)` | Le JavaScript face à Python sur 19 cas figés : même graphe, mêmes candidats, même réponse à 1e-9 près |
-| `(cd backend && .venv/Scripts/python.exe -m pytest)` | 394 tests, 16 fichiers, hors ligne et déterministes |
+| `(cd backend && .venv/Scripts/python.exe -m pytest)` | 395 tests, 16 fichiers, hors ligne et déterministes |
 | `(cd backend && .venv/Scripts/python.exe scripts/parity_dump.py --check)` | Dit, sans rien écrire, si l'oracle de parité est à jour |
 | `(cd backend && .venv/Scripts/python.exe -X utf8 scripts/smoke.py annecy 8)` | Essai réel : appelle OpenStreetMap, montre les boucles retenues **et** celles écartées, avec leur motif |
 

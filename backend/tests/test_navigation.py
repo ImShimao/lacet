@@ -229,6 +229,24 @@ class TestFusion:
         (pas,) = _merge_all(steps)
         assert pas.text == "Tourne à droite sur Passerelle du Collège"
 
+    def test_pas_de_demi_tour_que_le_virage_suivant_defait(self):
+        # Quai Eustache Chappuis, à Annecy : à gauche (−57°), à gauche pour
+        # traverser le quai (−108°), à droite dans la rue Saint-Maurice (+91°),
+        # le tout en dix-neuf mètres. Additionnés par paires, les deux premiers
+        # faisaient un demi-tour (−165°), et l'app disait « fais demi-tour puis
+        # tout de suite à droite » au départ, pour un virage à gauche de −74°.
+        from app.navigation import _merge_all
+
+        steps = [
+            _pas(37.4, -57.0, 327.0),
+            _pas(50.2, -108.0, 270.0),
+            _pas(56.4, 91.0, 162.0, road="Rue Saint-Maurice"),
+        ]
+        (pas,) = _merge_all(steps)
+        assert pas.text == "Tourne à gauche dans la rue Saint-Maurice"
+        assert pas.angle == pytest.approx(-74.0)
+        assert pas.dist_m == 37.4
+
 
 class TestResume:
     def test_compte_les_manoeuvres(self, scene, profile):

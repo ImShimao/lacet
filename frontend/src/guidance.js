@@ -105,9 +105,13 @@ export function announcement(step, remaining, { stage = 'act', following = null,
   const warning = step.caution ? ' Attention, traversée sans passage protégé.' : ''
   // À l'annonce, on ne dit la suivante que si elle est collée à celle-ci : le
   // reste le sera au carrefour. Au carrefour — et au départ, dit d'emblée —,
-  // tout ce qui viendra avant la prochaine annonce.
+  // tout ce qui viendra avant la prochaine annonce. L'arrivée qui suit, elle, se
+  // dit dès l'annonce : la détection d'arrivée peut devancer le carrefour. Sur
+  // les pentes de la Croix-Rousse, la boucle passe au pied du départ, sous un
+  // escalier, avant un dernier demi-tour à 31 m de la fin — on arrivait sans
+  // l'avoir entendue annoncer.
   const now = stage === 'act' || step.turn === 'start'
-  const joined = now ? chains(following, speed) : chains(following, speed) && following.gap <= RIGHT_AFTER_M
+  const joined = chains(following, speed) && (now || following.gap <= RIGHT_AFTER_M || following.step.turn === 'finish')
   const calm = now && !joined ? quietStretch(following) : null
   // La ligne droite qui suit se dit dans la phrase de la manœuvre ; l'arrivée,
   // elle, garde sa phrase à elle.
