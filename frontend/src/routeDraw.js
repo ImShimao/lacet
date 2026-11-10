@@ -128,5 +128,26 @@ export function sketch(track, width, height, pad = 6) {
   const oy = (height - (y1 - y0) * scale) / 2
   const at = (i) => [ox + (xs[i] - x0) * scale, oy + (y1 - ys[i]) * scale].map((v) => Math.round(v * 10) / 10)
   const points = track.map((_, i) => at(i))
-  return { d: `M${points.map((p) => p.join(' ')).join('L')}`, start: points[0] }
+  return { d: `M${points.map((p) => p.join(' ')).join('L')}`, start: points[0], points }
+}
+
+/**
+ * Le croquis découpé par bande (`paceBands`) : un chemin par suite de tronçons
+ * de la même bande, `[{ band, d }]`. Les tronçons sans bande restent au tracé
+ * de fond.
+ */
+export function bandPaths(points, bands) {
+  const out = []
+  for (let i = 1; i < points.length; i += 1) {
+    const band = bands[i - 1]
+    if (band === null || band === undefined) continue
+    const last = out[out.length - 1]
+    if (last && last.band === band && last.end === i - 1) {
+      last.d += `L${points[i].join(' ')}`
+      last.end = i
+    } else {
+      out.push({ band, end: i, d: `M${points[i - 1].join(' ')}L${points[i].join(' ')}` })
+    }
+  }
+  return out
 }

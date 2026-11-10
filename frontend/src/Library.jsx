@@ -30,7 +30,27 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
   const shown = history.filter(
     (r) => (sport === 'all' || (r.sport || 'run') === sport) && (month === 'all' || monthKey(r.ranAt) === month),
   )
-  const rows = view === 'history' ? shown : saved
+  const all = view === 'history' ? shown : saved
+  // Soixante lignes d'abord : l'historique en garde jusqu'à mille, et chacune
+  // dessine sa vignette et interroge sa carte hors ligne. La suite vient au
+  // bouton, en bas de liste.
+  const [limit, setLimit] = useState(PAGE)
+  const rows = all.slice(0, limit)
+  // Comptés une fois pour toute la liste, et non refaits à chaque ligne : les
+  // parcours qui partagent une carte hors ligne (`keyOf`), et les sorties de
+  // chaque mois. Refaits ligne par ligne, mille sorties coûtaient un million de
+  // comparaisons à chaque rendu.
+  const shared = useMemo(() => {
+    const counts = new Map()
+    for (const r of [...saved, ...history]) counts.set(offline.keyOf(r), (counts.get(offline.keyOf(r)) ?? 0) + 1)
+    return counts
+  }, [saved, history])
+  const byMonth = useMemo(() => {
+    const groups = new Map()
+    for (const r of shown) groups.set(monthKey(r.ranAt), [...(groups.get(monthKey(r.ranAt)) ?? []), r])
+    return groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, sport, month])
 
   return (
     <div className="panel">
@@ -112,12 +132,12 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
               // faisait sinon hériter la suivante de sa confirmation ouverte.
               <div key={r.ranAt || offline.keyOf(r)} className="list__group">
               {view === 'history' && monthKey(r.ranAt) !== monthKey(rows[i - 1]?.ranAt) && (
-                <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={rows.filter((x) => monthKey(x.ranAt) === monthKey(r.ranAt))} />
+                <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={byMonth.get(monthKey(r.ranAt)) ?? []} />
               )}
               <Item
                 route={r}
                 run={view === 'history'}
-                kept={[...saved, ...history]}
+                shared={shared.get(offline.keyOf(r)) > 1}
                 mapStyle={mapStyle}
                 // Une sortie ouvre son bilan — ce qu'on a fait —, un favori
                 // ouvre le parcours sur la carte. Longtemps les deux menaient
@@ -130,11 +150,18 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
               </div>
             ))}
           </div>
+          {all.length > rows.length && (
+            <button className="btn" onClick={() => setLimit(limit + PAGE)}>
+              Afficher les suivantes ({all.length - rows.length})
+            </button>
+          )}
         </>
       )}
     </div>
   )
 }
+
+const PAGE = 60
 
 /**
  * Une ligne de la liste, qu'on glisse vers la gauche pour la renommer ou la
@@ -151,7 +178,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
  * Une sortie reçoit le même geste : la supprimer obligeait à ouvrir son bilan
  * et à descendre jusqu'en bas.
  */
-function Item({ route, run, kept, mapStyle, onOpen, onRename, onForget }) {
+function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForget }) {
   const [naming, setNaming] = useState(false)
   const [asking, setAsking] = useState(false)
   const ruban = useRef(null)
@@ -160,8 +187,7 @@ function Item({ route, run, kept, mapStyle, onOpen, onRename, onForget }) {
   const refermer = () => ruban.current?.scrollTo?.({ left: 0, behavior: 'smooth' })
   // La carte hors ligne suit la clé du parcours (`keyOf`) : un favori et les
   // sorties faites dessus la partagent. Elle ne part qu'avec la dernière
-  // ligne qui la montre.
-  const partagee = kept.some((x) => x !== route && offline.keyOf(x) === offline.keyOf(route))
+  // ligne qui la montre (`shared`, compté une fois dans `Library`).
 
   if (asking) {
     return (
@@ -590,7 +616,19 @@ function Totals({ history, profile }) {
     .filter((r) => Date.now() - new Date(r.ranAt).getTime() < 7 * 864e5)
     .reduce((m, r) => m + (r.actual_distance_m || 0), 0)
 
-  const averagePace = sums.distance > 0 ? sums.time / (sums.distance / 1000) : 0
+  // Chaque sport à sa mesure : une allure moyenne qui mêlait course et vélo
+  // n'était celle d'aucune sortie — 3:40 du kilomètre pour qui court à 5:50.
+  const of = (bike) =>
+    history
+      .filter((r) => (r.sport === 'bike') === bike)
+      .reduce((acc, r) => ({ m: acc.m + (r.actual_distance_m || 0), s: acc.s + (r.actual_duration_s || 0) }), { m: 0, s: 0 })
+  const [foot, wheel] = [of(false), of(true)]
+  const average = [
+    foot.m > 0 ? `Allure moyenne ${pace(foot.s / (foot.m / 1000))}/km` : null,
+    wheel.m > 0 && wheel.s > 0 ? `${foot.m > 0 ? 'à vélo' : 'Vitesse moyenne'} ${(wheel.m / wheel.s * 3.6).toFixed(1).replace('.', ',')} km/h` : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   return (
     <>
@@ -613,7 +651,7 @@ function Totals({ history, profile }) {
         </div>
       </div>
       <p className="muted small">
-        Allure moyenne {pace(averagePace)}/km · environ{' '}
+        {average} · environ{' '}
         {Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString('fr-FR')}{' '}
         kcal, estimées à partir de ton poids — pas mesurées.
       </p>

@@ -28,10 +28,13 @@ prévue**.
 elles se téléchargent une fois et restent. Le fond de carte se garde parcours
 par parcours. Une sortie en montagne, sans antenne, fonctionne.
 
-**Il garde ce que tu as couru.** À l'arrivée, un écran de fin : distance, temps,
-allure, dénivelé, l'écart avec le parcours prévu, et **ta trace réelle** sur la
-carte, qui s'exporte en GPX horodaté — pour une montre, Garmin Connect ou le
-site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
+**Il garde ce que tu as couru.** À l'arrivée, un écran de fin : **ta trace
+réelle, coloriée par allure**, une phrase qui dit ce que la sortie vaut (« 12 s/km
+plus vite que la dernière fois ici »), distance, temps, allure, dénivelé, les
+temps au kilomètre jusqu'aux derniers mètres, le profil réellement monté, tes
+records sur 1, 5 et 10 km, l'écart avec le parcours prévu, et un ressenti à
+noter. La sortie se partage en image, et s'exporte en GPX — chaque point à son
+heure et à son altitude — pour une montre, Garmin Connect ou le site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
 batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
 
 **Il sait où boire.** Coche « Point d'eau » ou « Toilettes » dans « Mon

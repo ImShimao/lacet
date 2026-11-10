@@ -284,6 +284,13 @@ export async function shareTextFile(filename, text, mime) {
   await Share.share({ title: filename, url: uri, dialogTitle: mime })
 }
 
+/** Écrit une image (PNG en base64) et ouvre la feuille de partage d'iOS. */
+export async function shareImage(filename, base64, title) {
+  // Sans `encoding`, Capacitor lit `data` comme du base64 : un fichier binaire.
+  const { uri } = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache })
+  await Share.share({ title, url: uri })
+}
+
 export async function shareText(title, text) {
   await Share.share({ title, text })
 }

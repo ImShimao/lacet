@@ -115,3 +115,20 @@ describe('le nom d’une sortie libre', () => {
     expect(freeRunName('run', new Date(2026, 9, 19, 23, 40).getTime())).toBe('Course de nuit')
   })
 })
+
+describe('une sortie interrompue, rangée après coup', () => {
+  const stats = { distance: 5000, elapsed: 1500, trail: [[7.2, 47.9], [7.21, 47.9]] }
+
+  it('garde l’heure où elle s’est arrêtée, pas celle où on la range', () => {
+    const hier = Date.parse('2026-11-09T19:12:00.000Z')
+    const entry = runEntry({ ...stats, endedAt: hier }, { free: true, sport: 'run' }, DEFAULTS)
+    expect(entry.ranAt).toBe('2026-11-09T19:12:00.000Z')
+  })
+
+  it('ne garde l’heure des points que rang pour rang avec la trace', () => {
+    const entry = (trailT) => runEntry({ ...stats, trailT }, { free: true, sport: 'run' }, DEFAULTS)
+    expect(entry([0, 300]).track_t).toEqual([0, 300])
+    expect(entry([0, 150, 300]).track_t).toBeNull()
+    expect(entry([null, null]).track_t).toBeNull()
+  })
+})

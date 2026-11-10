@@ -53,8 +53,15 @@ function metres(a, b) {
  * trace, `ascent` le dénivelé positif mesuré. `ascent` repart de `climbed` :
  * une sortie reprise après une coupure ne perd pas ses côtes d'avant.
  */
-export function trailRecorder(initial = [], climbed = 0) {
+export function trailRecorder(initial = [], climbed = 0, { times: knownTimes, alts: knownAlts } = {}) {
   const points = initial.map((p) => [p[0], p[1]])
+  // L'heure et l'altitude de chaque point gardé, rangées à part : la trace reste
+  // une liste de [lon, lat], que la carte, le croquis et « déjà couru » lisent
+  // tels quels. Sans elles, l'écran de fin ne pouvait ni colorier la trace par
+  // allure ni dessiner ce qu'on avait réellement monté, et le GPX lissait
+  // l'allure entre deux bornes.
+  const times = points.map((_, i) => knownTimes?.[i] ?? null)
+  const alts = points.map((_, i) => knownAlts?.[i] ?? null)
   let smoothed = null
   let reference = null
   let ascent = climbed || 0
@@ -66,8 +73,22 @@ export function trailRecorder(initial = [], climbed = 0) {
     get ascent() {
       return Math.round(ascent)
     },
-    /** Rend `true` si le point a été gardé. */
-    push(point, altitude = null, altitudeAccuracy = null) {
+    get times() {
+      return times
+    },
+    get alts() {
+      return alts
+    },
+    /** L'altitude lissée du GPS, ou `null` tant qu'il n'en a pas donné. */
+    get altitude() {
+      return smoothed
+    },
+    /**
+     * Rend `true` si le point a été gardé. `t` : les secondes écoulées depuis le
+     * départ, à l'horloge ; `alt` : une altitude plus sûre que celle du GPS — le
+     * baromètre —, qui la remplace alors dans le profil.
+     */
+    push(point, altitude = null, altitudeAccuracy = null, { t = null, alt = null } = {}) {
       const trusted = !(altitudeAccuracy > ALTITUDE_ACCURACY_LIMIT_M)
       if (altitude !== null && Number.isFinite(altitude) && trusted) {
         smoothed = smoothed === null ? altitude : smoothed + SMOOTH * (altitude - smoothed)
@@ -82,6 +103,9 @@ export function trailRecorder(initial = [], climbed = 0) {
       const last = points[points.length - 1]
       if (last && metres(last, point) < KEEP_EVERY_M) return false
       points.push([point[0], point[1]])
+      times.push(t)
+      const kept = alt ?? smoothed
+      alts.push(kept == null ? null : Math.round(kept * 10) / 10)
       return true
     },
   }
@@ -95,7 +119,15 @@ export function trailRecorder(initial = [], climbed = 0) {
  * sur une carte.
  */
 export function simplify(points, toleranceM = CORNER_M) {
-  if (!points || points.length < 3) return (points || []).map(round5)
+  return keptIndices(points, toleranceM).map((i) => round5(points[i]))
+}
+
+/**
+ * Les rangs des points que `simplify` garde : ce qui accompagne la trace —
+ * l'heure et l'altitude de chaque point — s'allège avec elle, rang pour rang.
+ */
+export function keptIndices(points, toleranceM = CORNER_M) {
+  if (!points || points.length < 3) return (points || []).map((_, i) => i)
   const keep = new Uint8Array(points.length)
   keep[0] = 1
   keep[points.length - 1] = 1
@@ -119,7 +151,7 @@ export function simplify(points, toleranceM = CORNER_M) {
   }
 
   const out = []
-  for (let i = 0; i < points.length; i += 1) if (keep[i]) out.push(round5(points[i]))
+  for (let i = 0; i < points.length; i += 1) if (keep[i]) out.push(i)
   return out
 }
 

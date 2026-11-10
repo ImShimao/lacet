@@ -112,7 +112,9 @@ export default function App() {
 
   // Les commandes de la carte en course : la voix, l'orientation — dans le sens
   // de la course, ou nord en haut — et la vue d'ensemble du parcours.
-  const [speaking, setSpeaking] = useState(true)
+  // La voix coupée le reste d'une sortie à l'autre : on la coupe parce qu'on
+  // court avec un podcast, et c'est vrai aussi la fois suivante.
+  const [speaking, setSpeaking] = useState(stored.speaking !== false)
   const [runView, setRunView] = useState(stored.runView === 'north' ? 'north' : 'heading')
   const [overviewAt, setOverviewAt] = useState(0)
   const [northAt, setNorthAt] = useState(0)
@@ -290,6 +292,13 @@ export default function App() {
   // la recalcule à partir du candidat qu'il a gardé ; si le graphe a été
   // remplacé entre-temps, il le dit, et on ne prétend pas savoir.
   const [reversing, setReversing] = useState(false)
+  // Le moteur ne retourne que ce qu'il vient de calculer : un favori rouvert, un
+  // fichier importé ou un tracé du calculateur public aboutissaient à « cette
+  // boucle n'est plus en mémoire ». À vélo, une boucle à sens unique ne se
+  // retourne pas (`worker.js`).
+  const canReverse = Boolean(
+    selected && !selected.remote && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id),
+  )
   const reverseSelected = async () => {
     if (!selected || reversing) return
     setReversing(true)
@@ -472,7 +481,10 @@ export default function App() {
           <RunTools
             onStyles={() => setStylesOpen(true)}
             speaking={speaking}
-            onVoice={() => setSpeaking((v) => !v)}
+            onVoice={() => {
+              setSpeaking(!speaking)
+              save({ speaking: !speaking })
+            }}
             runView={runView}
             onRunView={toggleRunView}
             compassRef={compassRef}
@@ -645,6 +657,10 @@ export default function App() {
                 library.rename(r, nom)
                 setViewing({ ...r, name: nom.trim().slice(0, 60) })
               }}
+              onAnnotate={(patch) => {
+                library.annotate(viewing, patch)
+                setViewing((v) => v && { ...v, ...patch })
+              }}
               onClose={() => setViewing(null)}
               onReplay={(r) => {
                 setViewing(null)
@@ -664,6 +680,16 @@ export default function App() {
               onContinue={() => run.continueRun(summary, (entry) => library.forget(entry))}
               onKeep={!summary.free && selected ? () => library.toggleFavorite(selected) : null}
               kept={isFavorite}
+              // Le bilan se referme sur la boucle retournée, prête à repartir.
+              onReverse={
+                !summary.free && canReverse
+                  ? () => {
+                      run.closeSummary()
+                      reverseSelected()
+                    }
+                  : null
+              }
+              onAnnotate={(patch) => library.annotate(summary, patch)}
             />
           ) : running ? (
             <LiveRun
@@ -766,15 +792,7 @@ export default function App() {
               onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}
-              // Le moteur ne retourne que ce qu'il vient de calculer : un favori
-              // rouvert, un fichier importé ou un tracé du calculateur public
-              // aboutissaient à « cette boucle n'est plus en mémoire ».
-              onReverse={
-                // À vélo, une boucle à sens unique ne se retourne pas (`worker.js`).
-                selected && !selected.remote && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id)
-                  ? reverseSelected
-                  : null
-              }
+              onReverse={canReverse ? reverseSelected : null}
               onOpenFilters={() => setFiltersOpen(true)}
               onFavorite={() => {
                 haptic('tickHaptic')

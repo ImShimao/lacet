@@ -231,7 +231,7 @@
 }
 .splits__row {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 22px 1fr auto;
   align-items: center;
   gap: 9px;
 }

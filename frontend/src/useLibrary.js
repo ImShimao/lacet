@@ -131,6 +131,11 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       return put('favorites', saved.map((r) => (keyOf(r) === cle ? renomme(r) : r)), setSaved)
     },
 
+    /** Note une sortie après coup : son ressenti, une ligne libre. */
+    annotate(entry, patch) {
+      return put('history', history.map((s) => (meme(s, entry) ? { ...s, ...patch } : s)), setHistory)
+    },
+
     /** Retire une sortie — un test, un départ déclenché dans la poche — ou un favori. */
     forget(entry) {
       if (entry.ranAt) return put('history', history.filter((sortie) => !meme(sortie, entry)), setHistory)

@@ -389,6 +389,9 @@
   font-size: calc(10.5px * var(--text-scale));
   color: var(--text-3);
   margin-top: 2px;
+  /* Les chiffres passent à la ligne plutôt que de finir en « 5:46/k… » : le
+     nom, lui, peut se couper, pas l'allure. */
+  white-space: normal;
 }
 .list__row .grade {
   margin-left: auto;

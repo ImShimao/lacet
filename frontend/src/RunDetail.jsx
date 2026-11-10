@@ -4,6 +4,7 @@ import { downloadRun } from './api'
 import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
+import { climbProfile } from './runTrace'
 
 /**
  * Une sortie déjà faite, rouverte.
@@ -21,7 +22,7 @@ import { standing } from './knownRoutes'
  * `LiveRun.jsx`). Les sorties d'avant ne les ont pas : on ne les invente pas à
  * partir de la trace, dont les points n'ont pas d'heure.
  */
-export default function RunDetail({ entry, history = [], onReplay, onRename, onDelete, onClose }) {
+export default function RunDetail({ entry, history = [], onReplay, onRename, onAnnotate, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
   // Où cette sortie se situe parmi celles qui ont emprunté le même chemin.
   // Calculé à l'ouverture d'une sortie, pas à chaque rendu : c'est une
@@ -93,7 +94,11 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onD
 
       {rang && <Standing rang={rang} bike={bike} />}
 
-      {splits && <Splits splits={splits} bike={bike} />}
+      {splits && <Splits splits={splits} bike={bike} entry={entry} />}
+
+      <Climb entry={entry} />
+
+      {onAnnotate && <Feeling key={entry.ranAt} entry={entry} onChange={onAnnotate} />}
 
       {entry.spoken?.length > 0 && <Spoken spoken={entry.spoken} />}
 
@@ -282,11 +287,19 @@ const jour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric'
  * faisaient des barres presque égales. Deux secondes d'écart, elles, restent à
  * peine visibles, comme il se doit.
  */
-export function Splits({ splits, bike }) {
+export function Splits({ splits, bike, entry = null }) {
   const worst = Math.max(...splits.map((s) => s.seconds))
   const best = Math.min(...splits.map((s) => s.seconds))
-  const floor = best * 0.8
-  const width = (seconds) => Math.max(8, ((seconds - floor) / Math.max(1, worst - floor)) * 100)
+  const end = entry ? lastStretch(entry, splits) : null
+  const floor = Math.min(best, end?.perKm ?? best) * 0.8
+  const top = Math.max(worst, end?.perKm ?? worst)
+  const width = (seconds) => Math.max(8, ((seconds - floor) / Math.max(1, top - floor)) * 100)
+  // L'allure visée, celle du parcours prévu : sans elle, huit barres ne disent
+  // pas si l'on a tenu ce qu'on s'était fixé.
+  const target = entry && !bike && !entry.free && entry.duration_s > 0 && entry.distance_m > 0
+    ? entry.duration_s / (entry.distance_m / 1000)
+    : null
+  const under = target ? splits.filter((s) => s.seconds <= target).length : 0
   return (
     <div className="splits">
       <div className="splits__head">
@@ -305,6 +318,104 @@ export function Splits({ splits, bike }) {
           <b>{pace(s.seconds)}</b>
         </div>
       ))}
+      {/* Ce qui reste après la dernière borne : sur 8,35 km, les 350 derniers
+          mètres n'apparaissaient nulle part. À son allure, pas à son temps —
+          la barre se compare aux autres. */}
+      {end && (
+        <div className="splits__row splits__row--end">
+          <span>fin</span>
+          <i style={{ width: `${width(end.perKm)}%` }} />
+          <b title={`${Math.round(end.metres)} m`}>{pace(end.perKm)}</b>
+        </div>
+      )}
+      {target && (
+        <p className="muted small">
+          Allure visée {pace(target)}/km : {under} kilomètre{under > 1 ? 's' : ''} sur {splits.length} dans les temps.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// En dessous, la fin d'une sortie est trop courte pour avoir une allure : le
+// temps de s'arrêter y pèse plus que la course.
+const END_MIN_M = 150
+
+/** Les derniers mètres, après la dernière borne : leur longueur et leur allure. */
+function lastStretch(entry, splits) {
+  const metres = (entry.actual_distance_m || 0) - splits[splits.length - 1].km * 1000
+  const seconds = (entry.actual_duration_s || 0) - splits.reduce((sum, s) => sum + s.seconds, 0)
+  // Un kilomètre ou plus sans borne : les tours sont incomplets — une sortie
+  // d'avant, ou reprise sans eux —, et le reste n'est pas « la fin ».
+  if (metres < END_MIN_M || metres >= 1000 || seconds <= 0) return null
+  return { metres, perKm: seconds / (metres / 1000) }
+}
+
+/**
+ * Ce qu'on a réellement monté, en profil. Le chiffre de D+ dit combien ; le
+ * profil dit où — la côte du troisième kilomètre, celle qui explique sa barre.
+ */
+export function Climb({ entry }) {
+  const drawn = useMemo(() => climbProfile(entry.track, entry.track_alt, 320, 64), [entry.track, entry.track_alt])
+  if (!drawn) return null
+  return (
+    <div className="climb">
+      <div className="splits__head">
+        <span className="label">Profil monté</span>
+        <em>
+          sommet au km {km(drawn.topM, 1)} · {drawn.gain >= 0 ? '+' : '−'}
+          {Math.abs(Math.round(drawn.gain))} m sur le départ
+        </em>
+      </div>
+      <svg viewBox="0 0 320 64" preserveAspectRatio="none" aria-hidden="true">
+        <path className="climb__area" d={drawn.area} />
+        <path className="climb__line" d={drawn.d} />
+      </svg>
+    </div>
+  )
+}
+
+const FEELINGS = ['Facile', 'Bien', 'Moyen', 'Dur', 'Très dur']
+
+/**
+ * Comment c'était : cinq mots et une ligne libre. Les chiffres disent ce qu'on
+ * a fait, pas ce que ça a coûté — et c'est en relisant « Dur » trois dimanches
+ * de suite qu'on comprend une allure qui baisse. Noté à chaud sur l'écran de
+ * fin, corrigé dans le détail de la sortie.
+ */
+export function Feeling({ entry, onChange }) {
+  const [feeling, setFeeling] = useState(entry.feeling ?? null)
+  const [note, setNote] = useState(entry.note ?? '')
+  return (
+    <div className="feeling">
+      <span className="label">Ressenti</span>
+      <div className="chips" role="radiogroup" aria-label="Ressenti">
+        {FEELINGS.map((label, i) => (
+          <button
+            key={label}
+            role="radio"
+            aria-checked={feeling === i + 1}
+            className={`chip ${feeling === i + 1 ? 'chip--on' : ''}`}
+            onClick={() => {
+              // Retoucher le mot choisi l'efface : on n'est pas tenu d'en avoir un.
+              const next = feeling === i + 1 ? null : i + 1
+              setFeeling(next)
+              onChange({ feeling: next })
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <input
+        value={note}
+        aria-label="Note sur la sortie"
+        placeholder="Une note : la météo, les jambes, les chaussures…"
+        maxLength={140}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => note.trim() !== (entry.note ?? '') && onChange({ note: note.trim() })}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      />
     </div>
   )
 }

@@ -194,3 +194,32 @@ describe('les boucles déjà vues, pour le moteur', () => {
     expect(familiarTo(boucle, traces)).toBe(true)
   })
 })
+
+describe('les records par distance', () => {
+  const tours = (...seconds) => seconds.map((s, i) => ({ km: i + 1, seconds: s }))
+  const course = (ranAt, splits, extra = {}) => ({ ranAt, sport: 'run', splits, ...extra })
+
+  it('trouve le meilleur 5 km au milieu d’une sortie plus longue', async () => {
+    const { distanceRecords } = await import('./knownRoutes')
+    const avant = course('2026-10-01', tours(330, 330, 330, 330, 330))
+    const maintenant = course('2026-10-08', tours(360, 320, 320, 320, 320, 320, 360))
+    expect(distanceRecords(maintenant, [maintenant, avant])).toEqual([
+      { km: 1, seconds: 320 },
+      { km: 5, seconds: 1600 },
+    ])
+  })
+
+  it('ne fête rien la première fois, ni contre un autre sport', async () => {
+    const { distanceRecords } = await import('./knownRoutes')
+    const maintenant = course('2026-10-08', tours(300, 300))
+    const velo = course('2026-10-01', tours(400, 400), { sport: 'bike' })
+    expect(distanceRecords(maintenant, [maintenant, velo])).toEqual([])
+  })
+
+  it('ne recolle pas des bornes qui ne se suivent pas', async () => {
+    const { distanceRecords } = await import('./knownRoutes')
+    const avant = course('2026-10-01', tours(330, 330, 330, 330, 330))
+    const trouee = course('2026-10-08', [1, 2, 6, 7, 8].map((km) => ({ km, seconds: 200 })))
+    expect(distanceRecords(trouee, [avant]).map((r) => r.km)).toEqual([1])
+  })
+})

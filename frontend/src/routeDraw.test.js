@@ -73,3 +73,15 @@ describe('le croquis de la trace', () => {
     expect(sketch([[7, 47]], 120, 80)).toBeNull()
   })
 })
+
+describe('le croquis par allure', () => {
+  it('fait un chemin par suite de tronçons de la même bande', async () => {
+    const { bandPaths } = await import('./routeDraw')
+    const points = [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]
+    const parts = bandPaths(points, [0, 0, null, 4])
+    expect(parts.map((p) => [p.band, p.d])).toEqual([
+      [0, 'M0 0L1 0L2 0'],
+      [4, 'M3 0L4 0'],
+    ])
+  })
+})

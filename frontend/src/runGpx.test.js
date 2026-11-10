@@ -72,3 +72,26 @@ describe('le fichier', () => {
     expect(gpx).toContain('openstreetmap.org/copyright')
   })
 })
+
+describe('une trace qui a ses heures', () => {
+  // Trois points : dix secondes de course, une minute au feu, dix secondes.
+  const entry = { ranAt: '2026-10-05T17:42:00.000Z', actual_duration_s: 20, paused_s: 60, sport: 'run' }
+  const track = [TRACE[0], TRACE[3], TRACE[6]]
+
+  it('place la pause là où elle a eu lieu, et finit à l’heure de la fin', () => {
+    const times = runTimes(track, { ...entry, track_t: [0, 10, 80] })
+    const fin = Date.parse(entry.ranAt)
+    expect(times.map((t) => (t - fin) / 1000)).toEqual([-80, -70, 0])
+  })
+
+  it('n’écrit jamais une heure qui recule', () => {
+    const times = runTimes(track, { ...entry, track_t: [0, 12, 9] })
+    expect(times[2]).toBeGreaterThanOrEqual(times[1])
+  })
+
+  it('écrit l’altitude de chaque point', () => {
+    const gpx = buildRunGpx({ ...entry, name: 'x', track, track_t: [0, 10, 80], track_alt: [250, null, 252.5] })
+    expect(gpx.match(/<ele>/g)).toHaveLength(2)
+    expect(gpx).toContain('<ele>252.5</ele>')
+  })
+})

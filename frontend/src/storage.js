@@ -114,7 +114,7 @@ export const MAX_PLACES = 8
 const BRIEF = [
   'id', 'key', 'name', 'ranAt', 'sport', 'free', 'grade', 'distance_m', 'ascent_m',
   'actual_distance_m', 'actual_duration_s', 'actual_ascent_m', 'actual_ascent_source',
-  'splits', 'paused_s', 'rerouted', 'arrived',
+  'splits', 'paused_s', 'rerouted', 'arrived', 'feeling', 'note',
 ]
 
 /** Le résumé d'une sortie : ses chiffres, sans trace ni parcours prévu. */
@@ -296,7 +296,10 @@ export function usage() {
     parts: {
       favorites: poids(data.favorites),
       history: poids(history),
-      traces: history.reduce((somme, sortie) => somme + poids(sortie.track), 0),
+      traces: history.reduce(
+        (somme, sortie) => somme + poids(sortie.track) + poids(sortie.track_t) + poids(sortie.track_alt),
+        0,
+      ),
     },
     counts: {
       favorites: (data.favorites || []).length,
@@ -324,7 +327,8 @@ export const forgetTrim = () => save({ trimmed: null })
 export function dropTracks() {
   const data = load()
   const avant = usage()?.bytes ?? 0
-  const allegee = (sortie) => (sortie.track || sortie.spoken ? { ...sortie, track: null, spoken: null } : sortie)
+  const allegee = (sortie) =>
+    sortie.track || sortie.spoken ? { ...sortie, track: null, track_t: null, track_alt: null, spoken: null } : sortie
   save({ history: (data.history || []).map(allegee) })
   return Math.max(0, avant - (usage()?.bytes ?? 0))
 }

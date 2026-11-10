@@ -20,7 +20,7 @@ import { isNative } from './platform'
 import { watchPosition } from './position'
 import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
-import { simplify, trailRecorder } from './trail'
+import { keptIndices, simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
 import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed } from './runFormat'
 
@@ -265,7 +265,27 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const voicePrefs = useRef(voice.voiceSettings())
   // La trace réellement suivie, et le dénivelé qu'elle a coûté (voir `trail.js`).
   const trace = useRef(null)
-  if (!trace.current) trace.current = trailRecorder(resuming?.trail ?? [], resuming?.ascent ?? 0)
+  if (!trace.current) {
+    trace.current = trailRecorder(resuming?.trail ?? [], resuming?.ascent ?? 0, {
+      times: resuming?.trailT,
+      alts: resuming?.trailAlt,
+    })
+  }
+  // L'heure de chaque point de la trace se compte depuis ce départ, à l'horloge
+  // et non au chrono : une pause y laisse son trou, là où elle a eu lieu. Une
+  // sortie reprise repart de l'heure de son dernier point — le temps passé
+  // l'app fermée, ou devant le bilan, n'est pas de la sortie.
+  const wallStart = useRef(0)
+  if (!wallStart.current) {
+    wallStart.current = Date.now() - (resuming?.trailT?.at(-1) ?? resuming?.elapsed ?? 0) * 1000
+  }
+  // Ce qu'une reprise ne doit pas perdre : le temps déjà passé à l'arrêt, et
+  // qu'un chemin a été recalculé. Repartis de zéro, ils faussaient le bilan et
+  // l'heure de départ du GPX.
+  const pausedBefore = useRef(resuming?.pausedS ?? 0)
+  const reroutedBefore = useRef(Boolean(resuming?.rerouted))
+  // Ce qui cale le baromètre, qui ne donne que des écarts, sur une altitude.
+  const baroAnchor = useRef(null)
   // Le dénivelé au baromètre — voir `measuredAscent`. `base` : celui d'avant une
   // reprise ; `reading` : le dernier cumul rendu par le module natif.
   const baro = useRef({ base: resuming?.ascent ?? 0, reading: null })
@@ -420,7 +440,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         }
         last.current = point
         lastAt.current = at
-        trace.current.push(point, position.coords.altitude ?? null, position.coords.altitudeAccuracy ?? null)
+        trace.current.push(point, position.coords.altitude ?? null, position.coords.altitudeAccuracy ?? null, {
+          t: Math.round((Date.now() - wallStart.current) / 1000),
+          alt: baroAltitude(),
+        })
         if (route) {
           followRoute(point, { at, course })
           warnCrossing(point)
@@ -463,10 +486,39 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       covered: covered.current,
       elapsed: movingSeconds(now),
       trail: trace.current.points,
+      trailT: trace.current.times,
+      trailAlt: trace.current.alts,
       splits: splits.current,
       spoken: journal.current,
+      pausedS: pausedSeconds(now),
+      rerouted: wasRerouted(),
       ...measuredAscent(),
     })
+  }
+
+  /** Le temps passé à l'arrêt depuis le départ — reprises et pause en cours comprises. */
+  function pausedSeconds(now = Date.now()) {
+    const current = pausedAt.current ? now - pausedAt.current : 0
+    return Math.round(pausedBefore.current + (pausedMs.current + current) / 1000)
+  }
+
+  const wasRerouted = () => reroutedBefore.current || Boolean(guideRef.current.route?.rerouted)
+
+  /**
+   * L'altitude du moment d'après le baromètre, ou `null` s'il n'a rien dit —
+   * le profil garde alors l'altitude lissée du GPS (`trail.js`).
+   *
+   * Le baromètre ne rend que des cumuls, montée et descente : leur différence
+   * est la hauteur gagnée depuis qu'il mesure. Elle est calée une fois sur la
+   * dernière altitude connue — celle de la trace reprise, sinon celle du GPS —,
+   * pour que le profil ne fasse pas une marche à la reprise.
+   */
+  function baroAltitude() {
+    const reading = baro.current.reading
+    if (!reading || !Number.isFinite(reading.ascent) || !Number.isFinite(reading.descent)) return null
+    const gained = reading.ascent - reading.descent
+    baroAnchor.current ??= (trace.current.alts.at(-1) ?? trace.current.altitude ?? 0) - gained
+    return baroAnchor.current + gained
   }
 
   /**
@@ -1139,18 +1191,22 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (distance >= 100) {
       lockScreen.conclude(finishedState({ name: route?.name, distanceM: distance, elapsedS: elapsed, bike: sport === 'bike' }))
     }
+    // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
+    // reprendre, et un point tous les huit mètres y suffit. L'heure et
+    // l'altitude de chaque point gardé suivent, rang pour rang.
+    const kept = keptIndices(trace.current.points)
     onStop({
       distance,
       elapsed,
       arrived: Boolean(at?.arrived),
-      // Allégée au dernier moment : pendant la sortie, la trace sert aussi à
-      // reprendre, et un point tous les huit mètres y suffit.
       trail: simplify(trace.current.points),
+      trailT: kept.map((i) => trace.current.times[i]),
+      trailAlt: kept.map((i) => trace.current.alts[i]),
       ...measuredAscent(),
-      rerouted: Boolean(guideRef.current.route?.rerouted),
+      rerouted: wasRerouted(),
       splits: splits.current.slice(),
       spoken: journal.current.slice(),
-      pausedS: Math.round(pausedMs.current / 1000),
+      pausedS: pausedSeconds(),
     })
   }
 

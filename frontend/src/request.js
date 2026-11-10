@@ -125,10 +125,17 @@ export function freeRunName(sport, startedAt) {
 
 /** L'entrée d'historique d'une sortie terminée. */
 export function runEntry(stats, { route, free, sport }, params) {
-  const base = free ? freeRunEntry({ ...params, sport }, Date.now() - (stats.elapsed || 0) * 1000) : slim(route)
+  // L'heure de la fin : maintenant, sauf pour une sortie interrompue qu'on
+  // range après coup — gardée le lendemain matin, elle prenait la date du
+  // lendemain, et son GPX des heures où l'on dormait.
+  const endedAt = stats.endedAt ?? Date.now()
+  const base = free ? freeRunEntry({ ...params, sport }, endedAt - (stats.elapsed || 0) * 1000) : slim(route)
+  // Ce qui accompagne la trace n'a de sens que rang pour rang avec elle.
+  const along = (list) =>
+    stats.trail?.length > 1 && list?.length === stats.trail.length && list.some(Number.isFinite) ? list : null
   return {
     ...base,
-    ranAt: new Date().toISOString(),
+    ranAt: new Date(endedAt).toISOString(),
     actual_distance_m: Math.round(stats.distance),
     actual_duration_s: Math.round(stats.elapsed),
     actual_ascent_m: stats.ascent ?? null,
@@ -137,6 +144,9 @@ export function runEntry(stats, { route, free, sport }, params) {
     actual_ascent_source: stats.ascent != null ? (stats.ascentSource ?? 'gps') : null,
     // Ce qu'on a réellement couru, allégé — voir `trail.js`.
     track: stats.trail?.length > 1 ? stats.trail : null,
+    // L'heure (secondes depuis le départ) et l'altitude de chacun de ses points.
+    track_t: along(stats.trailT),
+    track_alt: along(stats.trailAlt),
     // Le temps de chaque kilomètre, et le temps passé à l'arrêt : relevés
     // pendant la sortie, impossibles à retrouver après coup.
     splits: stats.splits?.length ? stats.splits : null,

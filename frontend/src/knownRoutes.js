@@ -239,6 +239,48 @@ function coverage(mine, theirs, near) {
   return seen / mine.length
 }
 
+// Les distances dont on retient son meilleur temps : le kilomètre, le cinq, le
+// dix. Le semi et le marathon attendront qu'on en coure — et se lisent alors
+// sur la sortie entière.
+const BEST_KM = [1, 5, 10]
+
+/** Le meilleur temps sur `n` kilomètres de suite, ou `null` s'il n'y en a pas `n`. */
+function bestWindow(splits, n) {
+  if (!(splits?.length >= n)) return null
+  let best = Infinity
+  for (let i = 0; i + n <= splits.length; i += 1) {
+    // Des bornes qui se suivent : une sortie reprise après une coupure peut en
+    // avoir sauté, et dix tours épars ne font pas un dix kilomètres.
+    if (splits[i + n - 1].km - splits[i].km !== n - 1) continue
+    let sum = 0
+    for (let j = i; j < i + n; j += 1) sum += splits[j].seconds
+    if (sum > 0) best = Math.min(best, sum)
+  }
+  return Number.isFinite(best) ? best : null
+}
+
+/**
+ * Les distances sur lesquelles cette sortie bat toutes les autres du même
+ * sport : `[{ km, seconds }]`. Tirés des temps au kilomètre, que même une
+ * sortie ancienne garde (`brief`) — le meilleur 5 km peut donc se cacher au
+ * milieu d'un 12.
+ *
+ * Rien la première fois qu'on court une distance : un record a besoin d'un
+ * temps à battre.
+ */
+export function distanceRecords(entry, history = []) {
+  const sport = entry.sport || 'run'
+  const others = history.filter((r) => r.ranAt !== entry.ranAt && (r.sport || 'run') === sport)
+  const out = []
+  for (const km of BEST_KM) {
+    const mine = bestWindow(entry.splits, km)
+    if (mine === null) continue
+    const theirs = others.map((r) => bestWindow(r.splits, km)).filter((s) => s !== null)
+    if (theirs.length && mine < Math.min(...theirs)) out.push({ km, seconds: mine })
+  }
+  return out
+}
+
 // Sous trois kilomètres, une allure ne dit pas grand-chose : un aller-retour à
 // la boulangerie au pas de course battrait tous les records.
 const RECORD_MIN_M = 3000

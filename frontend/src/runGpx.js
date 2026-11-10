@@ -4,8 +4,9 @@
 // seulement un dessin. L'export d'un *parcours* n'en a pas besoin — c'est un
 // plan —, celui d'une *sortie*, si.
 //
-// La trace gardée n'a pas ses heures : un point tous les huit mètres, sans rien
-// d'autre, pour tenir dans le stockage (voir `trail.js`). Elles se retrouvent
+// Une sortie récente garde l'heure de chaque point (`track_t`, voir `trail.js`),
+// et il n'y a rien à reconstituer. Les plus anciennes n'ont que la trace, un
+// point tous les huit mètres, sans rien d'autre. Leurs heures se retrouvent
 // par les tours de kilomètre, relevés pendant la sortie : chaque kilomètre prend
 // exactement le temps qu'il a pris, et l'intérieur d'un kilomètre est couru à
 // allure régulière. L'allure au kilomètre, qu'on lit sur Strava, est donc la
@@ -32,6 +33,18 @@ const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z')
 export function runTimes(track, entry) {
   const moving = Math.max(1, entry.actual_duration_s || 0)
   const end = Date.parse(entry.ranAt) || Date.now()
+
+  // Les sorties récentes ont l'heure de chaque point, relevée en courant
+  // (`trail.js`) : rien à reconstituer, et les pauses tombent où elles ont eu
+  // lieu. Elle ne recule jamais — une pause automatique revient huit secondes
+  // en arrière sur le chrono, pas sur la montre.
+  const known = entry.track_t
+  if (known?.length === track.length && known.every(Number.isFinite)) {
+    let latest = 0
+    const seconds = known.map((t) => (latest = Math.max(latest, t)))
+    return seconds.map((t) => end - (latest - t) * 1000)
+  }
+
   const start = end - (moving + (entry.paused_s || 0)) * 1000
 
   const along = [0]
@@ -62,9 +75,10 @@ export function buildRunGpx(entry) {
   const track = entry.track?.length > 1 ? entry.track : entry.geometry || []
   const times = runTimes(track, entry)
   const name = escape(entry.name || 'Sortie')
+  const alts = entry.track_alt?.length === track.length ? entry.track_alt : []
   const points = track.map(
     ([lon, lat], i) =>
-      `      <trkpt lat="${pyFixed(lat, 7)}" lon="${pyFixed(lon, 7)}"><time>${iso(times[i])}</time></trkpt>`,
+      `      <trkpt lat="${pyFixed(lat, 7)}" lon="${pyFixed(lon, 7)}">${Number.isFinite(alts[i]) ? `<ele>${alts[i]}</ele>` : ''}<time>${iso(times[i])}</time></trkpt>`,
   )
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Lacet"

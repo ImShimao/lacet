@@ -70,3 +70,30 @@ describe('l’allègement', () => {
     expect(point).toEqual([7.12346, 47.98765])
   })
 })
+
+describe('l’heure et l’altitude de chaque point', () => {
+  it('les garde rang pour rang avec la trace, et les allège avec elle', async () => {
+    const { keptIndices } = await import('./trail')
+    const trail = trailRecorder()
+    for (let i = 0; i <= 30; i += 1) trail.push(est(i * 10), 250 + i, 5, { t: i * 3 })
+    expect(trail.times).toHaveLength(trail.points.length)
+    expect(trail.alts).toHaveLength(trail.points.length)
+    // Une ligne droite : il n'en reste que les deux bouts, avec leur heure.
+    const kept = keptIndices(trail.points)
+    expect(kept).toEqual([0, 30])
+    expect(kept.map((i) => trail.times[i])).toEqual([0, 90])
+  })
+
+  it('préfère l’altitude du baromètre à celle du GPS', () => {
+    const trail = trailRecorder()
+    trail.push(est(0), 250, 5, { t: 0, alt: 312.34 })
+    expect(trail.alts).toEqual([312.3])
+  })
+
+  it('reprend celles d’une sortie interrompue', () => {
+    const trail = trailRecorder([est(0), est(10)], 0, { times: [0, 4], alts: [250, 251] })
+    trail.push(est(20), null, null, { t: 9 })
+    expect(trail.times).toEqual([0, 4, 9])
+    expect(trail.alts).toEqual([250, 251, null])
+  })
+})

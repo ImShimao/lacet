@@ -77,3 +77,37 @@ describe('l’écran de fin', () => {
     expect(screen.queryByText(/Reprendre la sortie/)).toBeNull()
   })
 })
+
+describe('ce que l’écran de fin ajoute', () => {
+  afterEach(cleanup)
+
+  it('montre les derniers mètres après la dernière borne', () => {
+    render(<RunSummary entry={sortie({ actual_distance_m: 2400, actual_duration_s: 715 })} onClose={vi.fn()} />)
+    // 400 m en 120 s : 5:00 du kilomètre.
+    expect(screen.getByText('fin')).toBeTruthy()
+    expect(screen.getByTitle('400 m').textContent).toBe('5:00')
+  })
+
+  it('dit en une phrase l’écart à la dernière fois sur ce chemin', () => {
+    const avant = sortie({ ranAt: '2026-09-28T08:00:00.000Z', actual_duration_s: 560 })
+    const maintenant = sortie()
+    render(<RunSummary entry={maintenant} history={[maintenant, avant]} onClose={vi.fn()} />)
+    expect(screen.getByText(/20 s\/km plus lent que la dernière fois ici/)).toBeTruthy()
+  })
+
+  it('note le ressenti, et l’efface d’un second appui', () => {
+    const onAnnotate = vi.fn()
+    render(<RunSummary entry={sortie()} onClose={vi.fn()} onAnnotate={onAnnotate} />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Dur' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Dur' }))
+    expect(onAnnotate.mock.calls).toEqual([[{ feeling: 4 }], [{ feeling: null }]])
+  })
+
+  it('colorie la trace quand elle a ses heures, et la laisse d’un trait sinon', () => {
+    const t = trace.map((_, i) => (i < 50 ? i * 5 : 250 + (i - 50) * 10))
+    const { container, rerender } = render(<RunSummary entry={sortie({ track_t: t })} onClose={vi.fn()} />)
+    expect(container.querySelectorAll('.sketch__pace').length).toBeGreaterThan(1)
+    rerender(<RunSummary entry={sortie()} onClose={vi.fn()} />)
+    expect(container.querySelectorAll('.sketch__pace')).toHaveLength(0)
+  })
+})

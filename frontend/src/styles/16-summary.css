@@ -55,18 +55,21 @@
 }
 
 /* Un record : rare, donc dit en couleur. */
+/* En pastilles qui se rangent côte à côte : avec les records par distance, il
+   peut y en avoir quatre, et quatre blocs pleine largeur repoussaient les
+   kilomètres sous le pli. */
 .summary__records {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .summary__records span {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  font-size: calc(13px * var(--text-scale));
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 700;
   color: var(--caution);
   background: var(--caution-soft);
@@ -127,19 +130,73 @@
 
 /* Le croquis de la trace, qui se dessine en arrivant : départ marqué d'un point. */
 .sketch {
-  width: 160px;
-  height: 96px;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 320 / 190;
   margin-bottom: 2px;
 }
 .sketch path {
   fill: none;
-  stroke: var(--accent-text);
-  stroke-width: 3;
+  stroke-width: 3.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.sketch__line {
+  stroke: var(--accent-text);
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: sketch-draw 1.1s ease-out 0.15s forwards;
+}
+/* L'allure, par-dessus le trait une fois dessiné : du vert où l'on a couru plus
+   vite que sa médiane au rouge où l'on a coulé. Les mêmes trois teintes que
+   partout ailleurs dans l'app, où le vert est « bien » et le rouge « attention ». */
+.sketch__pace {
+  opacity: 0;
+  animation: sketch-pace 0.5s ease-out 1.2s forwards;
+}
+.sketch__pace[data-band='0'] {
+  stroke: var(--safe);
+}
+.sketch__pace[data-band='1'] {
+  stroke: color-mix(in srgb, var(--safe), var(--caution));
+}
+.sketch__pace[data-band='2'] {
+  stroke: var(--caution);
+}
+.sketch__pace[data-band='3'] {
+  stroke: color-mix(in srgb, var(--caution), var(--risk));
+}
+.sketch__pace[data-band='4'] {
+  stroke: var(--risk);
+}
+@keyframes sketch-pace {
+  to {
+    opacity: 1;
+  }
+}
+.sketch__legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: calc(10.5px * var(--text-scale));
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.sketch__legend i {
+  width: 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--safe), var(--caution), var(--risk));
+}
+/* Ce que la sortie vaut, en une phrase : à l'accent, sous le nom. */
+.summary__hero .summary__verdict {
+  margin-top: 4px;
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.summary details p {
+  margin-top: 8px;
 }
 .sketch circle {
   fill: var(--accent);
@@ -155,7 +212,58 @@
   .sketch path {
     animation: none;
     stroke-dashoffset: 0;
+    opacity: 1;
   }
+}
+
+/* Le profil réellement monté : une surface à l'accent, sans axe — le sommet et
+   son gain sont dits au-dessus. */
+.climb svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+.climb__area {
+  fill: var(--accent-soft);
+}
+.climb__line {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Le ressenti : cinq mots qui tiennent sur une ligne de téléphone, et une note.
+   Seize pixels au champ, sans quoi iOS zoome toute l'app au toucher. */
+.feeling {
+  display: grid;
+  gap: 8px;
+}
+.feeling .chips {
+  flex-wrap: wrap;
+}
+.feeling input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  outline: none;
+}
+.feeling input:focus {
+  border-color: var(--accent);
+}
+
+/* Les derniers mètres, après la dernière borne : en pointillé, ce n'est pas un
+   kilomètre entier. */
+.splits__row--end i {
+  border-style: dashed;
+}
+.splits .muted {
+  margin-top: 4px;
 }
 
 /* ══ les départs enregistrés ══════════════════════════════════════════════ */
