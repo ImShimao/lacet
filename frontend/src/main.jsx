@@ -6,9 +6,9 @@ import { createRoot } from 'react-dom/client'
 //
 // Inter, une seule famille pour tout : ses chiffres à chasse fixe alignent
 // les colonnes sans recourir à une police mono, et son axe de taille optique
-// resserre d'elle-même les grands chiffres de course. Les fichiers déclarent
-// leur jeu de caractères : seul le latin se charge.
-import '@fontsource-variable/inter/opsz.css'
+// resserre d'elle-même les grands chiffres de course. Seuls le latin et le
+// latin étendu sont embarqués (voir styles/inter.css) : le reste pèse 134 Ko.
+import './styles/inter.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './styles/index.css'
 import App from './App.jsx'
