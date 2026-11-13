@@ -24,6 +24,8 @@ export const MAX_DEVIATION_M = 12
 export const FLAT_SHARE = 0.01
 // Le retour à la porte évite la ligne droite (voir `chainLegs` en Python).
 const RETURN_PENALTY = 6
+// Carrefours de détour essayés pour approcher la distance demandée : chacun coûte un Dijkstra.
+const DETOUR_TRIES = 8
 
 const legal = (graph, e, from) => {
   const sens = graph.edgeOneway[e]
@@ -121,27 +123,63 @@ function chainFrom(graph, from, lo, hi, terrain) {
  * ligne, puis le retour à la porte par d'autres rues. Le retour pénalise les
  * tronçons déjà pris, pour ne pas repartir en arrière.
  *
+ * Avec `targetM`, le retour fait un détour par un carrefour `w` choisi pour que
+ * la boucle approche la distance demandée : sans lui, porte → ligne → porte
+ * faisait 1,5 à 2,5 km, moins que la séance elle-même (6 × 400 m et leurs
+ * récupérations ≈ 3,5 km), et le coureur rentrait au milieu de son fractionné.
+ * On essaie les `DETOUR_TRIES` carrefours dont l'estimation tombe le plus près,
+ * et on garde la boucle mesurée la plus proche de `targetM`.
+ *
  * Renvoie un `Candidate` mesuré (comme celui de `loops.js`), ou `null` si le
  * retour ou l'aller ne se tracent pas.
  */
-export function seanceLoop(graph, start, straight, profile, { night = false } = {}) {
+export function seanceLoop(graph, start, straight, profile, { night = false, targetM = 0 } = {}) {
   const weights = profile.precompute(graph)
   const toStart = reconstruct(dijkstra(graph, start, weights, { target: straight.from }), straight.from)
   if (!toStart) return null
 
   const used = new Map()
   for (const e of [...toStart, ...straight.edges]) used.set(e, RETURN_PENALTY)
-  const back = reconstruct(dijkstra(graph, straight.to, weights, { target: start, penalties: used }), start)
-  if (!back) return null
 
-  const edges = trimSpurs(graph, start, [...toStart, ...straight.edges, ...back], weights)
-  // Le rognage peut manger la ligne droite elle-même : on ne la rend que si elle tient.
-  const at = edges.indexOf(straight.edges[0])
-  if (at < 0 || straight.edges.some((e, i) => edges[at + i] !== e)) return null
+  const close = (back) => {
+    if (!back) return null
+    const edges = trimSpurs(graph, start, [...toStart, ...straight.edges, ...back], weights)
+    // Le rognage peut manger la ligne droite elle-même : on ne la rend que si elle tient.
+    const at = edges.indexOf(straight.edges[0])
+    if (at < 0 || straight.edges.some((e, i) => edges[at + i] !== e)) return null
+    const cand = new Candidate(edges, nodeSequence(graph, start, edges))
+    measure(graph, start, cand, { night })
+    return cand
+  }
 
-  const cand = new Candidate(edges, nodeSequence(graph, start, edges))
-  measure(graph, start, cand, { night })
-  return cand
+  const direct = close(reconstruct(dijkstra(graph, straight.to, weights, { target: start, penalties: used }), start))
+  const outM = toStart.reduce((sum, e) => sum + graph.edgeLen[e], 0) + straight.lengthM
+  const remaining = targetM - outM
+  if (direct && direct.distanceM >= targetM * (1 - STRAIGHT_TOLERANCE)) return direct
+  if (remaining <= 0) return direct
+
+  // Deux arbres : de la fin de la ligne vers `w`, et de la porte vers `w` (le
+  // retour `w` → porte, à peu près symétrique à pied).
+  const fromEnd = dijkstra(graph, straight.to, weights, { maxDist: remaining, penalties: used })
+  const fromHome = dijkstra(graph, start, weights, { maxDist: remaining, penalties: used })
+  const picks = fromEnd.reached
+    .filter((w) => w !== start && Number.isFinite(fromHome.dist[w]))
+    .map((w) => [Math.abs(fromEnd.dist[w] + fromHome.dist[w] - remaining), w])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .slice(0, DETOUR_TRIES)
+
+  let best = direct
+  const gap = (cand) => Math.abs(cand.distanceM - targetM)
+  for (const [, w] of picks) {
+    const leg = reconstruct(fromEnd, w)
+    if (!leg) continue
+    const penalties = new Map(used)
+    for (const e of leg) penalties.set(e, RETURN_PENALTY)
+    const home = reconstruct(dijkstra(graph, w, weights, { target: start, penalties }), start)
+    const cand = home && close([...leg, ...home])
+    if (cand && (best === null || gap(cand) < gap(best))) best = cand
+  }
+  return best
 }
 
 /**
@@ -149,9 +187,9 @@ export function seanceLoop(graph, start, straight, profile, { night = false } = 
  * plate à portée. `{ cand, straight }` : `straight.edges` sert à la mettre en
  * évidence sur la carte.
  */
-export function planSeance(graph, start, { straightM = 400, terrain = null, profile, night = false }) {
+export function planSeance(graph, start, { straightM = 400, terrain = null, profile, night = false, targetM = 0 }) {
   const straight = findStraight(graph, start, straightM, terrain)
   if (!straight) return null
-  const cand = seanceLoop(graph, start, straight, profile, { night })
+  const cand = seanceLoop(graph, start, straight, profile, { night, targetM })
   return cand && { cand, straight }
 }

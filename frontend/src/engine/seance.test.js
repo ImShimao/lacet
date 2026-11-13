@@ -82,6 +82,26 @@ describe('séance du jour : la ligne droite plate', () => {
     expect(cand.distanceM).toBeGreaterThan(1500)
   })
 
+  it('rallonge le retour par un détour pour approcher la distance demandée', () => {
+    // Le circuit de 1,8 km, plus une boucle à l'est : Z → E1 → E2 → W, 1,8 km de plus.
+    const big = network()
+    big.ways.push(
+      way(6, 'Rue Lointaine', [[4, 300, 600], [6, 900, 600]]),
+      way(7, 'Rue du Bout', [[6, 900, 600], [7, 900, 0]]),
+      way(8, 'Rue du Retour', [[7, 900, 0], [5, 300, 0]]),
+    )
+    const graph = buildGraph(big)
+    const door = nodeAt(graph, 0, 0)
+
+    const short = planSeance(graph, door, { straightM: 400, terrain: FLAT, profile: PROFILE })
+    const long = planSeance(graph, door, { straightM: 400, terrain: FLAT, profile: PROFILE, targetM: 3000 })
+
+    expect(short.cand.distanceM).toBeLessThan(2000)
+    expect(Math.abs(long.cand.distanceM - 3000)).toBeLessThan(300)
+    expect(long.cand.edges).toEqual(expect.arrayContaining(long.straight.edges))
+    expect(long.cand.nodes[long.cand.nodes.length - 1]).toBe(door)
+  })
+
   it('une ligne de même longueur en pente de 10 % n’est pas retenue', () => {
     const graph = buildGraph(network())
     expect(planSeance(graph, nodeAt(graph, 0, 0), { straightM: 400, terrain: HILL, profile: PROFILE })).toBeNull()

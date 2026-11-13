@@ -826,7 +826,7 @@ export async function planSeanceRoute(input, { loadGraph, fetchElevations = fetc
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
   const profile = buildProfile(req.surface, req.safety, night, req.sport, { terrain })
   const straightM = effortMetres(spec.effort)
-  const found = planSeance(graph, start, { straightM, terrain, profile, night })
+  const found = planSeance(graph, start, { straightM, terrain, profile, night, targetM: req.distance_km * 1000 })
   if (!found) return empty(`Aucune ligne droite plate de ${straightM} m à moins de 1 km de ce point. Essaie un autre départ.`)
 
   const { cand, straight } = found

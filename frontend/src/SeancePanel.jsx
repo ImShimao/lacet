@@ -20,7 +20,9 @@ const toForm = ({ unit, value }) => {
   return { u: 's', v: value }
 }
 
-const fromForm = ({ u, v }) => (u === 'min' ? { unit: 's', value: Math.round(v * 60) } : { unit: u, value: v })
+// Le champ garde le texte saisi : converti en nombre à chaque frappe, un champ
+// vidé affichait « 0 », et taper « 5 » donnait « 05 ». `normalizeSeance` borne.
+const fromForm = ({ u, v }) => (u === 'min' ? { unit: 's', value: Math.round(Number(v) * 60) } : { unit: u, value: v })
 
 function Amount({ label, value, onChange }) {
   return (
@@ -32,7 +34,7 @@ function Amount({ label, value, onChange }) {
           inputMode="decimal"
           min={1}
           value={value.v}
-          onChange={(e) => onChange({ ...value, v: Number(e.target.value) })}
+          onChange={(e) => onChange({ ...value, v: e.target.value })}
           aria-label={`${label}, valeur`}
         />
         <select value={value.u} onChange={(e) => onChange({ ...value, u: e.target.value })} aria-label={`${label}, unité`}>
@@ -63,7 +65,7 @@ export default function SeancePanel({ spec, onStart }) {
           min={1}
           max={30}
           value={reps}
-          onChange={(e) => setReps(Number(e.target.value))}
+          onChange={(e) => setReps(e.target.value)}
         />
       </label>
       <Amount label="Effort" value={effort} onChange={setEffort} />
