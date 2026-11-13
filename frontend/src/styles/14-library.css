@@ -54,6 +54,14 @@
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
+.monthhead__report {
+  margin-left: auto;
+  font-size: calc(13px * var(--text-scale));
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+}
 .list__group:first-child .monthhead {
   padding-top: 2px;
 }
