@@ -44,6 +44,7 @@ export default function Explore({
   onSelect,
   onToggleDetail,
   onSearch,
+  onSeance = null,
   onCancel = null,
   onRegenerate,
   onReverse,
@@ -128,6 +129,12 @@ export default function Explore({
           <Icon name="search" size={18} />
           Trouver ma boucle
         </button>
+        {/* La séance : même départ, mais une ligne droite plate de 400 m à parcourir. */}
+        {onSeance && (
+          <button className="btn btn--ghost" onClick={onSeance} disabled={!start}>
+            Séance 6 × 400 m
+          </button>
+        )}
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
         <div className="row">

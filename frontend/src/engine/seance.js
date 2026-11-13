@@ -46,17 +46,22 @@ function deviationM(coords, a, b) {
   return worst
 }
 
-/** Le tronçon `path`, parti de `from`, est-il une ligne droite plate ? */
-function isFlatStraight(graph, from, path, terrain) {
+/** Les coordonnées du tracé `edges`, parti de `from` : de quoi dessiner la ligne droite. */
+export function pathCoords(graph, from, edges) {
   const coords = []
   let cursor = from
-  let length = 0
-  for (const e of path) {
+  for (const e of edges) {
     const piece = graph.coordsFrom(e, cursor)
     coords.push(...(coords.length ? piece.slice(1) : piece))
-    length += graph.edgeLen[e]
     cursor = graph.other(e, cursor)
   }
+  return coords
+}
+
+/** Le tronçon `path`, parti de `from`, est-il une ligne droite plate ? */
+function isFlatStraight(graph, from, path, terrain) {
+  const coords = pathCoords(graph, from, path)
+  const length = path.reduce((sum, e) => sum + graph.edgeLen[e], 0)
   if (deviationM(coords, coords[0], coords[coords.length - 1]) > MAX_DEVIATION_M) return false
   return terrain.climb(coords) <= FLAT_SHARE * length
 }

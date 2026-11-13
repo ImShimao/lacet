@@ -6,7 +6,7 @@
 // d'adresse. Le nom du module reste, parce que c'est toujours la frontière entre
 // l'interface et ce qui calcule.
 
-import { planOnDevice } from './engine/client'
+import { planOnDevice, seanceOnDevice } from './engine/client'
 import { reverse, search } from './engine/geocode'
 import { buildGpx, gpxFilename } from './engine/gpx'
 import { buildRunGpx } from './runGpx'
@@ -52,6 +52,14 @@ export function explainFailure(error) {
 export async function generateLoops(params, onProgress) {
   try {
     return await planOnDevice(params, onProgress)
+  } catch (error) {
+    throw explainFailure(error)
+  }
+}
+
+export async function generateSeance(params, onProgress) {
+  try {
+    return await seanceOnDevice(params, onProgress)
   } catch (error) {
     throw explainFailure(error)
   }

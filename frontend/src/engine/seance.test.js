@@ -3,6 +3,7 @@ import { emptyExtract } from './extract'
 import { buildGraph } from './graph'
 import { Terrain } from './environment'
 import { planSeance } from './seance'
+import { planSeanceRoute } from './service'
 import { buildProfile } from './weights'
 
 /**
@@ -84,5 +85,27 @@ describe('séance du jour : la ligne droite plate', () => {
   it('une ligne de même longueur en pente de 10 % n’est pas retenue', () => {
     const graph = buildGraph(network())
     expect(planSeance(graph, nodeAt(graph, 0, 0), { straightM: 400, terrain: HILL, profile: PROFILE })).toBeNull()
+  })
+})
+
+describe('séance du jour : le parcours rendu à l’écran', () => {
+  const request = { lat: LAT, lon: LON, distance_km: 1.8, sport: 'run' }
+  const loadGraph = async () => buildGraph(network())
+
+  it('rend la boucle avec le tracé de sa ligne droite, pour la carte', async () => {
+    const flat = async ([points]) => [{ values: points.map(() => 100) }]
+    const { routes, meta } = await planSeanceRoute(request, { loadGraph, fetchElevations: flat })
+
+    expect(meta.message).toBeUndefined()
+    expect(routes).toHaveLength(1)
+    expect(routes[0].seance.straight.length).toBeGreaterThan(1)
+  })
+
+  it('sans relief, rend rien et le dit, plutôt qu’une boucle non vérifiée', async () => {
+    const none = async () => [{ values: [] }]
+    const { routes, meta } = await planSeanceRoute(request, { loadGraph, fetchElevations: none })
+
+    expect(routes).toHaveLength(0)
+    expect(meta.message).toMatch(/relief/)
   })
 })

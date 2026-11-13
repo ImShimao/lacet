@@ -733,6 +733,7 @@ export default function MapView({
     if (!m || !revision) return undefined
 
     m.getSource('ghost')?.setData(ghostToGeoJson(ghost, route))
+    m.getSource('seance')?.setData(seanceToGeoJson(route))
 
     // Le parcours se dessine depuis le départ, dans son sens, puis ses
     // traversées s'y posent. Pas en course : un détour remplace le tracé sous
@@ -1049,6 +1050,15 @@ function addLayers(m) {
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-width': 5 },
   })
+  // La ligne droite de la séance, par-dessus le tracé : blanche, pour se voir.
+  m.addSource('seance', { type: 'geojson', data: empty() })
+  m.addLayer({
+    id: 'seance-straight',
+    type: 'line',
+    source: 'seance',
+    layout: { 'line-cap': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 3 },
+  })
 
   // Le sens de parcours. Il n'est pas décoratif : les consignes de navigation,
   // le profil altimétrique et l'orientation par rapport au vent décrivent tous
@@ -1275,6 +1285,13 @@ function crossingsToGeoJson(route) {
       geometry: { type: 'Point', coordinates: [crossing.lon, crossing.lat] },
     })),
   }
+}
+
+/** La ligne droite de la séance, quand le parcours en a une. */
+function seanceToGeoJson(route) {
+  const line = route?.seance?.straight
+  if (!line?.length) return empty()
+  return { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } }
 }
 
 /** Les autres propositions, en gris derrière celle qui est sélectionnée. */

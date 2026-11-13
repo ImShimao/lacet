@@ -18,6 +18,7 @@ import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, pySum, sortByKey } fro
 import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
+import { pathCoords, planSeance } from './seance'
 import { familiarTo } from '../knownRoutes'
 import { ELEVATION_STEP_M, Terrain, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
 
@@ -800,6 +801,37 @@ function seeded(seed) {
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * « 6 × 400 m » : la boucle de la séance, en parcours affichable. Le relief est
+ * obligatoire — sans lui, la planéité ne se vérifie pas — et son absence se dit
+ * à l'écran plutôt que de rendre une boucle au hasard. Le parcours porte
+ * `seance.straight`, le tracé de la ligne droite, pour la carte.
+ */
+export async function planSeanceRoute(input, { loadGraph, fetchElevations = fetchMany, now = () => new Date() }) {
+  const req = normalizeRequest(input)
+  const args = graphArgs(req)
+  const terrainTask = fetchTerrain(req.lat, req.lon, args.radiusM, fetchElevations)
+  const graph = await loadGraph(args)
+  const terrain = await terrainTask
+  const start = graph.nearestNode(req.lon, req.lat)
+  const empty = (message) => ({ routes: [], rejected: [], meta: { engine: 'local', message } })
+  if (start === null) return empty("Impossible de raccorder ce point au réseau de rues. Essaie un départ plus proche d'une rue.")
+  if (!terrain) return empty("Le relief de la zone n'est pas disponible : la séance ne peut pas vérifier que la ligne droite est plate.")
+
+  const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
+  const profile = buildProfile(req.surface, req.safety, night, req.sport, { terrain })
+  const found = planSeance(graph, start, { terrain, profile, night })
+  if (!found) return empty('Aucune ligne droite plate de 400 m à moins de 1 km de ce point. Essaie un autre départ.')
+
+  const { cand, straight } = found
+  const route = matchedRoute(graph, start, { edges: cand.edges, nodes: cand.nodes }, { req, name: 'Séance du jour · 6 × 400 m', night })
+  return {
+    routes: [{ ...route, seance: { straight: pathCoords(graph, straight.from, straight.edges) } }],
+    rejected: [],
+    meta: { engine: 'local' },
   }
 }
 

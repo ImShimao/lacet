@@ -211,6 +211,19 @@ export default function App() {
     [params, start, result, via, history],
   )
 
+  // La séance « 6 × 400 m » : même départ et même distance que la recherche,
+  // mais une boucle qui passe par une ligne droite plate (voir `planSeanceRoute`).
+  const seance = useCallback(() => {
+    if (!start) return
+    setTab('explore')
+    setSheet('peek')
+    const asked = askedOf(start)
+    found.run(
+      { ...toRequest(params, start), blocked: blockedPoints(), zones: avoidedZones() },
+      { from: asked, onStart: (point) => here.setPoint({ ...point, asked }), seance: true },
+    )
+  }, [params, start, found])
+
   // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient
   // de poser. Retiré, elle repart sans lui — si des boucles étaient affichées.
   const passBy = (point) => {
@@ -789,6 +802,7 @@ export default function App() {
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
+              onSeance={seance}
               onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}
