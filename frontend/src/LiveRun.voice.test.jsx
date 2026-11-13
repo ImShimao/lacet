@@ -6,6 +6,8 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fromCompact } from './engine/extract'
 import { buildGraph } from './engine/graph'
+import { tilesFor } from './engine/overpass'
+import { fromRegionTile } from './engine/region'
 import { SETTINGS, planLoops } from './engine/service'
 import { haversine } from './format'
 import { bearing, buildTrack, headingAt, locate, pointAt } from './routeTracker'
@@ -181,6 +183,27 @@ const graphe = (nom) => {
   return graphes.get(nom)
 }
 
+// Le graphe d'une zone, reconstruit depuis les tuiles livrées (`public/region`),
+// pour les départs qui n'ont pas d'extrait de parité. Les tuiles qui touchent le
+// disque sont fusionnées, et chaque rue, passage ou zone n'est gardé qu'une fois.
+const regionDir = join(import.meta.dirname, '..', 'public', 'region')
+const regionGraphs = new Map()
+function regionGraph(nom, lat, lon, rayonM) {
+  if (!regionGraphs.has(nom)) {
+    const livrees = new Set(JSON.parse(readFileSync(join(regionDir, 'index.json'), 'utf8')).tiles)
+    const fusion = Object.fromEntries(['ways', 'landuse', 'crossings', 'barriers', 'green', 'marked'].map((k) => [k, new Map()]))
+    for (const [ix, iy] of tilesFor(lat, lon, rayonM).filter(([x, y]) => livrees.has(`${x}_${y}`))) {
+      const tuile = fromRegionTile(JSON.parse(readFileSync(join(regionDir, `${ix}_${iy}.json`), 'utf8')))
+      for (const k of Object.keys(fusion)) {
+        for (const item of tuile[k]) fusion[k].set(item.id ?? JSON.stringify(item), item)
+      }
+    }
+    const extract = Object.fromEntries(Object.entries(fusion).map(([k, m]) => [k, [...m.values()]]))
+    regionGraphs.set(nom, buildGraph(extract, { sport: 'run' }))
+  }
+  return regionGraphs.get(nom)
+}
+
 // L'heure de chaque sortie simulée : un dimanche matin, à Lyon comme à Beaune.
 const DEBUT = '2026-10-18T08:00:00Z'
 
@@ -188,6 +211,10 @@ const DEBUT = '2026-10-18T08:00:00Z'
 const BEAUNE = ['extract-beaune.json.gz', 47.0043406, 4.8380759]
 const GUILLOTIERE = ['extract-lyon-centre.json.gz', 45.7502885, 4.8579479]
 const PENTES = ['extract-lyon-centre.json.gz', 45.772538, 4.8279541]
+// Le centre de Guebwiller, pas l'adresse : les sorties virtuelles partent du
+// centre, et les coordonnées restent ainsi hors du dépôt. Rayon de 4 km, assez
+// pour une boucle de 10 km.
+const GUEBWILLER = ['guebwiller', 47.9057, 7.2092, 4000]
 
 /**
  * Les boucles proposées d'un départ, avec la demande qui les a produites.
@@ -197,9 +224,9 @@ const PENTES = ['extract-lyon-centre.json.gz', 45.772538, 4.8279541]
  * l'horloge — de nuit, d'autres rues — et avec la charge du PC, qui coupait
  * l'élargissement plus tôt : le test des pentes échouait un jour sur deux.
  */
-async function boucles([nom, lat, lon], km) {
+async function boucles([nom, lat, lon, rayonM], km) {
   const demande = { lat, lon, distance_km: km, sport: 'run', limit: 12 }
-  const graph = graphe(nom)
+  const graph = rayonM ? regionGraph(nom, lat, lon, rayonM) : graphe(nom)
   const r = await planLoops(demande, {
     loadGraph: async () => graph,
     fetchElevations: async () => [],
@@ -622,6 +649,52 @@ describe('une sortie entière, écoutée', () => {
     const { routes } = await boucles(PENTES, 5)
     expect(manoeuvres(chargee(routes)).length).toBeGreaterThan(30)
   }, 60_000)
+
+  // Sorties virtuelles autour de Guebwiller, sur les rues livrées dans l'app.
+  // Mêmes contrôles que plus haut : ce qu'on entend doit suivre la sortie.
+  describe('sorties virtuelles autour de Guebwiller', () => {
+    it.each([5, 10])('une boucle de %s km depuis le centre, guidée du départ à l’arrivée', async (km) => {
+      const { demande, routes } = await boucles(GUEBWILLER, km)
+      const route = routes.find((r) => r.laps === 1)
+      expect(route, `aucune boucle de ${km} km`).toBeTruthy()
+      const run = await courir(route, demande)
+      expect(defauts(route, run).join('\n'), transcription(run)).toBe('')
+      expect(run.onStop).toHaveBeenCalled()
+    }, 120_000)
+
+    it('l’écart à l’allure visée se dit à chaque kilomètre, kilomètres tus', async () => {
+      save({ voice: { km: 0, target: true } })
+      const { demande, routes } = await boucles(GUEBWILLER, 5)
+      const route = routes.find((r) => r.laps === 1)
+      // 300 s/km demandés : le coureur simulé, à près de 345 s/km, est trop lent.
+      const run = await courir(route, { ...demande, pace_sec_per_km: 300 })
+      const ecarts = run.dites.map((d) => d.texte).filter((t) => /^(Trop lent|En avance) de \d+ secondes\.$/.test(t))
+      expect(ecarts.length, transcription(run)).toBeGreaterThan(0)
+    }, 120_000)
+
+    // D'autres endroits de la carte livrée : une ville plate, une plus grande
+    // ville, et une vallée vosgienne aux côtes. Une sortie de 5 km chacune, avec
+    // un écart du tracé — ce qu'on demande à une vraie sortie.
+    it.each([
+      ['Colmar', ['colmar', 48.0794, 7.3585, 4000]],
+      ['Mulhouse', ['mulhouse', 47.7508, 7.3359, 4000]],
+      ['la vallée de Munster', ['munster', 48.0459, 7.1365, 4000]],
+    ])('à %s, une boucle de 5 km avec un écart, guidée jusqu’au bout', async (_, depart) => {
+      const { demande, routes } = await boucles(depart, 5)
+      const route = routes.find((r) => r.laps === 1)
+      expect(route, 'aucune boucle de 5 km').toBeTruthy()
+      const run = await courir(route, demande, { ecart: true })
+      expect(defauts(route, run).join('\n'), transcription(run)).toBe('')
+    }, 120_000)
+
+    it('un écart du tracé se rattrape, et la voix le dit', async () => {
+      const { demande, routes } = await boucles(GUEBWILLER, 5)
+      const route = routes.find((r) => r.laps === 1)
+      const run = await courir(route, demande, { ecart: true })
+      expect(defauts(route, run).join('\n'), transcription(run)).toBe('')
+      expect(run.dites.some((d) => d.texte.startsWith("Tu t'es écarté")), transcription(run)).toBe(true)
+    }, 120_000)
+  })
 
   it('dit la fin du premier tour, et ne s’arrête pas là', async () => {
     const { demande, routes } = await boucles(BEAUNE, 5)
