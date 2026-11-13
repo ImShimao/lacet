@@ -108,4 +108,18 @@ describe('séance du jour : le parcours rendu à l’écran', () => {
     expect(routes).toHaveLength(0)
     expect(meta.message).toMatch(/relief/)
   })
+
+  it('un effort de 2 min se traduit en ligne de 400 m ; une durée sans ligne le dit', async () => {
+    const flat = async ([points]) => [{ values: points.map(() => 100) }]
+    const deux = { ...request, seance: { reps: 6, effort: { unit: 's', value: 120 }, rest: { unit: 's', value: 60 } } }
+    const ok = await planSeanceRoute(deux, { loadGraph, fetchElevations: flat })
+    expect(ok.routes).toHaveLength(1)
+    expect(ok.routes[0].name).toBe('Fractionné · 6 × 2 min, récup 1 min')
+
+    // 72 s ≈ 240 m : aucune ligne droite plate de cette longueur dans le réseau.
+    const court = { ...request, seance: { ...deux.seance, effort: { unit: 's', value: 72 } } }
+    const none = await planSeanceRoute(court, { loadGraph, fetchElevations: flat })
+    expect(none.routes).toHaveLength(0)
+    expect(none.meta.message).toContain('240 m')
+  })
 })

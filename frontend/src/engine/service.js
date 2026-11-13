@@ -19,6 +19,7 @@ import { gradeRoute, runGate } from './safety'
 import { AVOID_KEYS, buildProfile } from './weights'
 import { planRejoin } from './reroute'
 import { pathCoords, planSeance } from './seance'
+import { describeSeance, effortMetres, normalizeSeance } from '../seanceSpec'
 import { familiarTo } from '../knownRoutes'
 import { ELEVATION_STEP_M, Terrain, ascentDescent, currentWind, fetchMany, isNight, shapeRelief, tailwindFinish } from './environment'
 
@@ -811,6 +812,7 @@ function seeded(seed) {
  * `seance.straight`, le tracé de la ligne droite, pour la carte.
  */
 export async function planSeanceRoute(input, { loadGraph, fetchElevations = fetchMany, now = () => new Date() }) {
+  const spec = normalizeSeance(input.seance)
   const req = normalizeRequest(input)
   const args = graphArgs(req)
   const terrainTask = fetchTerrain(req.lat, req.lon, args.radiusM, fetchElevations)
@@ -823,13 +825,14 @@ export async function planSeanceRoute(input, { loadGraph, fetchElevations = fetc
 
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
   const profile = buildProfile(req.surface, req.safety, night, req.sport, { terrain })
-  const found = planSeance(graph, start, { terrain, profile, night })
-  if (!found) return empty('Aucune ligne droite plate de 400 m à moins de 1 km de ce point. Essaie un autre départ.')
+  const straightM = effortMetres(spec.effort)
+  const found = planSeance(graph, start, { straightM, terrain, profile, night })
+  if (!found) return empty(`Aucune ligne droite plate de ${straightM} m à moins de 1 km de ce point. Essaie un autre départ.`)
 
   const { cand, straight } = found
-  const route = matchedRoute(graph, start, { edges: cand.edges, nodes: cand.nodes }, { req, name: 'Séance du jour · 6 × 400 m', night })
+  const route = matchedRoute(graph, start, { edges: cand.edges, nodes: cand.nodes }, { req, name: `Fractionné · ${describeSeance(spec)}`, night })
   return {
-    routes: [{ ...route, seance: { straight: pathCoords(graph, straight.from, straight.edges) } }],
+    routes: [{ ...route, seance: { straight: pathCoords(graph, straight.from, straight.edges), spec } }],
     rejected: [],
     meta: { engine: 'local' },
   }

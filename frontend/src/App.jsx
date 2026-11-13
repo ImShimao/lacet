@@ -29,6 +29,7 @@ import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
 import { startAppearance, useAppearance } from './appearance'
 import { km } from './format'
 import { load, rememberShown, save, shownFrom } from './storage'
+import { normalizeSeance } from './seanceSpec'
 import { ranFrom } from './knownRoutes'
 import { haptic } from './platform'
 import { announceDeparture, announcing } from './contact'
@@ -213,16 +214,24 @@ export default function App() {
 
   // La séance « 6 × 400 m » : même départ et même distance que la recherche,
   // mais une boucle qui passe par une ligne droite plate (voir `planSeanceRoute`).
-  const seance = useCallback(() => {
-    if (!start) return
-    setTab('explore')
-    setSheet('peek')
-    const asked = askedOf(start)
-    found.run(
-      { ...toRequest(params, start), blocked: blockedPoints(), zones: avoidedZones() },
-      { from: asked, onStart: (point) => here.setPoint({ ...point, asked }), seance: true },
-    )
-  }, [params, start, found])
+  // Le réglage (répétitions, effort, récupération) est gardé pour la course suivante.
+  const [seanceSpec, setSeanceSpec] = useState(() => normalizeSeance(load().seance))
+  const seance = useCallback(
+    (spec) => {
+      if (!start) return
+      const kept = normalizeSeance(spec)
+      setSeanceSpec(kept)
+      save({ seance: kept })
+      setTab('explore')
+      setSheet('peek')
+      const asked = askedOf(start)
+      found.run(
+        { ...toRequest(params, start), blocked: blockedPoints(), zones: avoidedZones(), seance: kept },
+        { from: asked, onStart: (point) => here.setPoint({ ...point, asked }), seance: true },
+      )
+    },
+    [params, start, found],
+  )
 
   // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient
   // de poser. Retiré, elle repart sans lui — si des boucles étaient affichées.
@@ -803,6 +812,7 @@ export default function App() {
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
               onSeance={seance}
+              seanceSpec={seanceSpec}
               onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}

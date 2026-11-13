@@ -16,7 +16,8 @@ import { REPORT_KINDS, addReport, blockedPoints } from './reports'
 import { avoidedZones } from './zones'
 import { load } from './storage'
 import * as voice from './voice'
-import { SEANCE, startSeance, stepSeance } from './seance'
+import { startSeance, stepSeance } from './seance'
+import { normalizeSeance } from './seanceSpec'
 import { isNative } from './platform'
 import { watchPosition } from './position'
 import { detourOnDevice } from './engine/client'
@@ -167,6 +168,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // Séance du jour (`seance.js`) : l'état vit dans un ref, lu par le minuteur ; l'affichage suit.
   const seance = useRef(null)
   const [seanceShown, setSeanceShown] = useState(null)
+  // Le réglage saisi à l'accueil, lu une fois : il dit ce que le bouton annonce.
+  const [seanceSpec] = useState(() => normalizeSeance(load().seance))
   const splitTimer = useRef(null)
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
@@ -871,7 +874,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       setSeanceShown(null)
       return
     }
-    const { state, say } = startSeance({ metres: covered.current, seconds: movingSeconds() })
+    const { state, say } = startSeance({ metres: covered.current, seconds: movingSeconds() }, seanceSpec)
     seance.current = state
     setSeanceShown(state)
     talk(say, { priority: false })
@@ -1332,9 +1335,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       <button className="live__seance" onClick={toggleSeance} aria-pressed={Boolean(seanceShown)}>
         {seanceShown
           ? seanceShown.phase === 'effort'
-            ? `Effort ${seanceShown.rep} sur ${SEANCE.reps} · arrêter`
-            : `Récupération · ${seanceShown.rep} sur ${SEANCE.reps} · arrêter`
-          : `Séance ${SEANCE.reps} × ${SEANCE.effort} m`}
+            ? `Effort ${seanceShown.rep} sur ${seanceShown.spec.reps} · arrêter`
+            : `Récupération · ${seanceShown.rep} sur ${seanceShown.spec.reps} · arrêter`
+          : 'Fractionné'}
       </button>
 
       {error && <div className="live__error">{error}</div>}

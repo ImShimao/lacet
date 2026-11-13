@@ -1,45 +1,51 @@
-// Séance du jour, version simple : des efforts en mètres (« 400 m »), des
-// récupérations en secondes (« 1 min »), dits à la voix pendant une sortie.
+// Séance du jour, pendant une sortie : des efforts et des récupérations, chacun en
+// mètres ou en secondes (voir `seanceSpec.js` pour le réglage), dits à la voix.
 //
 // Le module ne parle pas : à chaque relevé, il rend l'état suivant et, s'il y a
 // une transition, la phrase à dire. `LiveRun.jsx` la dit par son `talk`, qui
-// tient aussi le journal de la sortie. Un effort se mesure en distance courue,
-// une récupération en temps en mouvement : une pause à un feu ne raccourcit pas
-// la récupération : `LiveRun.jsx` lui passe le temps en mouvement (`movingSeconds`),
+// tient aussi le journal de la sortie. Une distance se mesure en mètres courus,
+// une durée en temps en mouvement : une pause à un feu ne raccourcit pas la
+// récupération — `LiveRun.jsx` lui passe le temps en mouvement (`movingSeconds`),
 // si bien qu'une pause au bouton prolonge la récupération au lieu de la finir.
 
-export const SEANCE = { reps: 6, effort: 400, rest: 60 }
+import { DEFAULT_SEANCE, normalizeSeance, spoken } from './seanceSpec'
 
 /** Lance la séance à la position `{ metres, seconds }` du moment : première répétition. */
-export function startSeance({ metres, seconds }, spec = SEANCE) {
-  const state = { spec, rep: 1, phase: 'effort', from: { metres, seconds }, over: false }
-  return { state, say: `Séance. Répétition 1 sur ${spec.reps}. Effort, ${spec.effort} mètres.` }
+export function startSeance({ metres, seconds }, spec = DEFAULT_SEANCE) {
+  const s = normalizeSeance(spec)
+  const state = { spec: s, rep: 1, phase: 'effort', from: { metres, seconds }, over: false }
+  return { state, say: `Fractionné. Répétition 1 sur ${s.reps}. Effort, ${spoken(s.effort)}.` }
 }
 
+// Une étape est finie quand la distance courue, ou le temps en mouvement, depuis
+// son début atteint sa valeur.
+const reached = ({ unit, value }, now, from) =>
+  unit === 'm' ? now.metres - from.metres >= value : now.seconds - from.seconds >= value
+
 /**
- * Au relevé `{ metres, seconds }`, passe à l'étape suivante si elle est atteinte.
+ * Au relevé `{ metres, seconds }`, passe à l'étape suivante si elle est finie.
  * Sans transition, rend le même `state` et `say` à `null`.
  *
  * Pas de récupération après la dernière répétition : la séance s'arrête à la
  * ligne d'arrivée de son dernier effort.
  */
-export function stepSeance(state, { metres, seconds }) {
+export function stepSeance(state, now) {
   if (!state || state.over) return { state, say: null }
   const { spec, rep, phase, from } = state
   if (phase === 'effort') {
-    if (metres - from.metres < spec.effort) return { state, say: null }
+    if (!reached(spec.effort, now, from)) return { state, say: null }
     if (rep === spec.reps) {
-      return { state: { ...state, over: true, phase: 'done' }, say: 'Séance terminée.' }
+      return { state: { ...state, over: true, phase: 'done' }, say: 'Fractionné terminé.' }
     }
     return {
-      state: { ...state, phase: 'rest', from: { metres, seconds } },
-      say: `Récupération, ${spec.rest} secondes.`,
+      state: { ...state, phase: 'rest', from: { metres: now.metres, seconds: now.seconds } },
+      say: `Récupération, ${spoken(spec.rest)}.`,
     }
   }
-  if (seconds - from.seconds < spec.rest) return { state, say: null }
+  if (!reached(spec.rest, now, from)) return { state, say: null }
   const next = rep + 1
   return {
-    state: { ...state, rep: next, phase: 'effort', from: { metres, seconds } },
-    say: `Répétition ${next} sur ${spec.reps}. Effort, ${spec.effort} mètres.`,
+    state: { ...state, rep: next, phase: 'effort', from: { metres: now.metres, seconds: now.seconds } },
+    say: `Répétition ${next} sur ${spec.reps}. Effort, ${spoken(spec.effort)}.`,
   }
 }
