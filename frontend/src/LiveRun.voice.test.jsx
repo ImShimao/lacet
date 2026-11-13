@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { act, cleanup, render } from '@testing-library/react'
@@ -187,6 +187,10 @@ const graphe = (nom) => {
 // pour les départs qui n'ont pas d'extrait de parité. Les tuiles qui touchent le
 // disque sont fusionnées, et chaque rue, passage ou zone n'est gardé qu'une fois.
 const regionDir = join(import.meta.dirname, '..', 'public', 'region')
+// Les tuiles sont générées (`public/region`, hors dépôt) : la CI des tests ne les
+// a pas, la publication qui les produit ne part qu'après eux. Sans elles, les
+// sorties autour de Guebwiller se sautent au lieu d'échouer ; en local, elles tournent.
+const HAS_REGION = existsSync(join(regionDir, 'index.json'))
 const regionGraphs = new Map()
 function regionGraph(nom, lat, lon, rayonM) {
   if (!regionGraphs.has(nom)) {
@@ -652,7 +656,7 @@ describe('une sortie entière, écoutée', () => {
 
   // Sorties virtuelles autour de Guebwiller, sur les rues livrées dans l'app.
   // Mêmes contrôles que plus haut : ce qu'on entend doit suivre la sortie.
-  describe('sorties virtuelles autour de Guebwiller', () => {
+  describe.skipIf(!HAS_REGION)('sorties virtuelles autour de Guebwiller', () => {
     it.each([5, 10])('une boucle de %s km depuis le centre, guidée du départ à l’arrivée', async (km) => {
       const { demande, routes } = await boucles(GUEBWILLER, km)
       const route = routes.find((r) => r.laps === 1)
