@@ -24,7 +24,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { keptIndices, simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
-import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed } from './runFormat'
+import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed, targetSpeech } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
@@ -686,11 +686,14 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       splitTimer.current = setTimeout(() => setSplitShown(null), SPLIT_SHOWN_MS)
     }
 
-    const { km, lap, pace: average, total } = voicePrefs.current
-    if (!km) return
+    const { km, lap, pace: average, total, target } = voicePrefs.current
     const every = (SPLIT_EVERY_KM[sport] ?? 1) * km
-    if (Math.floor(done / every) <= Math.floor(previous / every)) return
-    const ran = total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
+    const crossed = km > 0 && Math.floor(done / every) > Math.floor(previous / every)
+    // L'écart à l'allure visée se dit à chaque kilomètre plein, même kilomètres
+    // tus : c'est un réglage à part, et la course libre n'a pas d'allure visée.
+    const hint = target && sport !== 'bike' && gap === 1 ? targetSpeech(each, plannedPerKm(request, false)) : ''
+    if (!crossed && !hint) return
+    const ran = crossed && total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
       talk(`${done} kilomètres.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false })
@@ -699,13 +702,16 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
     // compte pas les annonces, et la borne dite par son rang répond d'un coup
     // aux deux questions — où en suis-je, et à quelle allure.
-    const which = `${capitalize(ordinal(done))} kilomètre`
-    // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
-    // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
-    const own = lap && gap === 1 && each > 0
-    let said = own ? `${which} à ${spoken(each)}.` : `${which}.`
-    if (average && !(own && done === 1)) said += ` Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
-    talk(said + ran, { priority: false })
+    let said = ''
+    if (crossed) {
+      const which = `${capitalize(ordinal(done))} kilomètre`
+      // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
+      // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
+      const own = lap && gap === 1 && each > 0
+      said = own ? `${which} à ${spoken(each)}.` : `${which}.`
+      if (average && !(own && done === 1)) said += ` Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
+    }
+    talk([said, hint].filter(Boolean).join(' ') + ran, { priority: false })
   }
 
   /**

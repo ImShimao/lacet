@@ -344,6 +344,7 @@ export default function Explore({
       <div className="route-meta">
         {terrain?.label} · {surfaceShare(selected)}
       </div>
+      {selected.safety && <div className="route-meta">{exposureLine(selected)}</div>}
 
       <RouteStrip route={selected} onScrub={onScrub} />
 
@@ -786,6 +787,19 @@ function RejectedList({ rejected }) {
       ))}
     </div>
   )
+}
+
+/**
+ * Ce que la note dit de la sécurité, en une ligne sous le tracé : les traversées
+ * sans protection et ce qui roule vite, sans avoir à ouvrir le détail de la note.
+ */
+function exposureLine({ safety: s }) {
+  const crossings =
+    s.unprotected_crossings === 0
+      ? 'aucune traversée sans protection'
+      : `${s.unprotected_crossings} traversée${s.unprotected_crossings > 1 ? 's' : ''} sans protection`
+  const exposed = s.exposed_m > 0 ? `${Math.round(s.exposed_m)} m au trafic rapide` : 'rien au trafic rapide'
+  return `${crossings} · ${exposed}`
 }
 
 function surfaceShare(route) {

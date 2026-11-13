@@ -120,7 +120,11 @@ describe('Mon compte', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Temps du km' }))
     fireEvent.click(screen.getByRole('button', { name: 'Temps couru' }))
     fireEvent.click(screen.getByRole('button', { name: 'Plus tôt' }))
-    expect(voiceSettings()).toEqual({ km: 2, lap: false, pace: true, total: true, lead: 'early' })
+    expect(voiceSettings()).toEqual({ km: 2, lap: false, pace: true, total: true, target: true, lead: 'early' })
+
+    // L'écart à l'allure visée se coupe à part, sans toucher aux kilomètres.
+    fireEvent.click(screen.getByRole('button', { name: 'Non' }))
+    expect(voiceSettings()).toMatchObject({ km: 2, target: false })
 
     // Rouverte, la page montre ce qui a été gardé.
     cleanup()

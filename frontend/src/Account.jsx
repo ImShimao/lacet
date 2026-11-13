@@ -987,6 +987,10 @@ const KM_SAYS = [
   ['pace', 'Allure'],
   ['total', 'Temps couru'],
 ]
+const TARGET_SAYS = [
+  { key: 'on', label: 'Oui' },
+  { key: 'off', label: 'Non' },
+]
 const LEADS = [
   { key: 'early', label: 'Plus tôt' },
   { key: 'normal', label: 'Normal' },
@@ -1029,6 +1033,19 @@ function VoiceSetting() {
           <p className="field__hint">La distance est toujours dite ; le reste, à ton choix.</p>
         </div>
       )}
+
+      <div className="field">
+        <span className="label">Écart à l'allure visée</span>
+        <Segmented
+          options={TARGET_SAYS}
+          value={prefs.target ? 'on' : 'off'}
+          onChange={(v) => change({ target: v === 'on' })}
+        />
+        <p className="field__hint">
+          À chaque kilomètre, la voix dit si tu es à plus de dix secondes de l'allure demandée à la
+          recherche. Course libre : rien à comparer, rien n'est dit.
+        </p>
+      </div>
 
       <div className="field">
         <span className="label">Annonce des virages</span>

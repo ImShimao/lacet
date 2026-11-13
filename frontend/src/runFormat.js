@@ -128,6 +128,19 @@ export function arrivalSpeech(metres, seconds, bike = false) {
   return `${head} : ${distance} en ${spokenDuration(seconds)}, ${average}.`
 }
 
+/**
+ * L'écart à l'allure demandée, dit à la voix, ou '' s'il n'y a rien à dire.
+ *
+ * Moins de dix secondes ne s'entend pas en courant : on ne dit rien plutôt que
+ * de répéter « trop lent » à chaque kilomètre. `planned` vaut 0 en course libre.
+ */
+export function targetSpeech(secondsPerKm, planned) {
+  if (!(planned > 0) || !(secondsPerKm > 0)) return ''
+  const diff = Math.round(secondsPerKm - planned)
+  if (Math.abs(diff) < 10) return ''
+  return diff > 0 ? `Trop lent de ${diff} secondes.` : `En avance de ${-diff} secondes.`
+}
+
 /** « 24,5 kilomètres-heure ». */
 export function spokenSpeed(kmh) {
   if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'

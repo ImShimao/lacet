@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalSpeech, clock, lapAt, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenDuration, spokenSpeed, turnIcon } from './runFormat'
+import { arrivalSpeech, clock, lapAt, minutes, ordinal, plannedPerKm, roundedDistance, speed, spoken, spokenDuration, spokenSpeed, targetSpeech, turnIcon } from './runFormat'
 
 describe('ce que l’écran de course écrit', () => {
   it('écrit une durée en heures et minutes, jamais comme un chrono', () => {
@@ -34,6 +34,11 @@ describe('ce que l’écran de course écrit', () => {
     expect(plannedPerKm({ pace_sec_per_km: 390 }, false)).toBe(390)
     expect(plannedPerKm({ speed_kmh: 24 }, true)).toBe(150)
     expect(plannedPerKm(null, false)).toBe(0)
+    // L'écart à l'allure visée : rien sous dix secondes, rien en course libre.
+    expect(targetSpeech(396, 390)).toBe('')
+    expect(targetSpeech(405, 390)).toBe('Trop lent de 15 secondes.')
+    expect(targetSpeech(370, 390)).toBe('En avance de 20 secondes.')
+    expect(targetSpeech(402, 0)).toBe('')
   })
 })
 

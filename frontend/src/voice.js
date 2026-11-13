@@ -23,11 +23,13 @@ const nativeModule = () => import('./native')
  *
  * `km` : une borne sur combien (1, 2), 0 pour les taire. `lap`, `pace`,
  * `total` : le temps du dernier kilomètre, l'allure moyenne, le temps couru.
+ * `target` : dire, à chaque kilomètre, l'écart à l'allure demandée — à part,
+ * pour pouvoir la couper sans toucher aux kilomètres.
  * `lead` : l'annonce d'un virage plus tôt ou plus tard. Seul le confort se
  * règle : les alertes de traversée, l'écart du parcours et le « maintenant »
  * d'un virage se disent toujours, et au même moment.
  */
-export const VOICE_DEFAULTS = { km: 1, lap: true, pace: true, total: false, lead: 'normal' }
+export const VOICE_DEFAULTS = { km: 1, lap: true, pace: true, total: false, target: true, lead: 'normal' }
 
 /** L'avance de l'annonce d'un virage : une trentaine de secondes, ou plus, ou moins. */
 export const LEAD = { early: 1.5, normal: 1, late: 0.6 }
