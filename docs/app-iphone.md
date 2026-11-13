@@ -31,10 +31,15 @@ versionné — il est régénéré à chaque compilation, et tout ce qui disting
 Lacet d'un projet Capacitor vierge tient dans `customize.py`, où chaque réglage
 dit pourquoi.
 
-## L'installer avec AltStore
+## L'installer avec SideStore
 
-**Avec AltStore, pas Sideloadly.** Les deux installent l'app aussi bien ; un
-seul signe **l'extension** qu'elle contient. L'activité en direct de l'écran de
+Depuis le 19 octobre 2026, Lacet s'installe et se met à jour avec **SideStore**
+(auparavant AltStore). Les étapes ci-dessous viennent de guides tiers lus en
+novembre 2026 : **la procédure officielle fait foi**, sur sidestore.io, et elle
+évolue vite. En cas d'écart, suis le site.
+
+**Pas Sideloadly.** Il installe l'app aussi bien, mais il ne signe pas
+**l'extension** qu'elle contient. L'activité en direct de l'écran de
 verrouillage est dessinée par `LacetWidgets.appex`, et iOS ne lance une
 extension que si elle a reçu **son propre** profil de signature, à côté de celui
 de l'app. Sideloadly signe l'app et pas son extension : elle reste dans le
@@ -43,32 +48,36 @@ galerie de widgets, une activité en direct acceptée par ActivityKit et dessin�
 par personne, écran de verrouillage noir, aucun message. Une soirée entière y
 est passée avant que l'app ne sache le dire elle-même.
 
-1. Installe AltServer sur le PC et AltStore sur l'iPhone (iTunes et iCloud
-   doivent venir du site d'Apple, pas du Microsoft Store).
-2. Mets l'IPA sur le téléphone. Sans entrée « Sideload .ipa » dans AltServer, le
-   plus simple est de la servir sur le réseau local :
-   `python scripts/altstore_source.py` prépare le dossier `altstore/`, et
-   `python -m http.server 8765 --directory altstore` le sert — ce dossier-là,
-   jamais la racine du dépôt, qui livrerait `.git` à tout le Wi-Fi. Ouvre
-   ensuite l'IPA dans Safari : elle arrive dans **Fichiers → Téléchargements**.
-   Mieux, une fois pour toutes : **AltStore → Sources → +** →
-   `http://<adresse du PC>:8765/source.json`, et chaque version s'installe
-   ensuite d'un « Mettre à jour ». Pour que le dossier soit servi sans y
-   penser, `python scripts/altstore_source.py --autostart` pose un lanceur dans
-   le dossier Démarrage de Windows : à chaque ouverture de session, le serveur
-   repart, sans fenêtre. Servi depuis une session de Claude Code, il mourait
-   avec elle, et « Mettre à jour » échouait sans autre explication qu'une
-   erreur réseau.
-3. **AltStore → Mes apps → +** → l'IPA téléchargée. AltServer doit tourner :
-   c'est lui qui signe.
-4. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
+1. **Sur l'iPhone** : installe **LocalDevVPN** (App Store), ouvre-le et touche
+   **Connect**, puis autorise la configuration VPN avec le code.
+2. **Sur le PC** : installe **iTunes** (depuis le site d'Apple, pas le Microsoft
+   Store) et **iloader**, qui installe SideStore et prépare les certificats et
+   le fichier de couplage en un clic.
+3. **Couplage** : le fichier de couplage lie le PC à **cet** iPhone. Il devient
+   caduc si l'iPhone est réinitialisé ou mis à jour à l'aveugle : il faut alors
+   le refaire, par la même procédure.
+4. **Mets l'IPA sur le téléphone** : la publication GitHub (voir plus haut), ou
+   la source locale. Si tu passes par la source, le dossier servi reste
+   `altstore/`, jamais la racine du dépôt, qui livrerait `.git`. Le lanceur
+   `python scripts/altstore_source.py --autostart` le sert à l'ouverture de
+   session Windows. Vérifier : `curl http://192.168.1.96:8765/source.json`.
+   *À confirmer sur sidestore.io : que SideStore accepte cette source comme
+   AltStore.*
+5. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
    identifiant → **Faire confiance** ; puis **Confidentialité et sécurité →
    Mode développeur** → activer et redémarrer.
 
-Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours** ; AltStore
-la renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi. Trois apps
-actives au maximum, et **l'extension en consomme une** : Lacet en prend donc
-deux.
+Avec un compte Apple **gratuit**, l'app expire au bout de **7 jours**.
+SideStore la renouvelle **depuis le téléphone**, à condition que LocalDevVPN
+soit actif (et le Wi-Fi ou les données allumés) : rien ne tourne sur le PC. Trois
+apps actives au maximum, et **l'extension en consomme une** : Lacet en prend
+donc deux.
+
+Sources (guides tiers, novembre 2026) :
+[gigazine.net, SideStore sideloading iOS (juin 2026)](https://gigazine.net/gsc_news/en/20260628-sidestore-sideloading-ios/),
+[SideGuide](https://sideguide.pages.dev/),
+[AltStore FAQ, fichier de couplage](https://faq.altstore.io/altstore-classic/no-computer-instructions.md).
+Officiel : [sidestore.io](https://sidestore.io).
 
 **Ce que le téléphone sait dire.** « Mon compte → Pendant la sortie » vérifie les
 cinq conditions d'une activité en direct — iOS 16.2, activités autorisées dans

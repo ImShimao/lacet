@@ -28,3 +28,8 @@ frontend/public/region/
 # réseau local, l’icône et les copies versionnées de l’IPA. Il se régénère
 # (scripts/altstore_source.py) et n’a rien à faire dans le dépôt.
 altstore/
+
+# Coffre Obsidian : préférences personnelles et état de fenêtre, jamais versionnés
+obsidian/.obsidian/workspace*.json
+obsidian/.obsidian/cache
+obsidian/.trash/

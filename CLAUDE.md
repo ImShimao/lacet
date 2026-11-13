@@ -88,7 +88,7 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
 - `README.md` est la page d'accueil du dépôt (captures, installation, liens) : courte, elle renvoie
   au détail. Celui-ci est dans `docs/`, un fichier par thème — lis seulement celui qu'il faut :
   - `fonctionnalites.md` (ce que fait l'app) · `architecture.md` (comment c'est fait, données)
-  - `app-iphone.md` (IPA, AltStore, natif, carte en course, hors parcours, fonds de carte, Apple Santé)
+  - `app-iphone.md` (IPA, SideStore, natif, carte en course, hors parcours, fonds de carte, Apple Santé)
   - `securite.md` (moteur de sécurité, note A, B, C) · `generation.md` (algorithme, choix des
     propositions, tours, vent, dénivelé)
   - `guidage.md` (guidage, sortie, cartes hors ligne) · `interface.md` (interface, réglages)

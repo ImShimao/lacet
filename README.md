@@ -5,7 +5,7 @@
 # Lacet
 
 [![Télécharger l'IPA](https://img.shields.io/badge/T%C3%A9l%C3%A9charger-derni%C3%A8re%20IPA-2563eb?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/ImShimao/lacet/releases/latest/download/Lacet.ipa)
-[![Installer avec AltStore](https://img.shields.io/badge/Installer-AltStore-1F1B2E?style=for-the-badge)](#installation-)
+[![Installer avec SideStore](https://img.shields.io/badge/Installer-SideStore-1F1B2E?style=for-the-badge)](#installation-)
 
 [![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
 [![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
@@ -49,25 +49,29 @@ sécurité, puis te guide à la voix, écran verrouillé.
 
 Lacet n'est pas sur l'App Store. Un Mac de GitHub compile l'IPA à chaque envoi
 sur `main` qui touche l'app, et chaque lundi avec les rues de la semaine ; elle
-s'installe avec [AltStore](https://altstore.io), sans Mac.
+s'installe avec [SideStore](https://sidestore.io), sans Mac.
 
 **Ce qu'il faut :** un iPhone sous iOS 15 ou plus (16.2 pour l'écran de
-verrouillage), un PC Windows sur le même Wi-Fi, et un identifiant Apple — un
-compte gratuit suffit.
+verrouillage), un PC Windows, et un identifiant Apple — un compte gratuit suffit.
 
-1. **AltServer sur le PC**, depuis [altstore.io](https://altstore.io). iTunes et
-   iCloud doivent venir du site d'Apple, pas du Microsoft Store.
-2. **AltStore sur l'iPhone.** iPhone branché, icône d'AltServer dans la barre des
-   tâches → *Install AltStore* → ton iPhone.
+1. **Sur l'iPhone : LocalDevVPN.** Installe-le depuis l'App Store, ouvre-le,
+   touche **Connect** et autorise la configuration VPN avec ton code. Il doit
+   être actif à chaque installation ou mise à jour.
+2. **Sur le PC : iTunes et iloader.** iTunes et iCloud doivent venir du site
+   d'Apple, pas du Microsoft Store. iloader (à trouver sur sidestore.io)
+   installe SideStore sur l'iPhone et prépare le certificat et le fichier de
+   couplage, en un clic.
 3. **La dernière IPA**, posée à la racine du dépôt :
 
    ```bash
    gh release download --repo ImShimao/lacet --pattern Lacet.ipa --clobber
    ```
 
-4. **La source AltStore.** Le script prépare le dossier `altstore/` (source, IPA
-   versionnée, icône), et `--autostart` le fait servir sur le port 8765 à chaque
-   ouverture de session Windows, sans fenêtre :
+4. **Installer l'IPA.** Ouvre l'IPA avec SideStore, ou ajoute la source de
+   Lacet dans SideStore. Pour servir la source depuis le PC, le script prépare
+   le dossier `altstore/` (source, IPA versionnée, icône) et `--autostart` le
+   fait servir sur le port 8765 à chaque ouverture de session Windows, sans
+   fenêtre :
 
    ```bash
    python scripts/altstore_source.py
@@ -77,8 +81,8 @@ compte gratuit suffit.
    python scripts/altstore_source.py --autostart
    ```
 
-   Sur l'iPhone : **AltStore → Sources → +** → l'adresse que le script affiche
-   (`http://<adresse du PC>:8765/source.json`) → **Lacet → Installer**.
+   L'adresse à donner est `http://<adresse du PC>:8765/source.json`. *Vérifie
+   sur sidestore.io que SideStore accepte cette source.*
 5. **Faire confiance au profil** : **Réglages → Général → VPN et gestion de
    l'appareil** → ton identifiant → **Faire confiance**, puis **Confidentialité
    et sécurité → Mode développeur** → activer, et redémarrer.
@@ -87,16 +91,16 @@ Au premier lancement, accepte la position — **« Toujours »** quand iOS le
 propose : c'est elle qui suit la sortie écran verrouillé — et les mouvements,
 pour que le baromètre mesure le dénivelé.
 
-**Mettre à jour :** refais l'étape 3, puis `python scripts/altstore_source.py`,
-et AltStore propose **Mettre à jour**.
+**Mettre à jour :** refais l'étape 3, puis relance le script de la source si tu
+la sers depuis le PC, et installe la nouvelle version depuis SideStore.
 
 > [!NOTE]
-> L'IPA n'est pas signée. C'est AltStore qui la signe, avec ton identifiant
+> L'IPA n'est pas signée. C'est SideStore qui la signe, avec ton identifiant
 > Apple, au moment de l'installer. Elle est compilée sur GitHub depuis ce dépôt,
 > par `.github/workflows/ios.yml`, et rien d'autre.
 
 > [!IMPORTANT]
-> **AltStore, pas Sideloadly.** Sideloadly signe l'app mais pas son extension, qui
+> **SideStore, pas Sideloadly.** Sideloadly signe l'app mais pas son extension, qui
 > dessine l'écran de verrouillage : iOS l'ignore, et l'écran reste noir, sans un
 > message. **Mon compte → Pendant la sortie** vérifie les cinq conditions d'une
 > activité en direct et dit laquelle manque.
@@ -211,7 +215,7 @@ backend/
 │                            elevation.py, wind.py, solar.py, service.py (plan_loops)
 ├── tests/                   395 tests sur des damiers synthétiques
 └── scripts/                 parity_dump.py (l'oracle), smoke.py (essai réel)
-scripts/altstore_source.py   Prépare et fait servir la source AltStore
+scripts/altstore_source.py   Prépare et fait servir la source de l'app (SideStore)
 docs/                        La documentation, un fichier par thème
 .github/workflows/           tests.yml (Linux, à chaque envoi) · ios.yml (l'IPA, sur macOS)
 ```
@@ -230,11 +234,11 @@ Le détail : [Comment c'est fait](docs/architecture.md),
   et un chantier peut apparaître. L'interface le dit, et doit continuer à le dire.
 * **iPhone seulement, en portrait.** Sur iPad, iOS l'ouvre en mode iPhone. Rien
   pour Android.
-* **Avec un compte Apple gratuit, l'app expire au bout de 7 jours.** AltStore la
-  renouvelle tout seul tant qu'AltServer tourne sur le même Wi-Fi. Trois apps
+* **Avec un compte Apple gratuit, l'app expire au bout de 7 jours.** SideStore la
+  renouvelle depuis le téléphone, tant que LocalDevVPN est actif. Trois apps
   actives au plus, et l'extension en compte une : Lacet en prend deux. Seul un
   compte développeur payant (99 € par an) supprimerait le renouvellement.
-* **Pas d'Apple Santé.** AltStore ne signe l'app qu'avec les autorisations de son
+* **Pas d'Apple Santé.** SideStore ne signe l'app qu'avec les autorisations de son
   profil, et HealthKit refuserait tout sans erreur visible. L'envoi direct vers
   Strava a été retiré : exporte la sortie en GPX, puis importe-la sur le site de
   Strava (« Téléverser une activité »).
