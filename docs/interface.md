@@ -101,7 +101,8 @@ pas d'ici, l'app le dit au lieu d'en proposer une autre (voir
 **Mes parcours** montre le croquis de chaque sortie et de chaque favori à la
 place d'une icône : dix « Boucle sud-ouest » se reconnaissent à leur dessin. Une
 course libre prend le nom de son moment — « Course du soir », « Vélo du
-matin ».
+matin ». Chaque mois de l'historique a un bouton **Bilan** : kilomètres, D+,
+temps, plus longue sortie et régularité, partageables en image comme une sortie.
 
 **Le point de passage** : un appui long sur la carte (ou « Passer par un
 point » dans le menu du départ) pose un fanion, et la recherche repart avec

@@ -72,8 +72,6 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 - **Séance du jour, version complète** : « 6 × 400 m » → une boucle qui contient
   une ligne droite plate de 400 m près de chez toi. Personne ne le fait
   correctement aujourd'hui.
-- **Bilan du mois** : une page de synthèse (kilomètres, D+, plus longue sortie,
-  régularité), à partager en image comme une sortie.
 - **Records sur semi et marathon** : l'écran de fin s'arrête à 1, 5 et 10 km
   (`BEST_KM`, `knownRoutes.js`).
 - Partage live d'une sortie en cours, couche communautaire de signalements avec

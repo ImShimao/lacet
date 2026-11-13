@@ -14,6 +14,8 @@ import { offlineStyleFor } from './mapStyles'
 import * as offline from './offlineMaps'
 import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
+import MonthReport from './MonthReport.jsx'
+import { monthKey, monthLabel } from './monthSummary'
 
 export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
@@ -26,6 +28,8 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
   // suivent — « combien ai-je couru en août » est la question qu'on se pose.
   const [sport, setSport] = useState('all')
   const [month, setMonth] = useState('all')
+  // Le bilan d'un mois, ouvert depuis son en-tête : le mois, ou rien.
+  const [report, setReport] = useState(null)
   const months = useMemo(() => [...new Set(history.map((r) => monthKey(r.ranAt)).filter(Boolean))], [history])
   const shown = history.filter(
     (r) => (sport === 'all' || (r.sport || 'run') === sport) && (month === 'all' || monthKey(r.ranAt) === month),
@@ -51,6 +55,16 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
     return groups
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history, sport, month])
+
+  if (report) {
+    return (
+      <MonthReport
+        history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)}
+        month={report}
+        onClose={() => setReport(null)}
+      />
+    )
+  }
 
   return (
     <div className="panel">
@@ -132,7 +146,11 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
               // faisait sinon hériter la suivante de sa confirmation ouverte.
               <div key={r.ranAt || offline.keyOf(r)} className="list__group">
               {view === 'history' && monthKey(r.ranAt) !== monthKey(rows[i - 1]?.ranAt) && (
-                <MonthHeader label={monthLabel(monthKey(r.ranAt))} runs={byMonth.get(monthKey(r.ranAt)) ?? []} />
+                <MonthHeader
+                  label={monthLabel(monthKey(r.ranAt))}
+                  runs={byMonth.get(monthKey(r.ranAt)) ?? []}
+                  onReport={monthKey(r.ranAt) ? () => setReport(monthKey(r.ranAt)) : null}
+                />
               )}
               <Item
                 route={r}
@@ -698,21 +716,6 @@ function Thumb({ line, sport }) {
   )
 }
 
-/** Le mois d'une sortie : « 2026-09 ». */
-function monthKey(iso) {
-  if (!iso) return null
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** « Septembre 2026 ». */
-function monthLabel(key) {
-  if (!key) return 'Sans date'
-  const [y, m] = key.split('-').map(Number)
-  const text = new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-  return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
 /** « mar. 16 sept. » */
 function dayLabel(iso) {
   const d = new Date(iso)
@@ -731,8 +734,8 @@ export function timeTotal(seconds) {
   return [hours, hours > 1 ? 'heures' : 'heure']
 }
 
-/** L'en-tête d'un mois : combien de sorties, de kilomètres, d'heures. */
-function MonthHeader({ label, runs }) {
+/** L'en-tête d'un mois : combien de sorties, de kilomètres, d'heures, et le bilan du mois. */
+function MonthHeader({ label, runs, onReport }) {
   const distance = runs.reduce((m, r) => m + (r.actual_distance_m || 0), 0)
   const time = runs.reduce((m, r) => m + (r.actual_duration_s || 0), 0)
   return (
@@ -741,6 +744,11 @@ function MonthHeader({ label, runs }) {
       <span>
         {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1)} km · {duration(time)}
       </span>
+      {onReport && (
+        <button className="monthhead__report" onClick={onReport}>
+          Bilan
+        </button>
+      )}
     </div>
   )
 }
