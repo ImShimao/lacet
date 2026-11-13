@@ -671,4 +671,18 @@ describe('la voix réglée', () => {
     expect(ecartDit(run), transcription(run)).toBe(true)
     expect(Math.max(...annonces(run)), transcription(run)).toBeLessThanOrEqual(70)
   }, 60_000)
+
+  it('l’écart à l’allure visée se dit à chaque kilomètre, même kilomètres tus', async () => {
+    // Le coureur simulé fait environ 2,9 m/s, soit près de 345 s/km ; l'allure
+    // demandée est de 300 s/km : il est donc nettement trop lent, à chaque km.
+    save({ voice: { km: 0, target: true } })
+    const { demande, routes } = await boucles(BEAUNE, 5)
+    const route = routes.find((r) => r.laps === 1)
+    const run = await courir(route, { ...demande, pace_sec_per_km: 300 })
+    const ecarts = run.dites.map((d) => d.texte).filter((t) => /^(Trop lent|En avance) de \d+ secondes\.$/.test(t))
+    expect(ecarts.length, transcription(run)).toBeGreaterThan(0)
+    expect(ecarts[0]).toMatch(/^Trop lent de \d+ secondes\.$/)
+    // Les kilomètres restent tus : aucune borne « … kilomètre. » n'est dite.
+    expect(run.dites.some((d) => /^(Premier|\S+ième|\S+uième) kilomètre\./.test(d.texte)), transcription(run)).toBe(false)
+  }, 60_000)
 })
