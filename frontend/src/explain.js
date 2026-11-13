@@ -61,7 +61,7 @@ const RELIEF = {
     {
       icon: 'flat',
       label: 'Plat',
-      text: 'Le moins de montée possible : vers 3 m par kilomètre, soit une trentaine de mètres pour 10 km. Pour une sortie facile, une récupération, un fractionné.',
+      text: 'Le moins de montée possible : vers 3 m par kilomètre, soit une trentaine de mètres pour 10 km. Pour une sortie facile ou une récupération.',
     },
     {
       icon: 'rolling',

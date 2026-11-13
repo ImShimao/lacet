@@ -21,8 +21,6 @@ import { km, surfaceLabel } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
-import SeancePanel from './SeancePanel.jsx'
-import { DEFAULT_SEANCE } from './seanceSpec'
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
@@ -46,8 +44,6 @@ export default function Explore({
   onSelect,
   onToggleDetail,
   onSearch,
-  onSeance = null,
-  seanceSpec = DEFAULT_SEANCE,
   onCancel = null,
   onRegenerate,
   onReverse,
@@ -64,7 +60,6 @@ export default function Explore({
   poiPrefs = null,
 }) {
   const [exporting, setExporting] = useState(false)
-  const [seanceOpen, setSeanceOpen] = useState(false)
   // Ce qu'on reconnaît de l'historique, calculé une fois par liste de
   // propositions : le tri grossier écarte presque tout sans rien mesurer, mais
   // le refaire à chaque rendu serait gratuit pour personne.
@@ -133,24 +128,6 @@ export default function Explore({
           <Icon name="search" size={18} />
           Trouver ma boucle
         </button>
-        {/* La séance : même départ, une boucle qui passe par la ligne droite de l'effort. */}
-        {onSeance && (
-          <>
-            <button className="btn btn--ghost" onClick={() => setSeanceOpen((open) => !open)} aria-expanded={seanceOpen} disabled={!start}>
-              Fractionné
-            </button>
-            {seanceOpen && (
-              <SeancePanel
-                key={JSON.stringify(seanceSpec)}
-                spec={seanceSpec}
-                onStart={(spec) => {
-                  setSeanceOpen(false)
-                  onSeance(spec)
-                }}
-              />
-            )}
-          </>
-        )}
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
         <div className="row">

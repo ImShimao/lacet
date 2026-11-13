@@ -23,7 +23,7 @@ import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
 import { ELEVATION_STEP_M, currentWind, fetchMany, shapeRelief } from './environment'
-import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, planSeanceRoute, pointKey, reverseRoute } from './service'
+import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, pointKey, reverseRoute } from './service'
 import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
@@ -389,18 +389,6 @@ self.onmessage = async ({ data }) => {
   if (type === 'detour') {
     try {
       const result = await planDetour(payload, { loadGraph: (args) => loadGraph(args, () => {}) })
-      self.postMessage({ id, type: 'result', result })
-    } catch (error) {
-      self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
-    }
-    return
-  }
-
-  // « 6 × 400 m » : une boucle avec sa ligne droite plate. Même graphe que la
-  // recherche ordinaire, relief compris — voir `planSeanceRoute`.
-  if (type === 'seance') {
-    try {
-      const result = await planSeanceRoute(payload, { loadGraph: (args) => loadGraph(args, progress) })
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })

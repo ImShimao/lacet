@@ -56,9 +56,6 @@ function request(type, payload, onProgress) {
 /** Calcule des boucles sur l'appareil. `onProgress(étape, fraction)`. */
 export const planOnDevice = (params, onProgress) => request('plan', params, onProgress)
 
-/** La séance « 6 × 400 m » : une boucle avec sa ligne droite plate, sur l'appareil. */
-export const seanceOnDevice = (params, onProgress) => request('seance', params, onProgress)
-
 /**
  * Prépare en fond les rues d'une recherche à venir. Ne rejette jamais : un
  * échec ici n'a rien à dire à l'écran, la recherche elle-même s'en chargera.

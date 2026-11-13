@@ -35,22 +35,6 @@
   align-items: center;
   gap: 9px;
 }
-.live__seance {
-  align-self: center;
-  margin: 0 auto;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--accent-line);
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font: inherit;
-  font-size: calc(14px * var(--text-scale));
-  font-weight: 700;
-}
-.live__seance[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--on-accent, #fff);
-}
 .live__error {
   background: var(--risk-soft);
   border: 1px solid var(--risk-line);

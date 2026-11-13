@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { generateLoops, generateSeance } from './api'
+import { generateLoops } from './api'
 import { prefetchOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
 import { formatKm } from './FiltersSheet.jsx'
@@ -130,7 +130,7 @@ export default function useSearch() {
      * Rend le résultat affiché, ou `null` si une autre recherche a pris la
      * main entre-temps.
      */
-    async run(request, { from = null, onStart = null, seance = false } = {}) {
+    async run(request, { from = null, onStart = null } = {}) {
       setBusy('search')
       setProgress(null)
       setError(null)
@@ -144,9 +144,8 @@ export default function useSearch() {
         if (mien === token.current) setProgress({ stage, fraction })
       }
       try {
-        // La séance n'élargit pas sa tolérance : une ligne droite de 400 m n'en a pas besoin.
-        let payload = await (seance ? generateSeance : generateLoops)(request, etape)
-        if (!seance && !payload.routes.length && request.tolerance) {
+        let payload = await generateLoops(request, etape)
+        if (!payload.routes.length && request.tolerance) {
           const { tolerance, ...large } = request
           const relache = await generateLoops(large, etape)
           if (relache.routes.length) {

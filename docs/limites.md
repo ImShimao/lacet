@@ -67,11 +67,6 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 
 ### À ajouter
 
-- **Séance du jour, version simple** : « 6 × 400 m, récup 1 min », minutée à la
-  voix sur n'importe quelle boucle.
-- **Séance du jour, version complète** : « 6 × 400 m » → une boucle qui contient
-  une ligne droite plate de 400 m près de chez toi. Personne ne le fait
-  correctement aujourd'hui.
 - **Records sur semi et marathon** : l'écran de fin s'arrête à 1, 5 et 10 km
   (`BEST_KM`, `knownRoutes.js`).
 - Partage live d'une sortie en cours, couche communautaire de signalements avec
