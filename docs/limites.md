@@ -81,9 +81,6 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 
 ### À enlever
 
-- **`replica/`** : six fichiers d'étude de marché dont le plan est entièrement
-  livré. Garder `fixes.md` ici, dans `docs/`, et retirer le reste — dont les
-  764 avis recopiés (`reviews.csv`).
 - **Les alphabets cyrillique, grec et vietnamien de la police Inter** : environ
   250 Ko dans l'IPA pour une app en français. N'importer que le latin.
 - **`.vscode/`**, suivi par git, s'il ne sert plus.

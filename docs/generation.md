@@ -131,7 +131,7 @@ côté coûterait 2 à 8 fois plus.
 Un appui long sur la carte — ou « Passer par un point » dans le menu du départ
 — pose un fanion, et **toutes** les boucles y passent. C'était la demande la
 plus citée dans les avis des apps concurrentes (58 avis sur le contrôle du
-tracé, `replica/fixes.md`). Propre à l'app : Python n'a pas de point de passage,
+tracé, `docs/fixes.md`). Propre à l'app : Python n'a pas de point de passage,
 et la parité ne le voit pas (`via` dans `normalizeRequest`).
 
 Le point se rattache à la voie la plus proche du réseau principal, à 300 m au
