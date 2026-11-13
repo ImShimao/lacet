@@ -16,6 +16,7 @@ import { REPORT_KINDS, addReport, blockedPoints } from './reports'
 import { avoidedZones } from './zones'
 import { load } from './storage'
 import * as voice from './voice'
+import { SEANCE, startSeance, stepSeance } from './seance'
 import { isNative } from './platform'
 import { watchPosition } from './position'
 import { detourOnDevice } from './engine/client'
@@ -163,6 +164,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // Le dernier kilomètre bouclé, montré quelques secondes : la voix le dit, mais
   // musique forte ou voix coupée, l'écran doit le dire aussi.
   const [splitShown, setSplitShown] = useState(null)
+  // Séance du jour (`seance.js`) : l'état vit dans un ref, lu par le minuteur ; l'affichage suit.
+  const seance = useRef(null)
+  const [seanceShown, setSeanceShown] = useState(null)
   const splitTimer = useRef(null)
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
@@ -362,6 +366,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   useEffect(() => {
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: movingSeconds() }))
+      seanceTick()
       keepRun()
     }, 1000)
 
@@ -849,6 +854,29 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     }
   }
 
+  /** Fait avancer la séance au relevé du moment, et dit ce qui change. */
+  function seanceTick() {
+    if (!seance.current) return
+    const { state, say } = stepSeance(seance.current, { metres: covered.current, seconds: movingSeconds() })
+    if (state === seance.current) return
+    seance.current = state
+    setSeanceShown(state.over ? null : state)
+    if (say) talk(say, { priority: false })
+  }
+
+  /** Le bouton : lance la séance, ou l'arrête si elle tourne déjà. */
+  function toggleSeance() {
+    if (seance.current && !seance.current.over) {
+      seance.current = null
+      setSeanceShown(null)
+      return
+    }
+    const { state, say } = startSeance({ metres: covered.current, seconds: movingSeconds() })
+    seance.current = state
+    setSeanceShown(state)
+    talk(say, { priority: false })
+  }
+
   /**
    * Dit une phrase, et la note au journal de la sortie : l'heure, la distance
    * courue, la position, les mots. Il se relit dans le détail de la sortie
@@ -1300,6 +1328,14 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           </span>
         </div>
       )}
+
+      <button className="live__seance" onClick={toggleSeance} aria-pressed={Boolean(seanceShown)}>
+        {seanceShown
+          ? seanceShown.phase === 'effort'
+            ? `Effort ${seanceShown.rep} sur ${SEANCE.reps} · arrêter`
+            : `Récupération · ${seanceShown.rep} sur ${SEANCE.reps} · arrêter`
+          : `Séance ${SEANCE.reps} × ${SEANCE.effort} m`}
+      </button>
 
       {error && <div className="live__error">{error}</div>}
       {!error && state.points === 0 && (
