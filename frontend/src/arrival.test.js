@@ -146,8 +146,8 @@ describe("l'arrivée, au plus juste", () => {
     // La boucle finit sur la rue ; on s'arrête à la porte, vingt-huit mètres
     // plus loin, et on n'y bouge plus.
     const w = arrivalWatcher()
-    expect(approche(w, [60, 40, ...Array(14).fill(28)])).toBeNull()
-    expect(approche(arrivalWatcher(), [60, 40, ...Array(18).fill(28)])?.at).toBe(17)
+    expect(approche(w, [60, 40, ...Array(9).fill(28)])).toBeNull()
+    expect(approche(arrivalWatcher(), [60, 40, ...Array(18).fill(28)])?.at).toBe(12)
   })
 
   it('retient le point le plus proche, pas le relevé qui le prouve', () => {

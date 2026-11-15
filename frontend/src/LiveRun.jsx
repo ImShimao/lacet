@@ -103,7 +103,23 @@ const TOP_SPEED_MS = { run: 7, bike: 22 }
 // d'un carrefour. Voir `locate`.
 const FIX_SLACK_M = 20
 
-// Un point d'eau ou des toilettes s'annoncent à cette distance : assez tôt pour
+// Le premier relevé de la sortie, à cette distance au plus du départ du tracé,
+// est la porte : on y arrive aussi — voir `watchArrival`.
+const DOOR_NEAR_M = 60
+const DOOR_ACCURACY_M = 20
+
+// Sans relevé utilisable depuis ce temps-là, on le dit : le guidage est figé,
+// et rien à l'écran ni à l'oreille ne l'expliquait.
+const GPS_LOST_MS = 25_000
+
+// « Mi-parcours » et « Il reste mille mètres » : une fois chacun, et seulement
+// au passage — pas à la reprise d'une sortie qui les a déjà dépassés.
+const LAST_KM_M = 1000
+const MILESTONE_SLACK_M = 150
+const HALF_MIN_M = 2000
+const LAST_KM_MIN_M = 3000
+
+// Un point d'eau s'annonce à cette distance : assez tôt pour
 // ralentir et regarder, assez tard pour qu'on s'en souvienne en y arrivant.
 const STOP_ALERT_M = 120
 const STOP_EVERY_M = 1000
@@ -244,6 +260,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const arrival = useRef(null)
   if (!arrival.current) arrival.current = arrivalWatcher()
   const finishing = useRef(false)
+  // Là où la sortie a vraiment commencé, si c'est près du départ du tracé.
+  const door = useRef(resuming ? null : undefined)
+  // L'heure du dernier relevé utilisable, et le signal donné pour perdu.
+  const lastGoodAt = useRef(null)
+  const gpsLost = useRef(false)
+  const [lostSignal, setLostSignal] = useState(false)
+  const milestones = useRef(new Set())
   // La précision du dernier relevé : l'arrivée s'y règle (`arrival.js`).
   const accuracyNow = useRef(null)
   // Le temps de chaque kilomètre, relevé au passage. Sans lui, une sortie
@@ -363,6 +386,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: movingSeconds() }))
       keepRun()
+      if (!gpsLost.current && lastGoodAt.current && Date.now() - lastGoodAt.current > GPS_LOST_MS) {
+        gpsLost.current = true
+        setLostSignal(true)
+        talk('Signal GPS perdu. Je reprends dès qu’il revient.', { priority: false })
+      }
     }, 1000)
 
     // `background` : le suivi continue écran verrouillé, téléphone dans la poche.
@@ -384,6 +412,17 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (accuracy > ACCURACY_LIMIT_M) {
           onPosition(point, heading.current)
           return
+        }
+
+        lastGoodAt.current = Date.now()
+        if (gpsLost.current) {
+          gpsLost.current = false
+          setLostSignal(false)
+          talk('Signal GPS retrouvé.', { priority: false })
+        }
+        if (door.current === undefined) {
+          const first = route?.geometry?.[0]
+          door.current = first && accuracy <= DOOR_ACCURACY_M && haversine(point, first) <= DOOR_NEAR_M ? point : null
         }
 
         // La pause automatique. Une pause mise à la main, elle, ne se lève
@@ -804,7 +843,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (!quiet) {
       watchArrival(point, found)
       watchTurnBack(found, course)
-      if (!found.offRoute) announceStop(found.along)
+      if (!found.offRoute) {
+        announceStop(found.along)
+        announceMilestone(found.along)
+      }
     }
 
     // Hors du tracé, l'avancée projetée ne dit pas où l'on est : à quatre-vingts
@@ -883,7 +925,27 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (last != null && next.along - last < STOP_EVERY_M) return
     lastStopSaid.current[next.kind] = next.along
     const metres = Math.max(20, Math.round((next.along - along) / 10) * 10)
-    talk(`${next.kind === 'water' ? "Point d'eau" : 'Toilettes'} dans ${metres} mètres.`, { priority: false })
+    talk(`Point d'eau dans ${metres} mètres.`, { priority: false })
+  }
+
+  /**
+   * « Mi-parcours. » « Il reste mille mètres. » Deux repères qu'on cherche sur
+   * une boucle, et que les bornes kilométriques ne donnent pas. Tus avec elles.
+   */
+  function announceMilestone(along) {
+    if (!voicePrefs.current.km) return
+    const total = guideRef.current.route?.distance_m || 0
+    const left = total - along
+    const say = (key, text) => {
+      if (milestones.current.has(key)) return
+      milestones.current.add(key)
+      talk(text, { priority: false })
+    }
+    const half = (covered.current + left) / 2
+    if (!guideRef.current.route?.home && covered.current + left >= HALF_MIN_M && covered.current >= half && covered.current - half <= MILESTONE_SLACK_M) {
+      say('half', 'Mi-parcours.')
+    }
+    if (covered.current + left >= LAST_KM_MIN_M && left <= LAST_KM_M && LAST_KM_M - left <= MILESTONE_SLACK_M) say('last', 'Il reste mille mètres.')
   }
 
   /**
@@ -954,8 +1016,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const guided = guideRef.current.route
     const fin = guided?.geometry?.[guided.geometry.length - 1]
     if (!fin || finishing.current) return
+    // On arrive au bout du tracé, ou à sa porte : partie à trente mètres du
+    // repère, la sortie se termine aussi là d'où elle est partie.
     const verdict = arrival.current.push({
-      toFinish: haversine(point, fin),
+      toFinish: Math.min(haversine(point, fin), door.current ? haversine(point, door.current) : Infinity),
       remaining: Math.max(0, (guided.distance_m || 0) - found.along),
       covered: covered.current,
       // Rentré plus tôt, on n'a pas couru la moitié prévue : l'arrivée compte quand même.
@@ -1310,6 +1374,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       {error && <div className="live__error">{error}</div>}
       {!error && state.points === 0 && (
         <div className="live__wait">Acquisition du signal GPS…</div>
+      )}
+      {!error && lostSignal && (
+        <div className="live__wait" role="status">
+          Signal GPS perdu : le guidage reprend dès qu'il revient.
+        </div>
       )}
 
       <ReportButton disabled={!here.current} onReport={(kind) => report(kind)} />

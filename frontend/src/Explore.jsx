@@ -161,11 +161,15 @@ export default function Explore({
             </p>
           )
         )}
-        <p className="muted small">
-          Fais glisser le repère, touche la carte en mode placement, ou cherche une
-          adresse pour changer de départ. Un appui long sur la carte fait passer la
-          boucle par ce point.
-        </p>
+        {/* Le mode d'emploi, tant qu'on n'est jamais sorti avec l'app : après,
+            on le connaît, et la carte mérite la place. */}
+        {history.length === 0 && (
+          <p className="muted small">
+            Fais glisser le repère, touche la carte en mode placement, ou cherche une
+            adresse pour changer de départ. Un appui long sur la carte fait passer la
+            boucle par ce point.
+          </p>
+        )}
       </div>
     )
   }

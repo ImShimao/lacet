@@ -19,9 +19,9 @@ import Foundation
 /// rendre le son tout de suite (la synthèse tient encore la sortie audio
 /// quelques centaines de millisecondes après le dernier mot), on réessaie.
 ///
-/// Les podcasts et livres audio, eux, se mettent en pause le temps de la
-/// consigne et reprennent après (`interruptSpokenAudioAndMixWithOthers`) :
-/// une voix par-dessus une autre voix ne se comprend pas, même baissée.
+/// Les podcasts et livres audio baissent comme la musique, sans se mettre en
+/// pause : pas de `interruptSpokenAudioAndMixWithOthers`. Une pause à chaque
+/// consigne hachait l'écoute, et certaines apps ne reprenaient pas seules.
 ///
 /// Côté JavaScript : `registerPlugin('Voice')`, dans `src/native.js`.
 @objc(VoicePlugin)
@@ -92,7 +92,7 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
 
     // === la musique =============================================================
 
-    /// Baisse la musique, et met en pause podcasts et livres audio.
+    /// Baisse la musique, les podcasts et les livres audio.
     private func lowerOthers() {
         restore?.cancel()
         restore = nil
@@ -101,7 +101,7 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             try session.setCategory(
                 .playback,
                 mode: .voicePrompt,
-                options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
+                options: [.duckOthers]
             )
             try session.setActive(true)
         } catch {
@@ -129,8 +129,7 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         }
         let session = AVAudioSession.sharedInstance()
         do {
-            // `notifyOthersOnDeactivation` : la musique remonte tout de suite,
-            // et un podcast mis en pause reprend.
+            // `notifyOthersOnDeactivation` : la musique remonte tout de suite.
             try session.setActive(false, options: [.notifyOthersOnDeactivation])
             try? session.setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers])
             restore = nil

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { alongRoute, poisIn, routeBox } from './pois'
+import { alongRoute, KINDS, poisIn, routeBox } from './pois'
 
 /**
- * Les points d'eau et toilettes qui bordent `route`, pour les genres cochés
- * dans « Mon compte » (`prefs`, par exemple `{ water: true, toilets: false }`).
+ * Les points d'eau qui bordent `route`, s'ils sont cochés dans « Mon compte »
+ * (`prefs`, par exemple `{ water: true }`).
  *
  * Rien n'est demandé tant que rien n'est coché : c'est une requête de plus, et
  * tout le monde n'en veut pas. Une réponse arrivée pour un parcours qu'on a
@@ -11,7 +11,7 @@ import { alongRoute, poisIn, routeBox } from './pois'
  */
 export default function usePois(route, prefs) {
   const [found, setFound] = useState({ key: null, stops: [], complete: true, offline: false })
-  const kinds = Object.keys(prefs || {}).filter((k) => prefs[k])
+  const kinds = Object.keys(KINDS).filter((k) => prefs?.[k])
   const geometry = route?.geometry
   const key = geometry?.length > 1 && kinds.length ? `${route.id}|${geometry.length}|${kinds.join(',')}` : null
 

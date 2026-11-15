@@ -134,6 +134,13 @@
   min-width: 140px;
 }
 
+.countdown__note {
+  margin: -10px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 @keyframes countdown-in {
   from {
     opacity: 0;

@@ -187,9 +187,20 @@ détail de la sortie, sous « Ce que la voix a dit ». C'est la vérification
 d'une vraie sortie écran verrouillé : la voix s'est-elle tue, a-t-elle parlé
 trop tard ? Il part avec la trace quand celle-ci n'est plus gardée.
 
-**Les points d'eau et toilettes**, quand ils sont cochés, s'annoncent cent
+**Les points d'eau**, quand ils sont cochés, s'annoncent cent
 mètres avant — « Point d'eau dans cent mètres » —, une fois par kilomètre au
 plus : à Paris, il y a une fontaine tous les deux cents mètres.
+
+**Le départ se recale sur la position.** Pendant le décompte, si l'on est sur
+la boucle à moins de 150 m de son repère de départ, elle tourne pour partir —
+et arriver — là où l'on est : mêmes rues, même longueur (`restart.js`). Un
+bout de rue pris à l'aller et au retour est coupé. Hors de la boucle, à tours
+ou en « 8 », rien n'est touché. Et l'arrivée se déclenche aussi à l'endroit
+d'où la sortie est vraiment partie, à 60 m au plus du départ du tracé.
+
+**Deux repères**, dits avec les bornes kilométriques : « Mi-parcours » et « Il
+reste mille mètres ». **Le signal perdu** se dit aussi, après 25 secondes sans
+relevé utilisable, puis « Signal GPS retrouvé ».
 
 **Le hors-parcours** se signale après trois relevés consécutifs à plus de 45 m
 du tracé. Un point aberrant est banal entre deux immeubles ; trois de suite,

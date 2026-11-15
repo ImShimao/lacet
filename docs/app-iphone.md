@@ -95,7 +95,7 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   que le téléphone part dans la poche.
 - **Le guidage vocal aussi**, même en mode silencieux. La voix vient d'un
   module écrit pour Lacet (`ios-overlay/live-activity/App/VoicePlugin.swift`) :
-  il baisse la musique — et met un podcast en pause — le temps d'une consigne,
+  il baisse la musique, ou le podcast, le temps d'une consigne,
   puis rend le son dès que la voix s'est tue. La session audio de repos, elle,
   est réglée dans `AppDelegate` : sans elle, iOS coupe la voix au verrouillage.
 - **L'écran reste allumé** pendant la sortie si on le demande, et une vibration
@@ -128,7 +128,7 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   magnétomètre — ou sur une installation d'avant —, le point de course garde
   sa flèche dans le sens du tracé.
 - **L'app se présente sous son nom.** Les serveurs Overpass, qui donnent les
-  points d'eau, les toilettes et les rues hors des archives, refusent depuis
+  points d'eau et les rues hors des archives, refusent depuis
   l'automne 2026 tout ce qui se présente comme un navigateur : 406 chez
   `overpass-api.de`, 403 chez `overpass.openstreetmap.fr`. L'app s'annonçait
   « Safari iPhone … Lacet/1.0 » (`appendUserAgent`), et les points d'eau ne

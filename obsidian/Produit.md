@@ -24,7 +24,7 @@ Retour : [[Accueil]] · Source : `docs/fonctionnalites.md`, `docs/guidage.md`, `
 - **Une forme.** Auto, une boucle, un « 8 » (deux boucles qui repassent au départ), ou des tours (2 à 10). Une forme choisie est tenue strictement.
 - **Une direction.** Auto, ou N, NE, E, SE, S, SO, O, NO.
 - **Un terrain.** Route, Mixte, Sentier. Et un dénivelé : Plat, Vallonné, Côtes, ou un D+ précis.
-- **Eau et toilettes.** Points cochés sur la carte, annoncés cent mètres avant.
+- **Points d'eau.** Cochés sur la carte, annoncés cent mètres avant.
 - **Éviter les boucles déjà courues** (décoché par défaut).
 - **Le côté de la route** : gauche par défaut (article R412-36 du Code de la route), droite, ou indifférent.
 

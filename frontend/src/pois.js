@@ -1,11 +1,14 @@
-// Les points d'eau et les toilettes le long d'une boucle.
+// Les points d'eau le long d'une boucle.
 //
 // Au-delà de dix kilomètres, ou par trente degrés, c'est la question qu'on se
-// pose avant de partir : où boire, où s'arrêter. OpenStreetMap les recense —
-// fontaines, robinets de cimetière, toilettes publiques —, mais pas les
-// archives de rues de l'app, qui ne gardent que ce qui se court. Ils viennent
-// donc d'Overpass, en une petite requête : deux étiquettes, l'emprise de la
-// boucle, quelques kilooctets.
+// pose avant de partir : où boire. OpenStreetMap les recense — fontaines,
+// robinets de cimetière —, mais pas les archives de rues de l'app, qui ne
+// gardent que ce qui se court. Ils viennent donc d'Overpass, en une petite
+// requête : l'emprise de la boucle, quelques kilooctets.
+//
+// On ne garde que ce où l'on boit à coup sûr, gratuitement et sans rien
+// demander : un point d'eau annoncé à tort, à sec ou derrière un comptoir,
+// coûte plus cher au coureur qu'un point d'eau tu.
 //
 // Gardés sur l'appareil par carreau, comme les rues : une boucle refaite, ou sa
 // voisine, les retrouve sans réseau.
@@ -31,7 +34,6 @@ const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.op
 
 export const KINDS = {
   water: { label: "Point d'eau", plural: "points d'eau", icon: 'water' },
-  toilets: { label: 'Toilettes', plural: 'toilettes', icon: 'toilets' },
 }
 
 const cache = store('pois')
@@ -47,37 +49,34 @@ export function tilesOver([s, w, n, e]) {
 
 const tileBox = ([ix, iy]) => [iy * TILE_DEG, ix * TILE_DEG, (iy + 1) * TILE_DEG, (ix + 1) * TILE_DEG]
 
-/** La requête : l'eau potable et les toilettes, pas ce qui est fermé au public. */
+/**
+ * La requête : l'eau potable. Pas les bornes de camping-car
+ * (`amenity=water_point`) : souvent payantes, et faites pour un réservoir.
+ */
 export function poiQuery([s, w, n, e]) {
   const box = `(${s},${w},${n},${e})`
   return `[out:json][timeout:20];
 (
   nwr["amenity"="drinking_water"]${box};
-  nwr["amenity"="water_point"]${box};
   nwr["amenity"="fountain"]["drinking_water"="yes"]${box};
-  nwr["amenity"="toilets"]${box};
+  nwr["man_made"="water_tap"]["drinking_water"="yes"]${box};
 );
 out center tags;`
 }
 
 /** Ce qu'on garde d'un élément OpenStreetMap, ou `null` s'il ne sert pas. */
-export function toPoi(el) {
+export function toPoi(el, month = new Date().getMonth()) {
   const tags = el.tags || {}
-  if (['private', 'no'].includes(tags.access)) return null
-  if (tags.drinking_water === 'no' || tags.disused === 'yes') return null
+  if (!['drinking_water', 'fountain'].includes(tags.amenity) && tags.man_made !== 'water_tap') return null
+  if (['private', 'no', 'customers'].includes(tags.access) || tags.fee === 'yes') return null
+  if (tags.drinking_water === 'no' || tags['drinking_water:legal'] === 'no' || tags.disused === 'yes') return null
+  if (['broken', 'closed', 'needs_maintenance'].includes(tags.operational_status)) return null
+  // Une fontaine saisonnière est coupée de novembre à mars.
+  if (tags.seasonal && tags.seasonal !== 'no' && (month >= 10 || month <= 2)) return null
   const lat = el.lat ?? el.center?.lat
   const lon = el.lon ?? el.center?.lon
   if (lat == null || lon == null) return null
-  const kind = tags.amenity === 'toilets' ? 'toilets' : 'water'
-  return {
-    kind,
-    lat,
-    lon,
-    ...(tags.name ? { name: tags.name } : {}),
-    ...(tags.fee === 'yes' ? { fee: true } : {}),
-    ...(tags.access === 'customers' ? { customers: true } : {}),
-    ...(tags.seasonal && tags.seasonal !== 'no' ? { seasonal: true } : {}),
-  }
+  return { kind: 'water', lat, lon, ...(tags.name ? { name: tags.name } : {}) }
 }
 
 /** Interroge les miroirs ensemble ; le premier qui répond l'emporte. */
@@ -134,7 +133,7 @@ export async function poisIn(bbox, { fetchImpl = fetch, now = Date.now(), online
     for (const m of missing) if (m.kept) found.push(...m.kept.pois)
     return { pois: found, complete: false, offline: !online() }
   }
-  const pois = elements.map(toPoi).filter(Boolean)
+  const pois = elements.map((el) => toPoi(el)).filter(Boolean)
   for (const { tile } of missing) {
     const [s, w, n, e] = tileBox(tile)
     const inside = pois.filter((p) => p.lat >= s && p.lat < n && p.lon >= w && p.lon < e)

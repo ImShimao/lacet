@@ -46,10 +46,11 @@ const MAX_NEAR_M = 25
 
 // **On s'arrête un peu avant.** La boucle part de la rue, devant la porte : on
 // finit souvent à la porte elle-même, vingt ou trente mètres plus loin que le
-// tracé, ou sur le trottoir d'en face. Arrêté là un quart de minute, tout au bout
-// du parcours, on est arrivé.
+// tracé, ou sur le trottoir d'en face. Arrêté là dix secondes, tout au bout
+// du parcours, on est arrivé — un quart de minute d'abord, mais la pause
+// automatique tombait à huit, et l'on attendait le bilan devant un chrono figé.
 const STOP_NEAR_M = 35
-const STOPPED_MS = 15_000
+const STOPPED_MS = 10_000
 
 // Il faut avoir fait la boucle. Trois conditions, et chacune répond à un cas
 // précis :

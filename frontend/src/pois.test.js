@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { alongRoute, poisIn, poiQuery, routeBox, tilesOver, toPoi } from './pois'
 
 /**
- * Les points d'eau et toilettes : ce qu'on garde d'OpenStreetMap, et où on les
+ * Les points d'eau : ce qu'on garde d'OpenStreetMap, et où on les
  * croise sur la boucle.
  */
 
@@ -19,27 +19,46 @@ const TRACE = [
 const decale = (lon, nordM) => ({ lon, lat: 48.85 + nordM / 111_195 })
 
 describe('ce qu’on garde d’OpenStreetMap', () => {
-  it('distingue l’eau des toilettes, et garde ce qui aide à choisir', () => {
-    expect(toPoi({ lat: 1, lon: 2, tags: { amenity: 'drinking_water' } })).toMatchObject({ kind: 'water' })
-    expect(toPoi({ center: { lat: 1, lon: 2 }, tags: { amenity: 'toilets', fee: 'yes', name: 'Parc' } })).toEqual({
-      kind: 'toilets',
+  it('garde l’eau potable, avec son nom', () => {
+    expect(toPoi({ center: { lat: 1, lon: 2 }, tags: { amenity: 'drinking_water', name: 'Parc' } })).toEqual({
+      kind: 'water',
       lat: 1,
       lon: 2,
       name: 'Parc',
-      fee: true,
     })
+    expect(toPoi({ lat: 1, lon: 2, tags: { man_made: 'water_tap', drinking_water: 'yes' } })).toMatchObject({ kind: 'water' })
   })
 
-  it('écarte ce qui est fermé au public ou non potable', () => {
-    expect(toPoi({ lat: 1, lon: 2, tags: { amenity: 'toilets', access: 'private' } })).toBeNull()
-    expect(toPoi({ lat: 1, lon: 2, tags: { amenity: 'drinking_water', drinking_water: 'no' } })).toBeNull()
-    expect(toPoi({ tags: { amenity: 'toilets' } })).toBeNull()
+  it('écarte ce où l’on n’est pas sûr de boire', () => {
+    const eau = (tags, mois) => toPoi({ lat: 1, lon: 2, tags: { amenity: 'drinking_water', ...tags } }, mois)
+    for (const tags of [
+      { access: 'private' },
+      { access: 'customers' },
+      { fee: 'yes' },
+      { drinking_water: 'no' },
+      { 'drinking_water:legal': 'no' },
+      { disused: 'yes' },
+      { operational_status: 'broken' },
+    ]) {
+      expect(eau(tags, 6)).toBeNull()
+    }
+    expect(toPoi({ tags: { amenity: 'drinking_water' } })).toBeNull()
+    // Les toilettes d'un carreau gardé par une ancienne version ne reviennent pas.
+    expect(toPoi({ lat: 1, lon: 2, tags: { amenity: 'toilets' } })).toBeNull()
   })
 
-  it('ne demande que les deux genres, dans l’emprise', () => {
+  it('tait la fontaine saisonnière en hiver, pas en été', () => {
+    const fontaine = { lat: 1, lon: 2, tags: { amenity: 'drinking_water', seasonal: 'yes' } }
+    expect(toPoi(fontaine, 0)).toBeNull()
+    expect(toPoi(fontaine, 10)).toBeNull()
+    expect(toPoi(fontaine, 6)).toMatchObject({ kind: 'water' })
+  })
+
+  it('ne demande que l’eau potable, dans l’emprise', () => {
     const q = poiQuery([48.8, 2.3, 48.9, 2.4])
     expect(q).toContain('"amenity"="drinking_water"')
-    expect(q).toContain('"amenity"="toilets"')
+    expect(q).not.toContain('toilets')
+    expect(q).not.toContain('water_point')
     expect(q).toContain('(48.8,2.3,48.9,2.4)')
   })
 })
@@ -48,9 +67,9 @@ describe('ce qu’on croise en chemin', () => {
   it('place chaque arrêt à son kilomètre, dans l’ordre', () => {
     const arrets = alongRoute(TRACE, [
       { kind: 'water', ...decale(2.3 + pas * 0.8, 30) },
-      { kind: 'toilets', ...decale(2.3 + pas * 0.2, -60) },
+      { kind: 'water', ...decale(2.3 + pas * 0.2, -60) },
     ])
-    expect(arrets.map((a) => a.kind)).toEqual(['toilets', 'water'])
+    expect(arrets.map((a) => a.along)).toEqual([...arrets.map((a) => a.along)].sort((x, y) => x - y))
     expect(arrets[0].along).toBeCloseTo(200, -1)
     expect(arrets[0].off).toBeCloseTo(60, -1)
     expect(arrets[1].along).toBeCloseTo(800, -1)

@@ -200,18 +200,8 @@ const PATHS = {
   ),
   // En cours : un arc qui tourne (`.ready--busy`), sans promettre de résultat.
   spinner: <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />,
-  // Un point d'eau : une goutte. Des toilettes : les deux silhouettes, en
-  // traits, comme sur les panneaux.
+  // Un point d'eau : une goutte.
   water: <path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z" />,
-  toilets: (
-    <>
-      <circle cx="7" cy="4.5" r="1.6" />
-      <circle cx="17" cy="4.5" r="1.6" />
-      <path d="M5 21v-6H4l1.2-6.5h3.6L10 15H9v6" />
-      <path d="M15 21v-5.5h-1V9h6v6.5h-1V21" />
-      <path d="M12 3v18" />
-    </>
-  ),
   refresh: (
     <>
       <path d="M20.5 12a8.5 8.5 0 1 1-2.9-6.4" />

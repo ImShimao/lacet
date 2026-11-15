@@ -664,6 +664,10 @@ describe('une sortie entière, écoutée', () => {
       const run = await courir(route, demande)
       expect(defauts(route, run).join('\n'), transcription(run)).toBe('')
       expect(run.onStop).toHaveBeenCalled()
+      // Les deux repères d'une boucle, une fois chacun, au passage.
+      for (const repere of ['Mi-parcours.', 'Il reste mille mètres.']) {
+        expect(run.dites.filter((d) => d.texte === repere).length, transcription(run)).toBe(1)
+      }
     }, 120_000)
 
     it('l’écart à l’allure visée se dit à chaque kilomètre, kilomètres tus', async () => {

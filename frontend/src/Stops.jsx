@@ -37,8 +37,9 @@ export function StopsSetting({ prefs, onChange }) {
       </div>
       <p className="muted small">
         Ceux qui sont à moins de {NEAR_M} m du tracé apparaissent sur la carte, dans le détail
-        du parcours, et pendant la sortie — « point d'eau dans 800 m ». D'après OpenStreetMap :
-        une fontaine peut être coupée l'hiver.
+        du parcours, et pendant la sortie — « point d'eau dans 800 m ». D'après OpenStreetMap,
+        en ne gardant que l'eau potable, gratuite et ouverte à tous : une fontaine peut quand
+        même être à sec.
       </p>
     </>
   )
@@ -64,7 +65,7 @@ export function longestGap(stops, distance) {
 export function StopsList({ stops, loading, complete, offline = false, prefs, distance = 0 }) {
   const kinds = Object.keys(KINDS).filter((k) => prefs?.[k])
   if (!kinds.length) return null
-  if (loading) return <p className="muted small stops">Recherche des points d'eau et toilettes…</p>
+  if (loading) return <p className="muted small stops">Recherche des points d'eau…</p>
 
   return (
     <div className="stops">
@@ -78,9 +79,7 @@ export function StopsList({ stops, loading, complete, offline = false, prefs, di
             {here.length === 0 ? (
               <span className="muted">
                 {complete
-                  ? kind === 'water'
-                    ? "Aucun point d'eau connu le long du tracé."
-                    : 'Pas de toilettes connues le long du tracé.'
+                  ? "Aucun point d'eau connu le long du tracé."
                   : offline
                     ? 'Pas de réseau : rien à montrer pour l’instant.'
                     : 'Le service d’OpenStreetMap ne répond pas pour l’instant.'}
@@ -90,7 +89,7 @@ export function StopsList({ stops, loading, complete, offline = false, prefs, di
                 <b>
                   {here.length} {name}
                 </b>{' '}
-                — km {here.map((s) => kmText(s.along) + (s.fee ? ' (payantes)' : '')).join(' · ')}
+                — km {here.map((s) => kmText(s.along)).join(' · ')}
               </span>
             ) : (
               <span>

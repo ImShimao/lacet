@@ -1,4 +1,4 @@
-/* Les points d'eau et toilettes : une ligne par genre dans le détail, un
+/* Les points d'eau : une ligne dans le détail, un
    repère rond sur la carte, une ligne discrète pendant la sortie. */
 
 .check__label {
@@ -44,10 +44,6 @@
   border: 1.5px solid var(--water);
   color: var(--water);
   box-shadow: 0 3px 10px -3px var(--shadow);
-}
-.poi--toilets {
-  border-color: var(--toilets);
-  color: var(--toilets);
 }
 
 .nextstops {

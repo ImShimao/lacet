@@ -12,6 +12,9 @@ import { isNative } from './platform'
  * Le compte peut s'annuler d'une touche — on lance parfois par erreur — et il
  * ne fait rien de plus que ce qu'il montre : c'est `onDone` qui démarre la
  * sortie, et rien n'est enregistré avant.
+ *
+ * `note` : ce qui a changé pendant le décompte — le départ recalé sur la
+ * position (`restart.js`) —, dit en une ligne sous le chiffre.
  */
 
 // Une seconde pleine par chiffre : plus court, on ne suit plus ; plus long, on
@@ -19,7 +22,7 @@ import { isNative } from './platform'
 const STEP_MS = 900
 const GO_MS = 650
 
-export default function Countdown({ onDone, onCancel }) {
+export default function Countdown({ onDone, onCancel, note = null }) {
   // 3, 2, 1, puis 0 pour « Partez ! ».
   const [n, setN] = useState(3)
   const done = useRef(false)
@@ -55,6 +58,7 @@ export default function Countdown({ onDone, onCancel }) {
           {n > 0 ? n : 'Partez !'}
         </span>
       </div>
+      {note && <p className="countdown__note">{note}</p>}
       <button className="btn countdown__cancel" onClick={onCancel}>
         Annuler
       </button>

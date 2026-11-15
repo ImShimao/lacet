@@ -48,12 +48,7 @@ const FLAG_SVG =
 // Quatre flèches : ce qu'on glisse, dans tous les sens.
 const MOVE_SVG =
   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>'
-const POI_SVG = {
-  water: svg('<path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z"/>'),
-  toilets: svg(
-    '<circle cx="7" cy="4.5" r="1.6"/><circle cx="17" cy="4.5" r="1.6"/><path d="M5 21v-6H4l1.2-6.5h3.6L10 15H9v6"/><path d="M15 21v-5.5h-1V9h6v6.5h-1V21"/><path d="M12 3v18"/>',
-  ),
-}
+const POI_SVG = svg('<path d="M12 3.5c3.2 4 5.5 7.1 5.5 10a5.5 5.5 0 0 1-11 0c0-2.9 2.3-6 5.5-10Z"/>')
 
 export default function MapView({
   styleKey,
@@ -682,7 +677,7 @@ export default function MapView({
     wasNavigating.current = Boolean(navigate)
   }, [navigate])
 
-  // --- points d'eau et toilettes -------------------------------------------------
+  // --- points d'eau -------------------------------------------------
   // Des repères HTML plutôt qu'une couche de symboles : deux des fonds (Relief,
   // Satellite) n'ont pas de jeu de glyphes, et un symbole n'y s'afficherait pas.
   // Ils sont peu nombreux — une poignée le long d'une boucle.
@@ -698,10 +693,10 @@ export default function MapView({
     )
     stopMarkers.current = shown.map((stop) => {
       const el = document.createElement('div')
-      el.className = `poi poi--${stop.kind}`
+      el.className = 'poi'
       el.setAttribute('role', 'img')
-      el.setAttribute('aria-label', `${stop.kind === 'water' ? "Point d'eau" : 'Toilettes'}${stop.name ? ` — ${stop.name}` : ''}`)
-      el.innerHTML = POI_SVG[stop.kind]
+      el.setAttribute('aria-label', `Point d'eau${stop.name ? ` — ${stop.name}` : ''}`)
+      el.innerHTML = POI_SVG
       return new maplibregl.Marker({ element: el }).setLngLat([stop.lon, stop.lat]).addTo(m)
     })
     return () => {

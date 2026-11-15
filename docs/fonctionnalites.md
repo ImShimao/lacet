@@ -37,8 +37,8 @@ noter. La sortie se partage en image, et s'exporte en GPX — chaque point à so
 heure et à son altitude — pour une montre, Garmin Connect ou le site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
 batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
 
-**Il sait où boire.** Coche « Point d'eau » ou « Toilettes » dans « Mon
-compte » : ceux qui bordent la boucle apparaissent sur la carte, le détail dit
+**Il sait où boire.** Coche « Point d'eau » dans « Mon compte » : ceux —
+potables, gratuits, ouverts à tous — qui bordent la boucle apparaissent sur la carte, le détail dit
 le plus long tronçon sans, et pendant la sortie la voix prévient cent mètres
 avant.
 

@@ -34,7 +34,7 @@ L'IPA **n'est pas signée** : c'est l'installateur qui la signe avec ton identif
   - `AltimeterPlugin` : baromètre, dénivelé mesuré pendant la sortie (lissage 4 s, seuil 1 m).
   - `CompassPlugin` : boussole, faisceau bleu sur le point de position.
   - `LiveActivityPlugin` : activité en direct sur l'écran verrouillé et la Dynamic Island.
-  - `VoicePlugin` : voix iOS, baisse la musique ou met un podcast en pause le temps d'une consigne.
+  - `VoicePlugin` : voix iOS, baisse la musique ou le podcast le temps d'une consigne.
   - `LacetBridgeViewController` : pont avec la page.
 - **Configuration** : `customize.py` (chaque réglage y dit pourquoi), `info_plist`, `app_delegate`. La session audio de repos est réglée dans `AppDelegate` : sans elle, iOS coupe la voix au verrouillage.
 - **Extension** greffée au projet Xcode par `add_live_activity.rb` à la compilation. Son identifiant se **déduit** de celui de l'app, pour que le lien ne puisse pas se rompre en silence.

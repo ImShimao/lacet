@@ -31,6 +31,8 @@ import { km } from './format'
 import { load, rememberShown, save, shownFrom } from './storage'
 import { ranFrom } from './knownRoutes'
 import { haptic } from './platform'
+import { locateOnce } from './position'
+import { startHere } from './restart'
 import { announceDeparture, announcing } from './contact'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
@@ -44,8 +46,8 @@ export default function App() {
   const look = useAppearance()
   const [chosenMap, setMapStyle] = useState(stored.mapStyle || null)
   const mapStyle = chosenMap || (look.resolved === 'light' ? LIGHT_STYLE : DEFAULT_STYLE)
-  // Les points d'eau et toilettes à montrer le long des boucles — voir `pois.js`.
-  const [poiPrefs, setPoiPrefs] = useState(stored.pois || { water: false, toilets: false })
+  // Les points d'eau à montrer le long des boucles — voir `pois.js`.
+  const [poiPrefs, setPoiPrefs] = useState(stored.pois || { water: false })
 
   const [tab, setTab] = useState('explore')
   // La page ouverte dans « Mon compte », ou `null` pour son sommaire. Tenue
@@ -284,7 +286,28 @@ export default function App() {
       })
     }
     run.countdown(kind)
+    // Le temps du décompte, la boucle se recale sur la position exacte : elle
+    // a été préparée d'un repère posé à quelques dizaines de mètres de la
+    // porte — voir `restart.js`. Passé le décompte, on n'y touche plus.
+    setShifted(false)
+    if (kind !== 'route' || !selected) return
+    const chosen = selected
+    shifting.current = true
+    locateOnce(
+      (geo) => {
+        if (!shifting.current) return
+        shifting.current = false
+        const moved = startHere(chosen, [geo.coords.longitude, geo.coords.latitude], geo.coords.accuracy)
+        if (!moved) return
+        found.swap(chosen.id, moved)
+        setShifted(true)
+      },
+      () => {},
+      { timeoutMs: 3000 },
+    )
   }
+  const shifting = useRef(false)
+  const [shifted, setShifted] = useState(false)
 
   // --- l'autre sens ------------------------------------------------------------
   // La même boucle retournée : mêmes rues, même note, mais les côtes dans
@@ -460,7 +483,19 @@ export default function App() {
 
         {/* Par-dessus la carte, et par-dessus tout le reste : pendant ces trois
             secondes, il n'y a rien d'autre à faire que partir. */}
-        {starting && <Countdown onCancel={() => run.cancelCountdown()} onDone={() => run.begin()} />}
+        {starting && (
+          <Countdown
+            note={shifted ? 'Départ recalé sur ta position' : null}
+            onCancel={() => {
+              shifting.current = false
+              run.cancelCountdown()
+            }}
+            onDone={() => {
+              shifting.current = false
+              run.begin()
+            }}
+          />
+        )}
 
         {!running && (
           <div className="stage__top">
@@ -757,7 +792,7 @@ export default function App() {
                 // prochain `save` les aurait réécrits dans le magasin vidé.
                 setParams({ ...DEFAULTS })
                 setMapStyle(null)
-                setPoiPrefs({ water: false, toilets: false })
+                setPoiPrefs({ water: false })
                 setRunView('heading')
                 setVia(null)
                 run.dropPending()
