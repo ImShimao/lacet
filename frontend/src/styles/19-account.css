@@ -35,11 +35,12 @@
 }
 
 /* Qui l'on est : l'activité du moment, et ce qu'on a déjà couru. */
+/* La carte du profil : un bouton qui ouvre la page « Profil ». */
 .acct__card {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 14px 14px 16px;
   border-radius: 20px;
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -71,33 +72,6 @@
   font-size: calc(13px * var(--text-scale));
   color: var(--text-2);
 }
-.acct__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.acct__stats > div {
-  min-width: 0;
-  padding: 9px 11px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg) 42%, transparent);
-}
-.acct__stats b {
-  display: block;
-  font-size: calc(17px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.acct__stats span {
-  display: block;
-  font-size: calc(11px * var(--text-scale));
-  color: var(--text-3);
-}
-
 /* Une famille : son nom en petites capitales, puis ses lignes d'un seul bloc. */
 .acct__group {
   display: flex;
@@ -225,12 +199,4 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
-}
-
-/* Petit écran, texte agrandi : « kilomètres » débordait de sa case de
-   quatre pixels. Les cases rendent un peu de leur marge intérieure. */
-@container lacet (max-width: 380px) {
-  .acct__stats > div {
-    padding-inline: 7px;
-  }
 }

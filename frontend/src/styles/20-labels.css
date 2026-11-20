@@ -88,12 +88,6 @@
   line-height: 1.1;
   overflow-wrap: anywhere;
 }
-.acct__stats span {
-  font-family: var(--eyebrow);
-  font-size: calc(9.5px * var(--text-scale));
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 .stats:not(.stats--live) span {
   display: flex;
   align-items: flex-start;

@@ -5,14 +5,14 @@ import { ZONE_RADIUS } from './zones'
 /**
  * La colonne de boutons posée sur la carte, hors course.
  *
- * Trois questions, un bouton chacune, dans l'ordre où on se les pose : à quoi
- * ressemble la carte, où suis-je, d'où je pars. La boussole n'apparaît que
- * carte tournée, pour la remettre nord en haut. Le cercle hachuré dessine une
- * zone que toutes les boucles contournent — voir `zones.js`.
+ * Peu de boutons, chacun une question : où suis-je, comment je veux ce
+ * parcours, et — une boucle choisie — à quoi elle ressemble en 3D. Tout ce qui
+ * change le parcours tient dans un seul menu, comme « Personnaliser le
+ * parcours » chez RunnrZ : le départ, un point de passage, une zone à éviter.
+ * Le fond de carte, réglé une fois pour toutes, est parti dans « Apparence ».
+ * La boussole n'apparaît que carte tournée, pour la remettre nord en haut.
  */
 export function MapTools({
-  stylesOpen,
-  onStyles,
   geo,
   onLocate,
   placing,
@@ -31,11 +31,8 @@ export function MapTools({
   onZone = null,
 }) {
   const [menu, setMenu] = useState(false)
-  // Les outils moins utilisés — fond de carte, zone, 3D — tiennent dans un seul
-  // bouton, comme le menu du départ : une colonne de six boutons se lisait mal.
-  const [tools, setTools] = useState(false)
 
-  // Le menu du départ se ferme au premier geste ailleurs.
+  // Le menu se ferme au premier geste ailleurs.
   useEffect(() => {
     if (!menu) return undefined
     const close = (e) => {
@@ -45,15 +42,6 @@ export function MapTools({
     return () => document.removeEventListener('pointerdown', close)
   }, [menu])
 
-  useEffect(() => {
-    if (!tools) return undefined
-    const close = (e) => {
-      if (!(e.target instanceof Element) || !e.target.closest('.toolspanel, .tool--tools')) setTools(false)
-    }
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [tools])
-
   /** Chaque choix du menu le referme avant d'agir. */
   const pick = (action) => () => {
     setMenu(false)
@@ -62,41 +50,6 @@ export function MapTools({
 
   return (
     <div className="stage__tools">
-      {/* Pendant le survol, ce bloc reste seul visible : c'est par lui qu'on
-          l'arrête (voir `10-map-tools.css`). */}
-      <div className={`toolmenu ${flying ? 'tool--fly' : ''}`}>
-        <button
-          className={`tool tool--tools ${tools || stylesOpen ? 'tool--on' : ''}`}
-          onClick={() => setTools((v) => !v)}
-          aria-label="Outils de la carte"
-          aria-haspopup="menu"
-          aria-expanded={tools}
-        >
-          <Icon name="layers" />
-        </button>
-        {tools && (
-          <div className="startmenu toolspanel" role="menu">
-            <b>Outils</b>
-            <button role="menuitem" onClick={pick(onStyles)}>
-              <Icon name="layers" size={17} />
-              Fond de carte
-            </button>
-            {onZone && (
-              <button role="menuitem" onClick={pick(onZone)}>
-                <Icon name="zone" size={17} />
-                {drawingZone ? 'Annuler la zone à éviter' : 'Dessiner une zone à éviter'}
-              </button>
-            )}
-            {onFlyover && (
-              <button role="menuitem" onClick={pick(onFlyover)}>
-                <Icon name={flying ? 'stop' : 'expand'} size={17} />
-                {flying ? 'Arrêter le survol 3D' : 'Survoler la boucle en 3D'}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      <span className="tools__gap" aria-hidden="true" />
       <button
         className={`tool ${geo.following ? 'tool--on' : ''} ${geo.status === 'locating' ? 'tool--busy' : ''}`}
         onClick={onLocate}
@@ -107,12 +60,12 @@ export function MapTools({
       </button>
       <div className="toolmenu">
         <button
-          className={`tool tool--start ${placing || menu ? 'tool--on' : ''}`}
+          className={`tool tool--start ${placing || menu || drawingZone ? 'tool--on' : ''}`}
           onClick={() => {
             if (placing) onPlacing(false)
             else setMenu((v) => !v)
           }}
-          aria-label="Choisir le point de départ"
+          aria-label="Personnaliser le parcours"
           aria-haspopup="menu"
           aria-expanded={menu}
         >
@@ -144,6 +97,13 @@ export function MapTools({
               <Icon name="pin" size={17} />
               Choisir sur la carte
             </button>
+            {onKeepStart && (
+              <button role="menuitem" onClick={pick(onKeepStart)}>
+                <Icon name="plus" size={17} />
+                Enregistrer ce départ
+              </button>
+            )}
+            {(onPlacingVia || onZone) && <b>Parcours</b>}
             {/* Le même geste qu'un appui long sur la carte, pour qui ne le
                 connaît pas encore. */}
             {onPlacingVia && (
@@ -152,15 +112,28 @@ export function MapTools({
                 Passer par un point
               </button>
             )}
-            {onKeepStart && (
-              <button role="menuitem" onClick={pick(onKeepStart)}>
-                <Icon name="plus" size={17} />
-                Enregistrer ce départ
+            {onZone && (
+              <button role="menuitem" onClick={pick(onZone)}>
+                <Icon name="zone" size={17} />
+                {drawingZone ? 'Annuler la zone à éviter' : 'Éviter une zone'}
               </button>
             )}
           </div>
         )}
       </div>
+      {/* Le survol n'a de sens qu'une boucle choisie : il n'apparaît qu'alors.
+          Pendant le survol, il reste seul visible : c'est par lui qu'on
+          l'arrête (voir `10-map-tools.css`). */}
+      {onFlyover && (
+        <button
+          className={`tool tool--fly tool--3d ${flying ? 'tool--on' : ''}`}
+          onClick={onFlyover}
+          aria-pressed={flying}
+          aria-label={flying ? 'Arrêter le survol 3D' : 'Survoler la boucle en 3D'}
+        >
+          {flying ? <Icon name="stop" /> : <span className="tool__text" aria-hidden="true">3D</span>}
+        </button>
+      )}
       <button ref={compassRef} className="tool tool--compass" onClick={onNorth} aria-label="Remettre le nord en haut">
         <span className="needle" aria-hidden="true" />
       </button>

@@ -529,8 +529,6 @@ export default function App() {
           />
         ) : (
           <MapTools
-            stylesOpen={stylesOpen}
-            onStyles={() => setStylesOpen(true)}
             geo={geo}
             onLocate={here.centerOnMe}
             placing={placing}
@@ -757,6 +755,8 @@ export default function App() {
             />
           ) : tab === 'account' ? (
             <Account
+              mapStyle={mapStyle}
+              onStyles={() => setStylesOpen(true)}
               zones={zones}
               onZones={onZones}
               page={accountPage}

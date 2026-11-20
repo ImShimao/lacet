@@ -1,13 +1,10 @@
-/* Les commandes de la carte : la boussole, le menu du départ. */
+/* Les commandes de la carte : la boussole, le menu du parcours. */
 
 /* ══ commandes de la carte ═══════════════════════════════════════════════
-   Hors course : le fond de carte, puis — un cran plus bas — ma position, le
-   départ, et la boussole quand la carte a tourné. En course : le fond, la
-   voix, l'orientation, la vue d'ensemble. */
+   Hors course : ma position, le menu du parcours, le survol 3D quand une
+   boucle est choisie, et la boussole quand la carte a tourné. En course : le
+   fond, la voix, l'orientation, la vue d'ensemble. */
 
-.tools__gap {
-  height: 4px;
-}
 .tool--muted {
   color: var(--text-3);
 }
@@ -78,11 +75,12 @@
 }
 .startmenu b {
   padding: 6px 10px 4px;
-  font-size: calc(11px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-3);
+}
+/* Le second titre du menu (« Parcours ») se détache du premier bloc. */
+.startmenu b:not(:first-child) {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
 }
 .startmenu button {
   display: flex;

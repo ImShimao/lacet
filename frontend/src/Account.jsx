@@ -18,8 +18,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented, directionOf } from './FiltersSheet.jsx'
-import { surfaceLabel } from './format'
+import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented } from './FiltersSheet.jsx'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
@@ -28,6 +27,7 @@ import * as offline from './offlineMaps'
 import { StopsSetting } from './Stops.jsx'
 import { KINDS } from './pois'
 import { voiceSettings } from './voice'
+import { styleByKey } from './mapStyles'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
 /** Les familles du sommaire, dans leur ordre. */
@@ -38,7 +38,7 @@ const GROUPS = ['Paramètres', 'Données', 'Infos']
  * ligne à sa couleur bien avant de l'avoir lue.
  */
 export const SECTIONS = [
-  { key: 'profile', group: 'Paramètres', icon: 'user', title: 'Profil' },
+  { key: 'profile', group: null, icon: 'user', title: 'Profil' },
   { key: 'search', group: 'Paramètres', icon: 'sliders', title: 'Recherche' },
   { key: 'run', group: 'Paramètres', icon: 'play', title: 'Pendant la sortie' },
   { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
@@ -91,51 +91,27 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
   )
 }
 
-/** Le sommaire : qui l'on est, puis une ligne par page. */
-function Summary({ onPage, params, geo, history = [], poiPrefs }) {
-  const runs = history.filter((h) => h.actual_distance_m > 0)
-  const totalKm = runs.reduce((sum, h) => sum + h.actual_distance_m, 0) / 1000
+/**
+ * Le sommaire : qui l'on est, puis une ligne par page.
+ *
+ * La carte du haut est la page « Profil » : une ligne « Profil » en dessous la
+ * répétait. Les sorties et les kilomètres cumulés n'y sont plus — ils se
+ * lisent dans « Mes parcours », avec leur graphique.
+ */
+function Summary({ onPage, params, poiPrefs }) {
   const sport = SPORTS.find((s) => s.key === params.sport)
-  const position =
-    geo.status === 'ready' ? `± ${Math.round(geo.accuracy)} m` : geo.status === 'denied' ? 'bloquée' : '—'
-
   return (
     <>
-      <div className="acct__card">
-        <div className="acct__who">
-          <span className="acct__avatar">
-            <Icon name={sport?.icon ?? 'user'} size={24} />
-          </span>
-          <div>
-            <b>Profil local</b>
-            <em>
-              {[
-                sport?.label,
-                surfaceLabel(params.surface),
-                params.safety === 'safe' ? 'Sûr' : 'Standard',
-                // Seulement quand elle est imposée : « Auto » est l'absence de choix.
-                directionOf(params.direction)?.toward.replace(/^v/, 'V'),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </em>
-          </div>
-        </div>
-        <div className="acct__stats">
-          <div>
-            <b>{runs.length}</b>
-            <span>sortie{runs.length > 1 ? 's' : ''}</span>
-          </div>
-          <div>
-            <b>{String(totalKm >= 100 ? Math.round(totalKm) : Math.round(totalKm * 10) / 10).replace('.', ',')}</b>
-            <span>kilomètres</span>
-          </div>
-          <div>
-            <b>{position}</b>
-            <span>GPS</span>
-          </div>
-        </div>
-      </div>
+      <button className="acct__card acct__who" onClick={() => onPage('profile')}>
+        <span className="acct__avatar">
+          <Icon name={sport?.icon ?? 'user'} size={24} />
+        </span>
+        <span className="menu__text">
+          <b>Profil local</b>
+          <em>{summaryOf('profile', { params, poiPrefs })}</em>
+        </span>
+        <Icon name="chevronRight" size={17} className="menu__chev" />
+      </button>
 
       {GROUPS.map((group) => (
         <section className="acct__group" key={group} aria-label={group}>
@@ -229,7 +205,7 @@ function summaryOf(key, { params, poiPrefs }) {
 }
 
 /** Une page de « Mon compte ». */
-function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored, zones = [], onZones = () => {} }) {
+function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored, zones = [], onZones = () => {} }) {
   switch (page) {
     case 'profile':
       return (
@@ -294,7 +270,7 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
         </>
       )
     case 'appearance':
-      return <AppearanceSettings />
+      return <AppearanceSettings mapStyle={mapStyle} onStyles={onStyles} />
     case 'storage':
       return (
         <>
@@ -448,7 +424,7 @@ function appearanceLabels() {
  * au toucher, sans bouton « Appliquer » : l'écran change sous le doigt, et
  * c'est ce qu'on vient voir.
  */
-function AppearanceSettings() {
+function AppearanceSettings({ mapStyle, onStyles }) {
   const look = useAppearance()
   return (
     <div className="fields">
@@ -493,10 +469,26 @@ function AppearanceSettings() {
         </p>
       </div>
 
-      <p className="muted small">
-        Le fond de carte se choisit à part, avec le bouton des calques. Tant qu'on n'en a pas
-        choisi, le thème clair part d'un fond clair.
-      </p>
+      {/* Le fond de carte vivait dans un bouton sur la carte : on le règle une
+          fois, pas à chaque sortie. Il ouvre le même choix, avec son aperçu. */}
+      {onStyles && (
+        <div className="field">
+          <span className="label">Fond de carte</span>
+          <div className="menu">
+            <button className="menu__row" onClick={onStyles}>
+              <span className="menu__icon">
+                <Icon name="layers" size={18} />
+              </span>
+              <span className="menu__text">
+                <b>{styleByKey(mapStyle).label}</b>
+                <em>Changer, avec un aperçu</em>
+              </span>
+              <Icon name="chevronRight" size={17} className="menu__chev" />
+            </button>
+          </div>
+          <p className="field__hint">Tant qu'on n'en a pas choisi, le thème clair part d'un fond clair.</p>
+        </div>
+      )}
     </div>
   )
 }

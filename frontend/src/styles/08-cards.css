@@ -148,6 +148,43 @@
   background: var(--accent);
 }
 
+/* Sous les cartes : les points à gauche, les gestes sur la boucle à droite. */
+.cards__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 2px;
+}
+.cardtools {
+  display: flex;
+  gap: 6px;
+}
+.cardtool {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  color: var(--text-2);
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+.cardtool:active {
+  transform: scale(0.92);
+}
+.cardtool:disabled {
+  opacity: 0.4;
+}
+.cardtool--on {
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
 .route-meta {
   font-size: calc(12px * var(--text-scale));
   font-weight: 600;

@@ -183,12 +183,9 @@ describe('l’accueil : la distance en grand', () => {
       />,
     )
 
-  it('affiche la distance choisie et la règle au raccourci', () => {
-    const onQuickParams = vi.fn()
-    accueil(onQuickParams)
+  it('affiche la distance choisie en grand', () => {
+    accueil(vi.fn())
     expect(screen.getByText('10')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: '5 km' }))
-    expect(onQuickParams).toHaveBeenCalledWith({ distance_km: 5, mode: 'distance' })
   })
 
   it('se règle à la règle, par demi-kilomètre : au défilement comme au clavier', () => {

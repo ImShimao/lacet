@@ -560,8 +560,7 @@
 }
 
 /* L'accueil : combien aujourd'hui. Pas de carte dans la carte — le bloc se
-   pose à même le panneau : le chiffre en grand au centre, la règle dessous,
-   les raccourcis. */
+   pose à même le panneau : le chiffre en grand au centre, la règle dessous. */
 .dist {
   display: flex;
   flex-direction: column;
@@ -642,15 +641,4 @@
   background: var(--accent-text);
   box-shadow: 0 0 10px var(--accent-glow);
   pointer-events: none;
-}
-.dist__chips {
-  display: flex;
-  gap: 6px;
-  margin-top: 2px;
-}
-.dist__chips .chip {
-  flex: 1;
-  justify-content: center;
-  padding: 6px 0;
-  font-size: calc(12.5px * var(--text-scale));
 }

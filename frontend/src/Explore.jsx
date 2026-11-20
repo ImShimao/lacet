@@ -23,11 +23,11 @@ import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
 
 // Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
-// une grande graduation tous les `major` pas, et les raccourcis dessous.
+// et une grande graduation tous les `major` pas.
 const QUICK = {
-  run: { min: 1, max: 42, step: 0.5, major: 10, chips: [3, 5, 10, 15] },
-  bike: { min: 5, max: 200, step: 5, major: 5, chips: [25, 50, 75, 100] },
-  duration: { min: 10, max: 300, step: 5, major: 6, chips: [30, 45, 60, 90] },
+  run: { min: 1, max: 42, step: 0.5, major: 10 },
+  bike: { min: 5, max: 200, step: 5, major: 5 },
+  duration: { min: 10, max: 300, step: 5, major: 6 },
 }
 // L'écart entre deux graduations, en pixels.
 const TICK = 12
@@ -54,7 +54,7 @@ function QuickLength({ params, onQuickParams }) {
     onQuickParams({ [key]: next, mode: duration ? 'duration' : 'distance' })
   }
 
-  // La règle suit la valeur quand elle change d'ailleurs (raccourci, filtres,
+  // La règle suit la valeur quand elle change d'ailleurs (filtres, sport,
   // changement de mode). Un défilement au doigt ne la contredit pas : il
   // tombe déjà à moins d'un demi-cran de la valeur qu'il vient de poser.
   useEffect(() => {
@@ -128,16 +128,6 @@ function QuickLength({ params, onQuickParams }) {
           <span className="ruler__pad" />
         </div>
         <span className="ruler__needle" aria-hidden="true" />
-      </div>
-      <div className="dist__chips" role="radiogroup" aria-label={duration ? 'Durées rapides' : 'Distances rapides'}>
-        {cfg.chips.map((k) => {
-          const on = Math.abs(value - k) < 0.01
-          return (
-            <button key={k} role="radio" aria-checked={on} className={`chip ${on ? 'chip--on' : ''}`} onClick={() => set(k)}>
-              {k} {unit}
-            </button>
-          )
-        })}
       </div>
     </div>
   )
@@ -254,13 +244,13 @@ export default function Explore({
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
         <div className="row">
-          {/* Ce qu'on va chercher, dit avant de chercher : sans ça, il fallait
-              ouvrir les filtres pour savoir si l'on partait pour 10 km ou 21. */}
+          {/* Ce que les filtres règlent, dit avant de les ouvrir — sans la
+              distance, déjà écrite en grand juste au-dessus. */}
           <button className="btn btn--stack" onClick={onOpenFilters}>
             <Icon name="sliders" size={17} />
             <span>
               Filtres
-              <em>{summarise(params)}</em>
+              <em>{summarise(params).split(' · ').slice(1).join(' · ')}</em>
             </span>
           </button>
           <button className="btn btn--ghost" onClick={onFreeRun}>
@@ -283,15 +273,6 @@ export default function Explore({
               Préparation des rues de ce coin…
             </p>
           )
-        )}
-        {/* Le mode d'emploi, tant qu'on n'est jamais sorti avec l'app : après,
-            on le connaît, et la carte mérite la place. */}
-        {history.length === 0 && (
-          <p className="muted small">
-            Fais glisser le repère, touche la carte en mode placement, ou cherche une
-            adresse pour changer de départ. Un appui long sur la carte fait passer la
-            boucle par ce point.
-          </p>
         )}
       </div>
     )
@@ -347,6 +328,39 @@ export default function Explore({
         onSelect={onSelect}
         onOpenDetail={onOpenDetail}
         sport={params.sport}
+        tools={
+          // Ce qu'on fait d'une boucle, en petit, sous les cartes — comme les
+          // icônes à côté du titre chez Roovr. La barre du bas ne garde que le
+          // favori et « Démarrer » : quatre boutons de plus y noyaient le geste.
+          <div className="cardtools">
+            {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend
+                en montant, du vent qu'on a dans le dos à la fin, et de chaque
+                consigne de virage. La même boucle à l'envers est une autre sortie. */}
+            {onReverse && (
+              <button
+                className={`cardtool ${selected.reversed ? 'cardtool--on' : ''}`}
+                onClick={onReverse}
+                disabled={reversing}
+                aria-pressed={Boolean(selected.reversed)}
+                title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+                aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+              >
+                <Icon name="uturn" size={17} />
+              </button>
+            )}
+            <button className="cardtool" onClick={exportGpx} disabled={exporting} title="Exporter en GPX" aria-label="Exporter en GPX">
+              <Icon name="fileExport" size={17} />
+            </button>
+            <button
+              className="cardtool"
+              onClick={onRegenerate ?? onSearch}
+              title="Régénérer d'autres boucles"
+              aria-label="Régénérer d'autres boucles"
+            >
+              <Icon name="shuffle" size={17} />
+            </button>
+          </div>
+        }
       />
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
@@ -495,12 +509,8 @@ export default function Explore({
       </button>
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
-          que soit l'endroit où l'on a fait défiler le détail. Elle était tout en
-          bas, sous la note, et il fallait la chercher.
-
-          Chaque icône porte son mot dessous : seules, quatre icônes en rang
-          se devinaient — le cœur, oui ; la flèche, le demi-tour, le cercle,
-          non. Le libellé complet reste celui que lit VoiceOver. */}
+          que soit l'endroit où l'on a fait défiler le détail. À côté, le seul
+          autre geste qu'on fait avant de partir : garder la boucle. */}
       <div className="actionbar">
         <button
           className={`btn btn--icon ${isFavorite ? 'btn--on' : ''}`}
@@ -510,42 +520,6 @@ export default function Explore({
           aria-pressed={isFavorite}
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
-          <span className="btn__cap">Favori</span>
-        </button>
-        <button
-          className="btn btn--icon"
-          onClick={exportGpx}
-          disabled={exporting}
-          title="Exporter en GPX"
-          aria-label="Exporter en GPX"
-        >
-          <Icon name="fileExport" size={19} />
-          <span className="btn__cap">GPX</span>
-        </button>
-        {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend en
-            montant, du vent qu'on a dans le dos à la fin, et de chaque consigne
-            de virage. La même boucle à l'envers est une autre sortie. */}
-        {onReverse && (
-          <button
-            className={`btn btn--icon ${selected.reversed ? 'btn--on' : ''}`}
-            onClick={onReverse}
-            disabled={reversing}
-            aria-pressed={Boolean(selected.reversed)}
-            title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
-            aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
-          >
-            <Icon name="uturn" size={19} />
-            <span className="btn__cap">Sens</span>
-          </button>
-        )}
-        <button
-          className="btn btn--icon"
-          onClick={onRegenerate ?? onSearch}
-          title="Régénérer d'autres boucles"
-          aria-label="Régénérer d'autres boucles"
-        >
-          <Icon name="shuffle" size={19} />
-          <span className="btn__cap">Autres</span>
         </button>
         <button className="btn btn--primary" onClick={onStart}>
           <Icon name="play" size={17} />
@@ -660,7 +634,7 @@ function AlreadyRun({ found }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, tools = null }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -807,13 +781,20 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
         })}
         <span className="cards__pad" aria-hidden="true" />
       </div>
-      {routes.length > 1 && (
-        <div className="cards__dots" aria-hidden="true">
-          {routes.map((r) => (
-            <i key={r.id} className={r.id === selected?.id ? 'on' : ''} />
-          ))}
-        </div>
-      )}
+      {/* Une seule ligne sous les cartes : où l'on en est à gauche, ce qu'on
+          peut faire de la boucle à droite. */}
+      <div className="cards__foot">
+        {routes.length > 1 ? (
+          <div className="cards__dots" aria-hidden="true">
+            {routes.map((r) => (
+              <i key={r.id} className={r.id === selected?.id ? 'on' : ''} />
+            ))}
+          </div>
+        ) : (
+          <span />
+        )}
+        {tools}
+      </div>
     </div>
   )
 }
