@@ -195,6 +195,26 @@ body,
   height: 100dvh;
   container: lacet / size;
 }
+
+/* Sur un grand écran à la souris, l'app tient dans un cadre de téléphone (390 ×
+   844) au lieu de s'étirer sur toute la fenêtre. L'iPhone, en portrait et au
+   doigt, n'entre pas dans cette règle : le cadre ne s'y voit pas. `transform`
+   fait de #root le repère des fenêtres modales, qui restent alors dans le cadre. */
+@media (min-width: 600px) and (hover: hover) and (pointer: fine) {
+  body {
+    display: grid;
+    place-items: center;
+    background: #06070a;
+  }
+  #root {
+    width: 390px;
+    height: min(844px, calc(100dvh - 24px));
+    border-radius: 36px;
+    overflow: hidden;
+    transform: translateZ(0);
+    box-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+}
 body {
   background: var(--bg);
   color: var(--text);
