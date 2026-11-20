@@ -451,21 +451,21 @@ function AppearanceSettings({ mapStyle, onStyles }) {
 // Le côté de la route où l'on court — `side` dans le moteur, voir `keepSide`.
 // La gauche d'abord : c'est ce que demande le code de la route.
 const SIDES = [
-  { key: 'left', label: 'Gauche', sub: 'Face aux voitures (R412-36)' },
+  { key: 'left', label: 'Gauche' },
   { key: 'right', label: 'Droite' },
   { key: 'any', label: 'Indifférent' },
 ]
 
 const SAFETY_OPTIONS = [
-  { key: 'safe', label: 'Sûr', sub: 'Jamais de route rapide sans trottoir' },
-  { key: 'standard', label: 'Standard', sub: 'Montre aussi les boucles exposées' },
+  { key: 'safe', label: 'Sûr' },
+  { key: 'standard', label: 'Standard' },
 ]
 
 const FORM_OPTIONS = [
-  { key: 'auto', label: 'Auto', sub: 'Une boucle, sinon des tours' },
+  { key: 'auto', label: 'Auto' },
   { key: 'loop', label: 'Une boucle' },
-  { key: 'eight', label: 'Deux boucles', sub: 'En 8, la seconde repart de la porte' },
-  { key: 'laps', label: 'Des tours', sub: 'Une petite boucle à refaire' },
+  { key: 'eight', label: 'Deux boucles' },
+  { key: 'laps', label: 'Des tours' },
 ]
 
 const LAP_OPTIONS = Array.from({ length: MAX_LAPS - 1 }, (_, i) => ({ key: i + 2, label: `${i + 2} tours` }))
@@ -484,7 +484,10 @@ function SearchSettings({ params, onProfile }) {
   const sport = params.sport ?? 'run'
   return (
     <>
-      <PrefsCard title="Itinéraire">
+      <PrefsCard
+        title="Itinéraire"
+        foot="Sûr écarte toute route rapide sans trottoir. À gauche, on court face aux voitures, comme le demande le code de la route (R412-36) hors agglomération."
+      >
         <PickRow
           icon="shield"
           label="Sécurité"
@@ -497,7 +500,7 @@ function SearchSettings({ params, onProfile }) {
           label="Direction"
           value={directionOf(params.direction)?.key ?? 'auto'}
           shown={directionOf(params.direction)?.title ?? 'Auto'}
-          options={DIRECTIONS.map((d) => ({ key: d.key, label: d.title ?? 'Auto', sub: d.deg === undefined ? 'Tout autour du départ' : undefined }))}
+          options={DIRECTIONS.map((d) => ({ key: d.key, label: d.title ?? 'Auto' }))}
           onChange={(direction) => onProfile({ direction })}
         />
         <PickRow
@@ -531,7 +534,6 @@ function SearchSettings({ params, onProfile }) {
             key={a.key}
             icon={{ steps: 'stairs', unlit: 'moon', known: 'history' }[a.key]}
             label={a.label}
-            sub={a.hint}
             on={avoid.includes(a.key)}
             onChange={(on) => onProfile({ avoid: on ? [...avoid, a.key] : avoid.filter((k) => k !== a.key) })}
           />
@@ -585,7 +587,7 @@ function ShownFilters({ params, onProfile }) {
           <ToggleRow
             key={f.key}
             label={f.label}
-            sub={on ? f.hint : `Masqué. ${f.fixed}`}
+            sub={on ? null : `Masqué. ${f.fixed}`}
             on={on}
             onChange={() => toggle(f)}
           />
@@ -909,32 +911,31 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
   const [pause, setPause] = useStored('autoPause')
   const [screen, setScreen] = useStored('keepScreenOn')
   return (
-    <PrefsCard title="Pendant la sortie">
+    <PrefsCard
+      title="Pendant la sortie"
+      foot="Sans recalcul automatique, le bouton « Recalculer » reste là. Sans arrêt automatique, l'arrivée propose de terminer, et la sortie continue."
+    >
       <ToggleRow
         icon="refresh"
         label="Recalcul automatique"
-        sub={reroute ? 'Un nouveau chemin 20 s après un écart' : 'Seulement au bouton « Recalculer »'}
         on={reroute}
         onChange={setReroute}
       />
       <ToggleRow
         icon="flag"
         label="Arrêt automatique à l'arrivée"
-        sub={finish ? 'La sortie se termine à la porte' : 'On termine soi-même, au bouton'}
         on={finish}
         onChange={setFinish}
       />
       <ToggleRow
         icon="pause"
         label="Pause automatique"
-        sub={pause ? "Le chrono s'arrête quand tu t'arrêtes" : 'Le chrono tourne sans interruption'}
         on={pause}
         onChange={setPause}
       />
       <ToggleRow
         icon="sun"
         label="Écran toujours allumé"
-        sub={screen ? 'La carte reste sous les yeux' : 'Veille normale : la voix guide quand même'}
         on={screen}
         onChange={setScreen}
       />
@@ -943,7 +944,6 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
           key={kind}
           icon={k.icon}
           label={`${k.label} sur le parcours`}
-          sub={`Sur la carte et à la voix, à moins de ${NEAR_M} m du tracé`}
           on={Boolean(poiPrefs?.[kind])}
           onChange={(on) => onPoiPrefs({ [kind]: on })}
         />
@@ -964,9 +964,9 @@ const KM_SAYS = [
 ]
 // « Anticipation des instructions » : quand la voix annonce un virage.
 const LEADS = [
-  { key: 'early', label: 'Tôt', sub: 'Une quarantaine de secondes avant' },
-  { key: 'normal', label: 'Moyen', sub: 'Une trentaine de secondes avant' },
-  { key: 'late', label: 'Tard', sub: 'Une vingtaine de secondes avant' },
+  { key: 'early', label: 'Tôt' },
+  { key: 'normal', label: 'Moyen' },
+  { key: 'late', label: 'Tard' },
 ]
 const RATES = [
   { key: 'slow', label: 'Lent' },
@@ -999,7 +999,7 @@ function VoiceSetting() {
 
   const voiceOptions = [
     { key: null, label: 'Voix du système' },
-    ...voices.map((v) => ({ key: v.id, label: v.name, sub: v.enhanced ? 'Qualité améliorée' : undefined })),
+    ...voices.map((v) => ({ key: v.id, label: v.enhanced ? `${v.name} (améliorée)` : v.name })),
   ]
 
   return (
@@ -1036,7 +1036,6 @@ function VoiceSetting() {
         <ToggleRow
           icon="trendUp"
           label="Écart à l'allure visée"
-          sub="À plus de dix secondes de l'allure demandée"
           on={prefs.target}
           onChange={(target) => change({ target })}
         />

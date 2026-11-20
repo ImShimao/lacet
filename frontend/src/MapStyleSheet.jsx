@@ -19,8 +19,14 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
   const preview = useRef(null)
   const map = useRef(null)
   const shown = useRef(value)
+  const tabs = useRef(null)
 
-  // Une petite carte figée : on la regarde, on ne s'y promène pas. Au moins au
+  // L'onglet choisi reste en vue : huit fonds ne tiennent pas sur une ligne.
+  useEffect(() => {
+    tabs.current?.querySelector('[aria-checked="true"]')?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+  }, [choice])
+
+  // Une carte figée : on la regarde, on ne s'y promène pas. Au moins au
   // zoom 14, là où les noms de rues apparaissent — c'est sur eux qu'on juge.
   useEffect(() => {
     const { center, zoom } = lastCamera()
@@ -60,49 +66,37 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
         aria-label="Fond de carte"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal__head">
-          <button className="mapsheet__close" onClick={onClose} aria-label="Fermer">
-            <Icon name="close" size={18} />
-          </button>
-          <h2>Fond de carte</h2>
-          <span />
+        {/* Comme la feuille de RunnrZ : fermer en haut à gauche, le fond en grand,
+            les fonds en onglets dessous, une phrase, et « Enregistrer ». */}
+        <button className="mapsheet__close" onClick={onClose} aria-label="Fermer">
+          <Icon name="close" size={18} />
+        </button>
+
+        <div className="mapsheet__preview" ref={preview} aria-hidden="true" />
+
+        <div className="mapsheet__tabs" role="radiogroup" aria-label="Fonds disponibles" ref={tabs}>
+          {MAP_STYLES.map((s) => (
+            <button
+              key={s.key}
+              role="radio"
+              aria-checked={choice === s.key}
+              className="mapsheet__tab"
+              onClick={() => setChoice(s.key)}
+              data-autofocus={choice === s.key || undefined}
+            >
+              <i style={{ background: s.swatch }} aria-hidden="true" />
+              {s.label}
+            </button>
+          ))}
         </div>
 
-        <div className="modal__body">
-          <div className="mapsheet__preview" ref={preview} aria-hidden="true" />
+        <p className="mapsheet__desc" aria-live="polite">
+          {styleByKey(choice).description}
+        </p>
 
-          {/* Une ligne par fond, comme les choix de RunnrZ : un rond à cocher,
-              le nom, ce qu'il montre, et sa couleur en vignette. */}
-          <div className="mapsheet__list" role="radiogroup" aria-label="Fonds disponibles">
-            {MAP_STYLES.map((s) => (
-              <button
-                key={s.key}
-                role="radio"
-                aria-checked={choice === s.key}
-                className="mapsheet__opt"
-                onClick={() => setChoice(s.key)}
-                data-autofocus={choice === s.key || undefined}
-              >
-                <span className="mapsheet__radio" aria-hidden="true" />
-                <span className="mapsheet__text">
-                  <b>{s.label}</b>
-                  <em>{s.description}</em>
-                </span>
-                <i style={{ background: s.swatch }} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="modal__foot">
-          <button className="btn" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn btn--primary" onClick={() => onSave(choice)}>
-            <Icon name="check" size={17} />
-            Enregistrer
-          </button>
-        </div>
+        <button className="btn btn--primary mapsheet__save" onClick={() => onSave(choice)}>
+          Enregistrer
+        </button>
       </div>
     </div>
   )

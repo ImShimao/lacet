@@ -141,13 +141,19 @@
   background: var(--accent-soft);
 }
 
-/* Le choix du fond de carte : un aperçu, les fonds, une phrase pour chacun. */
+/* Le choix du fond de carte, comme la feuille de RunnrZ : le fond en grand,
+   les fonds en onglets qui défilent, une phrase, « Enregistrer » à droite. */
+.mapsheet {
+  gap: 14px;
+  padding: 16px 16px calc(16px + var(--safe-bottom, env(safe-area-inset-bottom)));
+}
 .mapsheet__close {
-  justify-self: start;
+  align-self: flex-start;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
+  flex: none;
   border-radius: 50%;
   background: var(--surface-2);
   border: 1px solid var(--line);
@@ -155,70 +161,67 @@
 }
 .mapsheet__preview {
   position: relative;
-  height: 170px;
+  height: min(44vh, 340px);
   flex: none;
-  border-radius: var(--r);
+  border-radius: 22px;
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--surface-2);
 }
-.mapsheet__list {
+/* Une piste d'onglets, comme un sélecteur segmenté d'iOS, qui défile. */
+.mapsheet__tabs {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.mapsheet__opt {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 12px;
-  border-radius: var(--r);
-  border: 1px solid var(--line-soft);
+  gap: 4px;
+  flex: none;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: 14px;
   background: var(--surface-2);
-  text-align: left;
+  scroll-snap-type: x proximity;
+}
+.mapsheet__tabs::-webkit-scrollbar {
+  display: none;
+}
+.mapsheet__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+  scroll-snap-align: center;
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 500;
+  color: var(--text-2);
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
-.mapsheet__opt[aria-checked='true'] {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
+.mapsheet__tab[aria-checked='true'] {
+  color: var(--text);
+  background: var(--surface-3);
+  box-shadow: 0 1px 4px var(--shadow-soft);
 }
-.mapsheet__radio {
-  flex: none;
-  width: 18px;
-  height: 18px;
+.mapsheet__tab i {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 2px solid var(--line);
-  transition: border 0.15s ease;
+  border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
 }
-.mapsheet__opt[aria-checked='true'] .mapsheet__radio {
-  border: 5px solid var(--accent);
+.mapsheet__desc {
+  margin: 0;
+  min-height: 2.8em;
+  text-align: center;
+  font-size: calc(14px * var(--text-scale));
+  line-height: 1.4;
+  color: var(--text-2);
 }
-.mapsheet__text {
-  flex: 1;
-  min-width: 0;
-}
-.mapsheet__text b {
-  display: block;
-  font-size: calc(14.5px * var(--text-scale));
-}
-.mapsheet__text em {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-style: normal;
-  font-size: calc(12px * var(--text-scale));
-  line-height: 1.35;
-  color: var(--text-3);
-}
-.mapsheet__opt i {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+.mapsheet__save {
+  align-self: flex-end;
+  min-width: 140px;
 }
 
 /* La fiche d'explication : monte du bas comme une feuille, au-dessus de tout. */

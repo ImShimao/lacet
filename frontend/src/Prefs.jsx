@@ -37,8 +37,9 @@ function Head({ icon, label, sub }) {
 }
 
 /**
- * Un choix parmi quelques-uns, en menu. `options` : `[{ key, label, sub? }]`.
- * Le menu s'ouvre vers le haut quand la ligne est trop bas sur l'écran.
+ * Un choix parmi quelques-uns, en menu. `options` : `[{ key, label }]`. Le
+ * menu se pose sur la ligne elle-même, comme ceux d'iOS, et s'ouvre vers le
+ * haut quand la ligne est trop bas sur l'écran.
  */
 export function PickRow({ icon, label, sub, value, options, onChange, shown = null }) {
   const [open, setOpen] = useState(false)
@@ -49,8 +50,8 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
   useLayoutEffect(() => {
     if (!open || !row.current) return
     const box = row.current.getBoundingClientRect()
-    // 46 px par choix, la barre d'onglets en dessous.
-    setUp(box.bottom + options.length * 46 + 24 > (window.innerHeight || 800) - 90)
+    // 50 px par choix, la barre d'onglets en dessous.
+    setUp(box.top + options.length * 50 + 24 > (window.innerHeight || 800) - 90)
   }, [open])
 
   return (
@@ -76,10 +77,7 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
                 }}
               >
                 <Icon name="check" size={16} className="pop__check" />
-                <span>
-                  {o.label}
-                  {o.sub && <em>{o.sub}</em>}
-                </span>
+                <span>{o.label}</span>
               </button>
             ))}
           </div>

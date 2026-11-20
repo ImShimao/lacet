@@ -43,8 +43,7 @@
 /* Un choix fait glisse sa couleur au lieu de sauter d'un bouton à l'autre. */
 .seg button,
 .tile,
-.check,
-.mapsheet__opt {
+.check {
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
