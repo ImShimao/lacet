@@ -130,3 +130,22 @@ describe('glisser une ligne de « Mes parcours »', () => {
     expect(screen.queryByRole('group')).toBeNull()
   })
 })
+
+/** L'objectif de la semaine, réglé dans « Mon compte → Profil », se lit sur le graphique. */
+describe('le volume par semaine', () => {
+  afterEach(cleanup)
+  const recente = { ...sortie, ranAt: new Date().toISOString() }
+  const ecran = (profile) =>
+    render(<Library saved={[]} history={[recente]} profile={profile} onOpen={() => {}} onOpenRun={() => {}} />)
+
+  it('trace l’objectif quand il est réglé', () => {
+    const { container } = ecran({ weekly_km: 20 })
+    expect(screen.getByText(/pour un objectif de 20 km/)).toBeTruthy()
+    expect(container.querySelector('.weeks__goal')).not.toBeNull()
+  })
+
+  it('ne trace rien sans objectif', () => {
+    const { container } = ecran({})
+    expect(container.querySelector('.weeks__goal')).toBeNull()
+  })
+})

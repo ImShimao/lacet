@@ -172,7 +172,7 @@ function summaryOf(key, { params, poiPrefs }) {
   const saved = load()
   switch (key) {
     case 'profile':
-      return `Poids ${params.weight_kg || 70} kg`
+      return `Poids ${params.weight_kg || 70} kg${params.weekly_km ? ` · ${params.weekly_km} km par semaine` : ''}`
     case 'search': {
       const moment = MOMENTS.find((m) => m.key === (params.time_of_day ?? 'auto'))?.label ?? 'Auto'
       const hidden = params.hiddenFilters?.length ?? 0
@@ -246,7 +246,18 @@ function SectionPage({ page, params, poiPrefs, onPoiPrefs, onClearData, onProfil
               max={200}
               onChange={(weight_kg) => onProfile({ weight_kg })}
             />
+            <NumberRow
+              label="Objectif par semaine"
+              unit="km"
+              value={params.weekly_km || 0}
+              min={0}
+              max={300}
+              onChange={(weekly_km) => onProfile({ weekly_km })}
+            />
           </div>
+          <p className="muted small">
+            L'objectif trace un repère sur « Volume par semaine », dans tes sorties. À 0, pas de repère.
+          </p>
           <p className="muted small">
             L'activité, le terrain et le niveau de sécurité se règlent dans les filtres, au moment
             de chercher une boucle : ils changent d'une sortie à l'autre.
@@ -1329,7 +1340,7 @@ function NumberRow({ label, unit, value, min, max, onChange }) {
             type="text"
             inputMode="numeric"
             enterKeyHint="done"
-            aria-label={`${label} en ${unit === 'kg' ? 'kilogrammes' : 'centimètres'}`}
+            aria-label={`${label} en ${{ kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? 'centimètres'}`}
             value={draft ?? value}
             onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
             onFocus={(e) => e.target.select()}

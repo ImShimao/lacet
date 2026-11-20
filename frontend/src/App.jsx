@@ -497,7 +497,9 @@ export default function App() {
           />
         )}
 
-        {!running && (
+        {/* Sur une sortie passée ou l'écran de fin, la carte montre une trace
+            finie : chercher un lieu de départ n'y a pas de sens. */}
+        {!running && !viewing && !summary && (
           <div className="stage__top">
             <SearchBar
               near={

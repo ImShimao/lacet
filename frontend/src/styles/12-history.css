@@ -132,6 +132,16 @@
   gap: 2px;
   align-items: end;
   height: 76px;
+  position: relative;
+}
+/* L'objectif de la semaine (« Mon compte → Profil ») : un trait en pointillés,
+   pour ne pas se lire comme une barre de plus. */
+.weeks__goal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dashed var(--text-3);
+  pointer-events: none;
 }
 .weeks__col {
   display: flex;

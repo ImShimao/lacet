@@ -71,7 +71,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
       {view === 'history' && shown.length > 0 && (
         <>
           <Totals history={shown} profile={profile} />
-          <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} />
+          <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} goalKm={profile?.weekly_km} />
         </>
       )}
       <div className="seg">
@@ -88,13 +88,13 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
       {view === 'history' && history.length > 0 && (
         <div className="histfilter">
           <div className="chips" role="radiogroup" aria-label="Activité">
+            {/* Sans icône : à 390 px, elles prenaient la place du nom du mois, à côté. */}
             {[
-              ['all', null, 'Tout'],
-              ['run', 'run', 'Course'],
-              ['bike', 'bike', 'Vélo'],
-            ].map(([key, icon, label]) => (
+              ['all', 'Tout'],
+              ['run', 'Course'],
+              ['bike', 'Vélo'],
+            ].map(([key, label]) => (
               <button key={key} role="radio" aria-checked={sport === key} className={`chip ${sport === key ? 'chip--on' : ''}`} onClick={() => setSport(key)}>
-                {icon && <Icon name={icon} size={15} />}
                 {label}
               </button>
             ))}
@@ -521,9 +521,11 @@ const WEEKS = 12
  * d'une autre couleur se lirait comme une autre catégorie, et personne ne
  * devinerait laquelle.
  */
-function WeeklyVolume({ history }) {
+function WeeklyVolume({ history, goalKm = 0 }) {
   const semaines = useMemo(() => lastWeeks(history, WEEKS), [history])
-  const haut = Math.max(...semaines.map((s) => s.metres), 1)
+  const goal = goalKm > 0 ? goalKm * 1000 : 0
+  // L'échelle englobe l'objectif : sinon, les semaines toutes en dessous, le trait sortirait du cadre.
+  const haut = Math.max(...semaines.map((s) => s.metres), goal, 1)
   if (!semaines.some((s) => s.metres > 0)) return null
 
   const total = semaines.reduce((m, s) => m + s.metres, 0)
@@ -536,7 +538,9 @@ function WeeklyVolume({ history }) {
             « par semaine en moyenne » se repliaient chacun sur deux lignes. La
             période est déjà dite par l'axe, juste en dessous. */}
         <span className="label">Volume par semaine</span>
-        <em>{km(moyenne, 0)} km en moyenne</em>
+        <em>
+          {km(moyenne, 0)} km en moyenne{goal > 0 && ` · objectif ${goalKm}`}
+        </em>
       </figcaption>
 
       {/* Douze dates sous douze barres ne tiennent pas dans la largeur d'un
@@ -552,6 +556,7 @@ function WeeklyVolume({ history }) {
             />
           </div>
         ))}
+        {goal > 0 && <b className="weeks__goal" style={{ bottom: `${(goal / haut) * 100}%` }} />}
       </div>
       <div className="weeks__axis" aria-hidden="true">
         <span>{semaines[0].short}</span>
@@ -561,7 +566,9 @@ function WeeklyVolume({ history }) {
       {/* Ce que le dessin montre, écrit : c'est la seule version lisible par
           une synthèse vocale, et la seule consultable sans souris. */}
       <table className="visually-hidden">
-        <caption>Distance par semaine, les douze dernières</caption>
+        <caption>
+          Distance par semaine, les douze dernières{goal > 0 && `, pour un objectif de ${goalKm} km`}
+        </caption>
         <tbody>
           {semaines.map((s) => (
             <tr key={s.key}>

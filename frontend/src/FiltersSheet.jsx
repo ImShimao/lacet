@@ -258,7 +258,7 @@ export const OPTIONAL_FILTERS = [
 // Ce que « Réinitialiser » ne touche pas : ce qui se règle dans « Mon compte »,
 // pas dans ce panneau. Il remettait à 5 les douze propositions choisies là-bas,
 // et aurait réaffiché les filtres masqués.
-const KEPT_ON_RESET = ['sport', 'weight_kg', 'time_of_day', 'side', 'count', 'hiddenFilters']
+const KEPT_ON_RESET = ['sport', 'weight_kg', 'weekly_km','time_of_day', 'side', 'count', 'hiddenFilters']
 
 /**
  * Pas d'incrément de la distance.

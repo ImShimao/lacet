@@ -240,9 +240,9 @@ function coverage(mine, theirs, near) {
 }
 
 // Les distances dont on retient son meilleur temps : le kilomètre, le cinq, le
-// dix. Le semi et le marathon attendront qu'on en coure — et se lisent alors
-// sur la sortie entière.
-const BEST_KM = [1, 5, 10]
+// dix, puis 21 et 42 km. Les temps sont au kilomètre entier : un semi
+// (21,0975 km) ne se mesure pas, et « 21 km » dit exactement ce qui l'est.
+const BEST_KM = [1, 5, 10, 21, 42]
 
 /** Le meilleur temps sur `n` kilomètres de suite, ou `null` s'il n'y en a pas `n`. */
 function bestWindow(splits, n) {

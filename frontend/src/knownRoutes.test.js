@@ -216,6 +216,13 @@ describe('les records par distance', () => {
     expect(distanceRecords(maintenant, [maintenant, velo])).toEqual([])
   })
 
+  it('retient aussi le meilleur 21 km', async () => {
+    const { distanceRecords } = await import('./knownRoutes')
+    const avant = course('2026-10-01', tours(...Array(21).fill(330)))
+    const maintenant = course('2026-10-08', tours(...Array(22).fill(320)))
+    expect(distanceRecords(maintenant, [maintenant, avant]).map((r) => r.km)).toEqual([1, 5, 10, 21])
+  })
+
   it('ne recolle pas des bornes qui ne se suivent pas', async () => {
     const { distanceRecords } = await import('./knownRoutes')
     const avant = course('2026-10-01', tours(330, 330, 330, 330, 330))

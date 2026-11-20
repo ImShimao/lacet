@@ -49,17 +49,6 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 
 ### Ce qui existe et peut mieux faire
 
-- **Allure visée à la voix** : « dix secondes trop lent » à chaque kilomètre,
-  quand une allure est réglée. L'écran de fin la compare déjà après coup
-  (`Splits`, `RunDetail.jsx`) ; en course, rien ne le dit.
-- **Objectif de la semaine** : un trait sur le graphique « Volume par semaine »
-  (`WeeklyVolume`, `Library.jsx`), qui n'a aujourd'hui aucun repère.
-- **Détail d'une sortie passée** : la barre de recherche de lieu reste affichée
-  au-dessus, sans raison (`App.jsx`, `stage__top`).
-- **Filtre des mois** : le menu flotte seul sur sa ligne ; à ranger avec les
-  pastilles d'activité (`histfilter`, `Library.jsx`).
-- **Lien du SMS au proche** : Google Maps aujourd'hui (`mapLink`, `contact.js`) ;
-  un lien Apple Plans s'ouvre sans rien installer sur un iPhone.
 - **Poids du paquet** : un seul fichier JS de 1,47 Mo. Charger « Mon compte » et
   les filtres à la demande (`import()`) accélère le lancement.
 - **Sorties anciennes** : elles n'ont ni heures ni altitudes par point, donc ni
@@ -67,15 +56,11 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 
 ### À ajouter
 
-- **Records sur semi et marathon** : l'écran de fin s'arrête à 1, 5 et 10 km
-  (`BEST_KM`, `knownRoutes.js`).
 - Partage live d'une sortie en cours, couche communautaire de signalements avec
   seuil anti-abus : il y faut un serveur.
 
 ### À enlever
 
-- **Les alphabets cyrillique, grec et vietnamien de la police Inter** : environ
-  250 Ko dans l'IPA pour une app en français. N'importer que le latin.
 - **`.vscode/`**, suivi par git, s'il ne sert plus.
 - **Le compte de tests du README** : il annonce 1169 tests ; il y en a 1194
   (799 Vitest, 395 pytest).
@@ -86,6 +71,9 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
   (signature d'une app watchOS, droits HealthKit).
 - **Cardio Bluetooth** : un plugin natif de plus pour peu d'usage.
 - **Heatmap** : données propriétaires.
+- **Lien Apple Plans dans le SMS au proche** : c'est le proche qui ouvre le
+  lien, peut-être sur Android. Le lien Google Maps (`mapLink`, `contact.js`)
+  s'ouvre partout.
 
 ---
 

@@ -2,11 +2,12 @@
 
 /* ══ l'historique : filtres et mois ══════════════════════════════════════ */
 
+/* Une seule ligne : à 390 px, le menu des mois passait seul à la ligne en
+   dessous. Il rétrécit plutôt, son libellé coupé d'une ellipse. */
 .histfilter {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 .chips {
   display: flex;
@@ -31,6 +32,9 @@
 }
 .histfilter__month {
   margin-left: auto;
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
   padding: 7px 10px;
   border-radius: 999px;
   border: 1px solid var(--line);
