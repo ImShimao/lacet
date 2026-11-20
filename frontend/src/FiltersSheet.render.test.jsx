@@ -37,7 +37,6 @@ describe('le panneau des filtres', () => {
     expect(conversion()).toContain('environ 9,2 km')
 
     // Une allure plus lente, c'est moins de kilomètres dans la même heure.
-    déplier('Allure')
     const plus = screen.getAllByRole('button', { name: 'Augmenter' })
     fireEvent.click(plus[plus.length - 1])
     expect(screen.getAllByText(/6:35 \/km/).length).toBeGreaterThan(0)
@@ -46,7 +45,6 @@ describe('le panneau des filtres', () => {
 
   it('annonce la durée de la boucle quand on règle une distance', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
-    déplier('Allure')
     expect(screen.getByText(/environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
   })
 

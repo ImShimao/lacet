@@ -480,7 +480,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
 
           <Field
             label={isBike ? 'Vitesse' : 'Allure'}
-            value={usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`}
           >
             <div className="field__pace">
               {!isBike && (
