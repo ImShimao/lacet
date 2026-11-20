@@ -290,3 +290,90 @@
   color: var(--risk);
   background: var(--surface-2);
 }
+
+/* ══ la page de partage ════════════════════════════════════════════════════ */
+
+/* Le damier dit « transparent » sans un mot : c'est la convention de tous les
+   logiciels d'image, et un autocollant blanc sur fond sombre ne se distinguait
+   pas d'une image pleine. */
+.sharesheet__stage[data-clear],
+.sharesheet__thumb[data-clear] {
+  background: repeating-conic-gradient(#3a3d42 0 25%, #2a2c30 0 50%) 0 0 / 22px 22px;
+}
+.sharesheet__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: min(46cqh, 440px);
+  padding: 16px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+/* Toute la hauteur du cadre, l'image contenue dedans : en `max-height`, une
+   case de grille sans hauteur fixe laissait la carte déborder, rognée en bas. */
+.sharesheet__stage img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.sharesheet__wait {
+  color: var(--text-3);
+  font-size: calc(13px * var(--text-scale));
+}
+.sharesheet__hint {
+  margin: -6px 0 0;
+  min-height: 2.9em;
+  text-align: center;
+  font-size: calc(13px * var(--text-scale));
+  line-height: 1.45;
+  color: var(--text-2);
+}
+/* Les modèles défilent de côté : cinq vignettes ne tiennent pas en largeur. */
+.sharesheet__strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+  scrollbar-width: none;
+}
+.sharesheet__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 600;
+  color: var(--text-2);
+}
+.sharesheet__thumb {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 98px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.sharesheet__thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sharesheet__opt[aria-checked='true'] {
+  color: var(--text);
+}
+.sharesheet__opt[aria-checked='true'] .sharesheet__thumb {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-color: transparent;
+}
+.sharesheet .modal__foot .btn {
+  flex: 1;
+}

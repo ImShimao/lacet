@@ -150,6 +150,13 @@ const PATHS = {
       <path d="M8.5 10.5H6.5a1.5 1.5 0 0 0-1.5 1.5v7.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V12a1.5 1.5 0 0 0-1.5-1.5h-2" />
     </>
   ),
+  // Copier : deux feuilles décalées.
+  copy: (
+    <>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="2" />
+      <path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3" />
+    </>
+  ),
   // Un fichier qui sort de l'app (GPX, sauvegarde) ou qui y entre.
   fileExport: (
     <>

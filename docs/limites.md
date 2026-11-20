@@ -30,9 +30,11 @@ Tiré de l'analyse complète du 10 novembre 2026. Les corrections et le nouvel
 
 Rien de ceci n'a pu être éprouvé hors du téléphone :
 
-- **Le partage en image** depuis l'écran de fin : l'écriture du PNG et la
-  feuille de partage d'iOS (`shareCard.js`, `shareImage` dans `native.js`). Si
-  l'image échoue, le texte doit partir à sa place.
+- **Le partage en image** (`ShareSheet.jsx`, `shareCard.js`, `shareImage` dans
+  `native.js`) : l'écriture du PNG et la feuille de partage d'iOS ; si l'image
+  échoue, le texte doit partir à sa place. Et « Copier » : un PNG transparent
+  dans le presse-papiers depuis la vue web, puis collé dans une story Instagram
+  ou Snapchat, qui doit garder sa transparence.
 - **Le profil monté**, calé sur l'altitude du GPS au départ puis suivi au
   baromètre (`baroAltitude`, `LiveRun.jsx`). Le baromètre lui-même n'a jamais
   été éprouvé sur l'appareil.

@@ -6,10 +6,10 @@ import AscentNote from './AscentNote.jsx'
 import { Climb, Feeling, PlanGap, Splits, Standing, whenLabel } from './RunDetail.jsx'
 import { distanceRecords, records, standing } from './knownRoutes'
 import { energy } from './Library.jsx'
-import { announcing, arrivalText, contactOf, shareText, textTo } from './contact'
+import { announcing, arrivalText, contactOf, textTo } from './contact'
 import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
-import { shareRunCard } from './shareCard'
+import ShareSheet from './ShareSheet.jsx'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -67,28 +67,11 @@ export default function RunSummary({
   }, [entry.track, entry.track_t])
   const verdict = verdictOf({ rang, bests, best, gap })
 
-  const share = async () => {
-    try {
-      await shareRunCard(entry, verdict)
-    } catch (error) {
-      // Refermer la feuille de partage n'est pas une panne. Une image qui ne se
-      // fait pas, si : le texte part à sa place, plutôt que rien.
-      if (/cancel/i.test(error?.message || '')) return
-      shareText(
-        [
-          `${entry.name} — ${km(distance, 1)} km en ${duration(seconds)}`,
-          bike ? `${speed.toFixed(1).replace('.', ',')} km/h de moyenne` : `${pace(perKm)}/km`,
-          entry.actual_ascent_m != null ? `D+ ${entry.actual_ascent_m} m` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ') + ' — avec Lacet',
-        'Ma sortie',
-      )
-    }
-  }
+  const [sharing, setSharing] = useState(false)
 
   return (
     <div className="panel summary">
+      {sharing && <ShareSheet entry={entry} verdict={verdict} onClose={() => setSharing(false)} />}
       <div className="summary__hero">
         {drawn ? (
           <svg className="sketch" viewBox="0 0 320 190" aria-hidden="true">
@@ -214,7 +197,7 @@ export default function RunSummary({
       )}
 
       <div className="summary__actions">
-        <button className="btn btn--icon" onClick={share} aria-label="Partager la sortie en image" title="Partager">
+        <button className="btn btn--icon" onClick={() => setSharing(true)} aria-label="Partager la sortie en image" title="Partager">
           <Icon name="share" size={18} />
         </button>
         {entry.track?.length > 1 && (

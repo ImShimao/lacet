@@ -24,12 +24,12 @@ function mix(a, b) {
 }
 
 /**
- * Le canevas au format de la carte, ses couleurs (celles de l'apparence choisie)
- * et l'écriture de ses textes : commun à la carte d'une sortie et à celle du bilan.
+ * Le canevas au format voulu (la carte par défaut), ses couleurs (celles de
+ * l'apparence choisie) et l'écriture de ses textes : commun à toutes les images.
  */
-function painter(canvas) {
-  canvas.width = W
-  canvas.height = H
+function painter(canvas, w = W, h = H) {
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d')
   const css = getComputedStyle(document.documentElement)
   const color = (name, fallback) => css.getPropertyValue(name).trim() || fallback
@@ -64,27 +64,7 @@ export function drawRunCard(canvas, entry, verdict = null) {
   write(day, W - 80, 110, 34, muted, { align: 'right' })
 
   // La trace, dans le tiers haut : le fond d'un trait, les allures par-dessus.
-  const drawn = sketch(entry.track, 920, 640, 20)
-  if (drawn) {
-    ctx.save()
-    ctx.translate(80, 150)
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 12
-    ctx.strokeStyle = accent
-    ctx.stroke(new Path2D(drawn.d))
-    const bands = paceBands(entry.track, entry.track_t)
-    const shades = [safe, mix(safe, caution), caution, mix(caution, risk), risk]
-    for (const part of bands ? bandPaths(drawn.points, bands) : []) {
-      ctx.strokeStyle = shades[part.band]
-      ctx.stroke(new Path2D(part.d))
-    }
-    ctx.fillStyle = text
-    ctx.beginPath()
-    ctx.arc(drawn.start[0], drawn.start[1], 14, 0, 2 * Math.PI)
-    ctx.fill()
-    ctx.restore()
-  }
+  drawTrace(ctx, entry, { x: 80, y: 150, w: 920, h: 640, width: 12, base: accent, dot: text, shades: [safe, mix(safe, caution), caution, mix(caution, risk), risk] })
 
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
@@ -110,12 +90,165 @@ export function drawRunCard(canvas, entry, verdict = null) {
   return canvas
 }
 
-/** Dessine la carte et ouvre la feuille de partage d'iOS. Lève si l'image ne se fait pas. */
-export async function shareRunCard(entry, verdict) {
-  const canvas = drawRunCard(document.createElement('canvas'), entry, verdict)
-  const base64 = canvas.toDataURL('image/png').split(',')[1]
+/**
+ * La trace de `entry` dans le cadre `x, y, w, h` : un trait de fond, les
+ * tronçons par allure par-dessus quand la trace a ses heures, un point au départ.
+ * Rien sans trace.
+ */
+function drawTrace(ctx, entry, { x, y, w, h, width, base, dot, shades }) {
+  const drawn = sketch(entry.track, w, h, width * 2)
+  if (!drawn) return
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = width
+  ctx.strokeStyle = base
+  ctx.stroke(new Path2D(drawn.d))
+  const bands = paceBands(entry.track, entry.track_t)
+  for (const part of bands ? bandPaths(drawn.points, bands) : []) {
+    ctx.strokeStyle = shades[part.band]
+    ctx.stroke(new Path2D(part.d))
+  }
+  ctx.fillStyle = dot
+  ctx.beginPath()
+  ctx.arc(drawn.start[0], drawn.start[1], width * 1.15, 0, 2 * Math.PI)
+  ctx.fill()
+  ctx.restore()
+}
+
+/** Les chiffres d'une sortie, `[valeur, libellé]`, dans l'ordre où on les lit. */
+export function figuresOf(entry) {
+  const distance = entry.actual_distance_m || 0
+  const seconds = entry.actual_duration_s || 0
+  const bike = entry.sport === 'bike'
+  return [
+    [`${km(distance)} km`, 'Distance'],
+    bike
+      ? [`${(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ',')} km/h`, 'Vitesse']
+      : [distance > 100 ? `${pace(seconds / (distance / 1000))} /km` : '—', 'Allure'],
+    [duration(seconds), 'Temps'],
+    ...(entry.actual_ascent_m != null ? [[`${entry.actual_ascent_m} m`, 'Dénivelé +']] : []),
+  ]
+}
+
+// Les autocollants : fond transparent, à poser sur une photo dans une story.
+// Écrits en blanc avec une ombre douce — on ne sait pas sur quoi ils tomberont,
+// et un texte clair sans ombre disparaît sur un ciel. Chacun est rogné à son
+// contenu : collé dans Instagram, un grand cadre vide se placerait mal.
+const WHITE = '#ffffff'
+const SOFT = 'rgba(255, 255, 255, 0.78)'
+
+function sticker(canvas, w, h) {
+  const p = painter(canvas, w, h)
+  p.ctx.clearRect(0, 0, w, h)
+  p.ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+  p.ctx.shadowBlur = 16
+  p.ctx.shadowOffsetY = 2
+  // Un tracé blanc et les allures aux couleurs de l'app : le vert, le jaune et
+  // le rouge se lisent sur une photo, l'accent sombre de certains thèmes non.
+  p.shades = [p.safe, mix(p.safe, p.caution), p.caution, mix(p.caution, p.risk), p.risk]
+  return p
+}
+
+/** La trace en grand, la distance dessous, puis allure, temps et dénivelé. */
+function drawTraceSticker(canvas, entry) {
+  const S = 1080
+  const { ctx, write, shades } = sticker(canvas, S, 1460)
+  drawTrace(ctx, entry, { x: 60, y: 20, w: 960, h: 960, width: 16, base: WHITE, dot: WHITE, shades })
+  const [first, ...rest] = figuresOf(entry)
+  write(first[0], S / 2, 1170, 160, WHITE, { weight: 800, align: 'center' })
+  write(rest.map(([v]) => v).join('   ·   '), S / 2, 1280, 50, WHITE, { weight: 600, align: 'center' })
+  write('Lacet', S / 2, 1400, 44, WHITE, { weight: 800, align: 'center' })
+  return canvas
+}
+
+/** Les chiffres empilés, libellé au-dessus de chaque valeur. */
+function drawFiguresSticker(canvas, entry) {
+  const figures = figuresOf(entry)
+  const S = 900
+  const step = 250
+  const { write } = sticker(canvas, S, 120 + figures.length * step + 60)
+  figures.forEach(([value, label], i) => {
+    const top = 60 + i * step
+    write(label, S / 2, top + 50, 40, SOFT, { weight: 600, align: 'center' })
+    write(value, S / 2, top + 160, 108, WHITE, { weight: 800, align: 'center' })
+  })
+  write('Lacet', S / 2, 60 + figures.length * step + 60, 44, WHITE, { weight: 800, align: 'center' })
+  return canvas
+}
+
+/** Un bandeau : les chiffres côte à côte, à glisser en bas d'une photo. */
+function drawBandSticker(canvas, entry) {
+  const figures = figuresOf(entry)
+  const S = 1080
+  const { ctx, write } = sticker(canvas, S, 360)
+  write('Lacet', 50, 80, 44, WHITE, { weight: 800 })
+  const day = new Date(entry.ranAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  write(day, S - 50, 80, 34, SOFT, { align: 'right' })
+  ctx.fillStyle = SOFT
+  ctx.fillRect(50, 116, S - 100, 3)
+  const col = (S - 100) / figures.length
+  // Une taille pour toutes les valeurs, la plus grande qui laisse la plus large
+  // tenir dans sa colonne : à taille fixe, « 13,45 km » mordait sur l'allure.
+  write('', 0, 0, 100, WHITE, { weight: 800 })
+  const widest = Math.max(...figures.map(([value]) => ctx.measureText(value).width))
+  const size = Math.min(76, Math.floor((100 * (col - 28)) / widest))
+  figures.forEach(([value, label], i) => {
+    write(value, 50 + i * col, 240, size, WHITE, { weight: 800 })
+    write(label, 50 + i * col, 300, 32, SOFT, { weight: 600 })
+  })
+  return canvas
+}
+
+/** Le temps de chaque kilomètre en barres, le plus rapide en vert, comme sur l'écran de fin. */
+function drawSplitsSticker(canvas, entry) {
+  const splits = entry.splits
+  const S = 1080
+  const row = 62
+  const top = 170
+  const { ctx, write, safe } = sticker(canvas, S, top + splits.length * row + 110)
+  write(entry.sport === 'bike' ? 'Temps au kilomètre' : 'Allure au kilomètre', 50, 90, 56, WHITE, { weight: 800 })
+  const times = splits.map((s) => s.seconds)
+  const [lo, hi] = [Math.min(...times), Math.max(...times)]
+  const x0 = 140
+  const span = S - 50 - 170 - x0
+  splits.forEach((s, i) => {
+    const y = top + i * row
+    write(String(s.km), 110, y + 14, 36, SOFT, { weight: 600, align: 'right' })
+    // Plus long = plus lent, comme sur l'écran : la barre la plus courte saute aux yeux.
+    const len = span * (0.35 + 0.65 * ((s.seconds - lo) / (hi - lo || 1)))
+    ctx.fillStyle = s.seconds === lo ? safe : WHITE
+    ctx.beginPath()
+    ctx.roundRect(x0, y - 12, len, 26, 13)
+    ctx.fill()
+    write(pace(s.seconds), S - 50, y + 14, 40, WHITE, { weight: 700, align: 'right' })
+  })
+  write('Lacet', 50, top + splits.length * row + 70, 44, WHITE, { weight: 800 })
+  return canvas
+}
+
+/**
+ * Les images qu'on peut partager pour cette sortie, la carte en premier : la
+ * seule qui se lit seule, dans une conversation. Ce qui demande la trace ou les
+ * temps au kilomètre n'est offert que si la sortie les a gardés.
+ */
+export function templatesFor(entry) {
+  const track = entry.track?.length > 1
+  const splits = entry.splits?.length > 1
+  return [
+    { key: 'card', label: 'Carte', clear: false, hint: 'Une image complète, à envoyer telle quelle.', draw: drawRunCard },
+    track && { key: 'trace', label: 'Trace', clear: true, hint: 'Fond transparent : copie-la, puis colle-la sur une photo de ta story.', draw: drawTraceSticker },
+    { key: 'figures', label: 'Chiffres', clear: true, hint: 'Fond transparent : tes chiffres, à poser sur une photo.', draw: drawFiguresSticker },
+    { key: 'band', label: 'Bandeau', clear: true, hint: 'Fond transparent : une ligne à glisser en bas d’une photo.', draw: drawBandSticker },
+    splits && { key: 'splits', label: 'Kilomètres', clear: true, hint: 'Fond transparent : ton allure à chaque kilomètre.', draw: drawSplitsSticker },
+  ].filter(Boolean)
+}
+
+/** Ouvre la feuille de partage d'iOS sur une image `data:image/png`. */
+export async function shareDataUrl(url, title) {
   const { shareImage } = await import('./native')
-  await shareImage('lacet-sortie.png', base64, entry.name || 'Ma sortie')
+  await shareImage('lacet-sortie.png', url.split(',')[1], title)
 }
 
 /** Le bilan d'un mois sur `canvas` : ses chiffres, sans trace (un mois n'en a pas une). `summary` : `monthSummary`. */

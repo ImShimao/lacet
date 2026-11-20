@@ -5,6 +5,7 @@ import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
 import { climbProfile } from './runTrace'
+import ShareSheet from './ShareSheet.jsx'
 
 /**
  * Une sortie déjà faite, rouverte.
@@ -24,6 +25,7 @@ import { climbProfile } from './runTrace'
  */
 export default function RunDetail({ entry, history = [], onReplay, onRename, onAnnotate, onDelete, onClose }) {
   const [confirm, setConfirm] = useState(false)
+  const [sharing, setSharing] = useState(false)
   // Où cette sortie se situe parmi celles qui ont emprunté le même chemin.
   // Calculé à l'ouverture d'une sortie, pas à chaque rendu : c'est une
   // comparaison de tracés point à point sur tout l'historique.
@@ -125,7 +127,12 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
         </p>
       )}
 
+      {sharing && <ShareSheet entry={entry} onClose={() => setSharing(false)} />}
       <div className="row">
+        <button className="btn btn--fit" onClick={() => setSharing(true)} aria-label="Partager la sortie en image">
+          <Icon name="share" size={16} />
+          Partager
+        </button>
         {entry.track?.length > 1 && (
           <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
             <Icon name="fileExport" size={16} />

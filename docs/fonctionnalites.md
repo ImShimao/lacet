@@ -33,7 +33,10 @@ réelle, coloriée par allure**, une phrase qui dit ce que la sortie vaut (« 12
 plus vite que la dernière fois ici »), distance, temps, allure, dénivelé, les
 temps au kilomètre jusqu'aux derniers mètres, le profil réellement monté, tes
 records sur 1, 5, 10, 21 et 42 km, l'écart avec le parcours prévu, et un ressenti à
-noter. La sortie se partage en image, et s'exporte en GPX — chaque point à son
+noter. La sortie se partage en image, à l'arrivée comme plus tard depuis
+« Mes parcours » : une carte complète, ou un autocollant à fond transparent (trace,
+chiffres, bandeau, allure au kilomètre) à copier puis coller sur une photo de
+story. Elle s'exporte aussi en GPX — chaque point à son
 heure et à son altitude — pour une montre, Garmin Connect ou le site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
 batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
 
