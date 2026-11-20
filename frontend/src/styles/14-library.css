@@ -194,3 +194,15 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Le graphique par jour, sous l'en-tête d'un mois : pleine largeur, sur sa
+   propre ligne. Les jours tiennent côte à côte, un trait fin entre eux. */
+.monthhead {
+  flex-wrap: wrap;
+}
+.monthdays {
+  flex-basis: 100%;
+  height: 44px;
+  margin-top: 8px;
+  gap: 2px;
+}

@@ -71,3 +71,19 @@ describe('monthKey et monthLabel', () => {
     expect(monthLabel(null)).toBe('Sans date')
   })
 })
+
+describe('la distance par jour', () => {
+  it('compte chaque jour du mois, et laisse les jours sans sortie à zéro', async () => {
+    const { dailyMetres } = await import('./monthSummary')
+    const runs = [
+      { ranAt: new Date(2026, 8, 3, 9).toISOString(), actual_distance_m: 5000 },
+      { ranAt: new Date(2026, 8, 3, 18).toISOString(), actual_distance_m: 2000 },
+      { ranAt: new Date(2026, 8, 20, 9).toISOString(), actual_distance_m: 10000 },
+    ]
+    const jours = dailyMetres(runs, '2026-09')
+    expect(jours).toHaveLength(30)
+    expect(jours[2]).toBe(7000)
+    expect(jours[19]).toBe(10000)
+    expect(jours[0]).toBe(0)
+  })
+})

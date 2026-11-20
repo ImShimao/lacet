@@ -15,7 +15,7 @@ import * as offline from './offlineMaps'
 import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
 import MonthReport from './MonthReport.jsx'
-import { monthKey, monthLabel } from './monthSummary'
+import { dailyMetres, monthKey, monthLabel } from './monthSummary'
 
 export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
@@ -148,6 +148,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
               {view === 'history' && monthKey(r.ranAt) !== monthKey(rows[i - 1]?.ranAt) && (
                 <MonthHeader
                   label={monthLabel(monthKey(r.ranAt))}
+                  month={monthKey(r.ranAt)}
                   runs={byMonth.get(monthKey(r.ranAt)) ?? []}
                   onReport={monthKey(r.ranAt) ? () => setReport(monthKey(r.ranAt)) : null}
                 />
@@ -742,9 +743,13 @@ export function timeTotal(seconds) {
 }
 
 /** L'en-tête d'un mois : combien de sorties, de kilomètres, d'heures, et le bilan du mois. */
-function MonthHeader({ label, runs, onReport }) {
+function MonthHeader({ label, month, runs, onReport }) {
   const distance = runs.reduce((m, r) => m + (r.actual_distance_m || 0), 0)
   const time = runs.reduce((m, r) => m + (r.actual_duration_s || 0), 0)
+  // Un jour par barre, même hauteur pour tous les mois : le jour le plus long
+  // donne la pleine hauteur, et un jour sans sortie reste une case vide.
+  const jours = month && runs.length ? dailyMetres(runs, month) : []
+  const haut = Math.max(...jours, 1)
   return (
     <div className="monthhead">
       <b>{label}</b>
@@ -755,6 +760,15 @@ function MonthHeader({ label, runs, onReport }) {
         <button className="monthhead__report" onClick={onReport}>
           Bilan
         </button>
+      )}
+      {jours.length > 0 && (
+        <div className="monthdays weeks__plot" aria-hidden="true">
+          {jours.map((m, i) => (
+            <div className="weeks__col" key={i} title={`${i + 1} : ${km(m, 1)} km`}>
+              <i style={{ height: `${m ? Math.max(6, (m / haut) * 100) : 0}%` }} />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

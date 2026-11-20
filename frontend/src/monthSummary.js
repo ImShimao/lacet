@@ -57,3 +57,19 @@ export function monthSummary(history, key) {
     weeks: { active, total },
   }
 }
+
+/**
+ * La distance de chaque jour du mois `key` (« 2026-09 »), en mètres, du 1er au
+ * dernier : un jour sans sortie vaut 0, pour que le dessin garde sa place.
+ */
+export function dailyMetres(runs, key) {
+  const [y, m] = key.split('-').map(Number)
+  const days = new Date(y, m, 0).getDate()
+  const out = Array.from({ length: days }, () => 0)
+  for (const r of runs) {
+    const d = new Date(r.ranAt)
+    if (monthKey(r.ranAt) !== key) continue
+    out[d.getDate() - 1] += r.actual_distance_m || 0
+  }
+  return out
+}
