@@ -14,10 +14,10 @@ import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
-import { Segmented, TERRAINS, formatKm } from './FiltersSheet.jsx'
+import { Segmented, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
-import { km, surfaceLabel } from './format'
+import { km } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
@@ -296,7 +296,6 @@ export default function Explore({
     )
   }
 
-  const terrain = TERRAINS[params.sport].find((t) => t.key === params.surface)
   const relief =
     params.climb_m != null ? climbMismatch(params.climb_m, routes) : reliefMismatch(params.elevation, routes)
   const ground = surfaceMismatch(params.surface, routes)
@@ -328,39 +327,6 @@ export default function Explore({
         onSelect={onSelect}
         onOpenDetail={onOpenDetail}
         sport={params.sport}
-        tools={
-          // Ce qu'on fait d'une boucle, en petit, sous les cartes — comme les
-          // icônes à côté du titre chez Roovr. La barre du bas ne garde que le
-          // favori et « Démarrer » : quatre boutons de plus y noyaient le geste.
-          <div className="cardtools">
-            {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend
-                en montant, du vent qu'on a dans le dos à la fin, et de chaque
-                consigne de virage. La même boucle à l'envers est une autre sortie. */}
-            {onReverse && (
-              <button
-                className={`cardtool ${selected.reversed ? 'cardtool--on' : ''}`}
-                onClick={onReverse}
-                disabled={reversing}
-                aria-pressed={Boolean(selected.reversed)}
-                title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
-                aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
-              >
-                <Icon name="uturn" size={17} />
-              </button>
-            )}
-            <button className="cardtool" onClick={exportGpx} disabled={exporting} title="Exporter en GPX" aria-label="Exporter en GPX">
-              <Icon name="fileExport" size={17} />
-            </button>
-            <button
-              className="cardtool"
-              onClick={onRegenerate ?? onSearch}
-              title="Régénérer d'autres boucles"
-              aria-label="Régénérer d'autres boucles"
-            >
-              <Icon name="shuffle" size={17} />
-            </button>
-          </div>
-        }
       />
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
@@ -459,43 +425,41 @@ export default function Explore({
         </div>
       )}
 
-      <div className="route-meta">
-        {terrain?.label} · {surfaceShare(selected)}
-      </div>
-      {selected.safety && <div className="route-meta">{exposureLine(selected)}</div>}
-
+      {/* Le détail, en sections : le relief, la sécurité, les surfaces, puis
+          ce qu'on croise et la feuille de route. Les deux lignes de texte qui
+          résumaient terrain et traversées au-dessus répétaient les tuiles. */}
       <RouteStrip route={selected} onScrub={onScrub} />
 
-      <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
-
-      {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}
+      {selected.safety ? (
+        <SafetyPanel
+          safety={selected.safety}
+          surfaces={selected.surfaces}
+          segments={selected.segments}
+          distance={selected.distance_m}
+          sport={params.sport}
+          open={detail}
+        />
+      ) : (
+        detail && (
+          // Pas de note : le détail n'existe pas, et un panneau vide
+          // laisserait croire à une évaluation réussie. Deux raisons
+          // possibles, et elles n'appellent pas le même geste — réessayer
+          // plus tard, ou accepter que ce tracé-là ne sera jamais noté.
+          <div className="notice">
+            {selected.imported
+              ? "Ce parcours vient d'un fichier, et ses points ne suivent aucune rue connue d'ici — un chemin absent de la carte, ou des rues pas encore téléchargées. Lacet ne peut donc juger ni trottoirs, ni vitesses, ni traversées, et ne dicte pas les virages. Il le suit, le mesure et prévient si tu t'en écartes."
+              : "Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni traversées. Reste attentif, et relance la recherche plus tard pour une vraie note."}
+          </div>
+        )
+      )}
 
       <button className="disclose" onClick={onToggleDetail} aria-expanded={detail}>
-        {detail ? 'Masquer le détail' : 'Voir le détail de la note'}
+        {detail ? 'Moins de détails' : 'Pourquoi cette note ?'}
         <Icon name={detail ? 'chevronUp' : 'chevronDown'} size={16} />
       </button>
 
       {detail && (
         <>
-          {selected.safety ? (
-            <SafetyPanel
-              safety={selected.safety}
-              surfaces={selected.surfaces}
-              segments={selected.segments}
-              distance={selected.distance_m}
-              sport={params.sport}
-            />
-          ) : (
-            // Pas de note : le détail n'existe pas, et un panneau vide
-            // laisserait croire à une évaluation réussie. Deux raisons
-            // possibles, et elles n'appellent pas le même geste — réessayer
-            // plus tard, ou accepter que ce tracé-là ne sera jamais noté.
-            <div className="notice">
-              {selected.imported
-                ? "Ce parcours vient d'un fichier, et ses points ne suivent aucune rue connue d'ici — un chemin absent de la carte, ou des rues pas encore téléchargées. Lacet ne peut donc juger ni trottoirs, ni vitesses, ni traversées, et ne dicte pas les virages. Il le suit, le mesure et prévient si tu t'en écartes."
-                : "Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni traversées. Reste attentif, et relance la recherche plus tard pour une vraie note."}
-            </div>
-          )}
           {rejected?.length > 0 && <RejectedList rejected={rejected} />}
           <p className="disclaimer">
             Les itinéraires privilégient les voies protégées d'après OpenStreetMap. Les
@@ -503,6 +467,44 @@ export default function Explore({
           </p>
         </>
       )}
+
+      {/* Ce qu'on fait de la boucle, avec leur nom, dans le détail : sous les
+          cartes, trois ronds sans libellé se devinaient mal. */}
+      <div className="loopacts" role="group" aria-label="Cette boucle">
+        {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend
+            en montant, du vent qu'on a dans le dos à la fin, et de chaque
+            consigne de virage. La même boucle à l'envers est une autre sortie. */}
+        {onReverse && (
+          <button
+            className={`loopact ${selected.reversed ? 'loopact--on' : ''}`}
+            onClick={onReverse}
+            disabled={reversing}
+            aria-pressed={Boolean(selected.reversed)}
+            title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+            aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+          >
+            <Icon name="uturn" size={18} />
+            <span>Autre sens</span>
+          </button>
+        )}
+        <button className="loopact" onClick={exportGpx} disabled={exporting} title="Exporter en GPX" aria-label="Exporter en GPX">
+          <Icon name="fileExport" size={18} />
+          <span>GPX</span>
+        </button>
+        <button
+          className="loopact"
+          onClick={onRegenerate ?? onSearch}
+          title="Régénérer d'autres boucles"
+          aria-label="Régénérer d'autres boucles"
+        >
+          <Icon name="shuffle" size={18} />
+          <span>Autres boucles</span>
+        </button>
+      </div>
+
+      <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
+
+      {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}
 
       <button className="linkish" onClick={onFreeRun}>
         ou courir librement, sans suivre de tracé
@@ -634,7 +636,7 @@ function AlreadyRun({ found }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, tools = null }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -781,20 +783,13 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, to
         })}
         <span className="cards__pad" aria-hidden="true" />
       </div>
-      {/* Une seule ligne sous les cartes : où l'on en est à gauche, ce qu'on
-          peut faire de la boucle à droite. */}
-      <div className="cards__foot">
-        {routes.length > 1 ? (
-          <div className="cards__dots" aria-hidden="true">
-            {routes.map((r) => (
-              <i key={r.id} className={r.id === selected?.id ? 'on' : ''} />
-            ))}
-          </div>
-        ) : (
-          <span />
-        )}
-        {tools}
-      </div>
+      {routes.length > 1 && (
+        <div className="cards__dots" aria-hidden="true">
+          {routes.map((r) => (
+            <i key={r.id} className={r.id === selected?.id ? 'on' : ''} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -874,27 +869,3 @@ function RejectedList({ rejected }) {
   )
 }
 
-/**
- * Ce que la note dit de la sécurité, en une ligne sous le tracé : les traversées
- * sans protection et ce qui roule vite, sans avoir à ouvrir le détail de la note.
- */
-function exposureLine({ safety: s }) {
-  const crossings =
-    s.unprotected_crossings === 0
-      ? 'aucune traversée sans protection'
-      : `${s.unprotected_crossings} traversée${s.unprotected_crossings > 1 ? 's' : ''} sans protection`
-  const exposed = s.exposed_m > 0 ? `${Math.round(s.exposed_m)} m au trafic rapide` : 'rien au trafic rapide'
-  return `${crossings} · ${exposed}`
-}
-
-function surfaceShare(route) {
-  const total = route.distance_m || 1
-  const parts = [
-    ['paved', route.surfaces.paved_m],
-    ['gravel', route.surfaces.gravel_m],
-    ['trail', route.surfaces.trail_m],
-  ]
-    .filter(([, m]) => m / total > 0.05)
-    .map(([key, m]) => `${Math.round((m / total) * 100)} % ${surfaceLabel(key)}`)
-  return parts.join(' · ') || '—'
-}

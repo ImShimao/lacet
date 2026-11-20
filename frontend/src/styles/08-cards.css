@@ -148,38 +148,38 @@
   background: var(--accent);
 }
 
-/* Sous les cartes : les points à gauche, les gestes sur la boucle à droite. */
-.cards__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-inline: 2px;
-}
-.cardtools {
-  display: flex;
+/* Ce qu'on fait d'une boucle, dans son détail : trois boutons nommés. */
+.loopacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
 }
-.cardtool {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
+.loopact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 6px 10px;
+  border-radius: var(--r);
   border: 1px solid var(--line-soft);
   background: var(--surface-2);
   color: var(--text-2);
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 600;
   transition:
     background 0.15s ease,
     transform 0.12s ease;
 }
-.cardtool:active {
-  transform: scale(0.92);
+.loopact .icon {
+  color: var(--accent-text);
 }
-.cardtool:disabled {
+.loopact:active {
+  transform: scale(0.96);
+}
+.loopact:disabled {
   opacity: 0.4;
 }
-.cardtool--on {
+.loopact--on {
   color: var(--accent-text);
   border-color: var(--accent-line);
   background: var(--accent-soft);

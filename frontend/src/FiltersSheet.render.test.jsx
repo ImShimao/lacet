@@ -25,6 +25,9 @@ const ouvrir = (value = DEFAULTS) => {
   return { onApply, onClose }
 }
 
+/** Les réglages se replient en une ligne (nom, valeur, flèche) : on les ouvre comme au doigt. */
+const déplier = (nom) => fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + nom) }))
+
 /** Le texte de conversion « environ 9,2 km », sans se soucier des espaces. */
 const conversion = () => screen.getByText(/Converti en distance/).textContent.replace(/\s+/g, ' ')
 
@@ -34,24 +37,27 @@ describe('le panneau des filtres', () => {
     expect(conversion()).toContain('environ 9,2 km')
 
     // Une allure plus lente, c'est moins de kilomètres dans la même heure.
+    déplier('Allure')
     const plus = screen.getAllByRole('button', { name: 'Augmenter' })
     fireEvent.click(plus[plus.length - 1])
-    expect(screen.getByText(/6:35 \/km/)).toBeInTheDocument()
+    expect(screen.getAllByText(/6:35 \/km/).length).toBeGreaterThan(0)
     expect(conversion()).toContain('environ 9,1 km')
   })
 
   it('annonce la durée de la boucle quand on règle une distance', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
+    déplier('Allure')
     expect(screen.getByText(/environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
   })
 
   it('ne lance rien tant qu’on n’a pas demandé', () => {
     const { onApply } = ouvrir()
+    déplier('Terrain')
     fireEvent.click(screen.getByRole('button', { name: /Sentier/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Vélo' }))
     // Le terrain change de nom avec l'activité — « Sentier » à pied, « VTT » à
     // vélo —, et le panneau le suit sans rien lancer.
-    expect(screen.getByRole('button', { name: /VTT/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^VTT/ })).toHaveAttribute('aria-pressed', 'true')
     expect(onApply).not.toHaveBeenCalled()
   })
 
@@ -73,6 +79,7 @@ describe('le panneau des filtres', () => {
 
   it('choisit le côté où partir, « Auto » par défaut', () => {
     const { onApply } = ouvrir()
+    déplier('Direction')
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText(/se répartissent autour du départ/)).toBeInTheDocument()
 
@@ -87,6 +94,7 @@ describe('le panneau des filtres', () => {
 
   it('remet la direction sur « Auto » en réinitialisant', () => {
     ouvrir({ ...DEFAULTS, direction: 'O' })
+    déplier('Direction')
     expect(screen.getByRole('button', { name: 'Ouest' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
@@ -95,14 +103,15 @@ describe('le panneau des filtres', () => {
   it('demande un D+ précis à la place des trois réglages', () => {
     // « On ne peut pas demander un D+ en particulier », reprochait-on à RunnrZ.
     const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
+    déplier('Dénivelé')
     fireEvent.click(screen.getByRole('checkbox', { name: /Un D\+ précis/ }))
     // On part de 10 m par kilomètre, la cible de Vallonné, qui se décoche.
-    expect(screen.getByText('100 m de D+')).toBeInTheDocument()
+    expect(screen.getAllByText('100 m de D+').length).toBe(2)
     expect(screen.getByRole('button', { name: /Vallonné/ })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText(/entre 80 et 120 m passent devant/)).toBeInTheDocument()
 
     // Au clavier, comme la distance : « environ 150 m ».
-    fireEvent.click(screen.getByText('100 m de D+'))
+    fireEvent.click(screen.getAllByText('100 m de D+').at(-1))
     const champ = screen.getByRole('textbox', { name: 'Valeur' })
     fireEvent.change(champ, { target: { value: '150' } })
     fireEvent.keyDown(champ, { key: 'Enter' })
@@ -113,6 +122,7 @@ describe('le panneau des filtres', () => {
 
   it('reprend une tuile de relief en oubliant le D+ précis', () => {
     const { onApply } = ouvrir({ ...DEFAULTS, climb_m: 150 })
+    déplier('Dénivelé')
     fireEvent.click(screen.getByRole('button', { name: /Plat/ }))
     expect(screen.queryByText(/m de D\+/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
@@ -141,15 +151,16 @@ describe('le panneau des filtres', () => {
   it('choisit la forme, et dit la longueur de chaque tour', () => {
     // « Une boucle, deux boucles ou plusieurs tours » : le moteur choisissait seul.
     const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
+    déplier('Forme')
     expect(screen.getByRole('button', { name: 'Forme auto' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: '2 boucles' }))
     expect(screen.getByText(/Deux boucles d'environ 5 km, de deux côtés du départ/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Tours' }))
-    expect(screen.getByText('2 tours')).toBeInTheDocument()
-    // Le compteur de tours vient après la distance et l'allure.
+    expect(screen.getAllByText('2 tours').length).toBe(2)
+    // Le compteur de tours est le dernier ouvert.
     const plus = screen.getAllByRole('button', { name: 'Augmenter' })
-    fireEvent.click(plus[2])
+    fireEvent.click(plus.at(-1))
     expect(screen.getByText(/environ 3,3 km, à faire 3 fois/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
     expect(onApply.mock.calls[0][0]).toMatchObject({ form: 'laps', laps: 3 })
@@ -157,6 +168,7 @@ describe('le panneau des filtres', () => {
 
   it('prévient quand les tours seraient trop courts', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 5, form: 'laps', laps: 4 })
+    déplier('Forme')
     expect(screen.getByText(/4 tours de 1,3 km : trop courts/)).toBeInTheDocument()
   })
 
@@ -173,6 +185,7 @@ describe('le panneau des filtres', () => {
 
   it('peut faire passer les boucles déjà courues après les autres', () => {
     const { onApply } = ouvrir()
+    déplier('Éviter')
     fireEvent.click(screen.getByRole('checkbox', { name: /Boucles déjà courues/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
     expect(onApply.mock.calls[0][0].avoid).toEqual(['known'])

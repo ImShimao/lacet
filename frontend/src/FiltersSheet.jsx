@@ -498,8 +498,13 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 Elle avait été rangée dans « Mon compte » ; on ne voyait plus
                 l'effet de ce qu'on réglait. Ici, « 1 h à 5:30 » et « 1 h à
                 6:30 » ne font pas la même sortie, et ça se lit tout de suite. */}
+          </Field>
+
+          <Field
+            label={isBike ? 'Vitesse' : 'Allure'}
+            value={usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`}
+          >
             <div className="field__pace">
-              <span className="label">{isBike ? 'Vitesse' : 'Allure'}</span>
               {!isBike && (
                 <Segmented
                   options={[
@@ -540,7 +545,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           </Field>
 
           {shown('form') && (
-            <Field label="Forme">
+            <Field label="Forme" value={draft.form === 'laps' ? `${draft.laps} tours` : FORMS.find((o) => o.key === (draft.form ?? 'auto'))?.label ?? 'Auto'}>
               <Segmented options={FORMS} value={draft.form ?? 'auto'} onChange={(form) => set({ form })} />
               {draft.form === 'laps' && (
                 <Stepper
@@ -555,7 +560,12 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           )}
 
           {shown('terrain') && (
-            <Field label="Terrain" info="terrain" sport={draft.sport}>
+            <Field
+              label="Terrain"
+              info="terrain"
+              sport={draft.sport}
+              value={TERRAINS[draft.sport].find((o) => o.key === draft.surface)?.label ?? 'Mixte'}
+            >
               <div className="tiles">
                 {TERRAINS[draft.sport].map((t) => (
                   <Tile
@@ -588,7 +598,12 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           )}
 
           {shown('relief') && (
-            <Field label="Dénivelé" info="relief" sport={draft.sport}>
+            <Field
+              label="Dénivelé"
+              info="relief"
+              sport={draft.sport}
+              value={climbing ? `${draft.climb_m} m de D+` : RELIEFS.find((o) => o.key === draft.elevation)?.label ?? 'Auto'}
+            >
               <div className="tiles">
                 {RELIEFS.map((r) => (
                   <Tile
@@ -649,7 +664,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           )}
 
           {shown('direction') && (
-            <Field label="Direction">
+            <Field label="Direction" value={directionOf(draft.direction)?.title ?? 'Auto'}>
               {/* Neuf choix sur une ligne : serrés, ils tiennent à 390 px. */}
               <div className="directions">
                 <Segmented
@@ -670,7 +685,7 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           )}
 
           {shown('safety') && (
-            <Field label="Sécurité" info="safety" sport={draft.sport}>
+            <Field label="Sécurité" info="safety" sport={draft.sport} value={SAFETY.find((o) => o.key === draft.safety)?.label ?? 'Sûr'}>
               <Segmented
                 options={SAFETY}
                 value={draft.safety}
@@ -685,7 +700,16 @@ export default function FiltersSheet({ value, onApply, onClose }) {
           )}
 
           {shown('avoid') && (
-            <Field label="Éviter" info="avoid" sport={draft.sport}>
+            <Field
+              label="Éviter"
+              info="avoid"
+              sport={draft.sport}
+              value={
+                AVOIDABLE.filter((a) => (draft.avoid || []).includes(a.key))
+                  .map((a) => a.label)
+                  .join(', ') || 'Rien'
+              }
+            >
               <div className="checks">
                 {AVOIDABLE.filter((a) => !a.sport || a.sport === draft.sport).map((a) => {
                   const on = (draft.avoid || []).includes(a.key)
@@ -752,14 +776,42 @@ function formHint(draft, km) {
   }
 }
 
-function Field({ label, info, sport, children }) {
-  return (
-    <div className="field">
-      <div className="field__head">
-        <span className="label">{label}</span>
-        {info && <InfoButton topic={info} sport={sport} />}
+/**
+ * Un réglage. Avec `value`, il se replie en une ligne — son nom, ce qui est
+ * choisi, une flèche —, comme chez RunnrZ : on lit tous les filtres d'un coup
+ * d'œil, et on n'ouvre que celui qu'on vient changer. Sans, il reste ouvert :
+ * l'activité et la longueur, qu'on règle à chaque sortie.
+ */
+function Field({ label, info, sport, value = null, children }) {
+  const [open, setOpen] = useState(false)
+  if (value == null) {
+    return (
+      <div className="field">
+        <div className="field__head">
+          <span className="label">{label}</span>
+          {info && <InfoButton topic={info} sport={sport} />}
+        </div>
+        {children}
       </div>
-      {children}
+    )
+  }
+  return (
+    <div className={`field field--fold ${open ? 'field--open' : ''}`}>
+      <button className="field__toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="field__name">{label}</span>
+        <span className="field__value">{value}</span>
+        <Icon name="chevronDown" size={16} className="field__chev" />
+      </button>
+      {open && (
+        <div className="field__body">
+          {info && (
+            <div className="field__info">
+              <InfoButton topic={info} sport={sport} />
+            </div>
+          )}
+          {children}
+        </div>
+      )}
     </div>
   )
 }

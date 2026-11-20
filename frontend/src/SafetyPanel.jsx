@@ -1,10 +1,16 @@
 import { percent } from './format'
 
 /**
- * Le détail de la note. C'est l'écran qui porte la promesse du produit :
+ * Sur quoi repose la note. C'est l'écran qui porte la promesse du produit :
  * il ne suffit pas d'afficher « A », il faut montrer sur quoi elle repose.
+ *
+ * Deux sections, comme les cartes de Roovr : « Sécurité », quatre chiffres en
+ * tuiles qu'on lit d'un coup d'œil, et « Surfaces », la barre des revêtements.
+ * Ce qu'expliquent ces chiffres (`open`) se déplie sous les tuiles : le
+ * tableau qui les détaillait d'emblée faisait une page de texte avant le
+ * moindre graphique.
  */
-export default function SafetyPanel({ safety, surfaces, segments = [], distance, sport = 'run' }) {
+export default function SafetyPanel({ safety, surfaces, segments = [], distance, sport = 'run', open = true }) {
   // Les rues calmes dont le trottoir manque sur la carte mais est probable : en
   // ville, à 50 km/h ou moins (`separation` dans `engine/safety.js`). Sans
   // elles, une boucle courue entièrement sur trottoir affichait « 51 % »
@@ -85,46 +91,55 @@ export default function SafetyPanel({ safety, surfaces, segments = [], distance,
   ].filter(([, , metres]) => metres > 1)
 
   return (
-    <div className="safety">
-      <div className="safety__rows">
-        {rows.map((row) => (
-          <div key={row.label} className="safety__row">
-            <span className="safety__label">
-              {row.label}
-              {row.hint && <em>{row.hint}</em>}
-            </span>
-            <span
-              className={`safety__value ${row.tone ? `safety__value--${row.tone}` : ''}`}
-            >
-              {row.value}
-            </span>
+    <>
+      <section className="block safety">
+        <div className="block__head">
+          <span className="label">Sécurité</span>
+        </div>
+        <div className="safety__tiles">
+          {rows.map((row) => (
+            <div key={row.label} className="safety__tile">
+              <b className={`safety__value ${row.tone ? `safety__value--${row.tone}` : ''}`}>{row.value}</b>
+              <span>{row.label}</span>
+            </div>
+          ))}
+        </div>
+        {open && (
+          <div className="safety__more">
+            {rows
+              .filter((row) => row.hint)
+              .map((row) => (
+                <p key={row.label}>
+                  <b>{row.label}</b> : {row.hint}.
+                </p>
+              ))}
+            {safety.notes.map((note, i) => (
+              <p key={i} className="safety__note">
+                {note}
+              </p>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </section>
 
-      <div className="bar" role="img" aria-label="Répartition des revêtements">
-        {surfaceRows.map(([key, , metres]) => (
-          <span
-            key={key}
-            className={`s--${key}`}
-            style={{ width: `${(metres / distance) * 100}%` }}
-          />
-        ))}
-      </div>
-      <div className="bar__legend">
-        {surfaceRows.map(([key, label, metres]) => (
-          <span key={key} className="bar__key">
-            <i className={`s--${key}`} />
-            {label} {percent(metres / distance)}
-          </span>
-        ))}
-      </div>
-
-      {safety.notes.map((note, i) => (
-        <p key={i} className="safety__note">
-          {note}
-        </p>
-      ))}
-    </div>
+      <section className="block">
+        <div className="block__head">
+          <span className="label">Surfaces</span>
+        </div>
+        <div className="bar" role="img" aria-label="Répartition des revêtements">
+          {surfaceRows.map(([key, , metres]) => (
+            <span key={key} className={`s--${key}`} style={{ width: `${(metres / distance) * 100}%` }} />
+          ))}
+        </div>
+        <div className="bar__legend">
+          {surfaceRows.map(([key, label, metres]) => (
+            <span key={key} className="bar__key">
+              <i className={`s--${key}`} />
+              {label} {percent(metres / distance)}
+            </span>
+          ))}
+        </div>
+      </section>
+    </>
   )
 }

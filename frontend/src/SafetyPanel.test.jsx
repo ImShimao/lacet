@@ -30,7 +30,7 @@ const segments = [segment(4640, 2, false), segment(4100, 1.5, true), segment(360
 describe('le détail de la note', () => {
   it('compte à part les rues calmes au trottoir probable', () => {
     render(<SafetyPanel safety={safety} surfaces={surfaces} segments={segments} distance={9100} />)
-    expect(screen.getByText('Rue calme, trottoir probable')).toBeTruthy()
+    expect(screen.getAllByText('Rue calme, trottoir probable').length).toBeGreaterThan(0)
     expect(screen.getByText('45 %')).toBeTruthy()
   })
 

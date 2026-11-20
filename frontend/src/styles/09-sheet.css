@@ -139,10 +139,8 @@
 .shell[data-sheet='peek'] .cards {
   margin-inline: 0;
 }
-/* Les points s'effacent, mais gardent leur place : les gestes sur la boucle,
-   à leur droite, restent là, carte repliée. */
 .shell[data-sheet='peek'] .cards__dots {
-  visibility: hidden;
+  display: none;
 }
 /* Les voisines s'estompent vers le bord au lieu d'y être tranchées — sur
    tablette, la colonne s'arrête bien avant l'écran. */
