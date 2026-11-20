@@ -14,7 +14,7 @@ import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
-import { TERRAINS, formatKm } from './FiltersSheet.jsx'
+import { Segmented, TERRAINS, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
 import { km, surfaceLabel } from './format'
@@ -22,8 +22,126 @@ import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
 
-// Les distances qu'on choisit d'un geste, à l'accueil.
-const QUICK_KM = [3, 5, 10, 15]
+// Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
+// une grande graduation tous les `major` pas, et les raccourcis dessous.
+const QUICK = {
+  run: { min: 1, max: 42, step: 0.5, major: 10, chips: [3, 5, 10, 15] },
+  bike: { min: 5, max: 200, step: 5, major: 5, chips: [25, 50, 75, 100] },
+  duration: { min: 10, max: 300, step: 5, major: 6, chips: [30, 45, 60, 90] },
+}
+// L'écart entre deux graduations, en pixels.
+const TICK = 12
+
+/**
+ * La question de l'accueil : combien aujourd'hui. Le chiffre en grand, et sous
+ * lui une règle graduée qu'on fait défiler au pouce, l'aiguille fixe au milieu.
+ * Un curseur d'un bout à l'autre de l'écran ne laissait que 7 px par kilomètre :
+ * la règle en donne 24, et chaque cran se sent.
+ */
+function QuickLength({ params, onQuickParams }) {
+  const duration = params.mode === 'duration'
+  const key = duration ? 'duration_min' : 'distance_km'
+  const cfg = duration ? QUICK.duration : params.sport === 'bike' ? QUICK.bike : QUICK.run
+  const value = params[key]
+  const unit = duration ? 'min' : 'km'
+  const ref = useRef(null)
+
+  const clampStep = (v) => Math.min(cfg.max, Math.max(cfg.min, cfg.min + Math.round((v - cfg.min) / cfg.step) * cfg.step))
+  const set = (v) => {
+    const next = Math.round(clampStep(v) * 1000) / 1000
+    if (next === value) return
+    haptic('tickHaptic')
+    onQuickParams({ [key]: next, mode: duration ? 'duration' : 'distance' })
+  }
+
+  // La règle suit la valeur quand elle change d'ailleurs (raccourci, filtres,
+  // changement de mode). Un défilement au doigt ne la contredit pas : il
+  // tombe déjà à moins d'un demi-cran de la valeur qu'il vient de poser.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const target = ((clampStep(value) - cfg.min) / cfg.step) * TICK
+    if (Math.abs(el.scrollLeft - target) > TICK / 2) el.scrollLeft = target
+  })
+
+  return (
+    <div className="dist">
+      <Segmented
+        options={[
+          { key: 'distance', label: 'Distance' },
+          { key: 'duration', label: 'Durée' },
+        ]}
+        value={params.mode}
+        onChange={(mode) => onQuickParams({ mode })}
+      />
+      <div className="dist__value" aria-hidden="true">
+        <b>{duration ? value : formatKm(value)}</b>
+        <small>{unit}</small>
+      </div>
+      <div className="ruler">
+        <div
+          ref={ref}
+          className="ruler__track"
+          role="slider"
+          tabIndex={0}
+          aria-label={duration ? 'Durée de la sortie' : 'Distance de la boucle'}
+          aria-valuemin={cfg.min}
+          aria-valuemax={cfg.max}
+          aria-valuenow={value}
+          aria-valuetext={`${duration ? value : formatKm(value)} ${unit}`}
+          onScroll={(e) => set(cfg.min + Math.round(e.currentTarget.scrollLeft / TICK) * cfg.step)}
+          // Au doigt, la bande défile d'elle-même. À la souris (l'aperçu sur
+          // ordinateur), il faut la tirer, ou tourner la molette.
+          onPointerDown={(e) => {
+            if (e.pointerType !== 'mouse') return
+            const el = e.currentTarget
+            const x0 = e.clientX
+            const s0 = el.scrollLeft
+            const move = (ev) => (el.scrollLeft = s0 - (ev.clientX - x0))
+            const up = () => {
+              window.removeEventListener('pointermove', move)
+              window.removeEventListener('pointerup', up)
+            }
+            window.addEventListener('pointermove', move)
+            window.addEventListener('pointerup', up)
+          }}
+          onWheel={(e) => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+          }}
+          onKeyDown={(e) => {
+            const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key]
+            if (!d) return
+            e.preventDefault()
+            set(value + d * cfg.step)
+          }}
+        >
+          <span className="ruler__pad" />
+          <span
+            className="ruler__ticks"
+            style={{
+              width: ((cfg.max - cfg.min) / cfg.step) * TICK + 1,
+              '--major': `${cfg.major * TICK}px`,
+              // Les grandes graduations tombent sur les nombres ronds (5, 10, 15 km).
+              '--offset': `${((Math.ceil(cfg.min / (cfg.major * cfg.step)) * cfg.major * cfg.step - cfg.min) / cfg.step) * TICK}px`,
+            }}
+          />
+          <span className="ruler__pad" />
+        </div>
+        <span className="ruler__needle" aria-hidden="true" />
+      </div>
+      <div className="dist__chips" role="radiogroup" aria-label={duration ? 'Durées rapides' : 'Distances rapides'}>
+        {cfg.chips.map((k) => {
+          const on = Math.abs(value - k) < 0.01
+          return (
+            <button key={k} role="radio" aria-checked={on} className={`chip ${on ? 'chip--on' : ''}`} onClick={() => set(k)}>
+              {k} {unit}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
@@ -128,48 +246,7 @@ export default function Explore({
             </em>
           </div>
         </div>
-        {/* La question principale de l'accueil, en grand : combien de kilomètres
-            aujourd'hui. Les raccourcis couvrent le gros des sorties ; le reste
-            reste dans les filtres. */}
-        {params.mode !== 'duration' && onQuickParams && (
-          <div className="dist">
-            <div className="dist__head">
-              <span>Combien aujourd'hui ?</span>
-              <b>
-                {formatKm(params.distance_km)} <small>km</small>
-              </b>
-            </div>
-            {/* Un curseur qu'on glisse : la distance se règle au pouce, sans
-                viser de petits boutons. */}
-            <input
-              type="range"
-              className="dist__range"
-              aria-label="Distance de la boucle"
-              min={1}
-              max={42}
-              step={0.5}
-              value={params.distance_km}
-              style={{ '--fill': `${((params.distance_km - 1) / 41) * 100}%` }}
-              onChange={(e) => onQuickParams({ distance_km: Number(e.target.value), mode: 'distance' })}
-            />
-            <div className="dist__chips" role="radiogroup" aria-label="Distances rapides">
-              {QUICK_KM.map((k) => {
-                const on = Math.abs(params.distance_km - k) < 0.01
-                return (
-                  <button
-                    key={k}
-                    role="radio"
-                    aria-checked={on}
-                    className={`chip ${on ? 'chip--on' : ''}`}
-                    onClick={() => onQuickParams({ distance_km: k, mode: 'distance' })}
-                  >
-                    {k} km
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        {onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />}
         <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
           <Icon name="search" size={18} />
           Trouver ma boucle

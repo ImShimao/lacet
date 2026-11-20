@@ -68,19 +68,31 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
       <div className="stats stats--four rundet__stats">
         <div>
           <b>{duration(seconds)}</b>
-          <span>Temps</span>
+          <span>
+            <Icon name="clock" size={12} />
+            Temps
+          </span>
         </div>
         <div>
           <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
-          <span>{bike ? 'Vitesse (km/h)' : 'Allure (/km)'}</span>
+          <span>
+            <Icon name="gauge" size={12} />
+            {bike ? 'Vitesse (km/h)' : 'Allure (/km)'}
+          </span>
         </div>
         <div>
           <b>{bike ? pace(perKm) : speed.toFixed(1).replace('.', ',')}</b>
-          <span>{bike ? 'Allure (/km)' : 'Vitesse (km/h)'}</span>
+          <span>
+            <Icon name="gauge" size={12} />
+            {bike ? 'Allure (/km)' : 'Vitesse (km/h)'}
+          </span>
         </div>
         <div>
           <b>{entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—'}</b>
-          <span>Dénivelé +</span>
+          <span>
+            <Icon name="trendUp" size={12} />
+            Dénivelé +
+          </span>
         </div>
       </div>
 

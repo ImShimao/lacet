@@ -93,6 +93,9 @@
   --display: 'Inter Variable', 'Inter', -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif;
   /* Les chiffres : la même police, en chasse fixe (`.mono`). */
   --mono: var(--display);
+  /* Les étiquettes de section (`20-labels.css`) : une vraie chasse fixe, celle
+     du système, pour les distinguer du texte sans ajouter de police. */
+  --eyebrow: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
   --r: 14px;
   --side: 400px;

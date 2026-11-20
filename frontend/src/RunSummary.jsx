@@ -106,19 +106,31 @@ export default function RunSummary({
       <div className="stats stats--four">
         <div>
           <b>{duration(seconds)}</b>
-          <span>Temps</span>
+          <span>
+            <Icon name="clock" size={12} />
+            Temps
+          </span>
         </div>
         <div>
           <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
-          <span>{bike ? 'Vitesse (km/h)' : 'Allure (/km)'}</span>
+          <span>
+            <Icon name="gauge" size={12} />
+            {bike ? 'Vitesse (km/h)' : 'Allure (/km)'}
+          </span>
         </div>
         <div>
           <b>{entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—'}</b>
-          <span>Dénivelé +</span>
+          <span>
+            <Icon name="trendUp" size={12} />
+            Dénivelé +
+          </span>
         </div>
         <div>
           <b>{kcal > 0 ? kcal.toLocaleString('fr-FR') : '—'}</b>
-          <span>kcal estimées</span>
+          <span>
+            <Icon name="flame" size={12} />
+            kcal estimées
+          </span>
         </div>
       </div>
 

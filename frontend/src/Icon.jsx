@@ -322,6 +322,30 @@ const PATHS = {
       <circle cx="12" cy="16" r="1" fill="currentColor" stroke="none" />
     </>
   ),
+  // Les quatre chiffres d'une sortie, sur leurs tuiles : le temps, l'allure,
+  // la montée, l'énergie. Une icône par chiffre fait trouver le bon sans lire.
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  gauge: (
+    <>
+      <path d="M4.2 17.5a8.5 8.5 0 1 1 15.6 0" />
+      <path d="m12 13.5 3.8-4.3" />
+      <circle cx="12" cy="13.5" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  trendUp: (
+    <>
+      <path d="m3.5 17 6-6 4 4 7-7.5" />
+      <path d="M15 7.5h5.5V13" />
+    </>
+  ),
+  flame: (
+    <path d="M12 21.5c3.6 0 6.5-2.6 6.5-6.3 0-3.7-2.8-6.2-4.4-9.7-1 2.6-2.4 3.7-3.6 4.2.3-2.2-.2-4.4-1.7-6.2C8.6 6.6 5.5 9.6 5.5 15.2c0 3.7 2.9 6.3 6.5 6.3z" />
+  ),
   chart: (
     <>
       <path d="M4 20h16" />

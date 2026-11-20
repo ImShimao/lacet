@@ -559,87 +559,98 @@
   font-weight: 500;
 }
 
-/* L'accueil : la distance se règle au curseur, en une seule carte serrée. */
+/* L'accueil : combien aujourd'hui. Pas de carte dans la carte — le bloc se
+   pose à même le panneau : le chiffre en grand au centre, la règle dessous,
+   les raccourcis. */
 .dist {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px 12px;
-  border-radius: var(--r);
-  background: var(--surface-2);
-  border: 1px solid var(--line-soft);
+  gap: 6px;
 }
-.dist__head {
+.dist .seg {
+  align-self: center;
+  width: 210px;
+}
+.dist .seg button {
+  padding-block: 6px;
+  font-size: calc(12.5px * var(--text-scale));
+}
+.dist__value {
   display: flex;
+  justify-content: center;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 5px;
+  margin-top: 4px;
+  line-height: 1;
 }
-.dist__head span {
+.dist__value b {
+  font-size: calc(46px * var(--text-scale));
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.dist__value small {
+  font-family: var(--eyebrow);
   font-size: calc(12px * var(--text-scale));
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
 }
-.dist__head b {
-  font-size: calc(26px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+
+/* La règle : une bande qui défile sous une aiguille fixe. Les deux cales
+   d'une demi-largeur laissent la première et la dernière graduation venir
+   jusqu'au milieu. Les bords s'effacent, comme une molette. */
+.ruler {
+  position: relative;
+  height: 34px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent);
 }
-.dist__head b small {
-  font-size: calc(14px * var(--text-scale));
-  font-weight: 600;
-  color: var(--text-2);
-}
-.dist__range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 28px;
-  margin: 0;
-  background: transparent;
+.ruler__track {
+  display: flex;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
   touch-action: pan-x;
+  cursor: ew-resize;
+  user-select: none;
 }
-.dist__range::-webkit-slider-runnable-track {
-  height: 4px;
+.ruler__track::-webkit-scrollbar {
+  display: none;
+}
+.ruler__track:focus-visible {
+  outline: none;
+}
+.ruler__pad {
+  flex: 0 0 50%;
+}
+.ruler__ticks {
+  flex: none;
+  height: 100%;
+  background:
+    linear-gradient(to right, var(--text-2) 0 2px, transparent 2px) var(--offset) bottom / var(--major) 22px repeat-x,
+    repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 12px) left bottom / 100% 11px no-repeat;
+}
+.ruler__needle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 3px;
+  height: 30px;
+  margin-left: -1px;
   border-radius: 2px;
-  background: linear-gradient(to right, var(--accent) var(--fill, 20%), var(--line) var(--fill, 20%));
-}
-.dist__range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -9px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-.dist__range::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--line);
-}
-.dist__range::-moz-range-progress {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-.dist__range::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: #fff;
+  background: var(--accent-text);
+  box-shadow: 0 0 10px var(--accent-glow);
+  pointer-events: none;
 }
 .dist__chips {
   display: flex;
   gap: 6px;
-  justify-content: space-between;
+  margin-top: 2px;
 }
 .dist__chips .chip {
   flex: 1;
   justify-content: center;
-  padding: 5px 0;
-  font-size: calc(12px * var(--text-scale));
+  padding: 6px 0;
+  font-size: calc(12.5px * var(--text-scale));
 }

@@ -1,0 +1,106 @@
+/* Le ton commun à tous les écrans : les étiquettes, les chiffres, les choix.
+
+   Repris de ce qui se lit bien chez Roovr et RunnrZ, sans leurs couleurs :
+   - chaque section s'annonce par une petite étiquette en chasse fixe, espacée,
+     précédée d'un point de l'accent : on repère les blocs sans les lire ;
+   - un chiffre se lit en grand, son unité en petit à côté, et son étiquette
+     au-dessus : l'œil trouve le nombre d'abord ;
+   - un choix fait se voit d'un trait de l'accent, pas seulement d'un gris un
+     peu plus clair, qui ne se distinguait pas en plein soleil.
+   Ce fichier vient en dernier : il retouche les fichiers qui le précèdent. */
+
+/* ══ étiquettes de section ═══════════════════════════════════════════════ */
+
+.label,
+.strip__title,
+.rejected__title,
+.search__title,
+.startmenu b,
+.acct__label {
+  font-family: var(--eyebrow);
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.label::before,
+.acct__label::before,
+.strip__title::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: var(--accent-text);
+  vertical-align: middle;
+}
+
+/* ══ choix segmentés ═════════════════════════════════════════════════════ */
+
+.seg {
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+}
+.seg button[aria-pressed='true'],
+.seg button[aria-checked='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* ══ le geste principal ══════════════════════════════════════════════════ */
+
+/* Un halo de l'accent sous le bouton principal : il se trouve sans le chercher,
+   même posé sur la carte. */
+.btn--primary:not(:disabled) {
+  box-shadow: 0 10px 26px -12px var(--accent-glow);
+}
+
+/* ══ tuiles de chiffres ══════════════════════════════════════════════════ */
+
+/* Le bilan, le détail d'une sortie, le mois : quatre tuiles séparées,
+   l'étiquette au-dessus, le chiffre en grand, alignés à gauche. La course en
+   direct garde ses chiffres centrés, lus d'un coup d'œil en courant. */
+.stats:not(.stats--live) {
+  gap: 6px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: none;
+}
+.stats:not(.stats--live) > div {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 9px 10px;
+  text-align: left;
+  border: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.stats:not(.stats--live) b {
+  font-size: calc(18px * var(--text-scale));
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.acct__stats span {
+  font-family: var(--eyebrow);
+  font-size: calc(9.5px * var(--text-scale));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.stats:not(.stats--live) span {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-family: var(--eyebrow);
+  font-size: calc(9px * var(--text-scale));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}

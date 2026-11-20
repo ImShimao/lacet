@@ -191,10 +191,22 @@ describe('l’accueil : la distance en grand', () => {
     expect(onQuickParams).toHaveBeenCalledWith({ distance_km: 5, mode: 'distance' })
   })
 
-  it('se règle au curseur, par demi-kilomètre', () => {
+  it('se règle à la règle, par demi-kilomètre : au défilement comme au clavier', () => {
     const onQuickParams = vi.fn()
     accueil(onQuickParams)
-    fireEvent.change(screen.getByRole('slider', { name: 'Distance de la boucle' }), { target: { value: '12.5' } })
+    const regle = screen.getByRole('slider', { name: 'Distance de la boucle' })
+    // Vingt-trois crans de 12 px depuis 1 km : 12,5 km.
+    regle.scrollLeft = 23 * 12
+    fireEvent.scroll(regle)
     expect(onQuickParams).toHaveBeenLastCalledWith({ distance_km: 12.5, mode: 'distance' })
+    fireEvent.keyDown(regle, { key: 'ArrowRight' })
+    expect(onQuickParams).toHaveBeenLastCalledWith({ distance_km: 10.5, mode: 'distance' })
+  })
+
+  it('passe en durée, avec ses propres raccourcis', () => {
+    const onQuickParams = vi.fn()
+    accueil(onQuickParams)
+    fireEvent.click(screen.getByRole('button', { name: 'Durée' }))
+    expect(onQuickParams).toHaveBeenLastCalledWith({ mode: 'duration' })
   })
 })
