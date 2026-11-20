@@ -95,6 +95,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Numéro de version
+        run: echo "APP_VERSION=$(python3 scripts/version.py)" >> "$GITHUB_ENV"
+
       - name: Semaine
         id: week
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
@@ -160,7 +163,7 @@ jobs:
       - name: Publication des rues de la région
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v1.1.${{ github.run_number }}
+          TAG: v${{ env.APP_VERSION }}
         run: |
           set -euo pipefail
           tar -czf region.tar.gz -C region .
@@ -190,7 +193,7 @@ jobs:
               echo "<sub>Commit ${GITHUB_SHA::7}${PREV:+ · changements depuis $PREV}</sub>"
             } > notes.md
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Lacet 1.1.${{ github.run_number }}" --notes-file notes.md --prerelease
+              --title "Lacet $APP_VERSION" --notes-file notes.md --prerelease
           fi
           gh release upload "$TAG" region.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -208,6 +211,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Numéro de version
+        run: echo "APP_VERSION=$(python3 scripts/version.py)" >> "$GITHUB_ENV"
 
       - name: Xcode
         run: |
@@ -229,7 +235,7 @@ jobs:
       - name: Rues de la région
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v1.1.${{ github.run_number }}
+          TAG: v${{ env.APP_VERSION }}
         run: |
           set -euo pipefail
           mkdir -p public/region
@@ -269,7 +275,6 @@ jobs:
       # anciennes versions d'AltStore ignorent — et la mise à jour s'y voit.
       - name: Réglages de Lacet
         env:
-          APP_VERSION: 1.1.${{ github.run_number }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: python3 ios-overlay/customize.py ios/App
 
@@ -278,7 +283,6 @@ jobs:
       # ios-overlay/add_live_activity.rb.
       - name: Activité en direct (écran verrouillé)
         env:
-          APP_VERSION: 1.1.${{ github.run_number }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           ruby -e 'require "xcodeproj"' 2>/dev/null || gem install xcodeproj --no-document
@@ -362,7 +366,7 @@ jobs:
       - name: Publication de l'IPA
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v1.1.${{ github.run_number }}
+          TAG: v${{ env.APP_VERSION }}
         run: |
           set -euo pipefail
           gh release upload "$TAG" "$GITHUB_WORKSPACE/Lacet.ipa" --repo "$GITHUB_REPOSITORY" --clobber
