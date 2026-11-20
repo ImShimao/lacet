@@ -650,10 +650,16 @@ function terrainTilesFor(coords, z = TERRAIN_ZOOM) {
 
 /** Les altitudes lues dans les tuiles gardées, sans jamais toucher au réseau. */
 async function storedTerrain(coords) {
+  const here = await storedGrids(terrainTilesFor(coords))
+  return terrainValues(coords, (z, x, y) => here.get(terrainTileUrl(x, y, z)) ?? null)
+}
+
+/** Les grilles gardées de ces tuiles, par adresse — celles qui manquent restent absentes. */
+async function storedGrids(tiles) {
   // Celles de cet appel à part : le ménage de la mémoire ne doit pas jeter une
   // tuile dont un long parcours a encore besoin.
   const here = new Map()
-  for (const [x, y] of terrainTilesFor(coords)) {
+  for (const [x, y] of tiles) {
     const url = terrainTileUrl(x, y)
     if (grids.has(url)) {
       here.set(url, grids.get(url))
@@ -673,7 +679,78 @@ async function storedTerrain(coords) {
     grids.set(url, grid)
     here.set(url, grid)
   }
-  return terrainValues(coords, (z, x, y) => here.get(terrainTileUrl(x, y, z)) ?? null)
+  return here
+}
+
+/**
+ * Le D+ qu'un parcours de `distanceKm` peut ramasser près de `lat, lon`, en
+ * m/km, d'après les altitudes déjà gardées — sans réseau, avant la recherche.
+ *
+ * Un parcours s'éloigne au plus de `distanceKm / 2` du départ ; sur ce disque,
+ * un tracé qui va et revient ramasse la moitié de ce qu'il parcourt en
+ * dénivelé, soit `500 × pente` m/km. `pixelAt(x, y)` rend l'altitude d'un pixel
+ * du monde à `z`, ou `null`. Rend `null` si moins de la moitié du disque est
+ * gardée : une estimation à moitié vide ment.
+ */
+export function reachableClimbPerKm(lat, lon, distanceKm, pixelAt, z = TERRAIN_ZOOM) {
+  const radius = Math.max(500, (distanceKm * 1000) / 2)
+  const metresPerPixel = (40_075_016.686 * Math.cos(radians(lat))) / 2 ** (z + 8)
+  const [cx, cy] = terrariumPixel(lon, lat, z)
+  const reach = radius / metresPerPixel
+  const inside = (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= reach * reach
+  let climb = 0
+  let length = 0
+  let expected = 0
+  let known = 0
+  for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y += 1) {
+    for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x += 1) {
+      if (!inside(x, y)) continue
+      expected += 1
+      const here = pixelAt(x, y)
+      if (here === null) continue
+      known += 1
+      // Un voisin à l'est et un au sud : chaque paire compte une fois.
+      for (const [nx, ny] of [
+        [x + 1, y],
+        [x, y + 1],
+      ]) {
+        if (!inside(nx, ny)) continue
+        const next = pixelAt(nx, ny)
+        if (next === null) continue
+        climb += Math.abs(next - here)
+        length += metresPerPixel
+      }
+    }
+  }
+  if (known < expected / 2 || length === 0) return null
+  return Math.round((10 * 500 * climb) / length) / 10
+}
+
+/**
+ * Le D+ possible autour du départ, lu sur les grilles d'altitude gardées de
+ * l'appareil — voir `reachableClimbPerKm`. Sans réseau : une tuile absente
+ * rend `null`, et la réponse aussi.
+ */
+export async function reliefHint(lat, lon, distanceKm) {
+  const radius = Math.max(500, (distanceKm * 1000) / 2)
+  const dLat = radius / 111_320
+  const dLon = radius / (111_320 * Math.cos(radians(lat)))
+  const corners = [
+    [lon - dLon, lat - dLat],
+    [lon + dLon, lat - dLat],
+    [lon - dLon, lat + dLat],
+    [lon + dLon, lat + dLat],
+  ]
+  const here = await storedGrids(terrainTilesFor(corners))
+  const pixelAt = (x, y) => {
+    const tx = Math.floor(x / 256)
+    const ty = Math.floor(y / 256)
+    const grid = here.get(terrainTileUrl(tx, ty))
+    if (!grid) return null
+    const z = grid[(y - ty * 256) * 256 + (x - tx * 256)]
+    return missing(z) ? null : z
+  }
+  return reachableClimbPerKm(lat, lon, distanceKm, pixelAt)
 }
 
 /** D+ et D− avec seuil d'hystérésis — `ascent_descent`. */

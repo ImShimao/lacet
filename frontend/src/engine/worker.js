@@ -22,7 +22,7 @@ import { buildGraph } from './graph'
 import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
-import { ELEVATION_STEP_M, currentWind, fetchMany, shapeRelief } from './environment'
+import { ELEVATION_STEP_M, currentWind, fetchMany, reliefHint, shapeRelief } from './environment'
 import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, pointKey, reverseRoute } from './service'
 import { planRemote } from './remote'
 
@@ -364,6 +364,19 @@ self.onmessage = async ({ data }) => {
       self.postMessage({ id, type: 'result', result: { route } })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
+    }
+    return
+  }
+
+  // Le D+ possible près du départ, pour les badges du filtre : lu sur les tuiles
+  // gardées, sans réseau. Rien à dire si elles manquent : pas de badge.
+  if (type === 'reliefHint') {
+    try {
+      const { lat, lon, distance_km: km } = payload
+      const result = await reliefHint(lat, lon, km)
+      self.postMessage({ id, type: 'result', result })
+    } catch {
+      self.postMessage({ id, type: 'result', result: null })
     }
     return
   }

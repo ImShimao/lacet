@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useModal from './useModal'
 import Icon from './Icon.jsx'
 import { InfoButton } from './Explain.jsx'
-import { climbBand } from './explain'
+import { climbBand, reliefBadge } from './explain'
+import { reliefHintOnDevice } from './engine/client'
 import { pace } from './format'
 
 export const SPORTS = [
@@ -277,7 +278,7 @@ function climbStep(m) {
  * le dénivelé, la sécurité. La longueur est passée devant le terrain — c'est le
  * réglage qu'on vient changer, et il demandait de faire défiler.
  */
-export default function FiltersSheet({ value, onApply, onClose }) {
+export default function FiltersSheet({ value, origin = null, onApply, onClose }) {
   const [draft, setDraft] = useState(value)
   const panel = useModal(onClose)
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
@@ -288,6 +289,21 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   const maxKm = MAX_KM[draft.sport]
   const km = draft.mode === 'distance' ? draft.distance_km : estimateKm(draft)
   const climbing = draft.climb_m != null
+  // Le D+ possible autour du départ, lu sur les tuiles déjà gardées : un badge
+  // par relief, avant de chercher. Sans départ ou sans tuile, pas de badge.
+  const [reachable, setReachable] = useState(null)
+  const originLat = origin?.lat
+  const originLon = origin?.lon
+  useEffect(() => {
+    if (originLat == null) return undefined
+    let live = true
+    reliefHintOnDevice({ lat: originLat, lon: originLon, distance_km: km })
+      .then((v) => live && setReachable(v))
+      .catch(() => live && setReachable(null))
+    return () => {
+      live = false
+    }
+  }, [originLat, originLon, km])
   const shown = (key) => !(draft.hiddenFilters ?? []).includes(key)
 
   return (
@@ -552,7 +568,10 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                   cible de Vallonné. */}
               <Choices
                 label="Relief"
-                options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }]}
+                options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }].map((o) => ({
+                  ...o,
+                  badge: reliefBadge(o.key, reachable, o.key === 'climb' ? draft.climb_m / km : null),
+                }))}
                 value={climbing ? 'climb' : draft.elevation}
                 onChange={(key) =>
                   key === 'climb'
@@ -626,6 +645,7 @@ export function Choices({ label, options, value, onChange }) {
             <b>{o.label}</b>
             {o.sub && <em>{o.sub}</em>}
           </span>
+          {o.badge && <span className={`choice__badge choice__badge--${o.badge === 'Probable' ? 'yes' : 'maybe'}`}>{o.badge}</span>}
           {o.icon && <Icon name={o.icon} size={22} className="choice__icon" />}
         </button>
       ))}
