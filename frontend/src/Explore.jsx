@@ -75,7 +75,8 @@ function QuickLength({ params, onQuickParams }) {
         onChange={(mode) => onQuickParams({ mode })}
       />
       <div className="dist__value" aria-hidden="true">
-        <b>{duration ? value : formatKm(value)}</b>
+        {/* La clé relance le petit battement à chaque cran. */}
+        <b key={value}>{duration ? value : formatKm(value)}</b>
         <small>{unit}</small>
       </div>
       <div className="ruler">

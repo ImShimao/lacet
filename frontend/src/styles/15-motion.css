@@ -5,12 +5,21 @@
    confirme qu'un appui a été pris. Toutes se coupent si le système demande
    moins de mouvement. */
 
+/* Une seule courbe pour ce qui arrive : rapide au départ, posée à l'arrivée,
+   comme les feuilles d'iOS. `ease-out` finissait trop sec. */
+:root {
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 /* L'appui, senti plutôt que deviné : sur un écran tactile, il n'y a ni survol
    ni curseur pour dire qu'une cible a répondu. */
 .btn,
 .tool,
 .chip,
 .tab,
+.menu__row,
+.field__toggle,
+.acct__card,
 .runctl__side,
 .runctl__main,
 .sportpill {
@@ -20,12 +29,27 @@
 .tool:active,
 .chip:active,
 .tab:active,
+.menu__row:active,
+.field__toggle:active,
+.acct__card:active,
 .runctl__side:active,
 .sportpill:active {
   transform: scale(0.97);
 }
 .runctl__main:active {
   transform: scale(0.94);
+}
+
+/* Un choix fait glisse sa couleur au lieu de sauter d'un bouton à l'autre. */
+.seg button,
+.tile,
+.check,
+.mapsheet__opt {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 /* Ce qui arrive sur la carte se pose : la feuille monte, le bandeau descend,
@@ -49,10 +73,10 @@
 }
 
 .runbar {
-  animation: drop 0.24s ease-out;
+  animation: drop 0.28s var(--ease);
 }
 .rcard {
-  animation: rise 0.26s ease-out backwards;
+  animation: rise 0.34s var(--ease) backwards;
 }
 /* Décalées de quelques centièmes : la liste se remplit au lieu d'apparaître. */
 .cards__track > *:nth-child(2) .rcard {
@@ -64,13 +88,35 @@
 .cards__track > *:nth-child(n + 4) .rcard {
   animation-delay: 0.12s;
 }
-.panel .strip,
-.panel .stats,
 .notice {
   animation: fade 0.2s ease-out;
 }
+/* Le détail d'une boucle se remplit section par section. */
+.panel .strip,
+.panel .stats,
+.panel .block,
+.loopacts {
+  animation: rise 0.36s var(--ease) backwards;
+}
+.panel .block {
+  animation-delay: 0.05s;
+}
+.panel .block + .block {
+  animation-delay: 0.1s;
+}
+.loopacts {
+  animation-delay: 0.14s;
+}
+/* Le menu du parcours s'ouvre depuis son bouton, en haut à droite. */
 .startmenu {
-  animation: rise 0.16s ease-out;
+  animation: menu-in 0.2s var(--ease);
+  transform-origin: top right;
+}
+@keyframes menu-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
 }
 .live__paused,
 .live__alert {
@@ -79,7 +125,7 @@
 
 /* La feuille de détail monte de sous l'écran, comme celle des filtres. */
 .shell[data-sheet='full'] .side {
-  animation: sheet-up 0.24s ease-out;
+  animation: sheet-up 0.3s var(--ease);
 }
 .shell[data-sheet='full'][data-dragging] .side,
 .shell[data-sheet='full'][data-closing] .side {
@@ -102,17 +148,45 @@
   }
 }
 .shell[data-sheet='page'] .side__body > .panel {
-  animation: rise 0.22s ease-out;
+  animation: rise 0.28s var(--ease);
 }
 .shell[data-sheet='page'] .side__body > .acct--in {
-  animation: push 0.22s ease-out;
+  animation: push 0.28s var(--ease);
 }
 .shell[data-sheet='page'] .side__body > .acct--back {
-  animation: pop 0.22s ease-out;
+  animation: pop 0.28s var(--ease);
+}
+/* L'onglet choisi : son icône fait un petit saut, on voit où l'on arrive. */
+.tab--on .icon {
+  animation: bounce-in 0.4s var(--ease);
+}
+/* Mon compte : la carte du profil, puis chaque famille, l'une après l'autre. */
+.acct:not(.acct--page) > .acct__card,
+.acct:not(.acct--page) > .acct__group {
+  animation: rise 0.34s var(--ease) backwards;
+}
+.acct:not(.acct--page) > .acct__group:nth-of-type(1) {
+  animation-delay: 0.04s;
+}
+.acct:not(.acct--page) > .acct__group:nth-of-type(2) {
+  animation-delay: 0.08s;
+}
+.acct:not(.acct--page) > .acct__group:nth-of-type(3) {
+  animation-delay: 0.12s;
+}
+/* Le chiffre de l'accueil bat à chaque cran de la règle. */
+.dist__value b {
+  display: inline-block;
+  animation: tick 0.18s var(--ease);
+}
+@keyframes tick {
+  from {
+    transform: scale(1.06);
+  }
 }
 /* Les sorties se rangent l'une après l'autre, les premières d'abord. */
 .list__group {
-  animation: rise 0.24s ease-out backwards;
+  animation: rise 0.3s var(--ease) backwards;
 }
 .list__group:nth-child(2) {
   animation-delay: 0.03s;
@@ -125,31 +199,6 @@
 }
 .list__group:nth-child(n + 5) {
   animation-delay: 0.12s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .runbar,
-  .rcard,
-  .panel .strip,
-  .panel .stats,
-  .notice,
-  .startmenu,
-  .live__paused,
-  .live__alert,
-  .shell[data-sheet='full'] .side,
-  .shell[data-sheet='page'] .side__body > .panel,
-  .list__group {
-    animation: none;
-  }
-  .btn:active,
-  .tool:active,
-  .chip:active,
-  .tab:active,
-  .runctl__side:active,
-  .runctl__main:active,
-  .sportpill:active {
-    transform: none;
-  }
 }
 
 /* L'arrivée : la coche du bilan apparaît d'un petit bond. */
@@ -165,8 +214,40 @@
 .origin__pin--done {
   animation: bounce-in 0.45s ease-out;
 }
+
 @media (prefers-reduced-motion: reduce) {
+  .runbar,
+  .rcard,
+  .notice,
+  .panel .strip,
+  .panel .stats,
+  .panel .block,
+  .loopacts,
+  .startmenu,
+  .live__paused,
+  .live__alert,
+  .shell[data-sheet='full'] .side,
+  .shell[data-sheet='page'] .side__body > .panel,
+  .shell[data-sheet='page'] .side__body > .acct--in,
+  .shell[data-sheet='page'] .side__body > .acct--back,
+  .tab--on .icon,
+  .acct > *,
+  .dist__value b,
+  .field__body,
+  .list__group,
   .origin__pin--done {
     animation: none;
+  }
+  .btn:active,
+  .tool:active,
+  .chip:active,
+  .tab:active,
+  .menu__row:active,
+  .field__toggle:active,
+  .acct__card:active,
+  .runctl__side:active,
+  .runctl__main:active,
+  .sportpill:active {
+    transform: none;
   }
 }
