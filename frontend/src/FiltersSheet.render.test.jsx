@@ -88,15 +88,6 @@ describe('le panneau des filtres', () => {
     expect(onApply.mock.calls[0][0]).toMatchObject({ direction: 'O', safety: 'standard', form: 'laps', avoid: ['known'] })
   })
 
-  it('propose des allures toutes faites, et la sienne', () => {
-    const { onApply } = ouvrir({ ...DEFAULTS, pace_sec_per_km: 360 })
-    expect(screen.getByRole('button', { name: /^Allure/ }).textContent).toContain('Intermédiaire')
-    déplier('Allure')
-    fireEvent.click(screen.getByRole('radio', { name: /Débutant/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
-    expect(onApply.mock.calls[0][0]).toMatchObject({ pace_sec_per_km: 450, speedUnit: 'pace' })
-  })
-
   it('demande un D+ précis à la place des trois réglages', () => {
     // « On ne peut pas demander un D+ en particulier », reprochait-on à RunnrZ.
     const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })

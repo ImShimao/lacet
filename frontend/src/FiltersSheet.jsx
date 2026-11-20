@@ -33,22 +33,6 @@ const RELIEFS = [
   { key: 'hilly', label: 'Côtes', icon: 'hilly', sub: 'Les montées recherchées · 20 m/km et plus' },
 ]
 
-/**
- * Des allures toutes faites, comme chez RunnrZ : on sait se dire « débutant »
- * bien avant de connaître son allure au kilomètre. « Personnalisée » règle la sienne.
- */
-const PACES = {
-  run: [
-    { key: 450, label: 'Débutant', sub: '7:30 /km · 8 km/h' },
-    { key: 360, label: 'Intermédiaire', sub: '6:00 /km · 10 km/h' },
-    { key: 300, label: 'Avancé', sub: '5:00 /km · 12 km/h' },
-  ],
-  bike: [
-    { key: 15, label: 'Balade', sub: '15 km/h' },
-    { key: 22, label: 'Sportif', sub: '22 km/h' },
-    { key: 28, label: 'Rapide', sub: '28 km/h' },
-  ],
-}
 export const SAFETY = [
   { key: 'safe', label: 'Sûr' },
   { key: 'standard', label: 'Standard' },
@@ -305,8 +289,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   const km = draft.mode === 'distance' ? draft.distance_km : estimateKm(draft)
   const climbing = draft.climb_m != null
   const shown = (key) => !(draft.hiddenFilters ?? []).includes(key)
-  // « Personnalisée » est ouverte d'office quand l'allure n'est pas une des toutes faites.
-  const [paceCustom, setPaceCustom] = useState(() => presetOf(value) === null)
 
   return (
     <div className="modal" onClick={onClose}>
@@ -496,53 +478,44 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 6:30 » ne font pas la même sortie, et ça se lit tout de suite. */}
           </Field>
 
-          <Field label={isBike ? 'Vitesse' : 'Allure'} value={paceLabel(draft, usesSpeed)}>
-            <Choices
-              label={isBike ? 'Vitesse' : 'Allure'}
-              options={[...PACES[isBike ? 'bike' : 'run'], { key: 'custom', label: 'Personnalisée', sub: 'Ta propre allure ou vitesse', icon: 'sliders' }]}
-              value={paceCustom ? 'custom' : presetOf(draft)}
-              onChange={(key) => {
-                if (key === 'custom') return setPaceCustom(true)
-                setPaceCustom(false)
-                set(isBike ? { speed_kmh: key, speedUnit: 'speed' } : { pace_sec_per_km: key, speedUnit: 'pace' })
-              }}
-            />
-            {paceCustom && (
-              <div className="field__pace">
-                {!isBike && (
-                  <Segmented
-                    options={[
-                      { key: 'pace', label: 'min/km' },
-                      { key: 'speed', label: 'km/h' },
-                    ]}
-                    value={usesSpeed ? 'speed' : 'pace'}
-                    onChange={(speedUnit) => set({ speedUnit })}
-                  />
-                )}
-                {usesSpeed ? (
-                  <Stepper
-                    text={`${formatKm(draft.speed_kmh)} km/h`}
-                    onStep={(d) => set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })}
-                    canDown={draft.speed_kmh > 5}
-                    canUp={draft.speed_kmh < 60}
-                  />
-                ) : (
-                  <Stepper
-                    text={`${pace(draft.pace_sec_per_km)} /km`}
-                    onStep={(d) => set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })}
-                    canDown={draft.pace_sec_per_km > 150}
-                    canUp={draft.pace_sec_per_km < 1200}
-                  />
-                )}
-              </div>
-            )}
-            <p className="field__hint">
-              {draft.mode === 'duration'
-                ? 'Ne change pas le tracé : elle convertit la durée en distance.'
-                : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
-                    Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
-                  )} pour cette boucle.`}
-            </p>
+          <Field
+            label={isBike ? 'Vitesse' : 'Allure'}
+            value={usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`}
+          >
+            <div className="field__pace">
+              {!isBike && (
+                <Segmented
+                  options={[
+                    { key: 'pace', label: 'min/km' },
+                    { key: 'speed', label: 'km/h' },
+                  ]}
+                  value={usesSpeed ? 'speed' : 'pace'}
+                  onChange={(speedUnit) => set({ speedUnit })}
+                />
+              )}
+              {usesSpeed ? (
+                <Stepper
+                  text={`${formatKm(draft.speed_kmh)} km/h`}
+                  onStep={(d) => set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })}
+                  canDown={draft.speed_kmh > 5}
+                  canUp={draft.speed_kmh < 60}
+                />
+              ) : (
+                <Stepper
+                  text={`${pace(draft.pace_sec_per_km)} /km`}
+                  onStep={(d) => set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })}
+                  canDown={draft.pace_sec_per_km > 150}
+                  canUp={draft.pace_sec_per_km < 1200}
+                />
+              )}
+              <p className="field__hint">
+                {draft.mode === 'duration'
+                  ? 'Ne change pas le tracé : elle convertit la durée en distance.'
+                  : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
+                      Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
+                    )} pour cette boucle.`}
+              </p>
+            </div>
           </Field>
 
           {shown('terrain') && (
@@ -630,19 +603,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
       </div>
     </div>
   )
-}
-
-/** L'allure toute faite qui correspond au réglage, ou `null`. */
-function presetOf(params) {
-  const bike = params.sport === 'bike'
-  const v = bike ? params.speed_kmh : params.speedUnit === 'speed' ? null : params.pace_sec_per_km
-  return PACES[bike ? 'bike' : 'run'].find((p) => p.key === v)?.key ?? null
-}
-
-function paceLabel(draft, usesSpeed) {
-  const preset = PACES[draft.sport === 'bike' ? 'bike' : 'run'].find((p) => p.key === presetOf(draft))
-  const value = usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`
-  return preset ? `${preset.label} · ${value}` : value
 }
 
 /**
