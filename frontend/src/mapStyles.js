@@ -306,7 +306,8 @@ export const MAP_STYLES = [
   },
   {
     key: 'osm',
-    label: 'OpenStreetMap',
+    // « OpenStreetMap » ne tenait pas sous sa vignette, dans le choix du fond.
+    label: 'OSM',
     swatch: '#aad3df',
     contrast: 'light',
     description: "Le rendu du site OpenStreetMap, celui des contributeurs. Ne se garde pas hors ligne : OpenStreetMap l'interdit.",

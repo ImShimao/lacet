@@ -141,87 +141,147 @@
   background: var(--accent-soft);
 }
 
-/* Le choix du fond de carte, comme la feuille de RunnrZ : le fond en grand,
-   les fonds en onglets qui défilent, une phrase, « Enregistrer » à droite. */
+/* Le choix du fond de carte, comme le sélecteur de fonds d'Apple Plans : le
+   fond choisi en grand, tous les fonds en vignettes, « Enregistrer » en bas. */
 .mapsheet {
-  gap: 14px;
-  padding: 16px 16px calc(16px + var(--safe-bottom, env(safe-area-inset-bottom)));
+  gap: 12px;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.mapsheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mapsheet__head h2 {
+  margin: 0;
+  font-size: calc(20px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .mapsheet__close {
-  align-self: flex-start;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex: none;
   border-radius: 50%;
   background: var(--surface-2);
-  border: 1px solid var(--line);
-  color: var(--text);
+  color: var(--text-2);
 }
 .mapsheet__preview {
   position: relative;
-  height: min(44vh, 340px);
+  height: min(30vh, 230px);
   flex: none;
-  border-radius: 22px;
+  border-radius: 20px;
   overflow: hidden;
-  border: 1px solid var(--line);
   background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent);
 }
-/* Une piste d'onglets, comme un sélecteur segmenté d'iOS, qui défile. */
-.mapsheet__tabs {
-  display: flex;
-  gap: 4px;
-  flex: none;
-  padding: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-radius: 14px;
-  background: var(--surface-2);
-  scroll-snap-type: x proximity;
-}
-.mapsheet__tabs::-webkit-scrollbar {
-  display: none;
-}
-.mapsheet__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: none;
-  min-height: 38px;
-  padding: 0 14px;
-  border-radius: 10px;
-  white-space: nowrap;
-  scroll-snap-align: center;
-  font-size: calc(14px * var(--text-scale));
-  font-weight: 500;
-  color: var(--text-2);
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-.mapsheet__tab[aria-checked='true'] {
-  color: var(--text);
-  background: var(--surface-3);
-  box-shadow: 0 1px 4px var(--shadow-soft);
-}
-.mapsheet__tab i {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+.mapsheet__badge {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 10px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
+  color: #fff;
+  background: rgba(10, 9, 16, 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .mapsheet__desc {
-  margin: 0;
+  margin: -2px 2px 2px;
   min-height: 2.8em;
-  text-align: center;
-  font-size: calc(14px * var(--text-scale));
+  font-size: calc(13.5px * var(--text-scale));
   line-height: 1.4;
   color: var(--text-2);
 }
+/* Quatre vignettes par ligne : huit fonds tiennent en deux rangées, sans rien
+   cacher derrière le bord de l'écran. */
+.mapsheet__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+.mapsheet__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mapsheet__thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+.mapsheet__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: fade 0.3s ease-out;
+}
+.mapsheet__tile:active .mapsheet__thumb {
+  transform: scale(0.95);
+}
+.mapsheet__tile[aria-checked='true'] .mapsheet__thumb {
+  box-shadow:
+    0 0 0 2.5px var(--accent),
+    0 6px 18px var(--accent-glow);
+}
+.mapsheet__check {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  padding: 3px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  color: var(--on-accent);
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s var(--ease);
+}
+.mapsheet__tile[aria-checked='true'] .mapsheet__check {
+  opacity: 1;
+  transform: none;
+}
+/* Sur deux lignes au besoin : « Mapbox satellite » ne tient pas sous une vignette. */
+.mapsheet__name {
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.2;
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 500;
+  color: var(--text-2);
+}
+.mapsheet__tile[aria-checked='true'] .mapsheet__name {
+  color: var(--text);
+  font-weight: 600;
+}
 .mapsheet__save {
-  align-self: flex-end;
-  min-width: 140px;
+  width: 100%;
+  margin-top: 4px;
+}
+.mapsheet__offscreen {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 200px;
+  height: 200px;
 }
 
 /* La fiche d'explication : monte du bas comme une feuille, au-dessus de tout. */
