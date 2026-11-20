@@ -3,7 +3,7 @@ import Icon, { SolidIcon } from './Icon.jsx'
 import { downloadRun } from './api'
 import { duration, km, pace } from './format'
 import AscentNote from './AscentNote.jsx'
-import { Climb, Feeling, PlanGap, Splits, Standing, whenLabel } from './RunDetail.jsx'
+import { Climb, Feeling, PlanGap, SlopePace, Splits, Standing, whenLabel } from './RunDetail.jsx'
 import { distanceRecords, records, standing } from './knownRoutes'
 import { energy } from './Library.jsx'
 import { announcing, arrivalText, contactOf, textTo } from './contact'
@@ -149,6 +149,8 @@ export default function RunSummary({
       {rang && <Standing rang={rang} bike={bike} />}
 
       {splits && <Splits splits={splits} bike={bike} entry={entry} />}
+
+      <SlopePace entry={entry} bike={bike} />
 
       <Climb entry={entry} />
 

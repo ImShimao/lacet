@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climbProfile, paceBands } from './runTrace'
+import { climbProfile, paceBands, paceBySlope } from './runTrace'
 
 /**
  * Ce que l'écran de fin tire d'une trace horodatée : l'allure de chaque
@@ -61,5 +61,45 @@ describe('le profil monté', () => {
     expect(climbProfile(droite(101), Array(101).fill(250.4), 320, 64)).toBeNull()
     expect(climbProfile(droite(101), Array(101).fill(null), 320, 64)).toBeNull()
     expect(climbProfile(droite(101), undefined, 320, 64)).toBeNull()
+  })
+})
+
+/**
+ * L'allure selon la pente : la montée se court plus lentement que le plat, et
+ * une pente faible ne compte pas comme une côte.
+ */
+describe('l’allure selon la pente', () => {
+  // Une ligne droite de cent points, à trois mètres par seconde.
+  const droite = (pente) => {
+    const track = []
+    const times = []
+    const alts = []
+    for (let i = 0; i < 100; i += 1) {
+      track.push([7.2 + i * pas, 47.9])
+      times.push(i * (10 / 3))
+      alts.push(100 + i * 10 * pente)
+    }
+    return { track, times, alts }
+  }
+
+  it('range la montée à part, et ne donne pas d’allure aux classes vides', () => {
+    const { track, times, alts } = droite(0.06)
+    const allure = paceBySlope(track, times, alts)
+    expect(allure.up).toBeCloseTo(333.3, 0)
+    expect(allure.flat).toBeNull()
+    expect(allure.down).toBeNull()
+  })
+
+  it('compte le plat quand la pente reste sous trois pour cent', () => {
+    const { track, times, alts } = droite(0.01)
+    const allure = paceBySlope(track, times, alts)
+    expect(allure.flat).toBeCloseTo(333.3, 0)
+    expect(allure.up).toBeNull()
+  })
+
+  it('ne dit rien sans altitudes ni heures', () => {
+    const { track, times } = droite(0.06)
+    expect(paceBySlope(track, times, null)).toBeNull()
+    expect(paceBySlope(track, null, droite(0.06).alts)).toBeNull()
   })
 })

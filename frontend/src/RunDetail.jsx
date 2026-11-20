@@ -4,7 +4,7 @@ import { downloadRun } from './api'
 import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
-import { climbProfile } from './runTrace'
+import { climbProfile, paceBySlope } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
 
 /**
@@ -97,6 +97,8 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
       {rang && <Standing rang={rang} bike={bike} />}
 
       {splits && <Splits splits={splits} bike={bike} entry={entry} />}
+
+      <SlopePace entry={entry} bike={bike} />
 
       <Climb entry={entry} />
 
@@ -465,4 +467,38 @@ export function whenLabel(iso) {
   const jour = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   const heure = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ')
   return `${jour.charAt(0).toUpperCase()}${jour.slice(1)}, ${heure}`
+}
+
+/**
+ * L'allure en montée, sur le plat et en descente. Une sortie qui grimpe ne se
+ * juge pas à sa moyenne : cinq minutes au kilomètre en côte, c'est une bonne
+ * sortie. Rien à montrer sans heures et altitudes, ou sans assez de chaque pente.
+ */
+export function SlopePace({ entry, bike = false }) {
+  const allure = useMemo(() => paceBySlope(entry.track, entry.track_t, entry.track_alt), [entry.track, entry.track_t, entry.track_alt])
+  if (!allure) return null
+  const value = (seconds) => {
+    if (!Number.isFinite(seconds)) return '—'
+    return bike ? `${(3600 / seconds).toFixed(1).replace('.', ',')} km/h` : `${pace(seconds)} /km`
+  }
+  const rows = [
+    ['Montée', allure.up],
+    ['Plat', allure.flat],
+    ['Descente', allure.down],
+  ]
+  return (
+    <div className="slope">
+      <div className="slope__head">
+        <span className="label">{bike ? 'Vitesse selon la pente' : 'Allure selon la pente'}</span>
+      </div>
+      <div className="slope__rows">
+        {rows.map(([label, seconds]) => (
+          <div key={label} className="slope__row">
+            <span>{label}</span>
+            <b>{seconds === null ? '—' : value(seconds)}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }

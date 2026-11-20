@@ -94,3 +94,47 @@ export function climbProfile(track, alts, width, height, pad = 4) {
     topM: top[0],
   }
 }
+
+// Une pente se lit sur cinquante mètres : en dessous, le bruit de l'altitude
+// (un GPS qui tremble de un mètre) ferait passer du plat pour une côte.
+const SLOPE_BLOCK_M = 50
+// Au-delà de trois pour cent, on monte ou on descend ; en deçà, c'est du plat.
+const SLOPE_FLAT = 0.03
+// Une classe n'a son allure qu'avec deux cents mètres : sinon, la moyenne d'un
+// tronçon de trente mètres dirait une allure qu'on n'a pas vraiment tenue.
+const SLOPE_MIN_M = 200
+
+/**
+ * L'allure en montée, sur le plat et en descente : `{ up, flat, down }`, chacune
+ * en secondes au kilomètre, ou `null` sans assez de tronçon de cette pente.
+ * Rend `null` si la trace n'a ni ses heures ni ses altitudes.
+ */
+export function paceBySlope(track, times, alts) {
+  if (!(track?.length > 2) || times?.length !== track.length || alts?.length !== track.length) return null
+  const sum = { up: { s: 0, m: 0 }, flat: { s: 0, m: 0 }, down: { s: 0, m: 0 } }
+  let m = 0
+  let s = 0
+  let dh = 0
+  for (let i = 1; i < track.length; i += 1) {
+    const [a, b] = [times[i - 1], times[i]]
+    const metres = haversine(track[i - 1], track[i])
+    const dt = b - a
+    // Un arrêt ne se mesure pas en pente : feu, pause, attente.
+    if (!Number.isFinite(a) || !Number.isFinite(b) || dt <= 0 || metres / dt < STOPPED_MS) continue
+    if (!Number.isFinite(alts[i]) || !Number.isFinite(alts[i - 1])) continue
+    m += metres
+    s += dt
+    dh += alts[i] - alts[i - 1]
+    if (m < SLOPE_BLOCK_M) continue
+    const grade = dh / m
+    const key = grade >= SLOPE_FLAT ? 'up' : grade <= -SLOPE_FLAT ? 'down' : 'flat'
+    sum[key].s += s
+    sum[key].m += m
+    m = 0
+    s = 0
+    dh = 0
+  }
+  const pace = (k) => (sum[k].m >= SLOPE_MIN_M ? (sum[k].s / sum[k].m) * 1000 : null)
+  const out = { up: pace('up'), flat: pace('flat'), down: pace('down') }
+  return out.up === null && out.flat === null && out.down === null ? null : out
+}

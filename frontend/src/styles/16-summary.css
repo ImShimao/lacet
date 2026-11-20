@@ -377,3 +377,30 @@
 .sharesheet .modal__foot .btn {
   flex: 1;
 }
+
+/* L'allure selon la pente : trois lignes, la montée d'abord. */
+.slope {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.slope__head {
+  margin-bottom: 8px;
+}
+.slope__rows {
+  display: grid;
+  gap: 6px;
+}
+.slope__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: calc(14px * var(--text-scale));
+  color: var(--text-2);
+}
+.slope__row b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
