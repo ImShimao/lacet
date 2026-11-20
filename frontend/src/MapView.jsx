@@ -5,7 +5,7 @@ import { loadOptions, mapToken, styleByKey, traceColors } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
-import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt } from './routeDraw'
+import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, profilePath, slopeAt } from './routeDraw'
 import { km } from './format'
 import { useAppearance } from './appearance'
 
@@ -581,8 +581,18 @@ export default function MapView({
       const box = hud.current
       if (!box) return
       box.querySelector('[data-km]').textContent = km(d, 1)
-      const ele = profileAt(route.elevation_profile, (d / total) * (route.elevation_profile?.at(-1)?.dist_m ?? total))
-      box.querySelector('[data-ele]').textContent = ele == null ? '' : `${Math.round(ele)} m`
+      const profile = route.elevation_profile
+      const along = (d / total) * (profile?.at(-1)?.dist_m ?? total)
+      const ele = profileAt(profile, along)
+      box.querySelector('[data-ele]').textContent = ele == null ? '—' : `${Math.round(ele)} m`
+      // La pente du moment, sur 100 m : c'est elle qui dit, en survolant, à
+      // quel kilomètre ça monte et où ça redescend.
+      const slope = slopeAt(profile, along)
+      const flat = slope == null || Math.abs(slope) < 1
+      box.querySelector('[data-slope]').textContent =
+        slope == null ? '—' : flat ? 'Plat' : `${slope > 0 ? '↗' : '↘'} ${Math.round(Math.abs(slope))} %`
+      box.dataset.trend = flat ? 'flat' : slope > 0 ? 'up' : 'down'
+      box.style.setProperty('--p', String(d / total))
       box.dataset.paused = String(paused)
     }
 
@@ -769,15 +779,7 @@ export default function MapView({
   return (
     <>
       <div ref={container} className="map" />
-      {flyover && (
-        <div className="flyhud" ref={hud} data-paused="false">
-          <span className="flyhud__km">
-            <b data-km>0,0</b> km
-          </span>
-          <span className="flyhud__ele" data-ele />
-          <span className="flyhud__hint">En pause · touche pour reprendre</span>
-        </div>
-      )}
+      {flyover && <FlyHud hud={hud} profile={route?.elevation_profile} />}
       {navigate && !locked && (
         <button
           className="recenter"
@@ -1285,4 +1287,49 @@ function ghostToGeoJson(routes, active) {
         geometry: { type: 'LineString', coordinates: r.geometry },
       })),
   }
+}
+
+/**
+ * Le tableau du survol 3D, en bas comme chez Roovr : la distance, l'altitude
+ * et la pente au point atteint, puis la courbe d'altitude de toute la boucle,
+ * remplie jusqu'où l'on en est. Mis à jour à chaque image par l'effet du
+ * survol (`--p`, `data-*`), sans rendu React : soixante rendus par seconde
+ * pour trois nombres seraient du gâchis.
+ */
+function FlyHud({ hud, profile }) {
+  const chart = profilePath(profile)
+  return (
+    <div className="flyhud" ref={hud} data-paused="false" data-trend="flat">
+      <div className="flyhud__stats">
+        <span>
+          <em>Distance</em>
+          <b>
+            <span data-km>0,0</span> <small>km</small>
+          </b>
+        </span>
+        <span>
+          <em>Altitude</em>
+          <b data-ele>—</b>
+        </span>
+        <span className="flyhud__slope">
+          <em>Pente</em>
+          <b data-slope>—</b>
+        </span>
+      </div>
+      {chart && (
+        <div className="flyhud__chart" aria-hidden="true">
+          <svg viewBox="0 0 1000 60" preserveAspectRatio="none">
+            <path d={chart.area} className="flyhud__area" />
+            <path d={chart.line} className="flyhud__line" vectorEffect="non-scaling-stroke" />
+          </svg>
+          <svg viewBox="0 0 1000 60" preserveAspectRatio="none" className="flyhud__done">
+            <path d={chart.area} className="flyhud__area flyhud__area--done" />
+            <path d={chart.line} className="flyhud__line flyhud__line--done" vectorEffect="non-scaling-stroke" />
+          </svg>
+          <i className="flyhud__cursor" />
+        </div>
+      )}
+      <span className="flyhud__hint">En pause · touche la carte pour reprendre</span>
+    </div>
+  )
 }

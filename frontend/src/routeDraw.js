@@ -113,6 +113,36 @@ export function profileAt(profile, metres) {
 }
 
 /**
+ * Le profil d'altitude en courbe SVG, dans `width` × `height` : le trait
+ * (`line`) et l'aire sous lui (`area`), le point bas au pied du cadre et le
+ * haut à 10 % du bord. `null` sans profil. Sert à la courbe du survol 3D.
+ */
+export function profilePath(profile, width = 1000, height = 60) {
+  if (!(profile?.length > 1)) return null
+  const total = profile.at(-1).dist_m || 1
+  const eles = profile.map((p) => p.ele_m)
+  const lo = Math.min(...eles)
+  // Au moins 10 m d'écart : une boucle plate ne doit pas se dessiner en montagnes.
+  const span = Math.max(10, Math.max(...eles) - lo)
+  const xy = profile.map((p) => [
+    Math.round((p.dist_m / total) * width * 10) / 10,
+    Math.round((height - ((p.ele_m - lo) / span) * height * 0.9) * 10) / 10,
+  ])
+  const line = 'M' + xy.map(([x, y]) => `${x} ${y}`).join('L')
+  return { line, area: `${line}L${width} ${height}L0 ${height}Z` }
+}
+
+/** La pente en % autour de `metres` (sur 100 m), `null` sans profil. */
+export function slopeAt(profile, metres, window = 100) {
+  if (!(profile?.length > 1)) return null
+  const total = profile.at(-1).dist_m
+  const a = Math.max(0, metres - window / 2)
+  const b = Math.min(total, metres + window / 2)
+  if (b - a < 1) return 0
+  return ((profileAt(profile, b) - profileAt(profile, a)) / (b - a)) * 100
+}
+
+/**
  * La trace d'une sortie en croquis SVG, cadrée dans `width` × `height` : le
  * chemin `d` d'un `<path>`, et le point de départ. `null` sans trace.
  */

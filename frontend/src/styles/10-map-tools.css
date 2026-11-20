@@ -164,49 +164,116 @@
   }
 }
 
-/* Le compteur du survol : les kilomètres et l'altitude au point atteint, en
-   haut, là où était la recherche, qui s'efface pendant le survol. */
+/* Le tableau du survol, en bas, là où était le panneau, qui s'efface pendant
+   le survol : trois chiffres, puis la courbe d'altitude remplie jusqu'au
+   point atteint. `--p` (0 → 1) est posé à chaque image par `MapView`. */
 .flyhud {
+  --p: 0;
   position: fixed;
-  top: calc(env(safe-area-inset-top) + 14px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
   z-index: 5;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: baseline;
-  gap: 2px 12px;
-  padding: 9px 18px;
-  border-radius: 22px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 12px;
+  border-radius: 20px;
   background: var(--glass);
-  border: 1px solid var(--accent-line);
-  box-shadow: 0 6px 20px var(--shadow-soft);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px var(--shadow-soft);
   color: var(--text);
-  font-family: var(--mono);
-  font-size: calc(14px * var(--text-scale));
-  white-space: nowrap;
   pointer-events: none;
-  animation: fade 0.3s ease-out;
+  animation: flyhud-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.flyhud__km b {
-  font-family: var(--display);
-  font-size: calc(22px * var(--text-scale));
+@keyframes flyhud-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+.flyhud__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.flyhud__stats > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.flyhud__stats em {
+  font-style: normal;
+  font-family: var(--eyebrow);
+  font-size: calc(9.5px * var(--text-scale));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.flyhud__stats b {
+  font-size: calc(21px * var(--text-scale));
   font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.flyhud__ele {
-  color: var(--accent-text);
+.flyhud__stats small {
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 600;
+  color: var(--text-3);
 }
-.flyhud__ele:empty {
-  display: none;
+/* La pente prend la couleur de ce qui vient : rouge qui monte, vert qui descend. */
+.flyhud[data-trend='up'] .flyhud__slope b {
+  color: var(--risk);
+}
+.flyhud[data-trend='down'] .flyhud__slope b {
+  color: var(--safe);
+}
+.flyhud__chart {
+  position: relative;
+  height: 54px;
+}
+.flyhud__chart svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.flyhud__area {
+  fill: var(--surface-3);
+}
+.flyhud__line {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1.5;
+}
+/* Le parcouru : la même courbe, en couleur, découpée jusqu'au point atteint. */
+.flyhud__done {
+  clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0);
+}
+.flyhud__area--done {
+  fill: var(--accent-soft);
+}
+.flyhud__line--done {
+  stroke: var(--accent-text);
+  stroke-width: 2.5;
+}
+.flyhud__cursor {
+  position: absolute;
+  top: -4px;
+  bottom: 0;
+  left: calc(var(--p) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 .flyhud__hint {
   display: none;
-  flex-basis: 100%;
   text-align: center;
   color: var(--text-2);
-  font-family: inherit;
   font-size: calc(12px * var(--text-scale));
 }
 .flyhud[data-paused='true'] .flyhud__hint {

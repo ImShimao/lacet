@@ -1,6 +1,6 @@
 /** Le tracé qui se dessine s'arrête au bon endroit, dans le bon tronçon, et finit entier. */
 import { describe, expect, it } from 'vitest'
-import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, sketch } from './routeDraw'
+import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, profilePath, sketch, slopeAt } from './routeDraw'
 
 const line = (coordinates, level = 'safe') => ({
   type: 'Feature',
@@ -83,5 +83,24 @@ describe('le croquis par allure', () => {
       [0, 'M0 0L1 0L2 0'],
       [4, 'M3 0L4 0'],
     ])
+  })
+})
+
+describe('la courbe d’altitude du survol', () => {
+  const profil = [
+    { dist_m: 0, ele_m: 200 },
+    { dist_m: 500, ele_m: 250 },
+    { dist_m: 1000, ele_m: 200 },
+  ]
+
+  it('pose le point bas au pied et le haut à 10 % du bord', () => {
+    expect(profilePath(profil, 100, 60).line).toBe('M0 60L50 6L100 60')
+    expect(profilePath([{ dist_m: 0, ele_m: 1 }])).toBeNull()
+  })
+
+  it('dit la pente en direct : 10 % qui monte, puis qui descend', () => {
+    expect(slopeAt(profil, 250)).toBeCloseTo(10)
+    expect(slopeAt(profil, 750)).toBeCloseTo(-10)
+    expect(slopeAt(null, 10)).toBeNull()
   })
 })
