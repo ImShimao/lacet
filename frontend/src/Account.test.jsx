@@ -40,6 +40,13 @@ function Ecran() {
   )
 }
 
+/** Une ligne de réglage ouvre son menu ; on y touche le choix. */
+function choisir(ligne, choix) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + ligne) }))
+  fireEvent.click(screen.getByRole('option', { name: choix }))
+}
+const interrupteur = (nom) => screen.getByRole('switch', { name: new RegExp('^' + nom) })
+
 describe('Mon compte', () => {
   afterEach(() => cleanup())
 
@@ -116,26 +123,49 @@ describe('Mon compte', () => {
         />,
       )
     page()
-    fireEvent.click(screen.getByRole('button', { name: 'Tous les 2 km' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Temps du km' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Temps couru' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plus tôt' }))
-    expect(voiceSettings()).toEqual({ km: 2, lap: false, pace: true, total: true, target: true, lead: 'early' })
+    choisir('Kilomètres', 'Tous les 2 km')
+    fireEvent.click(interrupteur('Temps du km'))
+    fireEvent.click(interrupteur('Temps couru'))
+    choisir('Anticipation des instructions', /^Tôt/)
+    choisir('Débit', 'Rapide')
+    expect(voiceSettings()).toMatchObject({ km: 2, lap: false, pace: true, total: true, target: true, lead: 'early', rate: 'fast' })
 
     // L'écart à l'allure visée se coupe à part, sans toucher aux kilomètres.
-    fireEvent.click(screen.getByRole('button', { name: 'Non' }))
+    fireEvent.click(interrupteur("Écart à l'allure"))
     expect(voiceSettings()).toMatchObject({ km: 2, target: false })
 
     // Rouverte, la page montre ce qui a été gardé.
     cleanup()
     page()
-    expect(screen.getByRole('button', { name: 'Tous les 2 km' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Temps du km' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: /^Kilomètres/ }).textContent).toContain('Tous les 2 km')
+    expect(interrupteur('Temps du km').getAttribute('aria-checked')).toBe('false')
 
     // Kilomètres tus : ce qu'ils diraient n'a plus à se régler.
-    fireEvent.click(screen.getByRole('button', { name: 'Jamais' }))
-    expect(screen.queryByRole('button', { name: 'Allure' })).toBeNull()
+    choisir('Kilomètres', 'Jamais')
+    expect(screen.queryByRole('switch', { name: /^Allure/ })).toBeNull()
     expect(voiceSettings().km).toBe(0)
+    localStorage.clear()
+  })
+
+  it('coupe le recalcul et l’arrêt automatiques', () => {
+    localStorage.clear()
+    render(
+      <Account
+        page="run"
+        params={DEFAULTS}
+        geo={{ status: 'idle' }}
+        history={[]}
+        poiPrefs={{}}
+        onPoiPrefs={() => {}}
+        onProfile={() => {}}
+        onClearData={async () => {}}
+        onRestored={() => {}}
+      />,
+    )
+    expect(interrupteur('Recalcul automatique').getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(interrupteur('Recalcul automatique'))
+    fireEvent.click(interrupteur("Arrêt automatique à l'arrivée"))
+    expect(load()).toMatchObject({ autoReroute: false, autoFinish: false })
     localStorage.clear()
   })
 
@@ -157,16 +187,16 @@ describe('Mon compte', () => {
       )
     page({ ...DEFAULTS, surface: 'trail', carfree: false })
     // La longueur ne se décoche pas : sans elle, pas de recherche.
-    expect(screen.getByRole('checkbox', { name: /Longueur et allure/ }).disabled).toBe(true)
+    expect(screen.getByText(/La longueur et l'allure y restent toujours/)).toBeTruthy()
 
     // Un « Sentier » masqué ne doit pas continuer d'agir sans qu'on le voie.
-    fireEvent.click(screen.getByRole('checkbox', { name: /Terrain/ }))
+    fireEvent.click(screen.getByRole('switch', { name: /^Terrain/ }))
     expect(onProfile).toHaveBeenLastCalledWith({ hiddenFilters: ['terrain'], surface: 'mixed', carfree: true })
 
     // Masqué, la case dit la valeur qui s'applique ; recochée, elle réapparaît.
     cleanup()
     page({ ...DEFAULTS, hiddenFilters: ['terrain'] })
-    const terrain = screen.getByRole('checkbox', { name: /Terrain/ })
+    const terrain = screen.getByRole('switch', { name: /^Terrain/ })
     expect(terrain.getAttribute('aria-checked')).toBe('false')
     expect(terrain.textContent).toContain('Masqué. Mixte')
     fireEvent.click(terrain)
@@ -188,8 +218,8 @@ describe('Mon compte', () => {
         onRestored={() => {}}
       />,
     )
-    expect(screen.getByRole('radio', { name: 'Toujours allumé' }).getAttribute('aria-checked')).toBe('true')
-    fireEvent.click(screen.getByRole('radio', { name: 'Veille normale' }))
+    expect(interrupteur('Écran toujours allumé').getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(interrupteur('Écran toujours allumé'))
     expect(load().keepScreenOn).toBe(false)
     localStorage.clear()
   })
@@ -210,13 +240,37 @@ describe('Mon compte', () => {
         onRestored={() => {}}
       />,
     )
-    // Replié en une ligne qui dit déjà le choix : « Côté de la route · Gauche ».
+    // Une ligne qui dit déjà le choix : « Côté de la route · Gauche », et pourquoi.
     const ligne = screen.getByRole('button', { name: /^Côté de la route/ })
     expect(ligne.textContent).toContain('Gauche')
     fireEvent.click(ligne)
     expect(screen.getByText(/R412-36/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Gauche' }).getAttribute('aria-pressed')).toBe('true')
-    fireEvent.click(screen.getByRole('button', { name: 'Droite' }))
+    expect(screen.getByRole('option', { name: /^Gauche/ }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('option', { name: 'Droite' }))
     expect(onProfile).toHaveBeenCalledWith({ side: 'right' })
+  })
+
+  it('règle la direction, la forme et ce qu’on évite une fois pour toutes', () => {
+    const onProfile = vi.fn()
+    render(
+      <Account
+        page="search"
+        params={DEFAULTS}
+        geo={{ status: 'idle' }}
+        history={[]}
+        poiPrefs={{}}
+        onPoiPrefs={() => {}}
+        onProfile={onProfile}
+        onClearData={async () => {}}
+        onRestored={() => {}}
+      />,
+    )
+    // « NE » se lit « Nord-est » : deux lettres ne disent rien.
+    choisir('Direction', 'Nord-est')
+    expect(onProfile).toHaveBeenLastCalledWith({ direction: 'NE' })
+    choisir('Forme', /^Deux boucles/)
+    expect(onProfile).toHaveBeenLastCalledWith({ form: 'eight' })
+    fireEvent.click(interrupteur('Boucles déjà courues'))
+    expect(onProfile).toHaveBeenLastCalledWith({ avoid: ['known'] })
   })
 })

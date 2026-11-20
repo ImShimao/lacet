@@ -224,6 +224,8 @@ const PATHS = {
   minus: <path d="M5.5 12h13" />,
   chevronDown: <path d="m6.5 9.5 5.5 5.5 5.5-5.5" />,
   chevronUp: <path d="m6.5 14.5 5.5-5.5 5.5 5.5" />,
+  // Le choix qui s'ouvre en menu, comme les boutons à menu d'iOS.
+  updown: <path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4" />,
   chevronLeft: <path d="m14.5 6.5-5.5 5.5 5.5 5.5" />,
   chevronRight: <path d="m9.5 6.5 5.5 5.5-5.5 5.5" />,
 

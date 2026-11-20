@@ -77,8 +77,10 @@ SHAPES = (3, 4, 5, 6)
 
 # Orientations essayées par forme. Le départ étant un sommet, faire tourner le
 # polygone autour de lui donne à chaque fois une boucle réellement différente :
-# l'intervalle à balayer est le tour complet, pas une fraction.
-ORIENTATIONS = 8
+# l'intervalle à balayer est le tour complet, pas une fraction. Plafonnées
+# par `sectors // 2` : huit pour une recherche ordinaire (16 secteurs), douze
+# quand on demande plus de douze propositions (`wide_settings`).
+ORIENTATIONS = 12
 
 # Quand le relief est connu, on essaie trois fois plus d'orientations, et l'on
 # trace d'abord celles dont les points de passage vont au terrain demandé. Le

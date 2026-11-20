@@ -52,6 +52,12 @@ function page(key) {
   )
 }
 
+/** Une ligne de réglage ouvre son menu ; on y touche le choix. */
+function choisir(ligne, choix) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + ligne) }))
+  fireEvent.click(screen.getByRole('option', { name: choix }))
+}
+
 describe('Apparence', () => {
   beforeEach(() => {
     wipe()
@@ -70,14 +76,15 @@ describe('Apparence', () => {
 
   it('applique chaque choix au toucher et le garde', () => {
     page('appearance')
-    fireEvent.click(screen.getByRole('button', { name: 'Sombre' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Violet' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Grande' }))
+    choisir('Thème', 'Sombre')
+    choisir("Couleur d'accent", 'Violet')
+    choisir('Taille du texte', 'Grande')
 
     expect(root.dataset.theme).toBe('dark')
     expect(root.dataset.accent).toBe('violet')
     expect(root.dataset.text).toBe('large')
-    expect(screen.getByRole('radio', { name: 'Violet' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: /^Couleur d'accent/ }))
+    expect(screen.getByRole('option', { name: 'Violet' }).getAttribute('aria-selected')).toBe('true')
     expect(load().appearance).toEqual({ accent: 'violet', theme: 'dark', text: 'large' })
 
     // Au lancement suivant, le choix revient du magasin.
@@ -93,14 +100,14 @@ describe('Apparence', () => {
     expect(root.dataset.theme).toBe('light')
 
     page('appearance')
-    fireEvent.click(screen.getByRole('button', { name: 'Sombre' }))
+    choisir('Thème', 'Sombre')
     setOs(true)
     expect(root.dataset.theme).toBe('dark')
   })
 
   it('repart à zéro avec « Tout effacer »', () => {
     page('appearance')
-    fireEvent.click(screen.getByRole('radio', { name: 'Graphite' }))
+    choisir("Couleur d'accent", 'Graphite')
     expect(root.dataset.accent).toBe('graphite')
 
     wipe()

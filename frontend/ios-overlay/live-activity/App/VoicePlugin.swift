@@ -31,6 +31,7 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "speak", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "voices", returnType: CAPPluginReturnPromise),
     ]
 
     // Le temps laissé à la musique pour baisser avant le premier mot, et au
@@ -70,9 +71,13 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             }
             self.lowerOthers()
             let utterance = AVSpeechUtterance(string: text)
-            utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
-            // Le débit d'avant, à l'identique : un peu au-dessus du débit par défaut.
-            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.01
+            // La voix choisie dans les réglages (`voices`), sinon celle du système.
+            let chosen = call.getString("voice").flatMap { AVSpeechSynthesisVoice(identifier: $0) }
+            utterance.voice = chosen ?? AVSpeechSynthesisVoice(language: "fr-FR")
+            // Le débit d'avant, un peu au-dessus du défaut, multiplié par celui
+            // des réglages (0,85 lent, 1 normal, 1,15 rapide).
+            let rate = Float(call.getDouble("rate") ?? 1)
+            utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * 1.01 * rate)
             utterance.preUtteranceDelay = VoicePlugin.leadIn
             self.synthesizer.speak(utterance)
             call.resolve()
@@ -88,6 +93,22 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             self.scheduleRestore(after: 0.1)
             call.resolve()
         }
+    }
+
+    /// Les voix françaises installées sur l'iPhone, les meilleures d'abord.
+    @objc func voices(_ call: CAPPluginCall) {
+        let list = AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("fr") }
+            .sorted { $0.quality.rawValue > $1.quality.rawValue }
+            .map { voice -> [String: Any] in
+                [
+                    "id": voice.identifier,
+                    "name": voice.name,
+                    "language": voice.language,
+                    "enhanced": voice.quality != .default,
+                ]
+            }
+        call.resolve(["voices": list])
     }
 
     // === la musique =============================================================

@@ -1,0 +1,97 @@
+/* La marque, et l'ouverture de l'app (`Logo.jsx`, `Launch.jsx`). */
+
+.logo__loop {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logo__ring {
+  fill: var(--bg);
+}
+.logo__dot {
+  fill: #fff;
+}
+
+/* Le fond est celui de l'écran de lancement d'iOS (`capacitor.config.json`),
+   pas celui du thème : c'est lui qu'on vient de quitter. */
+.launch {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  background: #0a0910;
+  color: #fff;
+  transition: opacity 0.35s ease;
+}
+.launch .logo__ring {
+  fill: #0a0910;
+}
+.launch .logo__loop {
+  stroke: #3d7bff;
+}
+.launch--out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* La boucle se trace depuis son départ, le point bat, puis le nom monte. */
+.launch__mark .logo__loop {
+  stroke-dasharray: 1;
+  animation: launch-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.1s backwards;
+}
+.launch__mark .logo__dot,
+.launch__mark .logo__ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: launch-pop 0.45s var(--ease) 0.85s backwards;
+}
+.launch__name {
+  margin-top: 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  animation: launch-rise 0.5s var(--ease) 0.7s backwards;
+}
+.launch__tag {
+  font-family: var(--eyebrow);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  animation: launch-rise 0.5s var(--ease) 0.85s backwards;
+}
+
+@keyframes launch-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes launch-pop {
+  0% {
+    transform: scale(0.3);
+  }
+  65% {
+    transform: scale(1.18);
+  }
+}
+@keyframes launch-rise {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch__mark .logo__loop,
+  .launch__mark .logo__dot,
+  .launch__mark .logo__ring,
+  .launch__name,
+  .launch__tag {
+    animation: none;
+  }
+}

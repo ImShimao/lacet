@@ -18,15 +18,15 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, Field, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented } from './FiltersSheet.jsx'
+import { AVOIDABLE, COUNTS, DIRECTIONS, MAX_LAPS, MOMENTS, OPTIONAL_FILTERS, SAFETY, SPORTS, directionOf } from './FiltersSheet.jsx'
+import { LinkRow, PickRow, PrefsCard, ToggleRow } from './Prefs.jsx'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
-import { StopsSetting } from './Stops.jsx'
-import { KINDS } from './pois'
-import { voiceSettings } from './voice'
+import { KINDS, NEAR_M } from './pois'
+import { preview, voiceSettings } from './voice'
 import { styleByKey } from './mapStyles'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
@@ -39,8 +39,8 @@ const GROUPS = ['Paramètres', 'Données', 'Infos']
  */
 export const SECTIONS = [
   { key: 'profile', group: null, icon: 'user', title: 'Profil' },
-  { key: 'search', group: 'Paramètres', icon: 'sliders', title: 'Recherche' },
-  { key: 'run', group: 'Paramètres', icon: 'play', title: 'Pendant la sortie' },
+  { key: 'search', group: 'Paramètres', icon: 'routes', title: 'Parcours' },
+  { key: 'run', group: 'Paramètres', icon: 'volume', title: 'Guidage et voix' },
   { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
   { key: 'appearance', group: 'Paramètres', icon: 'appearance', title: 'Apparence' },
   { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
@@ -149,27 +149,24 @@ function summaryOf(key, { params, poiPrefs }) {
   switch (key) {
     case 'profile':
       return `Poids ${params.weight_kg || 70} kg${params.weekly_km ? ` · ${params.weekly_km} km par semaine` : ''}`
-    case 'search': {
-      const moment = MOMENTS.find((m) => m.key === (params.time_of_day ?? 'auto'))?.label ?? 'Auto'
-      const hidden = params.hiddenFilters?.length ?? 0
+    case 'search':
       return [
-        `Moment ${moment.toLowerCase()}`,
-        // « proposées » tombe quand un filtre est masqué : la ligne débordait.
-        `${params.count ?? 5} boucles${hidden ? '' : ' proposées'}`,
-        hidden ? `${hidden} filtre${hidden > 1 ? 's' : ''} masqué${hidden > 1 ? 's' : ''}` : null,
-        // Seul l'écart à la règle se dit : la gauche va sans dire.
-        params.side === 'right' ? 'Côté droit' : params.side === 'any' ? 'Côté indifférent' : null,
+        `Sécurité ${SAFETY.find((o) => o.key === params.safety)?.label.toLowerCase() ?? 'sûre'}`,
+        directionOf(params.direction) ? `Vers le ${directionOf(params.direction).title.toLowerCase()}` : null,
+        `${params.count ?? 5} boucles`,
+        params.avoid?.length ? `${params.avoid.length} évitement${params.avoid.length > 1 ? 's' : ''}` : null,
       ]
         .filter(Boolean)
         .join(' · ')
-    }
     case 'run': {
-      const stops = Object.entries(KINDS)
-        .filter(([kind]) => poiPrefs?.[kind])
-        .map(([, k]) => k.label.toLowerCase())
       const { km } = voiceSettings()
-      const voice = km ? (km > 1 ? 'Voix tous les 2 km' : null) : 'Kilomètres tus'
-      return [`Pause auto ${saved.autoPause !== false ? 'activée' : 'coupée'}`, voice, ...stops].filter(Boolean).join(' · ')
+      return [
+        `Recalcul ${saved.autoReroute !== false ? 'auto' : 'manuel'}`,
+        `Arrêt ${saved.autoFinish !== false ? 'auto' : 'manuel'} à l'arrivée`,
+        km ? null : 'Kilomètres tus',
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'safety': {
       const reports = activeReports().length
@@ -245,17 +242,9 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'run':
       return (
         <>
-          <h3 className="section">Pause automatique</h3>
-          <AutoPauseSetting />
-          {/* L'écran verrouillé était rangé sous « Pause automatique », avec
-              laquelle il n'a rien à voir. */}
-          <h3 className="section">Écran</h3>
-          <ScreenOnSetting />
-          <LockScreenSetting />
-          <h3 className="section">Voix</h3>
           <VoiceSetting />
-          <h3 className="section">Le long du parcours</h3>
-          <StopsSetting prefs={poiPrefs} onChange={onPoiPrefs} />
+          <RunSettings poiPrefs={poiPrefs} onPoiPrefs={onPoiPrefs} />
+          <LockScreenSetting />
         </>
       )
     case 'safety':
@@ -342,25 +331,17 @@ function EmergencyContact() {
           save({ emergencyContact: e.target.value.trim() })
         }}
       />
-      <h3 className="section">Prévenir au départ et au retour</h3>
-      <div className="seg" role="radiogroup" aria-label="Prévenir au départ et au retour">
-        {[
-          [true, 'Activé'],
-          [false, 'Désactivé'],
-        ].map(([value, label]) => (
-          <button
-            key={String(value)}
-            role="radio"
-            aria-checked={announce === value}
-            onClick={() => {
-              setAnnounce(value)
-              save({ notifyContact: value })
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <PrefsCard>
+        <ToggleRow
+          icon="sos"
+          label="Prévenir au départ et au retour"
+          on={announce}
+          onChange={(value) => {
+            setAnnounce(value)
+            save({ notifyContact: value })
+          }}
+        />
+      </PrefsCard>
       <p className="muted small">
         {!announce
           ? 'Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.'
@@ -420,144 +401,173 @@ function appearanceLabels() {
 }
 
 /**
- * L'apparence : le thème, la couleur d'accent, la taille du texte. Appliqués
- * au toucher, sans bouton « Appliquer » : l'écran change sous le doigt, et
- * c'est ce qu'on vient voir.
+ * L'apparence : le thème, la couleur d'accent, la taille du texte, le fond de
+ * carte. Appliqués au toucher, sans bouton « Appliquer » : l'écran change sous
+ * le doigt, et c'est ce qu'on vient voir.
  */
 function AppearanceSettings({ mapStyle, onStyles }) {
   const look = useAppearance()
   return (
-    <div className="fields">
-      <Field label="Thème" value={THEMES.find((o) => o.key === look.theme)?.label}>
-        <Segmented options={THEMES} value={look.theme} onChange={(theme) => setAppearance({ theme })} />
-        <p className="field__hint">
-          « Auto » suit le réglage de l'iPhone. Le thème clair se lit mieux en plein soleil, le
-          sombre éblouit moins le soir.
-        </p>
-      </Field>
-
-      <Field label="Couleur d'accent" value={ACCENTS.find((o) => o.key === look.accent)?.label}>
-        <div className="swatches" role="radiogroup" aria-label="Couleur d'accent">
-          {ACCENTS.map((a) => (
-            <button
-              key={a.key}
-              role="radio"
-              aria-checked={look.accent === a.key}
-              className="swatch"
-              onClick={() => setAppearance({ accent: a.key })}
-            >
-              {/* Peinte par le jeton de l'accent lui-même : voir `styles/01-base.css`. */}
+    <PrefsCard
+      title="Affichage"
+      foot="Le vert, le jaune et le rouge de la sécurité ne suivent pas l'accent : ce sont des avis, pas une décoration."
+    >
+      <PickRow
+        icon="appearance"
+        label="Thème"
+        value={look.theme}
+        options={THEMES}
+        onChange={(theme) => setAppearance({ theme })}
+      />
+      <PickRow
+        icon="sun"
+        label="Couleur d'accent"
+        value={look.accent}
+        shown={ACCENTS.find((o) => o.key === look.accent)?.label}
+        options={ACCENTS.map((a) => ({
+          key: a.key,
+          // Peinte par le jeton de l'accent lui-même : voir `styles/01-base.css`.
+          label: (
+            <span className="swatch-opt">
               <i data-accent={a.key} />
               {a.label}
-            </button>
-          ))}
-        </div>
-        <p className="field__hint">
-          Boutons, onglet actif, repère de départ. Le vert, le jaune et le rouge de la sécurité
-          ne changent pas : ce sont des avis, pas une décoration.
-        </p>
-      </Field>
-
-      <Field label="Taille du texte" value={TEXT_SIZES.find((o) => o.key === look.text)?.label}>
-        <Segmented options={TEXT_SIZES} value={look.text} onChange={(text) => setAppearance({ text })} />
-        <p className="field__hint">
-          Agrandit le texte des listes, des cartes et des réglages. Les chiffres de la sortie
-          sont déjà faits pour être lus à bout de bras.
-        </p>
-      </Field>
-
-      {/* Le fond de carte vivait dans un bouton sur la carte : on le règle une
-          fois, pas à chaque sortie. Il ouvre le même choix, avec son aperçu. */}
-      {onStyles && (
-        <div className="field">
-          <span className="label">Fond de carte</span>
-          <div className="menu">
-            <button className="menu__row" onClick={onStyles}>
-              <span className="menu__icon">
-                <Icon name="layers" size={18} />
-              </span>
-              <span className="menu__text">
-                <b>{styleByKey(mapStyle).label}</b>
-                <em>Changer, avec un aperçu</em>
-              </span>
-              <Icon name="chevronRight" size={17} className="menu__chev" />
-            </button>
-          </div>
-          <p className="field__hint">Tant qu'on n'en a pas choisi, le thème clair part d'un fond clair.</p>
-        </div>
-      )}
-    </div>
+            </span>
+          ),
+        }))}
+        onChange={(accent) => setAppearance({ accent })}
+      />
+      <PickRow
+        icon="sliders"
+        label="Taille du texte"
+        value={look.text}
+        options={TEXT_SIZES}
+        onChange={(text) => setAppearance({ text })}
+      />
+      {onStyles && <LinkRow icon="layers" label="Style de carte" value={styleByKey(mapStyle).label} onClick={onStyles} />}
+    </PrefsCard>
   )
 }
 
-/**
- * Les deux réglages de recherche qu'on choisit une fois.
- *
- * Le moment de la sortie et le nombre de propositions ne changent pas d'un jour
- * à l'autre : au milieu des filtres, ils encombraient le geste quotidien. Ici,
- * ils s'appliquent tout de suite, sans bouton « Appliquer » — on vient les
- * régler, pas les essayer.
- *
- * L'allure, elle, est repartie dans les filtres, sous la longueur : c'est elle
- * qui convertit une durée en distance, et on veut voir l'effet du réglage au
- * moment où on le touche.
- */
 // Le côté de la route où l'on court — `side` dans le moteur, voir `keepSide`.
 // La gauche d'abord : c'est ce que demande le code de la route.
 const SIDES = [
-  { key: 'left', label: 'Gauche' },
+  { key: 'left', label: 'Gauche', sub: 'Face aux voitures (R412-36)' },
   { key: 'right', label: 'Droite' },
   { key: 'any', label: 'Indifférent' },
 ]
 
+const SAFETY_OPTIONS = [
+  { key: 'safe', label: 'Sûr', sub: 'Jamais de route rapide sans trottoir' },
+  { key: 'standard', label: 'Standard', sub: 'Montre aussi les boucles exposées' },
+]
+
+const FORM_OPTIONS = [
+  { key: 'auto', label: 'Auto', sub: 'Une boucle, sinon des tours' },
+  { key: 'loop', label: 'Une boucle' },
+  { key: 'eight', label: 'Deux boucles', sub: 'En 8, la seconde repart de la porte' },
+  { key: 'laps', label: 'Des tours', sub: 'Une petite boucle à refaire' },
+]
+
+const LAP_OPTIONS = Array.from({ length: MAX_LAPS - 1 }, (_, i) => ({ key: i + 2, label: `${i + 2} tours` }))
+
+/**
+ * Comment Lacet dessine les boucles : ce qu'on règle une fois pour toutes.
+ *
+ * La sécurité, la direction, la forme et ce qu'on évite étaient dans le
+ * panneau Filtres, entre la longueur et « Rechercher » : on les faisait défiler
+ * à chaque sortie sans jamais y toucher. Ici, ils valent pour toutes les
+ * recherches suivantes, et le panneau ne garde que ce qui change d'une sortie
+ * à l'autre.
+ */
 function SearchSettings({ params, onProfile }) {
+  const avoid = params.avoid ?? []
+  const sport = params.sport ?? 'run'
   return (
-    <div className="fields">
-      <Field label="Moment" value={MOMENTS.find((o) => o.key === (params.time_of_day ?? 'auto'))?.label}>
-        <Segmented
-          options={MOMENTS}
+    <>
+      <PrefsCard title="Itinéraire">
+        <PickRow
+          icon="shield"
+          label="Sécurité"
+          value={params.safety ?? 'safe'}
+          options={SAFETY_OPTIONS}
+          onChange={(safety) => onProfile({ safety })}
+        />
+        <PickRow
+          icon="compass"
+          label="Direction"
+          value={directionOf(params.direction)?.key ?? 'auto'}
+          shown={directionOf(params.direction)?.title ?? 'Auto'}
+          options={DIRECTIONS.map((d) => ({ key: d.key, label: d.title ?? 'Auto', sub: d.deg === undefined ? 'Tout autour du départ' : undefined }))}
+          onChange={(direction) => onProfile({ direction })}
+        />
+        <PickRow
+          icon="repeat"
+          label="Forme"
+          value={params.form ?? 'auto'}
+          options={FORM_OPTIONS}
+          onChange={(form) => onProfile({ form })}
+        />
+        {params.form === 'laps' && (
+          <PickRow
+            icon="refresh"
+            label="Nombre de tours"
+            value={params.laps ?? 2}
+            options={LAP_OPTIONS}
+            onChange={(laps) => onProfile({ laps })}
+          />
+        )}
+        <PickRow
+          icon="navigation"
+          label="Côté de la route"
+          value={params.side ?? 'left'}
+          options={SIDES}
+          onChange={(side) => onProfile({ side })}
+        />
+      </PrefsCard>
+
+      <PrefsCard title="Éviter">
+        {AVOIDABLE.filter((a) => !a.sport || a.sport === sport).map((a) => (
+          <ToggleRow
+            key={a.key}
+            icon={{ steps: 'stairs', unlit: 'moon', known: 'history' }[a.key]}
+            label={a.label}
+            sub={a.hint}
+            on={avoid.includes(a.key)}
+            onChange={(on) => onProfile({ avoid: on ? [...avoid, a.key] : avoid.filter((k) => k !== a.key) })}
+          />
+        ))}
+      </PrefsCard>
+
+      <PrefsCard
+        title="Recherche"
+        foot="La nuit, les rues éclairées et passantes passent devant les chemins isolés. « Auto » suit l'heure du coucher du soleil."
+      >
+        <PickRow
+          icon="clock"
+          label="Moment"
           value={params.time_of_day ?? 'auto'}
+          options={MOMENTS}
           onChange={(time_of_day) => onProfile({ time_of_day })}
         />
-        <p className="field__hint">
-          La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
-          quand ils rallongent. « Auto » choisit selon l'heure du coucher du soleil au départ.
-        </p>
-      </Field>
-
-      <Field label="Côté de la route" value={SIDES.find((o) => o.key === (params.side ?? 'left'))?.label}>
-        <Segmented options={SIDES} value={params.side ?? 'left'} onChange={(side) => onProfile({ side })} />
-        <p className="field__hint">
-          Le côté par lequel la boucle fait le tour des ronds-points, et que la voix y rappelle. Le
-          code de la route (article R412-36) demande au piéton, hors agglomération et sans trottoir
-          ni accotement, de marcher à gauche, face aux voitures : on voit venir ce qui arrive. À
-          vélo, ce réglage ne change rien : on roule à droite.
-        </p>
-      </Field>
-
-      <Field label="Propositions" value={`${params.count ?? 5} boucles`}>
-        <Segmented
-          options={COUNTS}
+        <PickRow
+          icon="routes"
+          label="Propositions"
           value={params.count ?? 5}
+          shown={`${params.count ?? 5} boucles`}
+          options={COUNTS.map((c) => ({ key: c.key, label: `${c.label} boucles` }))}
           onChange={(count) => onProfile({ count })}
         />
-        <p className="field__hint">
-          Nombre de boucles proposées après une recherche. En demander plus allonge un peu
-          le calcul, et les dernières se ressemblent davantage.
-        </p>
-      </Field>
+      </PrefsCard>
 
       <ShownFilters params={params} onProfile={onProfile} />
-    </div>
+    </>
   )
 }
 
 /**
- * Les filtres qu'on veut voir dans le panneau, une case par filtre.
- *
- * Décocher remet le filtre à sa valeur par défaut, et la case le dit : un
- * réglage qu'on ne voit plus ne doit pas continuer d'agir en douce (voir
- * `OPTIONAL_FILTERS`). La longueur et l'allure sont cochées pour de bon.
+ * Ce qu'on veut voir dans le panneau Filtres. Décocher remet le filtre à sa
+ * valeur par défaut, et la ligne le dit : un réglage qu'on ne voit plus ne doit
+ * pas continuer d'agir en douce (voir `OPTIONAL_FILTERS`).
  */
 function ShownFilters({ params, onProfile }) {
   const hidden = params.hiddenFilters ?? []
@@ -568,44 +578,20 @@ function ShownFilters({ params, onProfile }) {
         : { hiddenFilters: [...hidden, f.key], ...f.reset },
     )
   return (
-    <div className="field">
-      <span className="label">Filtres affichés</span>
-      <div className="checks">
-        <button role="checkbox" aria-checked="true" className="check check--on" disabled>
-          <span className="check__box">
-            <Icon name="check" size={13} />
-          </span>
-          <span>
-            Longueur et allure
-            <em>Toujours affichées : sans elles, pas de recherche.</em>
-          </span>
-        </button>
-        {OPTIONAL_FILTERS.map((f) => {
-          const on = !hidden.includes(f.key)
-          return (
-            <button
-              key={f.key}
-              role="checkbox"
-              aria-checked={on}
-              className={`check ${on ? 'check--on' : ''}`}
-              onClick={() => toggle(f)}
-            >
-              <span className="check__box">
-                <Icon name="check" size={13} />
-              </span>
-              <span>
-                {f.label}
-                <em>{on ? f.hint : `Masqué. ${f.fixed}`}</em>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      <p className="field__hint">
-        Décoche ce que tu ne changes jamais : le panneau Filtres raccourcit d'autant. Un filtre
-        masqué revient à son réglage par défaut, écrit sous son nom.
-      </p>
-    </div>
+    <PrefsCard title="Panneau Filtres" foot="La longueur et l'allure y restent toujours : sans elles, pas de recherche.">
+      {OPTIONAL_FILTERS.map((f) => {
+        const on = !hidden.includes(f.key)
+        return (
+          <ToggleRow
+            key={f.key}
+            label={f.label}
+            sub={on ? f.hint : `Masqué. ${f.fixed}`}
+            on={on}
+            onChange={() => toggle(f)}
+          />
+        )
+      })}
+    </PrefsCard>
   )
 }
 
@@ -900,77 +886,69 @@ function OfflineStorage() {
   )
 }
 
-/**
- * La pause automatique : on la laisse active par défaut, parce que c'est ce
- * que tout le monde attend d'une app de course. On peut la couper — pour une
- * sortie fractionnée où l'on veut compter aussi les récupérations debout.
- */
-function AutoPauseSetting() {
-  const [on, setOn] = useState(() => load().autoPause !== false)
-  return (
-    <>
-      <div className="seg" role="radiogroup" aria-label="Pause automatique">
-        {[
-          [true, 'Pause auto activée'],
-          [false, 'Désactivée'],
-        ].map(([value, label]) => (
-          <button
-            key={String(value)}
-            role="radio"
-            aria-checked={on === value}
-            onClick={() => {
-              setOn(value)
-              save({ autoPause: value })
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="muted small">
-        {on
-          ? "Le chrono et la distance s'arrêtent quand tu t'arrêtes — à un feu, pour boire — et repartent dès que tu repars. Marcher, même lentement en côte, ne met pas en pause."
-          : "Le chrono tourne sans interruption. Le bouton pause, pendant la sortie, reste disponible."}
-      </p>
-    </>
-  )
+/** Un réglage booléen gardé dans le stockage, vrai par défaut. */
+function useStored(key) {
+  const [on, setOn] = useState(() => load()[key] !== false)
+  return [
+    on,
+    (value) => {
+      setOn(value)
+      save({ [key]: value })
+    },
+  ]
 }
 
 /**
- * L'écran reste allumé pendant une sortie, par défaut : c'est la carte qu'on
- * suit. Mais le téléphone au brassard ou dans la poche n'est jamais regardé, et
- * l'écran allumé une heure et demie vide la batterie bien avant la fin d'une
- * sortie longue. Éteint, la voix et l'écran verrouillé guident quand même.
- * Lu au départ d'une sortie (`LiveRun.jsx`).
+ * Ce que l'app fait d'elle-même pendant une sortie. Tout est actif par défaut,
+ * parce que c'est ce qu'on attend d'une app de course ; chaque réglage se
+ * coupe pour qui court autrement. Lus au départ d'une sortie (`LiveRun.jsx`).
  */
-function ScreenOnSetting() {
-  const [on, setOn] = useState(() => load().keepScreenOn !== false)
+function RunSettings({ poiPrefs, onPoiPrefs }) {
+  const [reroute, setReroute] = useStored('autoReroute')
+  const [finish, setFinish] = useStored('autoFinish')
+  const [pause, setPause] = useStored('autoPause')
+  const [screen, setScreen] = useStored('keepScreenOn')
   return (
-    <>
-      <div className="seg" role="radiogroup" aria-label="Écran allumé pendant la sortie">
-        {[
-          [true, 'Toujours allumé'],
-          [false, 'Veille normale'],
-        ].map(([value, label]) => (
-          <button
-            key={String(value)}
-            role="radio"
-            aria-checked={on === value}
-            onClick={() => {
-              setOn(value)
-              save({ keepScreenOn: value })
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="muted small">
-        {on
-          ? "L'écran ne s'éteint pas pendant la sortie : la carte reste sous les yeux, au prix de la batterie."
-          : "L'écran s'éteint comme d'habitude : la voix et l'écran verrouillé continuent de guider. Le bon choix pour un téléphone au brassard ou dans la poche."}
-      </p>
-    </>
+    <PrefsCard title="Pendant la sortie">
+      <ToggleRow
+        icon="refresh"
+        label="Recalcul automatique"
+        sub={reroute ? 'Un nouveau chemin 20 s après un écart' : 'Seulement au bouton « Recalculer »'}
+        on={reroute}
+        onChange={setReroute}
+      />
+      <ToggleRow
+        icon="flag"
+        label="Arrêt automatique à l'arrivée"
+        sub={finish ? 'La sortie se termine à la porte' : 'On termine soi-même, au bouton'}
+        on={finish}
+        onChange={setFinish}
+      />
+      <ToggleRow
+        icon="pause"
+        label="Pause automatique"
+        sub={pause ? "Le chrono s'arrête quand tu t'arrêtes" : 'Le chrono tourne sans interruption'}
+        on={pause}
+        onChange={setPause}
+      />
+      <ToggleRow
+        icon="sun"
+        label="Écran toujours allumé"
+        sub={screen ? 'La carte reste sous les yeux' : 'Veille normale : la voix guide quand même'}
+        on={screen}
+        onChange={setScreen}
+      />
+      {Object.entries(KINDS).map(([kind, k]) => (
+        <ToggleRow
+          key={kind}
+          icon={k.icon}
+          label={`${k.label} sur le parcours`}
+          sub={`Sur la carte et à la voix, à moins de ${NEAR_M} m du tracé`}
+          on={Boolean(poiPrefs?.[kind])}
+          onChange={(on) => onPoiPrefs({ [kind]: on })}
+        />
+      ))}
+    </PrefsCard>
   )
 }
 
@@ -980,79 +958,90 @@ const KM_EVERY = [
   { key: 0, label: 'Jamais' },
 ]
 const KM_SAYS = [
-  ['lap', 'Temps du km'],
-  ['pace', 'Allure'],
-  ['total', 'Temps couru'],
+  ['lap', 'Temps du km', 'clock'],
+  ['pace', 'Allure', 'gauge'],
+  ['total', 'Temps couru', 'history'],
 ]
-const TARGET_SAYS = [
-  { key: 'on', label: 'Oui' },
-  { key: 'off', label: 'Non' },
-]
+// « Anticipation des instructions » : quand la voix annonce un virage.
 const LEADS = [
-  { key: 'early', label: 'Plus tôt' },
+  { key: 'early', label: 'Tôt', sub: 'Une quarantaine de secondes avant' },
+  { key: 'normal', label: 'Moyen', sub: 'Une trentaine de secondes avant' },
+  { key: 'late', label: 'Tard', sub: 'Une vingtaine de secondes avant' },
+]
+const RATES = [
+  { key: 'slow', label: 'Lent' },
   { key: 'normal', label: 'Normal' },
-  { key: 'late', label: 'Plus tard' },
+  { key: 'fast', label: 'Rapide' },
 ]
 
 /**
- * Ce que la voix dit de confort, et quand.
+ * La voix : laquelle, à quelle vitesse, quand elle annonce, et ce qu'elle dit
+ * à chaque kilomètre.
  *
  * La plainte n° 1 dans les avis des apps concurrentes, c'est la voix : trop
- * bavarde pour les uns, muette pour les autres. Seul le confort se règle :
- * les alertes de traversée, l'écart du parcours et le « maintenant » d'un
- * virage se disent toujours. Lu au départ d'une sortie (`LiveRun.jsx`).
+ * bavarde pour les uns, muette pour les autres. Seul le confort se règle : les
+ * alertes de traversée, l'écart du parcours et le « maintenant » d'un virage se
+ * disent toujours. Lu au départ d'une sortie (`LiveRun.jsx`).
  */
 function VoiceSetting() {
   const [prefs, setPrefs] = useState(voiceSettings)
+  const [voices, setVoices] = useState([])
   const change = (patch) => {
     const next = { ...prefs, ...patch }
     setPrefs(next)
     save({ voice: next })
   }
+
+  useEffect(() => {
+    if (!isNative()) return
+    import('./native').then((n) => n.voicesNative()).then(setVoices)
+  }, [])
+
+  const voiceOptions = [
+    { key: null, label: 'Voix du système' },
+    ...voices.map((v) => ({ key: v.id, label: v.name, sub: v.enhanced ? 'Qualité améliorée' : undefined })),
+  ]
+
   return (
-    <div className="fields">
-      <div className="field">
-        <span className="label">Kilomètres</span>
-        <Segmented options={KM_EVERY} value={prefs.km} onChange={(km) => change({ km })} />
-        <p className="field__hint">À vélo, la voix parle tous les 5 km, ou tous les 10.</p>
-      </div>
-
-      {prefs.km !== 0 && (
-        <div className="field">
-          <span className="label">À chaque kilomètre</span>
-          <div className="seg" role="group" aria-label="Ce que dit la voix à chaque kilomètre">
-            {KM_SAYS.map(([key, label]) => (
-              <button key={key} aria-pressed={prefs[key]} onClick={() => change({ [key]: !prefs[key] })}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="field__hint">La distance est toujours dite ; le reste, à ton choix.</p>
-        </div>
-      )}
-
-      <div className="field">
-        <span className="label">Écart à l'allure visée</span>
-        <Segmented
-          options={TARGET_SAYS}
-          value={prefs.target ? 'on' : 'off'}
-          onChange={(v) => change({ target: v === 'on' })}
+    <>
+      <PrefsCard title="Voix">
+        <PickRow
+          icon="volume"
+          label="Voix utilisée"
+          value={prefs.voiceId ?? null}
+          shown={voices.find((v) => v.id === prefs.voiceId)?.name ?? 'Voix du système'}
+          options={voiceOptions}
+          onChange={(voiceId) => change({ voiceId })}
         />
-        <p className="field__hint">
-          À chaque kilomètre, la voix dit si tu es à plus de dix secondes de l'allure demandée à la
-          recherche. Course libre : rien à comparer, rien n'est dit.
-        </p>
-      </div>
+        <PickRow icon="gauge" label="Débit" value={prefs.rate ?? 'normal'} options={RATES} onChange={(rate) => change({ rate })} />
+        <PickRow
+          icon="turnRight"
+          label="Anticipation des instructions"
+          value={prefs.lead}
+          options={LEADS}
+          onChange={(lead) => change({ lead })}
+        />
+        <LinkRow icon="play" label="Écouter la voix" onClick={() => preview()} />
+      </PrefsCard>
 
-      <div className="field">
-        <span className="label">Annonce des virages</span>
-        <Segmented options={LEADS} value={prefs.lead} onChange={(lead) => change({ lead })} />
-        <p className="field__hint">
-          Une trentaine de secondes avant le carrefour, à la normale. Le « Maintenant », lui, ne
-          bouge pas, et les alertes de traversée ou d'écart se disent toujours.
-        </p>
-      </div>
-    </div>
+      <PrefsCard
+        title="Annonces"
+        foot="La distance est toujours dite ; le reste, à ton choix. À vélo, la voix parle tous les 5 ou 10 km."
+      >
+        <PickRow icon="flag" label="Kilomètres" value={prefs.km} options={KM_EVERY} onChange={(km) => change({ km })} />
+        {prefs.km !== 0 &&
+          KM_SAYS.map(([key, label, icon]) => (
+            <ToggleRow key={key} icon={icon} label={label} on={prefs[key]} onChange={(on) => change({ [key]: on })} />
+          ))}
+        <ToggleRow
+          icon="trendUp"
+          label="Écart à l'allure visée"
+          sub="À plus de dix secondes de l'allure demandée"
+          on={prefs.target}
+          onChange={(target) => change({ target })}
+        />
+      </PrefsCard>
+    </>
   )
 }
 

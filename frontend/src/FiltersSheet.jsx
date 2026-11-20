@@ -14,23 +14,42 @@ export const SPORTS = [
 // à vélo. Le moteur, lui, reçoit la même valeur.
 export const TERRAINS = {
   run: [
-    { key: 'road', label: 'Route', icon: 'road' },
-    { key: 'mixed', label: 'Mixte', icon: 'forest' },
-    { key: 'trail', label: 'Sentier', icon: 'mountain' },
+    { key: 'road', label: 'Route', icon: 'road', sub: 'Les rues et routes goudronnées.' },
+    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins mêlés, selon ce qui est autour.' },
+    { key: 'trail', label: 'Sentier', icon: 'mountain', sub: 'Chemins, sentiers et pistes, loin des voitures.' },
   ],
   bike: [
-    { key: 'road', label: 'Route', icon: 'road' },
-    { key: 'mixed', label: 'Mixte', icon: 'forest' },
-    { key: 'trail', label: 'VTT', icon: 'mountain' },
+    { key: 'road', label: 'Route', icon: 'road', sub: 'Les routes goudronnées.' },
+    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins roulants mêlés.' },
+    { key: 'trail', label: 'VTT', icon: 'mountain', sub: 'Chemins et sentiers, loin des voitures.' },
   ],
 }
 
+// Les cibles de `engine/service.js`, en mètres de montée par kilomètre : ce
+// que dit aussi « Comprendre le relief » (`explain.js`).
 const RELIEFS = [
-  { key: 'flat', label: 'Plat', icon: 'flat' },
-  { key: 'rolling', label: 'Vallonné', icon: 'rolling' },
-  { key: 'hilly', label: 'Côtes', icon: 'hilly' },
+  { key: 'flat', label: 'Plat', icon: 'flat', sub: 'Le moins de montée possible · vers 3 m/km' },
+  { key: 'rolling', label: 'Vallonné', icon: 'rolling', sub: 'Un peu de relief · vers 10 m/km' },
+  { key: 'hilly', label: 'Côtes', icon: 'hilly', sub: 'Les montées recherchées · 20 m/km et plus' },
 ]
-const SAFETY = [
+
+/**
+ * Des allures toutes faites, comme chez RunnrZ : on sait se dire « débutant »
+ * bien avant de connaître son allure au kilomètre. « Personnalisée » règle la sienne.
+ */
+const PACES = {
+  run: [
+    { key: 450, label: 'Débutant', sub: '7:30 /km · 8 km/h' },
+    { key: 360, label: 'Intermédiaire', sub: '6:00 /km · 10 km/h' },
+    { key: 300, label: 'Avancé', sub: '5:00 /km · 12 km/h' },
+  ],
+  bike: [
+    { key: 15, label: 'Balade', sub: '15 km/h' },
+    { key: 22, label: 'Sportif', sub: '22 km/h' },
+    { key: 28, label: 'Rapide', sub: '28 km/h' },
+  ],
+}
+export const SAFETY = [
   { key: 'safe', label: 'Sûr' },
   { key: 'standard', label: 'Standard' },
 ]
@@ -59,34 +78,23 @@ export const DIRECTIONS = [
   { key: 'NO', label: 'NO', title: 'Nord-ouest', toward: 'vers le nord-ouest', deg: 315 },
 ]
 
-/**
- * La forme de la sortie : le moteur la choisissait seul — une boucle entière, et
- * des tours ou un « 8 » faute de mieux. Une forme choisie est tenue strictement
- * (`LoopRequest.form`) : plutôt rien, et le dire, qu'une autre.
- */
-export const FORMS = [
-  // Nommé pour lui-même : la direction a aussi son « Auto ».
-  { key: 'auto', label: 'Auto', title: 'Forme auto' },
-  { key: 'loop', label: '1 boucle' },
-  { key: 'eight', label: '2 boucles' },
-  { key: 'laps', label: 'Tours' },
-]
 // Le moteur accepte de deux à dix tours, d'au moins 1,5 km chacun
 // (`MIN_LAP_M`) : en dessous, ce n'est plus une boucle mais de la piste.
 export const MAX_LAPS = 10
-const MIN_LAP_KM = 1.5
 
 /** La direction choisie, ou `null` pour « Auto » et une valeur inconnue. */
 export const directionOf = (key) => DIRECTIONS.find((d) => d.key === key && d.deg !== undefined) ?? null
 
 // Nombre d'itinéraires proposés. Trois, c'était trop peu pour choisir : on
-// prend le premier faute d'alternative. Au-delà de huit, la liste cesse d'être
-// un choix et devient un catalogue qu'on ne lit plus.
+// prend le premier faute d'alternative. Seize et vingt, pour qui veut tout voir
+// autour de chez soi : le moteur trace alors plus de polygones (`wideSettings`).
 export const COUNTS = [
   { key: 3, label: '3' },
   { key: 5, label: '5' },
   { key: 8, label: '8' },
   { key: 12, label: '12' },
+  { key: 16, label: '16' },
+  { key: 20, label: '20' },
 ]
 
 // Plafonds par sport — au-delà, l'extrait de carte à télécharger devient
@@ -212,13 +220,6 @@ export const DEFAULTS = {
 export const OPTIONAL_FILTERS = [
   { key: 'sport', label: 'Activité', hint: 'Course ou vélo.', fixed: "L'activité du moment est gardée." },
   {
-    key: 'form',
-    label: 'Forme',
-    hint: 'Une boucle, deux boucles ou des tours.',
-    fixed: 'Auto.',
-    reset: { form: DEFAULTS.form },
-  },
-  {
     key: 'terrain',
     label: 'Terrain',
     hint: 'Route, mixte ou sentier, et les voies sans voitures.',
@@ -227,38 +228,31 @@ export const OPTIONAL_FILTERS = [
   },
   {
     key: 'relief',
-    label: 'Dénivelé',
+    label: 'Relief',
     hint: 'Plat, vallonné, côtes, ou un D+ précis.',
     fixed: 'Vallonné.',
     reset: { elevation: DEFAULTS.elevation, climb_m: null },
-  },
-  {
-    key: 'direction',
-    label: 'Direction',
-    hint: 'Le côté du départ où partir.',
-    fixed: 'Auto.',
-    reset: { direction: DEFAULTS.direction },
-  },
-  {
-    key: 'safety',
-    label: 'Sécurité',
-    hint: 'Sûr, ou montrer aussi les boucles exposées.',
-    fixed: 'Sûr.',
-    reset: { safety: DEFAULTS.safety },
-  },
-  {
-    key: 'avoid',
-    label: 'Éviter',
-    hint: 'Escaliers, rues non éclairées, boucles déjà courues.',
-    fixed: 'Rien n’est évité.',
-    reset: { avoid: [] },
   },
 ]
 
 // Ce que « Réinitialiser » ne touche pas : ce qui se règle dans « Mon compte »,
 // pas dans ce panneau. Il remettait à 5 les douze propositions choisies là-bas,
 // et aurait réaffiché les filtres masqués.
-const KEPT_ON_RESET = ['sport', 'weight_kg', 'weekly_km','time_of_day', 'side', 'count', 'hiddenFilters']
+const KEPT_ON_RESET = [
+  'sport',
+  'weight_kg',
+  'weekly_km',
+  'time_of_day',
+  'side',
+  'count',
+  'hiddenFilters',
+  // Réglés dans « Mon compte › Parcours » depuis qu'ils ont quitté le panneau.
+  'safety',
+  'direction',
+  'form',
+  'laps',
+  'avoid',
+]
 
 /**
  * Pas d'incrément de la distance.
@@ -311,6 +305,8 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   const km = draft.mode === 'distance' ? draft.distance_km : estimateKm(draft)
   const climbing = draft.climb_m != null
   const shown = (key) => !(draft.hiddenFilters ?? []).includes(key)
+  // « Personnalisée » est ouverte d'office quand l'allure n'est pas une des toutes faites.
+  const [paceCustom, setPaceCustom] = useState(() => presetOf(value) === null)
 
   return (
     <div className="modal" onClick={onClose}>
@@ -500,84 +496,58 @@ export default function FiltersSheet({ value, onApply, onClose }) {
                 6:30 » ne font pas la même sortie, et ça se lit tout de suite. */}
           </Field>
 
-          <Field
-            label={isBike ? 'Vitesse' : 'Allure'}
-            value={usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`}
-          >
-            <div className="field__pace">
-              {!isBike && (
-                <Segmented
-                  options={[
-                    { key: 'pace', label: 'min/km' },
-                    { key: 'speed', label: 'km/h' },
-                  ]}
-                  value={usesSpeed ? 'speed' : 'pace'}
-                  onChange={(speedUnit) => set({ speedUnit })}
-                />
-              )}
-              {usesSpeed ? (
-                <Stepper
-                  text={`${formatKm(draft.speed_kmh)} km/h`}
-                  onStep={(d) =>
-                    set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })
-                  }
-                  canDown={draft.speed_kmh > 5}
-                  canUp={draft.speed_kmh < 60}
-                />
-              ) : (
-                <Stepper
-                  text={`${pace(draft.pace_sec_per_km)} /km`}
-                  onStep={(d) =>
-                    set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })
-                  }
-                  canDown={draft.pace_sec_per_km > 150}
-                  canUp={draft.pace_sec_per_km < 1200}
-                />
-              )}
-              <p className="field__hint">
-                {draft.mode === 'duration'
-                  ? 'Ne change pas le tracé : elle convertit la durée en distance.'
-                  : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
-                      Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
-                    )} pour cette boucle.`}
-              </p>
-            </div>
+          <Field label={isBike ? 'Vitesse' : 'Allure'} value={paceLabel(draft, usesSpeed)}>
+            <Choices
+              label={isBike ? 'Vitesse' : 'Allure'}
+              options={[...PACES[isBike ? 'bike' : 'run'], { key: 'custom', label: 'Personnalisée', sub: 'Ta propre allure ou vitesse', icon: 'sliders' }]}
+              value={paceCustom ? 'custom' : presetOf(draft)}
+              onChange={(key) => {
+                if (key === 'custom') return setPaceCustom(true)
+                setPaceCustom(false)
+                set(isBike ? { speed_kmh: key, speedUnit: 'speed' } : { pace_sec_per_km: key, speedUnit: 'pace' })
+              }}
+            />
+            {paceCustom && (
+              <div className="field__pace">
+                {!isBike && (
+                  <Segmented
+                    options={[
+                      { key: 'pace', label: 'min/km' },
+                      { key: 'speed', label: 'km/h' },
+                    ]}
+                    value={usesSpeed ? 'speed' : 'pace'}
+                    onChange={(speedUnit) => set({ speedUnit })}
+                  />
+                )}
+                {usesSpeed ? (
+                  <Stepper
+                    text={`${formatKm(draft.speed_kmh)} km/h`}
+                    onStep={(d) => set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })}
+                    canDown={draft.speed_kmh > 5}
+                    canUp={draft.speed_kmh < 60}
+                  />
+                ) : (
+                  <Stepper
+                    text={`${pace(draft.pace_sec_per_km)} /km`}
+                    onStep={(d) => set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })}
+                    canDown={draft.pace_sec_per_km > 150}
+                    canUp={draft.pace_sec_per_km < 1200}
+                  />
+                )}
+              </div>
+            )}
+            <p className="field__hint">
+              {draft.mode === 'duration'
+                ? 'Ne change pas le tracé : elle convertit la durée en distance.'
+                : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
+                    Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
+                  )} pour cette boucle.`}
+            </p>
           </Field>
 
-          {shown('form') && (
-            <Field label="Forme" value={draft.form === 'laps' ? `${draft.laps} tours` : FORMS.find((o) => o.key === (draft.form ?? 'auto'))?.label ?? 'Auto'}>
-              <Segmented options={FORMS} value={draft.form ?? 'auto'} onChange={(form) => set({ form })} />
-              {draft.form === 'laps' && (
-                <Stepper
-                  text={`${draft.laps} tours`}
-                  onStep={(d) => set({ laps: clamp(draft.laps + d, 2, MAX_LAPS) })}
-                  canDown={draft.laps > 2}
-                  canUp={draft.laps < MAX_LAPS}
-                />
-              )}
-              <p className="field__hint">{formHint(draft, km)}</p>
-            </Field>
-          )}
-
           {shown('terrain') && (
-            <Field
-              label="Terrain"
-              info="terrain"
-              sport={draft.sport}
-              value={TERRAINS[draft.sport].find((o) => o.key === draft.surface)?.label ?? 'Mixte'}
-            >
-              <div className="tiles">
-                {TERRAINS[draft.sport].map((t) => (
-                  <Tile
-                    key={t.key}
-                    label={t.label}
-                    icon={t.icon}
-                    on={draft.surface === t.key}
-                    onClick={() => set({ surface: t.key })}
-                  />
-                ))}
-              </div>
-              {/* Absent des réglages d'avant : coché, comme par défaut. */}
+            <Field label="Préférences de parcours" info="terrain" sport={draft.sport}>
+              <Choices label="Terrain" options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
               <div className="checks checks--after">
                 <button
                   role="checkbox"
@@ -599,42 +569,25 @@ export default function FiltersSheet({ value, onApply, onClose }) {
 
           {shown('relief') && (
             <Field
-              label="Dénivelé"
+              label="Relief"
               info="relief"
               sport={draft.sport}
               value={climbing ? `${draft.climb_m} m de D+` : RELIEFS.find((o) => o.key === draft.elevation)?.label ?? 'Auto'}
             >
-              <div className="tiles">
-                {RELIEFS.map((r) => (
-                  <Tile
-                    key={r.key}
-                    label={r.label}
-                    icon={r.icon}
-                    on={!climbing && draft.elevation === r.key}
-                    onClick={() => set({ elevation: r.key, climb_m: null })}
-                  />
-                ))}
-              </div>
               {/* « On ne peut pas demander un D+ en particulier » : la plainte
                   revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
                   (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
                   cible de Vallonné. */}
-              <div className="checks checks--after">
-                <button
-                  role="checkbox"
-                  aria-checked={climbing}
-                  className={`check ${climbing ? 'check--on' : ''}`}
-                  onClick={() => set({ climb_m: climbing ? null : Math.max(10, Math.round(km) * 10) })}
-                >
-                  <span className="check__box">
-                    <Icon name="check" size={13} />
-                  </span>
-                  <span>
-                    Un D+ précis
-                    <em>« Environ 150 m », plutôt que les trois réglages</em>
-                  </span>
-                </button>
-              </div>
+              <Choices
+                label="Relief"
+                options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }]}
+                value={climbing ? 'climb' : draft.elevation}
+                onChange={(key) =>
+                  key === 'climb'
+                    ? set({ climb_m: climbing ? draft.climb_m : Math.max(10, Math.round(km) * 10) })
+                    : set({ elevation: key, climb_m: null })
+                }
+              />
               {climbing && (
                 <>
                   <Stepper
@@ -663,84 +616,6 @@ export default function FiltersSheet({ value, onApply, onClose }) {
             </Field>
           )}
 
-          {shown('direction') && (
-            <Field label="Direction" value={directionOf(draft.direction)?.title ?? 'Auto'}>
-              {/* Neuf choix sur une ligne : serrés, ils tiennent à 390 px. */}
-              <div className="directions">
-                <Segmented
-                  options={DIRECTIONS}
-                  value={directionOf(draft.direction)?.key ?? 'auto'}
-                  onChange={(direction) => set({ direction })}
-                />
-              </div>
-              <p className="field__hint">
-                {directionOf(draft.direction)
-                  ? `Les boucles partent ${directionOf(draft.direction).toward} : leur centre tombe à moins de 45° de ce cap. S'il n'y en a aucune de sûre de ce côté, Lacet le dit et propose les autres.`
-                  : // « Tout autour » promettait trop : à Guebwiller, les boucles du
-                    // nord et de l'ouest montent dans les Vosges, et le dénivelé
-                    // demandé les fait passer après celles de la plaine.
-                    'Les boucles se répartissent autour du départ, du côté où le dénivelé demandé se trouve. Choisis un cap pour partir ailleurs.'}
-              </p>
-            </Field>
-          )}
-
-          {shown('safety') && (
-            <Field label="Sécurité" info="safety" sport={draft.sport} value={SAFETY.find((o) => o.key === draft.safety)?.label ?? 'Sûr'}>
-              <Segmented
-                options={SAFETY}
-                value={draft.safety}
-                onChange={(safety) => set({ safety })}
-              />
-              <p className="field__hint">
-                {draft.safety === 'safe'
-                  ? "Contourne chaque bout de route à 80 km/h ou plus sans trottoir ni accotement, et écarte les boucles qui en gardent ou qui la traversent sans passage protégé. Les rues à 50 et les routes à 70 restent proposées."
-                  : 'Montre aussi les itinéraires exposés, avec le détail des portions concernées.'}
-              </p>
-            </Field>
-          )}
-
-          {shown('avoid') && (
-            <Field
-              label="Éviter"
-              info="avoid"
-              sport={draft.sport}
-              value={
-                AVOIDABLE.filter((a) => (draft.avoid || []).includes(a.key))
-                  .map((a) => a.label)
-                  .join(', ') || 'Rien'
-              }
-            >
-              <div className="checks">
-                {AVOIDABLE.filter((a) => !a.sport || a.sport === draft.sport).map((a) => {
-                  const on = (draft.avoid || []).includes(a.key)
-                  return (
-                    <button
-                      key={a.key}
-                      role="checkbox"
-                      aria-checked={on}
-                      className={`check ${on ? 'check--on' : ''}`}
-                      onClick={() =>
-                        set({
-                          avoid: on
-                            ? draft.avoid.filter((k) => k !== a.key)
-                            : [...(draft.avoid || []), a.key],
-                        })
-                      }
-                    >
-                      <span className="check__box">
-                        <Icon name="check" size={13} />
-                      </span>
-                      <span>
-                        {a.label}
-                        <em>{a.hint}</em>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </Field>
-          )}
-
         </div>
 
         <div className="modal__foot">
@@ -757,23 +632,46 @@ export default function FiltersSheet({ value, onApply, onClose }) {
   )
 }
 
-/** Ce que donnera la forme choisie, à cette longueur. */
-function formHint(draft, km) {
-  const about = (v) => formatKm(Math.round(v * 10) / 10)
-  switch (draft.form) {
-    case 'loop':
-      return "Une seule boucle de toute la longueur, jamais de tours. S'il n'y en a pas d'ici, Lacet le dit."
-    case 'eight':
-      return km / 2 < MIN_LAP_KM
-        ? `Deux boucles de ${about(km / 2)} km : trop courtes, Lacet n'en cherche pas sous ${formatKm(MIN_LAP_KM)} km.`
-        : `Deux boucles d'environ ${about(km / 2)} km, de deux côtés du départ : la seconde repart de la porte.`
-    case 'laps':
-      return km / draft.laps < MIN_LAP_KM
-        ? `${draft.laps} tours de ${about(km / draft.laps)} km : trop courts, Lacet n'en cherche pas sous ${formatKm(MIN_LAP_KM)} km. Choisis moins de tours.`
-        : `Une boucle d'environ ${about(km / draft.laps)} km, à faire ${draft.laps} fois en repassant au départ.`
-    default:
-      return "Une boucle entière d'abord ; s'il en manque, Lacet complète par des tours ou deux boucles, et le dit."
-  }
+/** L'allure toute faite qui correspond au réglage, ou `null`. */
+function presetOf(params) {
+  const bike = params.sport === 'bike'
+  const v = bike ? params.speed_kmh : params.speedUnit === 'speed' ? null : params.pace_sec_per_km
+  return PACES[bike ? 'bike' : 'run'].find((p) => p.key === v)?.key ?? null
+}
+
+function paceLabel(draft, usesSpeed) {
+  const preset = PACES[draft.sport === 'bike' ? 'bike' : 'run'].find((p) => p.key === presetOf(draft))
+  const value = usesSpeed ? `${formatKm(draft.speed_kmh)} km/h` : `${pace(draft.pace_sec_per_km)} /km`
+  return preset ? `${preset.label} · ${value}` : value
+}
+
+/**
+ * Des choix lisibles d'un coup d'œil : un rond, le nom, une ligne qui dit ce
+ * qu'il donne, et son icône — comme les « Préférences de parcours » de RunnrZ.
+ * Des tuiles muettes demandaient d'ouvrir l'aide pour savoir ce que « Mixte »
+ * voulait dire.
+ */
+export function Choices({ label, options, value, onChange }) {
+  return (
+    <div className="choices" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={String(o.key)}
+          role="radio"
+          aria-checked={value === o.key}
+          className={`choice ${value === o.key ? 'choice--on' : ''}`}
+          onClick={() => onChange(o.key)}
+        >
+          <span className="choice__radio" />
+          <span className="choice__text">
+            <b>{o.label}</b>
+            {o.sub && <em>{o.sub}</em>}
+          </span>
+          {o.icon && <Icon name={o.icon} size={22} className="choice__icon" />}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /**

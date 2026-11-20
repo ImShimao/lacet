@@ -166,8 +166,14 @@ export function watchCompass(onHeading) {
  * de la phrase et remonte dès que la voix s'est tue : c'est le module natif qui
  * s'en charge (`VoicePlugin.swift`), sur ce que la voix fait vraiment.
  */
-export const speakNative = (text, { priority = true } = {}) =>
-  Voice.speak({ text, flush: priority }).catch(() => {})
+export const speakNative = (text, { priority = true, voice = null, rate = 1 } = {}) =>
+  Voice.speak({ text, flush: priority, ...(voice ? { voice } : {}), rate }).catch(() => {})
+
+/** Les voix françaises de l'iPhone : `[{ id, name, enhanced }]`, vide si le module manque. */
+export const voicesNative = () =>
+  Voice.voices()
+    .then((r) => r?.voices ?? [])
+    .catch(() => [])
 
 /** Se tait, et rend le son aux autres apps. */
 export const stopSpeechNative = () => Voice.stop().catch(() => {})

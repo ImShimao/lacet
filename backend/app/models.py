@@ -96,7 +96,7 @@ class LoopRequest(BaseModel):
     # Jusqu'à douze propositions : c'est le nombre au-delà duquel la liste
     # cesse d'être un choix pour devenir un catalogue, et le coût du calcul
     # d'altitude — un appel réseau par itinéraire — commence à se voir.
-    limit: int = Field(default=5, ge=1, le=12)
+    limit: int = Field(default=5, ge=1, le=20)
     with_elevation: bool = True
     # Préférer les rues et chemins qui longent un parc, un bois ou l'eau, et les
     # sentiers balisés — voir `routing.weights.GREEN_BONUS`.

@@ -1,49 +1,7 @@
 import Icon from './Icon.jsx'
-import { KINDS, NEAR_M } from './pois'
+import { KINDS } from './pois'
 
 const kmText = (m) => (m / 1000).toFixed(1).replace('.', ',')
-
-/**
- * Le réglage de « Mon compte » : quels arrêts montrer le long des boucles.
- * `onChange` reçoit ce qui change, pas l'ensemble : deux cases touchées coup
- * sur coup ne doivent pas s'écraser l'une l'autre.
- * Rien n'est coché d'office — c'est une requête de plus, et une carte plus
- * chargée, pour qui n'en a pas besoin.
- */
-export function StopsSetting({ prefs, onChange }) {
-  return (
-    <>
-      <div className="checks" role="group" aria-label="Arrêts à montrer le long du parcours">
-        {Object.entries(KINDS).map(([kind, k]) => {
-          const on = Boolean(prefs?.[kind])
-          return (
-            <button
-              key={kind}
-              role="checkbox"
-              aria-checked={on}
-              className={`check ${on ? 'check--on' : ''}`}
-              onClick={() => onChange({ [kind]: !on })}
-            >
-              <span className="check__box">
-                <Icon name="check" size={13} />
-              </span>
-              <span className="check__label">
-                <Icon name={k.icon} size={17} />
-                {k.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      <p className="muted small">
-        Ceux qui sont à moins de {NEAR_M} m du tracé apparaissent sur la carte, dans le détail
-        du parcours, et pendant la sortie — « point d'eau dans 800 m ». D'après OpenStreetMap,
-        en ne gardant que l'eau potable, gratuite et ouverte à tous : une fontaine peut quand
-        même être à sec.
-      </p>
-    </>
-  )
-}
 
 /** Au-delà, la liste des kilomètres ne se lit plus : on dit l'écart. */
 const LIST_MAX = 6

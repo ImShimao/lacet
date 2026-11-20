@@ -52,12 +52,12 @@ describe('le panneau des filtres', () => {
 
   it('ne lance rien tant qu’on n’a pas demandé', () => {
     const { onApply } = ouvrir()
-    déplier('Terrain')
-    fireEvent.click(screen.getByRole('button', { name: /Sentier/ }))
+    // Le terrain se lit sans rien ouvrir : un rond, le nom, ce qu'il donne.
+    fireEvent.click(screen.getByRole('radio', { name: /Sentier/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Vélo' }))
     // Le terrain change de nom avec l'activité — « Sentier » à pied, « VTT » à
     // vélo —, et le panneau le suit sans rien lancer.
-    expect(screen.getByRole('button', { name: /^VTT/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: /^VTT/ })).toHaveAttribute('aria-checked', 'true')
     expect(onApply).not.toHaveBeenCalled()
   })
 
@@ -77,37 +77,34 @@ describe('le panneau des filtres', () => {
     expect(onApply).not.toHaveBeenCalled()
   })
 
-  it('choisit le côté où partir, « Auto » par défaut', () => {
-    const { onApply } = ouvrir()
-    déplier('Direction')
-    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText(/se répartissent autour du départ/)).toBeInTheDocument()
-
-    // « NE » se lit « Nord-est » : deux lettres ne disent rien à une voix.
-    fireEvent.click(screen.getByRole('button', { name: 'Nord-est' }))
-    expect(screen.getByRole('button', { name: 'Nord-est' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText(/partent vers le nord-est/)).toBeInTheDocument()
-
+  it('laisse la direction, la sécurité et la forme à « Mon compte »', () => {
+    // Réglés une fois pour toutes, ils ne sont plus dans le panneau, et
+    // « Réinitialiser » n'y touche pas.
+    const { onApply } = ouvrir({ ...DEFAULTS, direction: 'O', safety: 'standard', form: 'laps', avoid: ['known'] })
+    expect(screen.queryByText('Direction')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sécurité')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
-    expect(onApply.mock.calls[0][0]).toMatchObject({ direction: 'NE' })
+    expect(onApply.mock.calls[0][0]).toMatchObject({ direction: 'O', safety: 'standard', form: 'laps', avoid: ['known'] })
   })
 
-  it('remet la direction sur « Auto » en réinitialisant', () => {
-    ouvrir({ ...DEFAULTS, direction: 'O' })
-    déplier('Direction')
-    expect(screen.getByRole('button', { name: 'Ouest' })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
-    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+  it('propose des allures toutes faites, et la sienne', () => {
+    const { onApply } = ouvrir({ ...DEFAULTS, pace_sec_per_km: 360 })
+    expect(screen.getByRole('button', { name: /^Allure/ }).textContent).toContain('Intermédiaire')
+    déplier('Allure')
+    fireEvent.click(screen.getByRole('radio', { name: /Débutant/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(onApply.mock.calls[0][0]).toMatchObject({ pace_sec_per_km: 450, speedUnit: 'pace' })
   })
 
   it('demande un D+ précis à la place des trois réglages', () => {
     // « On ne peut pas demander un D+ en particulier », reprochait-on à RunnrZ.
     const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
-    déplier('Dénivelé')
-    fireEvent.click(screen.getByRole('checkbox', { name: /Un D\+ précis/ }))
+    déplier('Relief')
+    fireEvent.click(screen.getByRole('radio', { name: /Un D\+ précis/ }))
     // On part de 10 m par kilomètre, la cible de Vallonné, qui se décoche.
     expect(screen.getAllByText('100 m de D+').length).toBe(2)
-    expect(screen.getByRole('button', { name: /Vallonné/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('radio', { name: /Vallonné/ })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByText(/entre 80 et 120 m passent devant/)).toBeInTheDocument()
 
     // Au clavier, comme la distance : « environ 150 m ».
@@ -122,8 +119,8 @@ describe('le panneau des filtres', () => {
 
   it('reprend une tuile de relief en oubliant le D+ précis', () => {
     const { onApply } = ouvrir({ ...DEFAULTS, climb_m: 150 })
-    déplier('Dénivelé')
-    fireEvent.click(screen.getByRole('button', { name: /Plat/ }))
+    déplier('Relief')
+    fireEvent.click(screen.getByRole('radio', { name: /Plat/ }))
     expect(screen.queryByText(/m de D\+/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
     expect(onApply.mock.calls[0][0]).toMatchObject({ elevation: 'flat', climb_m: null })
@@ -139,37 +136,12 @@ describe('le panneau des filtres', () => {
   })
 
   it('n’affiche pas un filtre masqué dans les réglages, mais garde la longueur', () => {
-    ouvrir({ ...DEFAULTS, hiddenFilters: ['terrain', 'direction'] })
-    expect(screen.queryByText('Terrain')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Nord-est' })).not.toBeInTheDocument()
+    ouvrir({ ...DEFAULTS, hiddenFilters: ['terrain'] })
+    expect(screen.queryByText('Préférences de parcours')).not.toBeInTheDocument()
     // Les essentiels et les autres filtres restent.
     expect(screen.getByText('Longueur')).toBeInTheDocument()
     expect(screen.getByText('Allure')).toBeInTheDocument()
-    expect(screen.getByText('Dénivelé')).toBeInTheDocument()
-  })
-
-  it('choisit la forme, et dit la longueur de chaque tour', () => {
-    // « Une boucle, deux boucles ou plusieurs tours » : le moteur choisissait seul.
-    const { onApply } = ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10 })
-    déplier('Forme')
-    expect(screen.getByRole('button', { name: 'Forme auto' })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: '2 boucles' }))
-    expect(screen.getByText(/Deux boucles d'environ 5 km, de deux côtés du départ/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tours' }))
-    expect(screen.getAllByText('2 tours').length).toBe(2)
-    // Le compteur de tours est le dernier ouvert.
-    const plus = screen.getAllByRole('button', { name: 'Augmenter' })
-    fireEvent.click(plus.at(-1))
-    expect(screen.getByText(/environ 3,3 km, à faire 3 fois/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
-    expect(onApply.mock.calls[0][0]).toMatchObject({ form: 'laps', laps: 3 })
-  })
-
-  it('prévient quand les tours seraient trop courts', () => {
-    ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 5, form: 'laps', laps: 4 })
-    déplier('Forme')
-    expect(screen.getByText(/4 tours de 1,3 km : trop courts/)).toBeInTheDocument()
+    expect(screen.getByText('Relief')).toBeInTheDocument()
   })
 
   it('propose à vélo des distances et des durées de cycliste', () => {
@@ -183,19 +155,11 @@ describe('le panneau des filtres', () => {
     expect(screen.queryByRole('button', { name: '30 min' })).not.toBeInTheDocument()
   })
 
-  it('peut faire passer les boucles déjà courues après les autres', () => {
-    const { onApply } = ouvrir()
-    déplier('Éviter')
-    fireEvent.click(screen.getByRole('checkbox', { name: /Boucles déjà courues/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
-    expect(onApply.mock.calls[0][0].avoid).toEqual(['known'])
-  })
-
   it('réinitialise les filtres sans réafficher ceux qu’on a masqués', () => {
-    const { onApply } = ouvrir({ ...DEFAULTS, hiddenFilters: ['avoid'], count: 12, surface: 'trail' })
+    const { onApply } = ouvrir({ ...DEFAULTS, hiddenFilters: ['relief'], count: 12, surface: 'trail' })
     fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
     // Le nombre de propositions se règle dans « Mon compte » : il reste aussi.
-    expect(onApply.mock.calls[0][0]).toMatchObject({ hiddenFilters: ['avoid'], count: 12, surface: 'mixed' })
+    expect(onApply.mock.calls[0][0]).toMatchObject({ hiddenFilters: ['relief'], count: 12, surface: 'mixed' })
   })
 })

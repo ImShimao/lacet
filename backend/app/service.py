@@ -218,6 +218,21 @@ LAP_PENALTY = 0.12
 def shortlist_size(limit: int) -> int:
     return limit + max(6, limit)
 
+
+# Au-delà de douze propositions, la recherche ordinaire n'a pas assez de
+# polygones : 4 formes × 8 orientations, dont une partie se referme en double ou
+# hors de la longueur, et il restait une dizaine de boucles distinctes à
+# proposer. On en essaie alors douze par forme, et l'on en trace jusqu'au
+# double de ce qui est demandé. Jusqu'à douze, rien ne change.
+WIDE_FROM = 12
+
+
+def wide_settings(sectors: int, max_candidates: int, limit: int) -> tuple[int, int]:
+    """Les secteurs et le plafond de candidats pour `limit` propositions."""
+    if limit <= WIDE_FROM:
+        return sectors, max_candidates
+    return max(sectors, 24), max(max_candidates, 2 * limit)
+
 # En dessous de ce quotient isopérimétrique, le tracé n'est plus une boucle mais
 # un aller-retour. Repère : triangle équilatéral 0,61 · carré 0,79 · une boucle
 # urbaine réaliste tourne désormais entre 0,30 et 0,55 · une « sucette » sous 0,10.
@@ -361,13 +376,14 @@ async def plan_loops(req: LoopRequest) -> LoopResponse:
     # --- génération -------------------------------------------------------
     # Un « 8 » ou des tours n'ont que faire des boucles de toute la distance :
     # on ne les trace pas, et seuls les tours sont cherchés (`_collect`).
+    sectors, max_candidates = wide_settings(settings.sectors, settings.max_candidates, req.limit)
     raw = generate_loops(
         graph,
         start,
         target_m,
         profile,
-        sectors=settings.sectors,
-        max_candidates=settings.max_candidates,
+        sectors=sectors,
+        max_candidates=max_candidates,
         tolerance=req.tolerance,
         terrain=terrain,
         climb_fit=climb_fit,

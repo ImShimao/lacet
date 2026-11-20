@@ -120,6 +120,21 @@ describe('la sortie guidée', () => {
     expect(bilan.arrived).toBe(true)
   })
 
+  it("propose de terminer, sans s'arrêter, quand l'arrêt automatique est coupé", async () => {
+    ;(await import('./storage')).save({ autoFinish: false })
+    const onStop = vi.fn()
+    render(<LiveRun route={boucle} request={null} sport="run" stage={null} onPosition={() => {}} onStop={onStop} />)
+    let t = Date.now()
+    for (const point of [...geometry, geometry[1]]) {
+      t += 2000
+      await relever(point, t)
+    }
+    expect(onStop).not.toHaveBeenCalled()
+    expect(screen.getByText('De retour au départ')).toBeTruthy()
+    await act(async () => screen.getByText('Terminer', { selector: '.live__home' }).click())
+    expect(onStop.mock.calls[0][0].arrived).toBe(true)
+  })
+
   it('en course libre, propose de terminer en repassant au départ', async () => {
     const onStop = vi.fn()
     render(<LiveRun route={null} request={null} sport="run" stage={null} onPosition={() => {}} onStop={onStop} />)

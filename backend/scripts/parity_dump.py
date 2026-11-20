@@ -101,6 +101,9 @@ CASES = [
              "climb_m": 760.0, "with_elevation": True, "limit": 8}},
     {"name": "lyon-douze", "extract": "lyon-centre",
      "req": {"lat": 45.7640, "lon": 4.8357, "distance_km": 3.0, "limit": 12}, "wind": True},
+    # Au-delà de douze propositions, plus de polygones (`wide_settings`).
+    {"name": "lyon-vingt", "extract": "lyon-centre",
+     "req": {"lat": 45.7640, "lon": 4.8357, "distance_km": 3.0, "limit": 20}},
     {"name": "lyon-velo", "extract": "lyon-centre",
      "req": {"lat": 45.7640, "lon": 4.8357, "distance_km": 3.0, "sport": "bike", "safety": "standard"}},
 ]

@@ -29,7 +29,21 @@ const nativeModule = () => import('./native')
  * règle : les alertes de traversée, l'écart du parcours et le « maintenant »
  * d'un virage se disent toujours, et au même moment.
  */
-export const VOICE_DEFAULTS = { km: 1, lap: true, pace: true, total: false, target: true, lead: 'normal' }
+export const VOICE_DEFAULTS = {
+  km: 1,
+  lap: true,
+  pace: true,
+  total: false,
+  target: true,
+  lead: 'normal',
+  // La voix de l'iPhone choisie (`voicesNative`), `null` pour celle du système,
+  // et son débit : `slow`, `normal`, `fast` (`RATE`).
+  voiceId: null,
+  rate: 'normal',
+}
+
+/** Le débit de la voix, en multiple du débit d'origine. */
+export const RATE = { slow: 0.85, normal: 1, fast: 1.15 }
 
 /** L'avance de l'annonce d'un virage : une trentaine de secondes, ou plus, ou moins. */
 export const LEAD = { early: 1.5, normal: 1, late: 0.6 }
@@ -55,8 +69,18 @@ export function setEnabled(value) {
  */
 export function speak(text, { priority = true } = {}) {
   if (!enabled || !text) return false
-  nativeModule().then((n) => n.speakNative(text, { priority }))
+  const { voiceId, rate } = voiceSettings()
+  nativeModule().then((n) => n.speakNative(text, { priority, voice: voiceId, rate: RATE[rate] ?? 1 }))
   return true
+}
+
+/**
+ * Fait entendre la voix réglée, hors sortie : le bouton « Écouter » des
+ * réglages. Passe outre `enabled`, qui ne vaut que pendant une sortie.
+ */
+export function preview(text = 'Dans deux cents mètres, tourne à gauche.') {
+  const { voiceId, rate } = voiceSettings()
+  nativeModule().then((n) => n.speakNative(text, { voice: voiceId, rate: RATE[rate] ?? 1 }))
 }
 
 export function stop() {

@@ -12,6 +12,7 @@ import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
 import Account, { sectionTitle } from './Account.jsx'
 import MapStyleSheet from './MapStyleSheet.jsx'
+import Launch from './Launch.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
 import { GeoBanner, LibraryNotice, ResumeBanner } from './Banners.jsx'
@@ -897,6 +898,7 @@ export default function App() {
           onClose={() => setStylesOpen(false)}
         />
       )}
+      <Launch />
     </div>
   )
 }

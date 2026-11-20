@@ -121,6 +121,13 @@ const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ou
 
 const shortlistSize = (limit) => limit + Math.max(6, limit)
 
+// Au-delà de douze propositions, plus de polygones : voir `wide_settings` en Python.
+const WIDE_FROM = 12
+export function wideSettings(sectors, maxCandidates, limit) {
+  if (limit <= WIDE_FROM) return { sectors, maxCandidates }
+  return { sectors: Math.max(sectors, 24), maxCandidates: Math.max(maxCandidates, 2 * limit) }
+}
+
 /** Refus métier, à montrer tel quel à l'utilisateur. */
 export class PlanningError extends Error {
   constructor(message) {
@@ -265,7 +272,7 @@ export function normalizeRequest(input) {
   req.tolerance = bounded(req.tolerance, 'tolerance', { min: 0.02, max: 0.35 })
   req.pace_sec_per_km = bounded(req.pace_sec_per_km, 'pace_sec_per_km', { min: 150, max: 1200, integer: true })
   req.speed_kmh = bounded(req.speed_kmh, 'speed_kmh', { min: 5, max: 60 })
-  req.limit = bounded(req.limit, 'limit', { min: 1, max: 12, integer: true })
+  req.limit = bounded(req.limit, 'limit', { min: 1, max: 20, integer: true })
   req.laps = bounded(req.laps, 'laps', { min: 2, max: 10, integer: true })
   req.variation = bounded(req.variation, 'variation', { min: 0, max: 1000, integer: true })
   if (!Array.isArray(req.avoid_bearings) || req.avoid_bearings.length > 24) {
@@ -518,8 +525,7 @@ export async function planLoops(input, deps) {
     if (!wholeLoops(req)) return []
     const batch = generateLoops(graph, start, targetM, profile, {
       reuse: (reuse = {}),
-      sectors: settings.sectors,
-      maxCandidates: settings.maxCandidates,
+      ...wideSettings(settings.sectors, settings.maxCandidates, req.limit),
       tolerance: req.tolerance,
       variation: req.variation,
       terrain,

@@ -12,7 +12,7 @@ import { EXPOSED_RISK, RouteStats, unlitLength } from './safety'
 
 const RETURN_PENALTY = 6
 const SHAPES = [3, 4, 5, 6]
-const ORIENTATIONS = 8
+const ORIENTATIONS = 12
 // Orientations essayées quand le relief est connu — voir `TERRAIN_DENSITY` en Python.
 const TERRAIN_DENSITY = 3
 const MAX_ATTEMPTS = 3

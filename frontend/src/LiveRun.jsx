@@ -284,6 +284,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
   const trail = useRef([])
   const autoPause = useRef(load().autoPause !== false)
+  // Réglés dans « Mon compte › Guidage », lus au départ. Le recalcul coupé, on
+  // garde le bouton « Recalculer » ; l'arrêt coupé, l'arrivée propose de terminer.
+  const autoReroute = useRef(load().autoReroute !== false)
+  const autoFinish = useRef(load().autoFinish !== false)
+  const arrivedShown = useRef(false)
   // Les réglages de la voix, lus au départ : changés en courant, ils valent à la sortie suivante.
   const voicePrefs = useRef(voice.voiceSettings())
   // La trace réellement suivie, et le dénivelé qu'elle a coûté (voir `trail.js`).
@@ -813,7 +818,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // Parti du mauvais côté : on est sur la fin de la boucle, à rebours.
         // « Écarté » ne dit pas quoi faire ; « demi-tour », si.
         const backwards = wrongWay(track, lastOnPoint.current, point, farthest.current)
-        if (canDetour) {
+        if (canDetour && !autoReroute.current) {
+          talk(
+            backwards
+              ? 'Tu pars à contresens du parcours. Fais demi-tour.'
+              : "Tu t'es écarté du parcours. Reviens sur le tracé, ou touche « Recalculer ».",
+          )
+        } else if (canDetour) {
           dueAt.current = Date.now() + REROUTE_AFTER_MS
           setRerouteDue(dueAt.current)
           talk(
@@ -827,7 +838,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
           )
         }
       }
-      if (strayCount.current >= OFF_ROUTE_FIXES && canDetour && dueAt.current && Date.now() >= dueAt.current) {
+      if (strayCount.current >= OFF_ROUTE_FIXES && canDetour && autoReroute.current && dueAt.current && Date.now() >= dueAt.current) {
         detour(point)
       }
     } else {
@@ -1015,7 +1026,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   function watchArrival(point, found) {
     const guided = guideRef.current.route
     const fin = guided?.geometry?.[guided.geometry.length - 1]
-    if (!fin || finishing.current) return
+    if (!fin || finishing.current || arrivedShown.current) return
     // On arrive au bout du tracé, ou à sa porte : partie à trente mètres du
     // repère, la sortie se termine aussi là d'où elle est partie.
     const verdict = arrival.current.push({
@@ -1032,8 +1043,18 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       now: Date.now(),
     })
     if (verdict !== 'arrived') return
-    finishing.current = true
     const at = arrival.current.mark ?? { covered: covered.current, elapsed: movingSeconds() }
+    if (!autoFinish.current) {
+      // L'arrêt automatique coupé : on le dit, et la sortie continue tant
+      // qu'on ne touche pas « Terminer » — pour un tour de plus, ou marcher.
+      arrivedShown.current = true
+      homeShown.current = true
+      setBackHome(true)
+      haptic('warnHaptic')
+      talk(`${arrivalSpeech(at.covered, at.elapsed, sport === 'bike')} Touche « Terminer » pour finir.`)
+      return
+    }
+    finishing.current = true
     // Le bilan, dit à voix haute : on arrive essoufflé, le téléphone au bras, et
     // c'est la seule chose qu'on veut savoir avant de le regarder.
     talk(arrivalSpeech(at.covered, at.elapsed, sport === 'bike'))
@@ -1353,7 +1374,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
             <b>De retour au départ</b>
             <span>Termine ici, ou continue : la sortie suit.</span>
           </div>
-          <button className="live__home" onClick={() => finish()}>
+          <button className="live__home" onClick={() => finish(arrivedShown.current ? { arrived: true } : null)}>
             Terminer
           </button>
         </div>
