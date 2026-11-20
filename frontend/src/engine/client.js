@@ -78,6 +78,9 @@ export const detourOnDevice = (payload) => request('detour', payload)
  */
 export const matchOnDevice = (payload, onProgress) => request('match', payload, onProgress)
 
+/** Le D+ possible près du départ, en m/km, ou `null` — pour les badges du filtre. */
+export const reliefHintOnDevice = (payload) => request('reliefHint', payload)
+
 /** La même boucle dans l'autre sens, tant qu'elle est à l'écran. */
 export const reverseOnDevice = (id) => request('reverse', { id })
 

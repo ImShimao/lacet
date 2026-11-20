@@ -54,9 +54,9 @@ const TERRAIN_BIKE = {
 }
 
 const RELIEF = {
-  title: 'Dénivelé',
+  title: 'Comprendre le relief',
   intro:
-    "Le dénivelé positif (D+) est le total des montées sur la boucle. Celles qui tiennent le réglage passent devant les autres, même mieux notées en sécurité ; mais en plaine, « Côtes » ne peut pas inventer de colline.",
+    "Le dénivelé positif (D+) est le total des montées sur la boucle. Les seuils, en mètres de montée par kilomètre : plat vers 3, vallonné vers 10, côtes à partir de 22. Le badge de chaque réglage dit si le terrain autour du départ le permet : Probable, Possible ou Peu probable, d'après les altitudes déjà sur ton téléphone. Celles qui tiennent le réglage passent devant les autres ; en plaine, « Côtes » ne peut pas inventer de colline.",
   items: [
     {
       icon: 'flat',
@@ -85,6 +85,24 @@ const RELIEF = {
 // bande, une boucle est pénalisée au classement — mais proposée quand même, s'il
 // n'y a rien d'autre.
 const RELIEF_BAND_PER_KM = { flat: [0, 10], hilly: [12, Infinity] }
+
+/**
+ * Le badge d'un relief avant de chercher, d'après le D+ possible près du départ
+ * (`reliefHint`, en m/km). « Plat » veut peu de montée, « Côtes » beaucoup,
+ * « Vallonné » entre les deux ; un D+ précis tient si sa cible est sous ce qui
+ * se trouve autour, ou à peine au-dessus. Rend `Probable`, `Possible`,
+ * `Peu probable`, ou `null` quand le terrain n'est pas gardé.
+ */
+export function reliefBadge(key, reachable, climbPerKm = null) {
+  if (reachable == null) return null
+  const e = reachable
+  let level = 0
+  if (key === 'flat') level = e <= 5 ? 2 : e <= 10 ? 1 : 0
+  else if (key === 'rolling') level = e >= 4 && e <= 15 ? 2 : e >= 2 && e <= 25 ? 1 : 0
+  else if (key === 'hilly') level = e >= 15 ? 2 : e >= 10 ? 1 : 0
+  else if (key === 'climb') level = climbPerKm <= e ? 2 : climbPerKm <= 1.5 * e ? 1 : 0
+  return ['Peu probable', 'Possible', 'Probable'][level]
+}
 
 /**
  * Le relief demandé que le terrain n'a pas pu donner : « Côtes » en plaine,

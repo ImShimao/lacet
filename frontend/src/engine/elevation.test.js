@@ -4,6 +4,7 @@ import {
   ELEVATION_STEP_M,
   ascentDescent,
   fetchMany,
+  reachableClimbPerKm,
   shapeRelief,
   smoothAlong,
   terrainTileUrl,
@@ -313,5 +314,29 @@ describe("l'altitude sans réseau, dans les tuiles gardées", () => {
       throw new TypeError('Load failed')
     }
     expect(await fetchMany([[[-60.1, -20.2]]], { fetchImpl: horsLigne })).toEqual([null])
+  })
+})
+
+/**
+ * Le D+ possible près du départ, lu sur les altitudes gardées — `reachableClimbPerKm`.
+ * Une pente pure en x donne un D+ qu'on peut écrire à la main : 250 × h / m.
+ */
+describe('reachableClimbPerKm', () => {
+  it('rend 0 sur un plateau', () => {
+    expect(reachableClimbPerKm(0, 0, 10, () => 120)).toBe(0)
+  })
+
+  it('rend null quand moins de la moitié du disque est gardée', () => {
+    expect(reachableClimbPerKm(0, 0, 10, () => null)).toBeNull()
+  })
+
+  it('compte la moitié de la pente, en m/km', () => {
+    // À l'équateur, zoom 12 : 38,2 m par pixel. Un pixel de plus d'altitude
+    // tous les 0,01 pixel de distance, soit une pente de 1 %, donne ~2,5 m/km
+    // (un pixel sur deux est une paire horizontale, l'autre verticale).
+    const h = 0.01 * 38.22
+    const climb = reachableClimbPerKm(0, 0, 10, (x) => x * h)
+    expect(climb).toBeGreaterThan(2)
+    expect(climb).toBeLessThan(3)
   })
 })

@@ -882,7 +882,7 @@ export default function App() {
       </aside>
 
       {filtersOpen && (
-        <FiltersSheet value={params} onApply={search} onClose={() => setFiltersOpen(false)} />
+        <FiltersSheet value={params} origin={start ? askedOf(start) : null} onApply={search} onClose={() => setFiltersOpen(false)} />
       )}
       {naming && (
         <PlaceSheet suggestion={startLabel || ''} onSave={keepPlace} onClose={() => setNaming(false)} />

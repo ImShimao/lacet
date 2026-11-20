@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climbBand, climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
+import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, surfaceMismatch } from './explain'
 
 /**
  * Le relief demandé que le terrain ne donne pas. À Colmar, « Côtes » rendait
@@ -86,5 +86,29 @@ describe('la nuit qui tombe pendant la boucle', () => {
   it('se tait de jour à l’arrivée comme de nuit au départ', () => {
     expect(nightfall(lat, lon, 3600, at(14, 0))).toBeNull()
     expect(nightfall(lat, lon, 3600, at(21, 0))).toBeNull()
+  })
+})
+
+/**
+ * Le badge d'un relief avant de chercher — `reliefBadge`. Sans estimation (tuiles
+ * absentes), pas de badge du tout.
+ */
+describe('reliefBadge', () => {
+  it('sans estimation, pas de badge', () => {
+    expect(reliefBadge('flat', null)).toBeNull()
+  })
+
+  it('Plat veut peu de montée, Côtes beaucoup', () => {
+    expect(reliefBadge('flat', 3)).toBe('Probable')
+    expect(reliefBadge('flat', 8)).toBe('Possible')
+    expect(reliefBadge('flat', 20)).toBe('Peu probable')
+    expect(reliefBadge('hilly', 20)).toBe('Probable')
+    expect(reliefBadge('hilly', 5)).toBe('Peu probable')
+  })
+
+  it('un D+ précis tient si sa cible est sous ce qui se trouve autour', () => {
+    expect(reliefBadge('climb', 12, 10)).toBe('Probable')
+    expect(reliefBadge('climb', 12, 15)).toBe('Possible')
+    expect(reliefBadge('climb', 12, 25)).toBe('Peu probable')
   })
 })

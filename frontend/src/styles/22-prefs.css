@@ -263,6 +263,20 @@
   flex: none;
   color: var(--text-2);
 }
+/* Le badge du terrain autour du départ : « Probable » en accent, le reste en retrait. */
+.choice__badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: calc(11.5px * var(--text-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.choice__badge--yes {
+  color: var(--accent-text);
+}
 .choice--on .choice__icon {
   color: var(--accent-text);
 }
