@@ -32,7 +32,7 @@ def info_plist() -> None:
         plist = plistlib.load(fh)
 
     plist["CFBundleDisplayName"] = "Lacet"
-    plist["CFBundleShortVersionString"] = os.environ.get("APP_VERSION", "1.0")
+    plist["CFBundleShortVersionString"] = os.environ.get("APP_VERSION", "1.1")
     plist["CFBundleVersion"] = os.environ.get("BUILD_NUMBER", "1")
 
     # Les phrases qu'iOS affiche en demandant l'autorisation. Elles disent à
