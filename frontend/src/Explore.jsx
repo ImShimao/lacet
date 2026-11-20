@@ -14,13 +14,18 @@ import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
 import { StopsList } from './Stops.jsx'
-import { TERRAINS } from './FiltersSheet.jsx'
+import { TERRAINS, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
 import { km, surfaceLabel } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
+
+// Les distances qu'on choisit d'un geste, à l'accueil.
+const QUICK_KM = [3, 5, 10, 15]
+
+const round1 = (v) => Math.round(v * 10) / 10
 
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
@@ -49,6 +54,7 @@ export default function Explore({
   onReverse,
   reversing = false,
   onOpenFilters,
+  onQuickParams = null,
   onFavorite,
   onStart,
   onFreeRun,
@@ -124,6 +130,48 @@ export default function Explore({
             </em>
           </div>
         </div>
+        {/* La question principale de l'accueil, en grand : combien de kilomètres
+            aujourd'hui. Les raccourcis couvrent le gros des sorties ; le reste
+            reste dans les filtres. */}
+        {params.mode !== 'duration' && onQuickParams && (
+          <div className="quick">
+            <div className="quick__label">Combien aujourd'hui ?</div>
+            <div className="quick__value">
+              <button
+                className="quick__step"
+                onClick={() => onQuickParams({ distance_km: Math.max(1, round1(params.distance_km - 1)), mode: 'distance' })}
+                aria-label="Diminuer la distance"
+              >
+                <Icon name="minus" size={18} />
+              </button>
+              <b>{formatKm(params.distance_km)}</b>
+              <span>km</span>
+              <button
+                className="quick__step"
+                onClick={() => onQuickParams({ distance_km: Math.min(60, round1(params.distance_km + 1)), mode: 'distance' })}
+                aria-label="Augmenter la distance"
+              >
+                <Icon name="plus" size={18} />
+              </button>
+            </div>
+            <div className="quick__chips" role="radiogroup" aria-label="Distances rapides">
+              {QUICK_KM.map((k) => {
+                const on = Math.abs(params.distance_km - k) < 0.01
+                return (
+                  <button
+                    key={k}
+                    role="radio"
+                    aria-checked={on}
+                    className={`chip ${on ? 'chip--on' : ''}`}
+                    onClick={() => onQuickParams({ distance_km: k, mode: 'distance' })}
+                  >
+                    {k} km
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
           <Icon name="search" size={18} />
           Trouver ma boucle

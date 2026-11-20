@@ -831,6 +831,11 @@ export default function App() {
               reversing={reversing}
               onReverse={canReverse ? reverseSelected : null}
               onOpenFilters={() => setFiltersOpen(true)}
+              onQuickParams={(patch) => {
+                const next = { ...params, ...patch }
+                setParams(next)
+                save({ params: next })
+              }}
               onFavorite={() => {
                 haptic('tickHaptic')
                 library.toggleFavorite(selected)

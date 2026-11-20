@@ -165,3 +165,36 @@ describe('un « 8 »', () => {
     expect(screen.getByText(/à parcourir/)).toBeInTheDocument()
   })
 })
+
+/** L'accueil, sans proposition : la distance se règle d'un geste, sans ouvrir les filtres. */
+describe('l’accueil : la distance en grand', () => {
+  const accueil = (onQuickParams) =>
+    render(
+      <Explore
+        start={[7.2, 47.9]}
+        startLabel="Guebwiller"
+        geo={{ status: 'ready', accuracy: 8 }}
+        params={{ sport: 'run', mode: 'distance', distance_km: 10, surface: 'mixed', elevation: 'rolling', safety: 'safe' }}
+        history={[]}
+        onQuickParams={onQuickParams}
+        onSearch={() => {}}
+        onOpenFilters={() => {}}
+        onFreeRun={() => {}}
+      />,
+    )
+
+  it('affiche la distance choisie et la règle au raccourci', () => {
+    const onQuickParams = vi.fn()
+    accueil(onQuickParams)
+    expect(screen.getByText('10')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: '5 km' }))
+    expect(onQuickParams).toHaveBeenCalledWith({ distance_km: 5, mode: 'distance' })
+  })
+
+  it('ajuste d’un kilomètre avec les boutons, sans descendre sous 1', () => {
+    const onQuickParams = vi.fn()
+    accueil(onQuickParams)
+    fireEvent.click(screen.getByRole('button', { name: 'Augmenter la distance' }))
+    expect(onQuickParams).toHaveBeenLastCalledWith({ distance_km: 11, mode: 'distance' })
+  })
+})
