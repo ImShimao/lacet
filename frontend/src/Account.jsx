@@ -18,7 +18,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { COUNTS, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented } from './FiltersSheet.jsx'
+import { COUNTS, Field, MOMENTS, OPTIONAL_FILTERS, SPORTS, Segmented } from './FiltersSheet.jsx'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
@@ -428,17 +428,15 @@ function AppearanceSettings({ mapStyle, onStyles }) {
   const look = useAppearance()
   return (
     <div className="fields">
-      <div className="field">
-        <span className="label">Thème</span>
+      <Field label="Thème" value={THEMES.find((o) => o.key === look.theme)?.label}>
         <Segmented options={THEMES} value={look.theme} onChange={(theme) => setAppearance({ theme })} />
         <p className="field__hint">
           « Auto » suit le réglage de l'iPhone. Le thème clair se lit mieux en plein soleil, le
           sombre éblouit moins le soir.
         </p>
-      </div>
+      </Field>
 
-      <div className="field">
-        <span className="label">Couleur d'accent</span>
+      <Field label="Couleur d'accent" value={ACCENTS.find((o) => o.key === look.accent)?.label}>
         <div className="swatches" role="radiogroup" aria-label="Couleur d'accent">
           {ACCENTS.map((a) => (
             <button
@@ -458,16 +456,15 @@ function AppearanceSettings({ mapStyle, onStyles }) {
           Boutons, onglet actif, repère de départ. Le vert, le jaune et le rouge de la sécurité
           ne changent pas : ce sont des avis, pas une décoration.
         </p>
-      </div>
+      </Field>
 
-      <div className="field">
-        <span className="label">Taille du texte</span>
+      <Field label="Taille du texte" value={TEXT_SIZES.find((o) => o.key === look.text)?.label}>
         <Segmented options={TEXT_SIZES} value={look.text} onChange={(text) => setAppearance({ text })} />
         <p className="field__hint">
           Agrandit le texte des listes, des cartes et des réglages. Les chiffres de la sortie
           sont déjà faits pour être lus à bout de bras.
         </p>
-      </div>
+      </Field>
 
       {/* Le fond de carte vivait dans un bouton sur la carte : on le règle une
           fois, pas à chaque sortie. Il ouvre le même choix, avec son aperçu. */}
@@ -516,8 +513,7 @@ const SIDES = [
 function SearchSettings({ params, onProfile }) {
   return (
     <div className="fields">
-      <div className="field">
-        <span className="label">Moment</span>
+      <Field label="Moment" value={MOMENTS.find((o) => o.key === (params.time_of_day ?? 'auto'))?.label}>
         <Segmented
           options={MOMENTS}
           value={params.time_of_day ?? 'auto'}
@@ -527,10 +523,9 @@ function SearchSettings({ params, onProfile }) {
           La nuit, les rues éclairées et passantes passent devant les chemins isolés, même
           quand ils rallongent. « Auto » choisit selon l'heure du coucher du soleil au départ.
         </p>
-      </div>
+      </Field>
 
-      <div className="field">
-        <span className="label">Côté de la route</span>
+      <Field label="Côté de la route" value={SIDES.find((o) => o.key === (params.side ?? 'left'))?.label}>
         <Segmented options={SIDES} value={params.side ?? 'left'} onChange={(side) => onProfile({ side })} />
         <p className="field__hint">
           Le côté par lequel la boucle fait le tour des ronds-points, et que la voix y rappelle. Le
@@ -538,10 +533,9 @@ function SearchSettings({ params, onProfile }) {
           ni accotement, de marcher à gauche, face aux voitures : on voit venir ce qui arrive. À
           vélo, ce réglage ne change rien : on roule à droite.
         </p>
-      </div>
+      </Field>
 
-      <div className="field">
-        <span className="label">Propositions</span>
+      <Field label="Propositions" value={`${params.count ?? 5} boucles`}>
         <Segmented
           options={COUNTS}
           value={params.count ?? 5}
@@ -551,7 +545,7 @@ function SearchSettings({ params, onProfile }) {
           Nombre de boucles proposées après une recherche. En demander plus allonge un peu
           le calcul, et les dernières se ressemblent davantage.
         </p>
-      </div>
+      </Field>
 
       <ShownFilters params={params} onProfile={onProfile} />
     </div>

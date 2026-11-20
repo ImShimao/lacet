@@ -210,6 +210,10 @@ describe('Mon compte', () => {
         onRestored={() => {}}
       />,
     )
+    // Replié en une ligne qui dit déjà le choix : « Côté de la route · Gauche ».
+    const ligne = screen.getByRole('button', { name: /^Côté de la route/ })
+    expect(ligne.textContent).toContain('Gauche')
+    fireEvent.click(ligne)
     expect(screen.getByText(/R412-36/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Gauche' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'Droite' }))

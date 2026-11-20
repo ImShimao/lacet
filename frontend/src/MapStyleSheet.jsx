@@ -49,8 +49,6 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
     map.current.setStyle(entry.style, loadOptions(entry))
   }, [choice])
 
-  const current = styleByKey(choice)
-
   return (
     <div className="modal" onClick={onClose}>
       <div
@@ -73,7 +71,9 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
         <div className="modal__body">
           <div className="mapsheet__preview" ref={preview} aria-hidden="true" />
 
-          <div className="mapsheet__grid" role="radiogroup" aria-label="Fonds disponibles">
+          {/* Une ligne par fond, comme les choix de RunnrZ : un rond à cocher,
+              le nom, ce qu'il montre, et sa couleur en vignette. */}
+          <div className="mapsheet__list" role="radiogroup" aria-label="Fonds disponibles">
             {MAP_STYLES.map((s) => (
               <button
                 key={s.key}
@@ -83,15 +83,15 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
                 onClick={() => setChoice(s.key)}
                 data-autofocus={choice === s.key || undefined}
               >
-                <i style={{ background: s.swatch }} />
-                {s.label}
+                <span className="mapsheet__radio" aria-hidden="true" />
+                <span className="mapsheet__text">
+                  <b>{s.label}</b>
+                  <em>{s.description}</em>
+                </span>
+                <i style={{ background: s.swatch }} aria-hidden="true" />
               </button>
             ))}
           </div>
-
-          <p className="mapsheet__desc" aria-live="polite">
-            {current.description}
-          </p>
         </div>
 
         <div className="modal__foot">

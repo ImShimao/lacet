@@ -782,7 +782,7 @@ function formHint(draft, km) {
  * d'œil, et on n'ouvre que celui qu'on vient changer. Sans, il reste ouvert :
  * l'activité et la longueur, qu'on règle à chaque sortie.
  */
-function Field({ label, info, sport, value = null, children }) {
+export function Field({ label, info, sport, value = null, children }) {
   const [open, setOpen] = useState(false)
   if (value == null) {
     return (
