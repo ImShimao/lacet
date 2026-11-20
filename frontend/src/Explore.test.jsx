@@ -191,10 +191,10 @@ describe('l’accueil : la distance en grand', () => {
     expect(onQuickParams).toHaveBeenCalledWith({ distance_km: 5, mode: 'distance' })
   })
 
-  it('ajuste d’un kilomètre avec les boutons, sans descendre sous 1', () => {
+  it('se règle au curseur, par demi-kilomètre', () => {
     const onQuickParams = vi.fn()
     accueil(onQuickParams)
-    fireEvent.click(screen.getByRole('button', { name: 'Augmenter la distance' }))
-    expect(onQuickParams).toHaveBeenLastCalledWith({ distance_km: 11, mode: 'distance' })
+    fireEvent.change(screen.getByRole('slider', { name: 'Distance de la boucle' }), { target: { value: '12.5' } })
+    expect(onQuickParams).toHaveBeenLastCalledWith({ distance_km: 12.5, mode: 'distance' })
   })
 })

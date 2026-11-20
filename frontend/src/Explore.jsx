@@ -25,8 +25,6 @@ import { clockTime, turnIcon } from './runFormat'
 // Les distances qu'on choisit d'un geste, à l'accueil.
 const QUICK_KM = [3, 5, 10, 15]
 
-const round1 = (v) => Math.round(v * 10) / 10
-
 // Mêmes libellés que le backend, pour que l'app parle d'une seule voix.
 const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest']
 
@@ -134,27 +132,27 @@ export default function Explore({
             aujourd'hui. Les raccourcis couvrent le gros des sorties ; le reste
             reste dans les filtres. */}
         {params.mode !== 'duration' && onQuickParams && (
-          <div className="quick">
-            <div className="quick__label">Combien aujourd'hui ?</div>
-            <div className="quick__value">
-              <button
-                className="quick__step"
-                onClick={() => onQuickParams({ distance_km: Math.max(1, round1(params.distance_km - 1)), mode: 'distance' })}
-                aria-label="Diminuer la distance"
-              >
-                <Icon name="minus" size={18} />
-              </button>
-              <b>{formatKm(params.distance_km)}</b>
-              <span>km</span>
-              <button
-                className="quick__step"
-                onClick={() => onQuickParams({ distance_km: Math.min(60, round1(params.distance_km + 1)), mode: 'distance' })}
-                aria-label="Augmenter la distance"
-              >
-                <Icon name="plus" size={18} />
-              </button>
+          <div className="dist">
+            <div className="dist__head">
+              <span>Combien aujourd'hui ?</span>
+              <b>
+                {formatKm(params.distance_km)} <small>km</small>
+              </b>
             </div>
-            <div className="quick__chips" role="radiogroup" aria-label="Distances rapides">
+            {/* Un curseur qu'on glisse : la distance se règle au pouce, sans
+                viser de petits boutons. */}
+            <input
+              type="range"
+              className="dist__range"
+              aria-label="Distance de la boucle"
+              min={1}
+              max={42}
+              step={0.5}
+              value={params.distance_km}
+              style={{ '--fill': `${((params.distance_km - 1) / 41) * 100}%` }}
+              onChange={(e) => onQuickParams({ distance_km: Number(e.target.value), mode: 'distance' })}
+            />
+            <div className="dist__chips" role="radiogroup" aria-label="Distances rapides">
               {QUICK_KM.map((k) => {
                 const on = Math.abs(params.distance_km - k) < 0.01
                 return (
