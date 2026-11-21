@@ -9,6 +9,7 @@
 
 import { pace } from './format'
 import { clock } from './runFormat'
+import { paceLabel } from './units'
 
 // En dessous de cette distance parcourue, l'allure réelle ne dit encore rien :
 // le premier kilomètre part d'un feu rouge ou d'un lacet à renouer. On se fie à
@@ -94,7 +95,7 @@ export function finishedState({ name, distanceM, elapsedS, bike = false, now = D
   const average = bike
     ? `${((distanceM / Math.max(1, elapsedS)) * 3.6).toFixed(1).replace('.', ',')} km/h`
     : perKm
-      ? `${pace(perKm)}/km`
+      ? `${pace(perKm)}${paceLabel()}`
       : null
   return {
     name: name || 'Sortie',

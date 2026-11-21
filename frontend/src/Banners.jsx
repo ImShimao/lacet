@@ -1,5 +1,6 @@
 import Icon from './Icon.jsx'
 import { km } from './format'
+import { unitLabel } from './units'
 
 /**
  * La sortie interrompue, retrouvée au lancement : l'app a été fermée en plein
@@ -11,7 +12,7 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
     <div className="banner banner--resume">
       <Icon name="pause" size={16} />
       <span>
-        <b>Sortie interrompue</b> · {km(pending.covered, 1)} km en {Math.round(pending.elapsed / 60)} min,{' '}
+        <b>Sortie interrompue</b> · {km(pending.covered, 1)} {unitLabel()} en {Math.round(pending.elapsed / 60)} min,{' '}
         {ago(Date.now() - pending.at)}.
       </span>
       <button className="banner__close" onClick={onDrop} aria-label="Oublier">

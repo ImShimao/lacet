@@ -10,6 +10,7 @@ import { announcing, arrivalText, contactOf, textTo } from './contact'
 import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
+import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -49,7 +50,7 @@ export default function RunSummary({
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
   const perKm = distance > 100 ? seconds / (distance / 1000) : 0
-  const speed = seconds > 0 ? (distance / seconds) * 3.6 : 0
+  const speed = seconds > 0 ? speedIn((distance / seconds) * 3.6) : 0
   const planned = entry.free ? null : entry.distance_m || null
   const gap = planned ? distance - planned : null
   const rang = useMemo(() => standing(entry, history), [entry, history])
@@ -115,7 +116,7 @@ export default function RunSummary({
           <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
           <span>
             <Icon name="gauge" size={12} />
-            {bike ? 'Vitesse (km/h)' : 'Allure (/km)'}
+            {bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}
           </span>
         </div>
         <div>
@@ -172,7 +173,7 @@ export default function RunSummary({
 
       <p className="muted small">
         {best.monthCount > 1
-          ? `${best.monthCount}ᵉ sortie du mois · ${km(best.monthM, 1)} km depuis le 1er.`
+          ? `${best.monthCount}ᵉ sortie du mois · ${km(best.monthM, 1)} ${unitLabel()} depuis le 1er.`
           : 'Première sortie du mois.'}
       </p>
 

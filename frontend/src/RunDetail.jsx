@@ -6,6 +6,7 @@ import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
 import { climbProfile, paceBySlope } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
+import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
 /**
  * Une sortie déjà faite, rouverte.
@@ -34,7 +35,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
   const perKm = distance > 100 ? seconds / (distance / 1000) : 0
-  const speed = seconds > 0 ? (distance / seconds) * 3.6 : 0
+  const speed = seconds > 0 ? speedIn((distance / seconds) * 3.6) : 0
   const planned = entry.free ? null : entry.distance_m || null
   const gap = planned ? distance - planned : null
   const splits = entry.splits?.length ? entry.splits : null
@@ -77,14 +78,14 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
           <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
           <span>
             <Icon name="gauge" size={12} />
-            {bike ? 'Vitesse (km/h)' : 'Allure (/km)'}
+            {bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}
           </span>
         </div>
         <div>
           <b>{bike ? pace(perKm) : speed.toFixed(1).replace('.', ',')}</b>
           <span>
             <Icon name="gauge" size={12} />
-            {bike ? 'Allure (/km)' : 'Vitesse (km/h)'}
+            {bike ? `Allure (${paceLabel()})` : `Vitesse (${speedLabel()})`}
           </span>
         </div>
         <div>
@@ -230,7 +231,7 @@ export function PlanGap({ entry, planned, gap }) {
     <div className="rundet__plan">
       <div>
         <span>Prévu</span>
-        <b>{km(planned, 1)} km</b>
+        <b>{km(planned, 1)} {unitLabel()}</b>
       </div>
       <div>
         <span>Écart</span>
@@ -355,7 +356,7 @@ export function Splits({ splits, bike, entry = null }) {
       )}
       {target && (
         <p className="muted small">
-          Allure visée {pace(target)}/km : {under} kilomètre{under > 1 ? 's' : ''} sur {splits.length} dans les temps.
+          Allure visée {pace(target)}{paceLabel()} : {under} kilomètre{under > 1 ? 's' : ''} sur {splits.length} dans les temps.
         </p>
       )}
     </div>
@@ -465,7 +466,7 @@ export function Spoken({ spoken }) {
         {spoken.map((s, i) => (
           <li key={i}>
             <time>{heure(s.t)}</time>
-            <em>{km(s.m, 2)} km</em>
+            <em>{km(s.m, 2)} {unitLabel()}</em>
             <span>{s.text}</span>
           </li>
         ))}
@@ -495,7 +496,7 @@ export function SlopePace({ entry, bike = false }) {
   if (!allure) return null
   const value = (seconds) => {
     if (!Number.isFinite(seconds)) return '—'
-    return bike ? `${(3600 / seconds).toFixed(1).replace('.', ',')} km/h` : `${pace(seconds)} /km`
+    return bike ? `${speedIn(3600 / seconds).toFixed(1).replace('.', ',')} ${speedLabel()}` : `${pace(seconds)} ${paceLabel()}`
   }
   const rows = [
     ['Montée', allure.up],

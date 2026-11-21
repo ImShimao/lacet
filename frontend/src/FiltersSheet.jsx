@@ -5,6 +5,7 @@ import { InfoButton } from './Explain.jsx'
 import { climbBand, reliefBadge } from './explain'
 import { reliefHintOnDevice } from './engine/client'
 import { pace } from './format'
+import { fromKm, paceLabel, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 
 export const SPORTS = [
   { key: 'run', label: 'Course', icon: 'run' },
@@ -403,15 +404,15 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
             )}
             {draft.mode === 'distance' ? (
               <Stepper
-                text={`${formatKm(draft.distance_km)} km`}
+                text={`${formatDistance(draft.distance_km)} ${unitLabel()}`}
                 editable={{
-                  value: draft.distance_km,
-                  suffix: 'km',
+                  value: Number(fromKm(draft.distance_km).toFixed(3)),
+                  suffix: unitLabel(),
                   min: MIN_KM,
                   max: maxKm,
                   // Au mètre près : c'est tout l'intérêt de taper soi-même —
                   // 21,0975 pour un semi, 8,4 pour une boucle connue.
-                  onCommit: (v) => set({ distance_km: round(clamp(v, MIN_KM, maxKm), 0.001) }),
+                  onCommit: (v) => set({ distance_km: round(clamp(toKm(v), MIN_KM, maxKm), 0.001) }),
                 }}
                 onStep={(d) => {
                   const step = distanceStep(draft.distance_km + (d > 0 ? 0 : -0.001))
@@ -467,22 +468,22 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
                 />
                 <p className="field__hint">
                   {draft.precise
-                    ? `La boucle tombera entre ${formatKm(draft.distance_km * 0.975)} et ${formatKm(
+                    ? `La boucle tombera entre ${formatDistance(draft.distance_km * 0.975)} et ${formatDistance(
                         draft.distance_km * 1.025,
-                      )} km. Moins de boucles conviennent : s'il n'y en a aucune, Lacet élargit tout seul et le dit.`
-                    : `La boucle tombera entre ${formatKm(draft.distance_km * 0.9)} et ${formatKm(
+                      )} ${unitLabel()}. Moins de boucles conviennent : s'il n'y en a aucune, Lacet élargit tout seul et le dit.`
+                    : `La boucle tombera entre ${formatDistance(draft.distance_km * 0.9)} et ${formatDistance(
                         draft.distance_km * 1.1,
-                      )} km — de quoi suivre les rues plutôt que le chiffre.`}
+                      )} ${unitLabel()} — de quoi suivre les rues plutôt que le chiffre.`}
                 </p>
               </>
             )}
             <p className="field__hint">
               {draft.mode === 'duration'
                 ? // Une estimation à trois décimales se lirait comme une promesse.
-                  `Converti en distance selon l'allure : environ ${formatKm(
+                  `Converti en distance selon l'allure : environ ${formatDistance(
                     Math.round(estimateKm(draft) * 10) / 10,
-                  )} km.`
-                : `Pas de ${formatKm(distanceStep(draft.distance_km))} km · jusqu'à ${maxKm} km ${
+                  )} ${unitLabel()}.`
+                : `Pas de ${formatDistance(distanceStep(draft.distance_km))} ${unitLabel()} · jusqu'à ${formatDistance(maxKm)} ${unitLabel()} ${
                     isBike ? 'à vélo' : 'à pied'
                   }. Le champ est modifiable au clavier.`}
             </p>
@@ -501,8 +502,8 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               {!isBike && (
                 <Segmented
                   options={[
-                    { key: 'pace', label: 'min/km' },
-                    { key: 'speed', label: 'km/h' },
+                    { key: 'pace', label: `min${paceLabel()}` },
+                    { key: 'speed', label: speedLabel() },
                   ]}
                   value={usesSpeed ? 'speed' : 'pace'}
                   onChange={(speedUnit) => set({ speedUnit })}
@@ -510,14 +511,14 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               )}
               {usesSpeed ? (
                 <Stepper
-                  text={`${formatKm(draft.speed_kmh)} km/h`}
+                  text={`${formatKm(Math.round(speedIn(draft.speed_kmh) * 10) / 10)} ${speedLabel()}`}
                   onStep={(d) => set({ speed_kmh: round(clamp(draft.speed_kmh + d * 0.5, 5, 60), 0.5) })}
                   canDown={draft.speed_kmh > 5}
                   canUp={draft.speed_kmh < 60}
                 />
               ) : (
                 <Stepper
-                  text={`${pace(draft.pace_sec_per_km)} /km`}
+                  text={`${pace(draft.pace_sec_per_km)} ${paceLabel()}`}
                   onStep={(d) => set({ pace_sec_per_km: clamp(draft.pace_sec_per_km + d * 5, 150, 1200) })}
                   canDown={draft.pace_sec_per_km > 150}
                   canUp={draft.pace_sec_per_km < 1200}
@@ -783,6 +784,10 @@ export const round = (v, step) => Number((Math.round(v / step) * step).toFixed(3
  * « 10 » plutôt que « 10.0 », « 10,5 » quand la décimale compte, et
  * « 21,098 » quand on a saisi une distance au mètre près.
  */
+/** Une distance de la demande (en km), dans l'unité affichée : au centième en miles. */
+export const formatDistance = (kmValue) =>
+  formatKm(units() === 'mi' ? Math.round(fromKm(kmValue) * 100) / 100 : kmValue)
+
 export function formatKm(v) {
   const rounded = Number(Number(v).toFixed(3))
   return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',')

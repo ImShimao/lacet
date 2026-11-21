@@ -21,6 +21,7 @@ import { km } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
+import { speedIn, speedLabel, unitLabel } from './units'
 
 // Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
 // et une grande graduation tous les `major` pas.
@@ -406,11 +407,11 @@ export default function Explore({
             {selected.figure_eight ? (
               <>
                 Deux boucles différentes, de <b>{km(selected.lap_distances_m[0], 2)}</b> puis{' '}
-                <b>{km(selected.lap_distances_m[1], 2)} km</b>, enchaînées au départ
+                <b>{km(selected.lap_distances_m[1], 2)} {unitLabel()}</b>, enchaînées au départ
               </>
             ) : (
               <>
-                Un tour de <b>{km(selected.lap_distance_m, 2)} km</b>, à parcourir{' '}
+                Un tour de <b>{km(selected.lap_distance_m, 2)} {unitLabel()}</b>, à parcourir{' '}
                 <b>{selected.laps} fois</b>
               </>
             )}
@@ -724,9 +725,9 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     et pour un « 8 », ses deux boucles. */}
                 <span className="rcard__dir">
                   {r.figure_eight
-                    ? `${km(r.lap_distances_m[0], 1)} + ${km(r.lap_distances_m[1], 1)} km`
+                    ? `${km(r.lap_distances_m[0], 1)} + ${km(r.lap_distances_m[1], 1)} ${unitLabel()}`
                     : r.laps > 1
-                      ? `${km(r.lap_distance_m, 1)} km × ${r.laps}`
+                      ? `${km(r.lap_distance_m, 1)} ${unitLabel()} × ${r.laps}`
                       : r.direction}
                 </span>
                 {/* Sans analyse — un tracé de secours —, pas de note : un tiret
@@ -754,7 +755,7 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                 )}
               </span>
               <span className="rcard__km">
-                <b>{km(r.distance_m, 1)}</b> km
+                <b>{km(r.distance_m, 1)}</b> {unitLabel()}
               </span>
               <span className="rcard__name">{r.name}</span>
               <span className="rcard__stats">
@@ -816,7 +817,7 @@ function WindNote({ wind }) {
     <div className="windnote">
       <Icon name="compass" size={16} />
       <span>
-        Vent de {from}, {Math.round(wind.speed_kmh)} km/h — à qualité égale, les boucles
+        Vent de {from}, {Math.round(speedIn(wind.speed_kmh))} {speedLabel()} — à qualité égale, les boucles
         qui finissent vent dans le dos sont proposées en premier.
       </span>
     </div>
@@ -841,7 +842,7 @@ function RouteSteps({ steps, onShow }) {
           <li key={i}>
             <button
               onClick={() => s.lon != null && onShow?.([s.lon, s.lat])}
-              aria-label={`${s.text}, à ${km(s.dist_m, 1)} km — montrer sur la carte`}
+              aria-label={`${s.text}, à ${km(s.dist_m, 1)} ${unitLabel()} — montrer sur la carte`}
             >
               <Icon name={turnIcon(s.turn)} size={17} />
               <em>{km(s.dist_m, 1)}</em>
@@ -862,7 +863,7 @@ function RejectedList({ rejected }) {
       </span>
       {rejected.map((r, i) => (
         <div key={i} className="rejected__row">
-          <span className="mono">{km(r.distance_m, 1)} km</span>
+          <span className="mono">{km(r.distance_m, 1)} {unitLabel()}</span>
           <span>{r.label}</span>
         </div>
       ))}

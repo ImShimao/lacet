@@ -13,6 +13,7 @@
 import { km } from './format'
 import { clockTime, minutes } from './runFormat'
 import { load } from './storage'
+import { unitLabel } from './units'
 
 export const contactOf = () => load().emergencyContact || null
 
@@ -64,7 +65,7 @@ export function departureText({ route = null, sport = 'run', from = null, now = 
   const where = point ? ` depuis ici : ${mapLink(point)}` : ''
   if (!route) return `Je pars ${verb}${where}. Je te dis quand je suis de retour.`
   const back = route.duration_s ? ` Retour prévu vers ${clockTime(now + route.duration_s * 1000)}.` : ''
-  return `Je pars ${verb} ${km(route.distance_m, 1)} km${where}.${back}`
+  return `Je pars ${verb} ${km(route.distance_m, 1)} ${unitLabel()}${where}.${back}`
 }
 
 /**
@@ -89,6 +90,6 @@ export async function announceDeparture(details, settleMs = 700) {
 
 /** « De retour de ma sortie : 10,2 km en 58 min. » */
 export function arrivalText(entry) {
-  const done = entry.actual_distance_m > 0 ? ` : ${km(entry.actual_distance_m, 1)} km en ${minutes(Math.round((entry.actual_duration_s || 0) / 60))}` : ''
+  const done = entry.actual_distance_m > 0 ? ` : ${km(entry.actual_distance_m, 1)} ${unitLabel()} en ${minutes(Math.round((entry.actual_duration_s || 0) / 60))}` : ''
   return `De retour de ma sortie${done}. Tout va bien.`
 }

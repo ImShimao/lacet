@@ -1,7 +1,8 @@
 import Icon from './Icon.jsx'
 import { KINDS } from './pois'
+import { unitLabel, unitM } from './units'
 
-const kmText = (m) => (m / 1000).toFixed(1).replace('.', ',')
+const kmText = (m) => (m / unitM()).toFixed(1).replace('.', ',')
 
 /** Au-delà, la liste des kilomètres ne se lit plus : on dit l'écart. */
 const LIST_MAX = 6
@@ -54,7 +55,7 @@ export function StopsList({ stops, loading, complete, offline = false, prefs, di
                 <b>
                   {here.length} {name}
                 </b>
-                , le plus long tronçon sans : <b>{kmText(gap.to - gap.from)} km</b> (km {kmText(gap.from)} → {kmText(gap.to)})
+                , le plus long tronçon sans : <b>{kmText(gap.to - gap.from)} {unitLabel()}</b> ({unitLabel()} {kmText(gap.from)} → {kmText(gap.to)})
               </span>
             )}
           </div>
@@ -79,7 +80,7 @@ export function NextStops({ stops, along }) {
         <span key={s.kind}>
           <Icon name={KINDS[s.kind].icon} size={15} />
           {KINDS[s.kind].label} dans{' '}
-          <b>{s.along - along >= 1000 ? `${kmText(s.along - along)} km` : `${Math.max(10, Math.round((s.along - along) / 10) * 10)} m`}</b>
+          <b>{s.along - along >= 1000 ? `${kmText(s.along - along)} ${unitLabel()}` : `${Math.max(10, Math.round((s.along - along) / 10) * 10)} m`}</b>
         </span>
       ))}
     </div>

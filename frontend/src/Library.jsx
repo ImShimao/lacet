@@ -16,6 +16,7 @@ import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
 import MonthReport from './MonthReport.jsx'
 import { dailyMetres, monthKey, monthLabel } from './monthSummary'
+import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
 export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
@@ -241,8 +242,8 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
         )}
         <em>
           {run
-            ? `${dayLabel(route.ranAt)} · ${km(route.actual_distance_m)} km · ${duration(route.actual_duration_s)} · ${paceOf(route)}/km`
-            : `${km(route.distance_m)} km · D+ ${Math.round(route.ascent_m || 0)} m`}
+            ? `${dayLabel(route.ranAt)} · ${km(route.actual_distance_m)} ${unitLabel()} · ${duration(route.actual_duration_s)} · ${paceOf(route)}${paceLabel()}`
+            : `${km(route.distance_m)} ${unitLabel()} · D+ ${Math.round(route.ascent_m || 0)} m`}
         </em>
       </span>
       {route.grade ? (
@@ -540,7 +541,7 @@ function WeeklyVolume({ history, goalKm = 0 }) {
             période est déjà dite par l'axe, juste en dessous. */}
         <span className="label">Volume par semaine</span>
         <em>
-          {km(moyenne, 0)} km en moyenne{goal > 0 && ` · objectif ${goalKm}`}
+          {km(moyenne, 0)} {unitLabel()} en moyenne{goal > 0 && ` · objectif ${goalKm}`}
         </em>
       </figcaption>
 
@@ -550,7 +551,7 @@ function WeeklyVolume({ history, goalKm = 0 }) {
           tableau ci-dessous. */}
       <div className="weeks__plot" aria-hidden="true">
         {semaines.map((s, i) => (
-          <div className="weeks__col" key={s.key} title={`${s.label} : ${km(s.metres, 1)} km`}>
+          <div className="weeks__col" key={s.key} title={`${s.label} : ${km(s.metres, 1)} ${unitLabel()}`}>
             <i
               style={{ height: `${s.metres ? Math.max(3, (s.metres / haut) * 100) : 0}%` }}
               data-now={i === semaines.length - 1 || undefined}
@@ -574,7 +575,7 @@ function WeeklyVolume({ history, goalKm = 0 }) {
           {semaines.map((s) => (
             <tr key={s.key}>
               <th scope="row">{s.label}</th>
-              <td>{km(s.metres, 1)} km</td>
+              <td>{km(s.metres, 1)} {unitLabel()}</td>
             </tr>
           ))}
         </tbody>
@@ -650,8 +651,8 @@ function Totals({ history, profile }) {
       .reduce((acc, r) => ({ m: acc.m + (r.actual_distance_m || 0), s: acc.s + (r.actual_duration_s || 0) }), { m: 0, s: 0 })
   const [foot, wheel] = [of(false), of(true)]
   const average = [
-    foot.m > 0 ? `Allure moyenne ${pace(foot.s / (foot.m / 1000))}/km` : null,
-    wheel.m > 0 && wheel.s > 0 ? `${foot.m > 0 ? 'à vélo' : 'Vitesse moyenne'} ${(wheel.m / wheel.s * 3.6).toFixed(1).replace('.', ',')} km/h` : null,
+    foot.m > 0 ? `Allure moyenne ${pace(foot.s / (foot.m / 1000))}${paceLabel()}` : null,
+    wheel.m > 0 && wheel.s > 0 ? `${foot.m > 0 ? 'à vélo' : 'Vitesse moyenne'} ${speedIn(wheel.m / wheel.s * 3.6).toFixed(1).replace('.', ',')} ${speedLabel()}` : null,
   ]
     .filter(Boolean)
     .join(', ')
@@ -754,7 +755,7 @@ function MonthHeader({ label, month, runs, onReport }) {
     <div className="monthhead">
       <b>{label}</b>
       <span>
-        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1)} km · {duration(time)}
+        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1)} {unitLabel()} · {duration(time)}
       </span>
       {onReport && (
         <button className="monthhead__report" onClick={onReport}>
@@ -764,7 +765,7 @@ function MonthHeader({ label, month, runs, onReport }) {
       {jours.length > 0 && (
         <div className="monthdays weeks__plot" aria-hidden="true">
           {jours.map((m, i) => (
-            <div className="weeks__col" key={i} title={`${i + 1} : ${km(m, 1)} km`}>
+            <div className="weeks__col" key={i} title={`${i + 1} : ${km(m, 1)} ${unitLabel()}`}>
               <i style={{ height: `${m ? Math.max(6, (m / haut) * 100) : 0}%` }} />
             </div>
           ))}

@@ -4,6 +4,7 @@ import { duration, km } from './format'
 import { load, save } from './storage'
 import { mapLink, shareText, textTo } from './contact'
 import useModal from './useModal'
+import { unitLabel } from './units'
 
 // Appui long, en millisecondes, avant que le SOS ne s'arme. Un bouton d'alerte
 // posé à côté de « Terminer », sur un écran qu'on touche en courant, part tout
@@ -69,7 +70,7 @@ export default function SosButton({ position, distance, elapsed, className = '' 
     return (
       `J'ai besoin d'aide pendant ma sortie. ` +
       `Je suis ici : ${point ? mapLink(point) : 'position inconnue'}. ` +
-      `Parcouru ${km(distance, 1)} km en ${duration(elapsed)}.`
+      `Parcouru ${km(distance, 1)} ${unitLabel()} en ${duration(elapsed)}.`
     )
   }
 

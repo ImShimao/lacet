@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
-import { profileRange } from './format'
+import { km, profileRange } from './format'
+import { unitLabel } from './units'
 import useModal from './useModal'
 
 /**
@@ -69,7 +70,7 @@ export default function ElevationSheet({ route, along, onClose }) {
             <circle cx={hereX} cy={y(model, hereEle)} r="5" className="elevsheet__dot" />
             <text x={PAD.left} y={H - 5} className="elevsheet__tick">0</text>
             <text x={W - PAD.right} y={H - 5} textAnchor="end" className="elevsheet__tick">
-              {(model.total / 1000).toFixed(1).replace('.', ',')} km
+              {km(model.total, 1)} {unitLabel()}
             </text>
           </svg>
 

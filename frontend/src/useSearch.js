@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { generateLoops } from './api'
 import { prefetchOnDevice } from './engine/client'
 import { haversineM } from './engine/geo'
-import { formatKm } from './FiltersSheet.jsx'
+import { formatDistance, formatKm } from './FiltersSheet.jsx'
 import { save } from './storage'
+import { unitLabel } from './units'
 
 /**
  * Chercher des boucles, et ce qu'il faut tenir pendant ce temps-là.
@@ -154,7 +155,7 @@ export default function useSearch() {
               meta: {
                 ...relache.meta,
                 relaxed: true,
-                message: `Aucune boucle à ±2,5 % de ${formatKm(request.distance_km)} km depuis ce départ : voici les plus proches, à ±10 %.`,
+                message: `Aucune boucle à ±2,5 % de ${formatDistance(request.distance_km)} ${unitLabel()} depuis ce départ : voici les plus proches, à ±10 %.`,
               },
             }
           }

@@ -2,9 +2,10 @@
 // terminée à son entrée d'historique. Rien ici ne dépend de React : ce sont des
 // traductions, et elles se testent comme telles.
 
-import { directionOf, estimateKm, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
+import { directionOf, estimateKm, formatDistance, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
 import { pace } from './format'
 import { slim } from './storage'
+import { paceLabel, unitLabel } from './units'
 
 // « Distance exacte » : l'écart toléré entre la boucle et la distance visée.
 const PRECISE_TOLERANCE = 0.025
@@ -83,12 +84,12 @@ export function summarise(p) {
   const dist = race
     ? race.label
     : p.mode === 'distance'
-      ? `${formatKm(p.distance_km)} km`
+      ? `${formatDistance(p.distance_km)} ${unitLabel()}`
       : `≈${Math.round(estimateKm(p))} km`
   const speed =
     p.sport === 'bike' || p.speedUnit === 'speed'
       ? `${p.speed_kmh} km/h`
-      : `${pace(p.pace_sec_per_km)}/km`
+      : `${pace(p.pace_sec_per_km)}${paceLabel()}`
   const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
   // « Éviter › Boucles déjà courues » : ce qu'on cherche, ce sont des inédites.
   const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null

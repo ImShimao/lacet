@@ -22,6 +22,7 @@ import { detourOnDevice } from './engine/client'
 import { spliceRoute } from './detour'
 import { keptIndices, simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
+import { MILE_M, units } from './units'
 import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed, targetSpeech } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
@@ -279,6 +280,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // reprise après une coupure n'a plus les tours d'avant, et le premier
   // kilomètre d'après aurait hérité de toute la durée écoulée.
   const splitAt = useRef(0)
+  // En miles, la voix compte ses bornes à part : les temps gardés restent au
+  // kilomètre (`splits`), l'historique et ses comparaisons en dépendent.
+  const lastMile = useRef(0)
+  const mileAt = useRef(0)
   // Ce que la voix a dit, phrase par phrase — voir `talk`.
   const journal = useRef(resuming?.spoken ?? [])
   // Ce que la voix ne dit pas, pour le rapport de sortie (`runReport.js`) : la
@@ -333,6 +338,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       lastSplit.current = Math.floor(covered.current / 1000)
       splits.current = resuming.splits ?? []
       splitAt.current = resuming.elapsed ?? 0
+      lastMile.current = Math.floor(covered.current / MILE_M)
+      mileAt.current = resuming.elapsed ?? 0
     }
   }
   // La sortie est écrite sur le disque de loin en loin : fermée par iOS ou par
@@ -711,6 +718,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
    * les deux minutes : la voix ne parle que tous les cinq, et en kilomètres-heure.
    */
   function announceSplit(travelled) {
+    if (units() === 'mi') announceMile(travelled)
     const done = Math.floor(travelled / 1000)
     if (done <= lastSplit.current) return
     const elapsed = movingSeconds()
@@ -725,12 +733,32 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     for (let n = lastSplit.current + 1; n <= done; n += 1) splits.current.push({ km: n, seconds: each })
     splitAt.current = elapsed
     lastSplit.current = done
-    if (gap === 1 && each > 0) {
+    // En miles, le temps au kilomètre affiché contredirait les bornes dites au mile.
+    if (gap === 1 && each > 0 && units() !== 'mi') {
       setSplitShown({ km: done, seconds: each })
       clearTimeout(splitTimer.current)
       splitTimer.current = setTimeout(() => setSplitShown(null), SPLIT_SHOWN_MS)
     }
 
+    if (units() !== 'mi') sayMilestone({ done, previous, gap, each, elapsed, travelled, word: 'kilomètre' })
+  }
+
+  /** Les bornes de la voix en miles : même phrases, au mile, l'allure au mile. */
+  function announceMile(travelled) {
+    const done = Math.floor(travelled / MILE_M)
+    if (done <= lastMile.current) return
+    const elapsed = movingSeconds()
+    const gap = done - lastMile.current
+    // Le temps de ce mile, ramené au kilomètre : `spoken` le redit au mile.
+    const each = Math.round(((elapsed - mileAt.current) / gap) * (1000 / MILE_M))
+    const previous = lastMile.current
+    mileAt.current = elapsed
+    lastMile.current = done
+    sayMilestone({ done, previous, gap, each, elapsed, travelled, word: 'mile' })
+  }
+
+  /** Ce que la voix dit à une borne — kilomètre ou mile —, selon les réglages. */
+  function sayMilestone({ done, previous, gap, each, elapsed, travelled, word }) {
     const { km, lap, pace: average, total, target } = voicePrefs.current
     const every = (SPLIT_EVERY_KM[sport] ?? 1) * km
     const crossed = km > 0 && Math.floor(done / every) > Math.floor(previous / every)
@@ -741,7 +769,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const ran = crossed && total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      talk(`${done} kilomètres.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false })
+      talk(`${done} ${word}s.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false })
       return
     }
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
@@ -749,7 +777,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // aux deux questions — où en suis-je, et à quelle allure.
     let said = ''
     if (crossed) {
-      const which = `${capitalize(ordinal(done))} kilomètre`
+      const which = `${capitalize(ordinal(done))} ${word}`
       // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
       // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
       const own = lap && gap === 1 && each > 0

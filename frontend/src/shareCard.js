@@ -9,6 +9,7 @@
 import { duration, km, pace } from './format'
 import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
+import { paceLabel, unitLabel } from './units'
 
 // Le format portrait des réseaux et des messageries : il occupe l'écran d'un
 // téléphone sans être rogné.
@@ -123,10 +124,10 @@ export function figuresOf(entry) {
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
   return [
-    [`${km(distance)} km`, 'Distance'],
+    [`${km(distance)} ${unitLabel()}`, 'Distance'],
     bike
       ? [`${(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ',')} km/h`, 'Vitesse']
-      : [distance > 100 ? `${pace(seconds / (distance / 1000))} /km` : '—', 'Allure'],
+      : [distance > 100 ? `${pace(seconds / (distance / 1000))} ${paceLabel()}` : '—', 'Allure'],
     [duration(seconds), 'Temps'],
     ...(entry.actual_ascent_m != null ? [[`${entry.actual_ascent_m} m`, 'Dénivelé +']] : []),
   ]
@@ -267,7 +268,7 @@ export function drawMonthCard(canvas, summary, label) {
   const figures = [
     [String(summary.count), summary.count > 1 ? 'sorties' : 'sortie'],
     [summary.ascent_m != null ? `${summary.ascent_m} m` : '—', 'Dénivelé +'],
-    [summary.longest ? `${km(summary.longest.actual_distance_m, 1)} km` : '—', 'Plus longue'],
+    [summary.longest ? `${km(summary.longest.actual_distance_m, 1)} ${unitLabel()}` : '—', 'Plus longue'],
   ]
   figures.forEach(([value, lib], i) => {
     write(value, 80 + i * 320, 820, 68, text, { weight: 700 })

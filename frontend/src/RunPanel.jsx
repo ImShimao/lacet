@@ -8,6 +8,7 @@ import SosButton from './SosButton.jsx'
 import { km, pace } from './format'
 import { REPORT_KINDS } from './reports'
 import { clock, clockTime, minutes, speed } from './runFormat'
+import { paceLabel, speedLabel, unitLabel } from './units'
 
 /**
  * Temps restant, pause, chrono, distance, allure, tour.
@@ -62,11 +63,11 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
         </div>
         <div>
           <b>{bike ? speed(state.distance, state.elapsed) : pace(moving)}</b>
-          <span>{bike ? 'Vitesse (km/h)' : 'Allure (/km)'}</span>
+          <span>{bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}</span>
         </div>
         <div>
           <b>{remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}</b>
-          <span>{remaining === null ? (bike ? 'Allure (/km)' : 'Vitesse (km/h)') : 'Restant (km)'}</span>
+          <span>{remaining === null ? (bike ? `Allure (${paceLabel()})` : `Vitesse (${speedLabel()})`) : `Restant (${unitLabel()})`}</span>
         </div>
       </div>
 

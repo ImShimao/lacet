@@ -28,6 +28,7 @@ import * as offline from './offlineMaps'
 import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
 import { styleByKey } from './mapStyles'
+import { setUnits, unitLabel, units } from './units'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
 /** Les familles du sommaire, dans leur ordre. */
@@ -393,6 +394,8 @@ function appearanceLabels() {
  */
 function AppearanceSettings({ mapStyle, onStyles }) {
   const look = useAppearance()
+  // Lue au rendu partout ailleurs : changer d'onglet suffit à tout réafficher.
+  const [unit, setUnit] = useState(units)
   return (
     <PrefsCard
       title="Affichage"
@@ -429,10 +432,25 @@ function AppearanceSettings({ mapStyle, onStyles }) {
         options={TEXT_SIZES}
         onChange={(text) => setAppearance({ text })}
       />
+      <PickRow
+        icon="routes"
+        label="Unités"
+        value={unit}
+        options={UNIT_OPTIONS}
+        onChange={(value) => {
+          setUnits(value)
+          setUnit(value)
+        }}
+      />
       {onStyles && <LinkRow icon="layers" label="Style de carte" value={styleByKey(mapStyle).label} onClick={onStyles} />}
     </PrefsCard>
   )
 }
+
+const UNIT_OPTIONS = [
+  { key: 'km', label: 'Kilomètres' },
+  { key: 'mi', label: 'Miles' },
+]
 
 // Le côté de la route où l'on court — `side` dans le moteur, voir `keepSide`.
 // La gauche d'abord : c'est ce que demande le code de la route.
@@ -938,13 +956,14 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
   )
 }
 
-const KM_EVERY = [
-  { key: 1, label: 'Chaque km' },
-  { key: 2, label: 'Tous les 2 km' },
+// Au mile quand l'app est en miles : la voix compte alors ses bornes au mile.
+const kmEvery = () => [
+  { key: 1, label: `Chaque ${unitLabel()}` },
+  { key: 2, label: `Tous les 2 ${unitLabel()}` },
   { key: 0, label: 'Jamais' },
 ]
-const KM_SAYS = [
-  ['lap', 'Temps du km', 'clock'],
+const kmSays = () => [
+  ['lap', `Temps du ${unitLabel()}`, 'clock'],
   ['pace', 'Allure', 'gauge'],
   ['total', 'Temps couru', 'history'],
 ]
@@ -1014,9 +1033,9 @@ function VoiceSetting() {
         title="Annonces"
         foot="La distance est toujours dite ; le reste, à ton choix. À vélo, la voix parle tous les 5 ou 10 km."
       >
-        <PickRow icon="flag" label="Kilomètres" value={prefs.km} options={KM_EVERY} onChange={(km) => change({ km })} />
+        <PickRow icon="flag" label={units() === 'mi' ? 'Miles' : 'Kilomètres'} value={prefs.km} options={kmEvery()} onChange={(km) => change({ km })} />
         {prefs.km !== 0 &&
-          KM_SAYS.map(([key, label, icon]) => (
+          kmSays().map(([key, label, icon]) => (
             <ToggleRow key={key} icon={icon} label={label} on={prefs[key]} onChange={(on) => change({ [key]: on })} />
           ))}
         <ToggleRow

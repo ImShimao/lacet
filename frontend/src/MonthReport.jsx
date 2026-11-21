@@ -4,6 +4,7 @@ import { duration, km } from './format'
 import { shareText } from './contact'
 import { monthLabel, monthSummary } from './monthSummary'
 import { shareMonthCard } from './shareCard'
+import { unitLabel } from './units'
 
 /**
  * Le bilan d'un mois, ouvert depuis Mes parcours. Il lit `monthSummary`, comme la
@@ -24,7 +25,7 @@ export default function MonthReport({ history, month, onClose }) {
       if (/cancel/i.test(error?.message || '')) return
       shareText(
         [
-          `${label} — ${km(summary.distance_m, 1)} km en ${summary.count} sortie${summary.count > 1 ? 's' : ''}`,
+          `${label} — ${km(summary.distance_m, 1)} ${unitLabel()} en ${summary.count} sortie${summary.count > 1 ? 's' : ''}`,
           summary.ascent_m != null ? `D+ ${summary.ascent_m} m` : null,
           `${active} semaine${active > 1 ? 's' : ''} sur ${total} avec une sortie`,
         ]

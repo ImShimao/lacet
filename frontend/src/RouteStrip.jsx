@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { haversine, km, profileRange, surfaceLabel } from './format'
+import { unitLabel } from './units'
 
 /**
  * La bande de parcours : le profil altimétrique et le niveau de sécurité sur un
@@ -74,7 +75,7 @@ export default function RouteStrip({ route, onScrub }) {
         <span className="strip__title">Parcours</span>
         <span className="mono strip__read">
           {readout
-            ? `${km(readout.dist, 2)} km · ${Math.round(readout.ele)} m · ${
+            ? `${km(readout.dist, 2)} ${unitLabel()} · ${Math.round(readout.ele)} m · ${
                 LEVEL_LABELS[readout.level]
               }`
             : model.hasElevation

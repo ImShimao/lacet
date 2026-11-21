@@ -1,7 +1,12 @@
 // La virgule française, partout : chaque écran la remettait — ou l'oubliait —
 // à sa façon, et la même sortie s'affichait « 5,23 » dans l'historique et
 // « 5.23 » sur l'écran de fin.
-export const km = (metres, digits = 2) => (metres / 1000).toFixed(digits).replace('.', ',')
+//
+// Dans l'unité réglée (`units.js`) : le nom reste `km`, mais en miles c'est
+// des miles qu'il écrit. L'unité qui suit le chiffre vient de `unitLabel()`.
+import { perUnit, unitM } from './units'
+
+export const km = (metres, digits = 2) => (metres / unitM()).toFixed(digits).replace('.', ',')
 
 export function duration(seconds) {
   const h = Math.floor(seconds / 3600)
@@ -13,6 +18,7 @@ export function duration(seconds) {
 
 export function pace(secondsPerKm) {
   if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return '—'
+  secondsPerKm = perUnit(secondsPerKm)
   // Arrondir **avant** de séparer les minutes des secondes. L'inverse —
   // `floor(x/60)` d'un côté, `round(x%60)` de l'autre — affiche « 4:60 » dès
   // que l'allure tombe dans la dernière demi-seconde d'une minute. Ça n'a rien
