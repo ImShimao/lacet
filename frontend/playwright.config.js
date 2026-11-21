@@ -12,6 +12,8 @@ export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.e2e.js',
   timeout: 30_000,
+  // Un essai de plus sur la CI : une machine partagée a ses lenteurs.
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: 'http://127.0.0.1:5173',
     locale: 'fr-FR',

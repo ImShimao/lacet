@@ -6,15 +6,19 @@ import { expect, test } from '@playwright/test'
  * repliée) : si l'un revient, il casse ici avant le téléphone.
  */
 
+// Le lancement dure 1,5 s, mais la première page d'un Vite à froid, sur la CI,
+// arrive bien plus tard : 4 s y ont déjà manqué.
+const LAUNCH_MS = 15_000
+
 test('le lancement se joue puis disparaît', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.launch')).toBeVisible()
-  await expect(page.locator('.launch')).toBeHidden({ timeout: 4000 })
+  await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
 })
 
 test("l'allure reste ouverte dans les filtres, comme la longueur", async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('.launch')).toBeHidden({ timeout: 4000 })
+  await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Explorer' }).first().click()
   await page.getByRole('button', { name: /^Filtres/ }).click()
   await expect(page.getByRole('button', { name: 'min/km' })).toBeVisible()
@@ -23,7 +27,7 @@ test("l'allure reste ouverte dans les filtres, comme la longueur", async ({ page
 
 test('un menu de réglage passe devant les lignes qui suivent', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('.launch')).toBeHidden({ timeout: 4000 })
+  await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
   await page.getByRole('button', { name: /^Guidage et voix/ }).click()
   await page.getByRole('button', { name: /^Anticipation des instructions/ }).click()
@@ -41,7 +45,7 @@ test('un menu de réglage passe devant les lignes qui suivent', async ({ page })
 
 test("les fonds de carte tiennent sur l'écran, sans défilement latéral", async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('.launch')).toBeHidden({ timeout: 4000 })
+  await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
   await page.getByRole('button', { name: /^Apparence/ }).click()
   await page.getByRole('button', { name: /^Style de carte/ }).click()
