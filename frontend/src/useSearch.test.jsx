@@ -55,29 +55,6 @@ describe('la recherche', () => {
     expect(api.busy).toBe(false)
   })
 
-  it('met le fichier importé en tête, et le garde seul si la recherche échoue', async () => {
-    // Un GPX importé se compare aux boucles que Lacet propose du même départ :
-    // il passe devant elles, choisi. Hors ligne, il ne doit pas disparaître
-    // derrière un message d'erreur.
-    render(<Sonde />)
-    const fichier = { ...boucle('fichier'), imported: true }
-    repondre = async () => reponse([boucle('a'), boucle('b')])
-    await act(async () => {
-      await api.run({ distance_km: 8 }, { lead: fichier })
-    })
-    expect(api.result.routes.map((r) => r.id)).toEqual(['fichier', 'a', 'b'])
-    expect(api.selected.id).toBe('fichier')
-
-    repondre = async () => {
-      throw new Error('hors ligne')
-    }
-    await act(async () => {
-      await api.run({ distance_km: 8 }, { lead: fichier })
-    })
-    expect(api.result.routes.map((r) => r.id)).toEqual(['fichier'])
-    expect(api.error).toBe(null)
-  })
-
   it('élargit plutôt que de rendre un écran vide', async () => {
     render(<Sonde />)
     const vues = []

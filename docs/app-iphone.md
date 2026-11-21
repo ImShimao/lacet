@@ -106,9 +106,9 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
 - **Un GPX s'ouvre avec Lacet** depuis Messages, AirDrop, Mail ou Fichiers :
   l'app déclare le type `com.topografix.gpx` (`customize.py`) et lit le
   fichier qu'iOS lui confie (`onOpenedFile`, `native.js`). C'est ainsi qu'une
-  boucle passe d'un coureur à l'autre. Le fichier est accroché aux rues, noté,
-  gardé en favori, puis comparé aux boucles de même longueur proposées depuis
-  son départ.
+  boucle passe d'un coureur à l'autre. Le fichier est accroché aux rues puis
+  décrit comme une boucle de Lacet — note, types de voie, revêtement,
+  traversées, dénivelé, consignes — et gardé en favori.
 - **Elle s'ouvre sans réseau** : ses fichiers sont sur le téléphone. Les zones
   déjà explorées se recalculent sans réseau aussi — les rues téléchargées sont
   gardées quatorze jours.
