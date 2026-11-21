@@ -21,7 +21,7 @@ import { km } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
-import { speedIn, speedLabel, unitLabel } from './units'
+import { fromKm, speedIn, speedLabel, unitLabel, units } from './units'
 
 // Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
 // et une grande graduation tous les `major` pas.
@@ -44,7 +44,9 @@ function QuickLength({ params, onQuickParams }) {
   const key = duration ? 'duration_min' : 'distance_km'
   const cfg = duration ? QUICK.duration : params.sport === 'bike' ? QUICK.bike : QUICK.run
   const value = params[key]
-  const unit = duration ? 'min' : 'km'
+  const unit = duration ? 'min' : unitLabel()
+  // shortcut: en miles, la règle garde ses crans d'un demi-kilomètre ; seul le chiffre est converti.
+  const shown = duration ? value : units() === 'mi' ? formatKm(Math.round(fromKm(value) * 10) / 10) : formatKm(value)
   const ref = useRef(null)
 
   const clampStep = (v) => Math.min(cfg.max, Math.max(cfg.min, cfg.min + Math.round((v - cfg.min) / cfg.step) * cfg.step))
@@ -77,7 +79,7 @@ function QuickLength({ params, onQuickParams }) {
       />
       <div className="dist__value" aria-hidden="true">
         {/* La clé relance le petit battement à chaque cran. */}
-        <b key={value}>{duration ? value : formatKm(value)}</b>
+        <b key={value}>{shown}</b>
         <small>{unit}</small>
       </div>
       <div className="ruler">
@@ -90,7 +92,7 @@ function QuickLength({ params, onQuickParams }) {
           aria-valuemin={cfg.min}
           aria-valuemax={cfg.max}
           aria-valuenow={value}
-          aria-valuetext={`${duration ? value : formatKm(value)} ${unit}`}
+          aria-valuetext={`${shown} ${unit}`}
           onScroll={(e) => set(cfg.min + Math.round(e.currentTarget.scrollLeft / TICK) * cfg.step)}
           // Au doigt, la bande défile d'elle-même. À la souris (l'aperçu sur
           // ordinateur), il faut la tirer, ou tourner la molette.
