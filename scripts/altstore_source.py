@@ -25,6 +25,7 @@ sur le réseau local, et elle ne vaut que chez soi.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import plistlib
@@ -224,7 +225,10 @@ def main() -> None:
                 vieille.unlink()
         download = f"{base}/{copie.name}"
     shutil.copyfile(ICON, SERVED / ICON.name)
-    icon = f"{base}/{ICON.name}"
+    # SideStore garde l'image d'une adresse en cache : l'empreinte du fichier dans
+    # l'adresse fait voir le nouveau logo (il montrait encore l'ancien rond violet).
+    empreinte = hashlib.sha1(ICON.read_bytes()).hexdigest()[:8]
+    icon = f"{base}/{ICON.name}?v={empreinte}"
 
     entry = {
         "name": "Lacet",
