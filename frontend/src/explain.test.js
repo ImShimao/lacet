@@ -98,17 +98,29 @@ describe('reliefBadge', () => {
     expect(reliefBadge('flat', null)).toBeNull()
   })
 
-  it('Plat veut peu de montée, Côtes beaucoup', () => {
-    expect(reliefBadge('flat', 3)).toBe('Probable')
-    expect(reliefBadge('flat', 8)).toBe('Possible')
-    expect(reliefBadge('flat', 20)).toBe('Peu probable')
-    expect(reliefBadge('hilly', 20)).toBe('Probable')
-    expect(reliefBadge('hilly', 5)).toBe('Peu probable')
+  // Les reliefs mesurés au départ, et ce que les boucles y ont vraiment donné.
+  it('Plat tient à Soultz et Guebwiller, pas à Buhl ni Lautenbach', () => {
+    expect(reliefBadge('flat', 34.6)).toBe('Probable') // Soultz : boucles à 3,5-5 m/km
+    expect(reliefBadge('flat', 65.2)).toBe('Possible') // Guebwiller : 7 m/km au mieux
+    expect(reliefBadge('flat', 81.5)).toBe('Peu probable') // Buhl : 22 m/km au mieux
   })
 
-  it('un D+ précis tient si sa cible est sous ce qui se trouve autour', () => {
-    expect(reliefBadge('climb', 12, 10)).toBe('Probable')
-    expect(reliefBadge('climb', 12, 15)).toBe('Possible')
-    expect(reliefBadge('climb', 12, 25)).toBe('Peu probable')
+  it('Côtes vient dès Rouffach, jamais à Ensisheim', () => {
+    expect(reliefBadge('hilly', 21.2)).toBe('Probable')
+    expect(reliefBadge('hilly', 14.8)).toBe('Possible')
+    expect(reliefBadge('hilly', 5.5)).toBe('Peu probable')
+  })
+
+  it('Vallonné manque en pleine plaine et au fond des vallées', () => {
+    expect(reliefBadge('rolling', 5.5)).toBe('Peu probable')
+    expect(reliefBadge('rolling', 34.6)).toBe('Probable')
+    expect(reliefBadge('rolling', 98.2)).toBe('Peu probable')
+  })
+
+  it('un D+ précis tient jusqu’à la moitié du relief, et peu de D+ en montagne reste du plat', () => {
+    expect(reliefBadge('climb', 98.2, 40)).toBe('Probable')
+    expect(reliefBadge('climb', 98.2, 70)).toBe('Possible')
+    expect(reliefBadge('climb', 98.2, 90)).toBe('Peu probable')
+    expect(reliefBadge('climb', 98.2, 5)).toBe('Peu probable')
   })
 })

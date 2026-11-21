@@ -93,14 +93,29 @@ const RELIEF_BAND_PER_KM = { flat: [0, 10], hilly: [12, Infinity] }
  * se trouve autour, ou à peine au-dessus. Rend `Probable`, `Possible`,
  * `Peu probable`, ou `null` quand le terrain n'est pas gardé.
  */
+//
+// Seuils calés le 21 novembre 2026 (`measure_loops.mjs --hint`, 7 départs de
+// Lautenbach à Ensisheim, 5, 10 et 15 km) : `reachable` mesure le relief du
+// terrain, et une boucle n'en ramasse que 20 à 60 %. Avec les anciens seuils,
+// « Plat » était « Peu probable » à Soultz (relief 27 à 40, boucles plates à
+// 3-5 m/km), et 90 m/km de D+ « Probable » à Lautenbach, qui plafonne à 50.
 export function reliefBadge(key, reachable, climbPerKm = null) {
   if (reachable == null) return null
   const e = reachable
+  // Plat tient jusqu'à Guebwiller (relief 54 à 65, boucles à 6-10 m/km), pas à Buhl (75 et plus).
+  const flat = e <= 45 ? 2 : e <= 70 ? 1 : 0
   let level = 0
-  if (key === 'flat') level = e <= 5 ? 2 : e <= 10 ? 1 : 0
-  else if (key === 'rolling') level = e >= 4 && e <= 15 ? 2 : e >= 2 && e <= 25 ? 1 : 0
-  else if (key === 'hilly') level = e >= 15 ? 2 : e >= 10 ? 1 : 0
-  else if (key === 'climb') level = climbPerKm <= e ? 2 : climbPerKm <= 1.5 * e ? 1 : 0
+  if (key === 'flat') level = flat
+  // Vallonné manque en pleine plaine (Ensisheim, 5,5 : 1 à 3 m/km) et au fond des vallées.
+  else if (key === 'rolling') level = e >= 10 && e <= 65 ? 2 : e >= 6 && e <= 80 ? 1 : 0
+  // Côtes vient dès Rouffach (15, boucles à 14-27 m/km), jamais à Ensisheim.
+  else if (key === 'hilly') level = e >= 20 ? 2 : e >= 12 ? 1 : 0
+  // Un D+ précis : les meilleures boucles montent à la moitié du relief, rarement aux quatre cinquièmes.
+  else if (key === 'climb') {
+    level = climbPerKm <= 0.5 * e ? 2 : climbPerKm <= 0.8 * e ? 1 : 0
+    // Peu de D+ en montagne, c'est du plat : il en prend la limite.
+    if (climbPerKm < 10) level = Math.min(level, flat)
+  }
   return ['Peu probable', 'Possible', 'Probable'][level]
 }
 

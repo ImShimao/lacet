@@ -174,7 +174,7 @@ async function run(name, distanceKm, limit, elevation, safety, extra = {}, keep 
   const t0 = performance.now()
   const result = await planLoops(input, {
     loadGraph: async () => graph,
-    fetchElevations: flag('climb') ? fineElevations(grid) : offlineElevations(grid),
+    fetchElevations: flag('climb') || flag('hint') ? fineElevations(grid) : offlineElevations(grid),
     wind: async () => null,
     settings: { ...SETTINGS, widenBudgetMs: WIDEN_BUDGET_MS / RATIO },
     trace: {
@@ -344,6 +344,68 @@ if (flag('climb')) {
   for (const name of new Set(cases.map((c) => c.name))) console.log(line(name, cases.filter((c) => c.name === name)))
   console.log(line('Total', cases))
   if (OUT) writeFileSync(OUT, JSON.stringify(cases, null, 1))
+  process.exit(0)
+}
+
+// --- le badge de relief ------------------------------------------------------------
+
+// `--hint` : le D+ que le badge croit possible autour du départ (`reliefHint`, lu
+// sur les tuiles terrarium), face à celui des boucles que Plat, Vallonné et Côtes
+// rendent vraiment. C'est sur cette mesure que se calent les seuils de
+// `reliefBadge` (`explain.js`).
+if (flag('hint')) {
+  const { terrariumGrid, terrariumPixel, terrainTileUrl, reachableClimbPerKm, TERRAIN_ZOOM } = await import(
+    '../src/engine/environment'
+  )
+  // Plus loin dans les Vosges, et en pleine plaine : les deux bouts de l'échelle.
+  Object.assign(STARTS, {
+    lautenbach: { lat: 47.9405, lon: 7.1555 },
+    rouffach: { lat: 47.9585, lon: 7.3005 },
+    ensisheim: { lat: 47.8655, lon: 7.3525 },
+  })
+  const grids = new Map()
+  async function load(tx, ty) {
+    const url = terrainTileUrl(tx, ty)
+    if (grids.has(url)) return
+    const file = join(CACHE, `terrarium-${TERRAIN_ZOOM}-${tx}-${ty}.png`)
+    if (!existsSync(file)) {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`${url} : ${res.status}`)
+      writeFileSync(file, Buffer.from(await res.arrayBuffer()))
+    }
+    grids.set(url, await terrariumGrid(new Uint8Array(readFileSync(file))))
+  }
+  const pixelAt = (x, y) => {
+    const tx = Math.floor(x / 256)
+    const ty = Math.floor(y / 256)
+    const grid = grids.get(terrainTileUrl(tx, ty))
+    return grid ? grid[(y - ty * 256) * 256 + (x - tx * 256)] : null
+  }
+  const rows = []
+  for (const name of option('only')?.split(',') ?? Object.keys(STARTS)) {
+    const { lat, lon } = STARTS[name]
+    for (const km of [5, 10, 15]) {
+      const radius = Math.max(500, (km * 1000) / 2)
+      const dLat = radius / 111_320
+      const dLon = radius / (111_320 * Math.cos((lat * Math.PI) / 180))
+      const [x0, y0] = terrariumPixel(lon - dLon, lat + dLat)
+      const [x1, y1] = terrariumPixel(lon + dLon, lat - dLat)
+      for (let tx = Math.floor(x0 / 256); tx <= Math.floor(x1 / 256); tx += 1) {
+        for (let ty = Math.floor(y0 / 256); ty <= Math.floor(y1 / 256); ty += 1) await load(tx, ty)
+      }
+      const hint = reachableClimbPerKm(lat, lon, km, pixelAt)
+      const perKm = {}
+      for (const elevation of ['flat', 'rolling', 'hilly']) {
+        const row = await run(name, km, 8, elevation, 'standard')
+        perKm[elevation] = row.ascents.filter((z) => z != null).map((z) => Math.round((10 * z) / km) / 10)
+      }
+      rows.push({ name, km, hint, ...perKm })
+      process.stderr.write(
+        `${name} ${km} km : badge ${hint} m/km | plat ${perKm.flat.join(' ')} | vallonné ${perKm.rolling.join(' ')} | côtes ${perKm.hilly.join(' ')}\n`,
+      )
+    }
+  }
+  if (OUT) writeFileSync(OUT, JSON.stringify(rows, null, 1))
   process.exit(0)
 }
 
