@@ -214,7 +214,10 @@ jobs:
         working-directory: frontend
 
     steps:
+      # Les trois derniers commits font le « Quoi de neuf » de la source SideStore.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
 
       # Chemin absolu : le job IPA travaille dans `frontend/`. Un échec du calcul
       # arrête l'étape, au lieu d'écrire une version vide.
@@ -381,3 +384,23 @@ jobs:
           gh release delete-asset "$TAG" region.tar.gz --repo "$GITHUB_REPOSITORY" --yes || true
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+
+      # La source SideStore sur internet : SideStore la relit de n'importe où, en
+      # 4G aussi, et propose la mise à jour sans le PC. La branche `altstore` ne
+      # garde que la source et l'icône, réécrite à chaque compilation ; l'IPA
+      # reste celle de la publication, sous son numéro.
+      - name: Source SideStore publique
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/altstore_source.py" --public
+          D="$RUNNER_TEMP/altstore-branch"
+          mkdir -p "$D"
+          cp "$GITHUB_WORKSPACE/altstore/source.json" "$GITHUB_WORKSPACE/altstore/icon-192.png" "$D/"
+          cd "$D"
+          git init -q -b altstore
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Source SideStore $APP_VERSION"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" altstore

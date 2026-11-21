@@ -9,7 +9,8 @@
 
 [![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
 [![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
-[![1172 tests](https://img.shields.io/badge/tests-1172%20%E2%9C%93-4ade80)](#tests-)
+[![1247 tests](https://img.shields.io/badge/tests-1247%20%E2%9C%93-4ade80)](#tests-)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 [![Capacitor 8](https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![MapLibre 5](https://img.shields.io/badge/MapLibre_GL-5-396CB2)](https://maplibre.org/)
 [![iOS 15+](https://img.shields.io/badge/iPhone-iOS%2015%2B-1F1B2E?logo=apple&logoColor=white)](#limitations-connues-)
@@ -61,28 +62,20 @@ verrouillage), un PC Windows, et un identifiant Apple — un compte gratuit suff
    d'Apple, pas du Microsoft Store. iloader (à trouver sur sidestore.io)
    installe SideStore sur l'iPhone et prépare le certificat et le fichier de
    couplage, en un clic.
-3. **La dernière IPA**, posée à la racine du dépôt :
+3. **Ajouter la source de Lacet dans SideStore** (onglet **Sources**, **+**) :
 
-   ```bash
-   gh release download --repo ImShimao/lacet --pattern Lacet.ipa --clobber
+   ```
+   https://raw.githubusercontent.com/ImShimao/lacet/altstore/source.json
    ```
 
-4. **Installer l'IPA.** Ouvre l'IPA avec SideStore, ou ajoute la source de
-   Lacet dans SideStore. Pour servir la source depuis le PC, le script prépare
-   le dossier `altstore/` (source, IPA versionnée, icône) et `--autostart` le
-   fait servir sur le port 8765 à chaque ouverture de session Windows, sans
-   fenêtre :
-
-   ```bash
-   python scripts/altstore_source.py
-   ```
-
-   ```bash
-   python scripts/altstore_source.py --autostart
-   ```
-
-   L'adresse à donner est `http://<adresse du PC>:8765/source.json`. *Vérifie
-   sur sidestore.io que SideStore accepte cette source.*
+   Chaque compilation la met à jour : SideStore propose alors la nouvelle
+   version, depuis n'importe où, sans le PC. Pour installer sans la source,
+   ouvre avec SideStore le fichier `Lacet.ipa` de la
+   [dernière publication](https://github.com/ImShimao/lacet/releases/latest).
+4. *Sans internet, depuis le PC* : `python scripts/altstore_source.py` prépare
+   le dossier `altstore/` à partir de `Lacet.ipa` posée à la racine, et
+   `--autostart` le fait servir sur le port 8765 à chaque ouverture de session
+   Windows. L'adresse est alors `http://<adresse du PC>:8765/source.json`.
 5. **Faire confiance au profil** : **Réglages → Général → VPN et gestion de
    l'appareil** → ton identifiant → **Faire confiance**, puis **Confidentialité
    et sécurité → Mode développeur** → activer, et redémarrer.
@@ -91,8 +84,8 @@ Au premier lancement, accepte la position — **« Toujours »** quand iOS le
 propose : c'est elle qui suit la sortie écran verrouillé — et les mouvements,
 pour que le baromètre mesure le dénivelé.
 
-**Mettre à jour :** refais l'étape 3, puis relance le script de la source si tu
-la sers depuis le PC, et installe la nouvelle version depuis SideStore.
+**Mettre à jour :** dans SideStore, **Mes apps** → **Mettre à jour**. La
+nouvelle version y apparaît quelques minutes après la fin de sa compilation.
 
 > [!NOTE]
 > L'IPA n'est pas signée. C'est SideStore qui la signe, avec ton identifiant
@@ -183,9 +176,8 @@ et à l'arrondi au pair.
 **L'IPA se compile sur un Mac de GitHub**, parce que Xcode n'existe que sur
 macOS. Le dossier `ios/` n'est pas versionné : il est régénéré à chaque fois,
 et tout ce qui distingue Lacet d'un projet Capacitor vierge tient dans
-`frontend/ios-overlay/`. L'IPA part dans une publication `v1.0.<n>` plutôt
-qu'en artefact : sur un dépôt privé, ceux-ci ont un quota de 500 Mo que six
-compilations remplissaient.
+`frontend/ios-overlay/`. L'IPA part dans une publication `v<version>` plutôt
+qu'en artefact, que GitHub efface au bout de quelques jours.
 
 <details>
 <summary><b>Architecture du code</b></summary>
@@ -280,14 +272,15 @@ L'aperçu tourne sur http://127.0.0.1:5173. Ouvre-le à taille de téléphone
 ### Tests 🧪
 
 Les tests sont à côté du code (`foo.js` → `foo.test.js`) côté app, dans
-`backend/tests/` côté Python. GitHub relance les deux suites, l'oracle de parité
-et le build à chaque envoi (`.github/workflows/tests.yml`).
+`backend/tests/` côté Python. GitHub relance les deux suites, l'oracle de parité,
+le build et les parcours Playwright à chaque envoi (`.github/workflows/tests.yml`).
 
 | Commande | Couverture |
 | --- | --- |
-| `(cd frontend && npm test)` | 777 tests, 67 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
+| `(cd frontend && npm test)` | 848 tests, 71 fichiers : le moteur JavaScript, l'interface sous jsdom, et des sorties entières écoutées consigne par consigne (`LiveRun.voice.test.jsx`) |
 | `(cd frontend && npx vitest run src/engine/parity.test.js)` | Le JavaScript face à Python sur 19 cas figés : même graphe, mêmes candidats, même réponse à 1e-9 près |
 | `(cd backend && .venv/Scripts/python.exe -m pytest)` | 395 tests, 16 fichiers, hors ligne et déterministes |
+| `(cd frontend && npm run test:e2e)` | 4 parcours dans Chromium à taille d'iPhone : ce que jsdom ne voit pas (un menu passé sous une ligne, une feuille qui déborde) |
 | `(cd backend && .venv/Scripts/python.exe scripts/parity_dump.py --check)` | Dit, sans rien écrire, si l'oracle de parité est à jour |
 | `(cd backend && .venv/Scripts/python.exe -X utf8 scripts/smoke.py annecy 8)` | Essai réel : appelle OpenStreetMap, montre les boucles retenues **et** celles écartées, avec leur motif |
 
@@ -314,7 +307,8 @@ gh run list --workflow ios.yml
 ```
 
 Une compilation prend de trois à dix minutes, tests compris, et pose l'IPA dans
-la publication `v1.0.<numéro de compilation>`.
+la publication `v<version>` : 1.1.8 pour la compilation 108, 1.2.0 pour la 200
+(`scripts/version.py`). La source SideStore suit, sur la branche `altstore`.
 
 <details>
 <summary><b>Pièges connus</b></summary>
@@ -345,9 +339,8 @@ la publication `v1.0.<numéro de compilation>`.
 
 ## Contribuer 🤝
 
-Le dépôt est privé : les retours passent par une
-[issue](https://github.com/ImShimao/lacet/issues) ou une pull request, pour qui y
-a accès.
+Les retours passent par une [issue](https://github.com/ImShimao/lacet/issues),
+le code par une pull request.
 
 Avant de proposer une PR, vérifie que `npm test`, `pytest` et
 `parity_dump.py --check` passent. Les commentaires, les tests et les messages
@@ -359,7 +352,7 @@ kilomètre » »).
 
 <div align="center">
 
-Sans licence publiée : tous droits réservés · Fait avec React, MapLibre et
+Code sous [licence MIT](LICENSE) · Fait avec React, MapLibre et
 [Capacitor](https://capacitorjs.com/) par [**ImShimao**](https://github.com/ImShimao)
 
 <sub>Rues © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL),

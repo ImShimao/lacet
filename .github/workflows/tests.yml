@@ -71,3 +71,11 @@ jobs:
       - name: Build de l'app
         working-directory: frontend
         run: npm run build
+
+      # Ce que jsdom ne voit pas — un menu passé sous les lignes, une feuille qui
+      # déborde — se voit dans Chromium à taille d'iPhone, avant l'IPA.
+      - name: Parcours dans un navigateur (Playwright)
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e

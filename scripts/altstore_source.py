@@ -183,9 +183,9 @@ def main() -> None:
         return
     public = "--public" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    host = args[0] if args else lan_address()
     port = args[1] if len(args) > 1 else "8765"
-    base = PUBLIC_BASE if public else f"http://{host}:{port}"
+    # Sur la CI, pas de Wi-Fi à découvrir : l'adresse du PC ne sert qu'en local.
+    base = PUBLIC_BASE if public else f"http://{args[0] if args else lan_address()}:{port}"
 
     if not IPA.exists():
         sys.exit(f"{IPA} introuvable — télécharge d'abord l'artefact du workflow.")

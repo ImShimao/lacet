@@ -56,13 +56,14 @@ est passée avant que l'app ne sache le dire elle-même.
 3. **Couplage** : le fichier de couplage lie le PC à **cet** iPhone. Il devient
    caduc si l'iPhone est réinitialisé ou mis à jour à l'aveugle : il faut alors
    le refaire, par la même procédure.
-4. **Mets l'IPA sur le téléphone** : la publication GitHub (voir plus haut), ou
-   la source locale. Si tu passes par la source, le dossier servi reste
-   `altstore/`, jamais la racine du dépôt, qui livrerait `.git`. Le lanceur
-   `python scripts/altstore_source.py --autostart` le sert à l'ouverture de
-   session Windows. Vérifier : `curl http://192.168.1.96:8765/source.json`.
-   *À confirmer sur sidestore.io : que SideStore accepte cette source comme
-   AltStore.*
+4. **Mets l'IPA sur le téléphone** : ajoute dans SideStore la source publique
+   `https://raw.githubusercontent.com/ImShimao/lacet/altstore/source.json`,
+   que chaque compilation réécrit (branche `altstore`) ; les mises à jour se
+   font alors de n'importe où. En secours, la source locale : le dossier servi
+   reste `altstore/`, jamais la racine du dépôt, qui livrerait `.git`. Le
+   lanceur `python scripts/altstore_source.py --autostart` le sert à
+   l'ouverture de session Windows. Vérifier :
+   `curl http://192.168.1.96:8765/source.json`.
 5. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton
    identifiant → **Faire confiance** ; puis **Confidentialité et sécurité →
    Mode développeur** → activer et redémarrer.
