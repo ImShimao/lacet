@@ -95,8 +95,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Chemin absolu : le job IPA travaille dans `frontend/`. Un échec du calcul
+      # arrête l'étape, au lieu d'écrire une version vide.
       - name: Numéro de version
-        run: echo "APP_VERSION=$(python3 scripts/version.py)" >> "$GITHUB_ENV"
+        run: |
+          V="$(python3 "$GITHUB_WORKSPACE/scripts/version.py")"
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
 
       - name: Semaine
         id: week
@@ -212,8 +216,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Chemin absolu : le job IPA travaille dans `frontend/`. Un échec du calcul
+      # arrête l'étape, au lieu d'écrire une version vide.
       - name: Numéro de version
-        run: echo "APP_VERSION=$(python3 scripts/version.py)" >> "$GITHUB_ENV"
+        run: |
+          V="$(python3 "$GITHUB_WORKSPACE/scripts/version.py")"
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
 
       - name: Xcode
         run: |
