@@ -1,5 +1,6 @@
 """Écrit la source AltStore de Lacet, à servir avec l'IPA.
 
+    python scripts/altstore_source.py --public   # la source sur internet (CI)
     python scripts/altstore_source.py            # découvre l'IP du PC
     python scripts/altstore_source.py 192.168.1.96 8765
     python scripts/altstore_source.py --autostart  # servi à chaque ouverture de session
@@ -39,6 +40,13 @@ IPA = ROOT / "Lacet.ipa"
 ICON = ROOT / "frontend" / "resources" / "icon-192.png"
 SERVED = ROOT / "altstore"
 OUT = SERVED / "source.json"
+
+# Le mode `--public` : la source sur internet, lue depuis n'importe où (SideStore,
+# AltStore hors du Wi-Fi). La source et l'icône vivent sur la branche `altstore`,
+# que le workflow republie à chaque compilation ; l'IPA reste celle de la release
+# de cette version, téléchargée depuis GitHub.
+PUBLIC_BASE = "https://raw.githubusercontent.com/ImShimao/lacet/altstore"
+RELEASES = "https://github.com/ImShimao/lacet/releases/download"
 
 DESCRIPTION = (
     "Des boucles de course et de vélo depuis ta porte, qui évitent les routes "
@@ -172,9 +180,11 @@ def main() -> None:
     if "--autostart" in sys.argv:
         autostart()
         return
-    host = sys.argv[1] if len(sys.argv) > 1 else lan_address()
-    port = sys.argv[2] if len(sys.argv) > 2 else "8765"
-    base = f"http://{host}:{port}"
+    public = "--public" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    host = args[0] if args else lan_address()
+    port = args[1] if len(args) > 1 else "8765"
+    base = PUBLIC_BASE if public else f"http://{host}:{port}"
 
     if not IPA.exists():
         sys.exit(f"{IPA} introuvable — télécharge d'abord l'artefact du workflow.")
@@ -202,14 +212,18 @@ def main() -> None:
     # match the version specified by the source ». Le nom porte donc la version,
     # et les anciennes s'effacent.
     SERVED.mkdir(exist_ok=True)
-    copie = SERVED / f"Lacet-{version}.ipa"
-    if not copie.exists() or copie.stat().st_size != size:
-        copie.write_bytes(IPA.read_bytes())
-    for vieille in SERVED.glob("Lacet-*.ipa"):
-        if vieille != copie:
-            vieille.unlink()
+    if public:
+        # L'IPA n'est pas copiée : elle est déjà sur la release, sous son numéro.
+        download = f"{RELEASES}/v{version}/{IPA.name}"
+    else:
+        copie = SERVED / f"Lacet-{version}.ipa"
+        if not copie.exists() or copie.stat().st_size != size:
+            copie.write_bytes(IPA.read_bytes())
+        for vieille in SERVED.glob("Lacet-*.ipa"):
+            if vieille != copie:
+                vieille.unlink()
+        download = f"{base}/{copie.name}"
     shutil.copyfile(ICON, SERVED / ICON.name)
-    download = f"{base}/{copie.name}"
     icon = f"{base}/{ICON.name}"
 
     entry = {
@@ -246,7 +260,7 @@ def main() -> None:
     source = {
         "name": "Lacet",
         "identifier": "fr.lacet.source",
-        "subtitle": "Les compilations de Lacet, servies depuis le PC",
+        "subtitle": "Les compilations de Lacet",
         "iconURL": icon,
         "tintColor": "2563EB",
         "apps": [entry],
@@ -256,7 +270,7 @@ def main() -> None:
     OUT.write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{OUT} écrit — version {version}, compilation {build}")
     print(f"À servir : python -m http.server {port} --directory altstore")
-    print(f"À ajouter dans AltStore : {base}/source.json")
+    print(f"À ajouter dans AltStore ou SideStore : {base}/source.json")
 
 
 if __name__ == "__main__":
