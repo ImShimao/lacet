@@ -269,7 +269,11 @@ def main() -> None:
 
     OUT.write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{OUT} écrit — version {version}, compilation {build}")
-    print(f"À servir : python -m http.server {port} --directory altstore")
+    if public:
+        # La release d'un dépôt privé répond 404 sans compte : SideStore n'y accède pas.
+        print("À pousser sur la branche altstore — le dépôt doit être public.")
+    else:
+        print(f"À servir : python -m http.server {port} --directory altstore")
     print(f"À ajouter dans AltStore ou SideStore : {base}/source.json")
 
 
