@@ -219,7 +219,7 @@ def main() -> None:
         "subtitle": "Des boucles de course depuis ta porte",
         "localizedDescription": DESCRIPTION,
         "iconURL": icon,
-        "tintColor": "7C3AED",
+        "tintColor": "2563EB",
         "screenshotURLs": [],
         "permissions": permissions,
         # AltStore 1 lit ces clés à la racine de l'app…
@@ -248,7 +248,7 @@ def main() -> None:
         "identifier": "fr.lacet.source",
         "subtitle": "Les compilations de Lacet, servies depuis le PC",
         "iconURL": icon,
-        "tintColor": "7C3AED",
+        "tintColor": "2563EB",
         "apps": [entry],
         "news": [],
     }

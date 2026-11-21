@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/icone.png" width="104" alt="Icône de Lacet : un lacet violet qui fait une boucle">
+<img src="docs/images/icone.png" width="104" alt="Icône de Lacet : une boucle bleue qui revient à son départ, marqué d'un point blanc">
 
 # Lacet
 
