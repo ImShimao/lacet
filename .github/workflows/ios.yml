@@ -68,6 +68,8 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       # Le chemin de l'extrait chez Geofabrik (download.geofabrik.de/europe/…).
       REGION: france/alsace
@@ -95,12 +97,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Chemin absolu : le job IPA travaille dans `frontend/`. Un échec du calcul
-      # arrête l'étape, au lieu d'écrire une version vide.
+      # La version qui suit la dernière **publiée** (hors préversions) : un run en
+      # échec ne fait plus sauter de numéro. Une préversion laissée par un run
+      # raté porte déjà ce numéro : elle est reprise plus bas, pas doublée.
+      # Calculée une fois ici, et passée au job IPA.
       - name: Numéro de version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          V="$(python3 "$GITHUB_WORKSPACE/scripts/version.py")"
+          set -euo pipefail
+          LAST="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName')"
+          V="$(python3 "$GITHUB_WORKSPACE/scripts/version.py" --after "$LAST")"
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
 
       - name: Semaine
         id: week
@@ -189,8 +199,8 @@ jobs:
               echo
               echo "### Installer"
               echo
-              echo "- **Par la source AltStore** : remplace \`Lacet.ipa\` à la racine du dépôt par celle-ci, lance \`python scripts/altstore_source.py\`, puis **AltStore → Lacet → Mettre à jour**."
-              echo "- **Par le fichier** : télécharge \`Lacet.ipa\` ci-dessous, puis **AltStore → Mes apps → +**."
+              echo "- **Par SideStore** : ajoute la source \`https://raw.githubusercontent.com/$GITHUB_REPOSITORY/altstore/source.json\`, puis **Mes apps → Mettre à jour**, de n'importe où."
+              echo "- **Par le fichier** : télécharge \`Lacet.ipa\` ci-dessous, puis ouvre-la avec SideStore."
               echo
               echo "Le pas-à-pas complet : [L'installer](https://github.com/$GITHUB_REPOSITORY#linstaller)."
               echo
@@ -219,11 +229,12 @@ jobs:
         with:
           fetch-depth: 3
 
-      # Chemin absolu : le job IPA travaille dans `frontend/`. Un échec du calcul
-      # arrête l'étape, au lieu d'écrire une version vide.
+      # Le numéro calculé par le job des rues : le même, une seule fois.
       - name: Numéro de version
+        env:
+          V: ${{ needs.region.outputs.version }}
         run: |
-          V="$(python3 "$GITHUB_WORKSPACE/scripts/version.py")"
+          test -n "$V"
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
 
       - name: Xcode

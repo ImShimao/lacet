@@ -1,23 +1,29 @@
-"""Le numéro de version de Lacet, d'après le numéro de run du workflow.
+"""Le numéro de version de Lacet : celui qui suit la dernière version publiée.
 
-Chaque partie reste sous cent : quand le patch atteint 99, le suivant passe la
-version au-dessus et remet le patch à zéro. Le run 104 donne donc 1.1.4 ; le
-run 199, 1.1.99 ; le run 200, 1.2.0. Le compteur ne recule jamais, donc une
-version déjà publiée n'est jamais remplacée par une plus ancienne.
+Chaque partie reste sous cent : après 1.1.99 vient 1.2.0, après 1.99.99, 2.0.0.
+Le numéro suit les publications, pas le compteur de runs du workflow : un run
+qui échoue ou qu'on annule n'en consomme plus (le run 109, en échec, avait fait
+passer de 1.1.8 à 1.1.10).
 
-    python scripts/version.py 104    # 1.1.4
-    python scripts/version.py        # lit GITHUB_RUN_NUMBER (dans le workflow)
+    python scripts/version.py --after v1.1.10    # 1.1.11
+    python scripts/version.py --after v1.1.99    # 1.2.0
 """
 
 from __future__ import annotations
 
-import os
 import sys
 
 
-def version(run: int) -> str:
-    return f"{1 + run // 10000}.{run // 100 % 100}.{run % 100}"
+def bump(previous: str) -> str:
+    major, minor, patch = (int(p) for p in previous.lstrip("v").split("."))
+    patch += 1
+    if patch == 100:
+        minor, patch = minor + 1, 0
+    if minor == 100:
+        major, minor = major + 1, 0
+    return f"{major}.{minor}.{patch}"
 
 
 if __name__ == "__main__":
-    print(version(int(sys.argv[1] if len(sys.argv) > 1 else os.environ["GITHUB_RUN_NUMBER"])))
+    assert bump("v1.1.10") == "1.1.11" and bump("1.1.99") == "1.2.0" and bump("1.99.99") == "2.0.0"
+    print(bump(sys.argv[sys.argv.index("--after") + 1]))
