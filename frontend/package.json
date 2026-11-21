@@ -8,7 +8,8 @@
     "icons": "python scripts/make-icons.py",
     "build": "vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
+    "@playwright/test": "^1.65.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^4.3.4",

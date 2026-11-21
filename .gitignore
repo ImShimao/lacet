@@ -37,3 +37,8 @@ obsidian/.trash/
 # Réglages locaux d'éditeurs : propres à chaque machine, jamais versionnés.
 .vscode/
 .obsidian/
+
+# Résultats des tests dans le navigateur (npm run test:e2e).
+frontend/test-results/
+frontend/playwright-report/
+
