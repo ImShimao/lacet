@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import Countdown from './Countdown.jsx'
 import MapView from './MapView.jsx'
@@ -10,7 +10,7 @@ import PlaceSheet from './PlaceSheet.jsx'
 import Explore from './Explore.jsx'
 import Library from './Library.jsx'
 import RunDetail from './RunDetail.jsx'
-import Account, { sectionTitle } from './Account.jsx'
+import { sectionTitle } from './accountSections.js'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import Launch from './Launch.jsx'
 import TabBar from './TabBar.jsx'
@@ -37,6 +37,9 @@ import { startHere } from './restart'
 import { announceDeparture, announcing } from './contact'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
+
+// « Mon compte » ne s'ouvre pas au lancement : son code n'est chargé qu'à l'ouverture.
+const Account = lazy(() => import('./Account.jsx'))
 
 export default function App() {
   const stored = useMemo(() => load(), [])
@@ -755,58 +758,60 @@ export default function App() {
               onExplore={() => setTab('explore')}
             />
           ) : tab === 'account' ? (
-            <Account
-              mapStyle={mapStyle}
-              onStyles={() => setStylesOpen(true)}
-              zones={zones}
-              onZones={onZones}
-              page={accountPage}
-              onPage={setAccountPage}
-              params={params}
-              geo={geo}
-              history={history}
-              poiPrefs={poiPrefs}
-              onPoiPrefs={(patch) =>
-                setPoiPrefs((prev) => {
-                  const next = { ...prev, ...patch }
-                  save({ pois: next })
-                  return next
-                })
-              }
-              onProfile={(patch) => {
-                const next = { ...params, ...patch }
-                setParams(next)
-                save({ params: next })
-              }}
-              onClearData={async () => {
-                // Les cartes gardées partent avec le reste : ce sont des données
-                // comme les autres, et ce sont de loin les plus volumineuses.
-                // Les laisser derrière ferait mentir le bouton.
-                //
-                // On l'attend : effacer un cache prend un instant, et l'écran qui
-                // annonce le résultat lit le journal juste après.
-                await offline.clear()
-                // Les rues et altitudes gardées pour calculer hors ligne aussi.
-                await clearEngineData()
-                library.clear()
-                // L'apparence aussi revient à celle du premier jour.
-                startAppearance()
-                // Et les réglages que tient l'écran : laissés tels quels, le
-                // prochain `save` les aurait réécrits dans le magasin vidé.
-                setParams({ ...DEFAULTS })
-                setMapStyle(null)
-                setPoiPrefs({ water: false })
-                setRunView('heading')
-                setVia(null)
-                run.dropPending()
-              }}
-              onRestored={() => {
-                library.reload()
-                startAppearance()
-                const restored = load().params
-                if (restored) setParams({ ...DEFAULTS, ...restored })
-              }}
-            />
+            <Suspense fallback={null}>
+              <Account
+                mapStyle={mapStyle}
+                onStyles={() => setStylesOpen(true)}
+                zones={zones}
+                onZones={onZones}
+                page={accountPage}
+                onPage={setAccountPage}
+                params={params}
+                geo={geo}
+                history={history}
+                poiPrefs={poiPrefs}
+                onPoiPrefs={(patch) =>
+                  setPoiPrefs((prev) => {
+                    const next = { ...prev, ...patch }
+                    save({ pois: next })
+                    return next
+                  })
+                }
+                onProfile={(patch) => {
+                  const next = { ...params, ...patch }
+                  setParams(next)
+                  save({ params: next })
+                }}
+                onClearData={async () => {
+                  // Les cartes gardées partent avec le reste : ce sont des données
+                  // comme les autres, et ce sont de loin les plus volumineuses.
+                  // Les laisser derrière ferait mentir le bouton.
+                  //
+                  // On l'attend : effacer un cache prend un instant, et l'écran qui
+                  // annonce le résultat lit le journal juste après.
+                  await offline.clear()
+                  // Les rues et altitudes gardées pour calculer hors ligne aussi.
+                  await clearEngineData()
+                  library.clear()
+                  // L'apparence aussi revient à celle du premier jour.
+                  startAppearance()
+                  // Et les réglages que tient l'écran : laissés tels quels, le
+                  // prochain `save` les aurait réécrits dans le magasin vidé.
+                  setParams({ ...DEFAULTS })
+                  setMapStyle(null)
+                  setPoiPrefs({ water: false })
+                  setRunView('heading')
+                  setVia(null)
+                  run.dropPending()
+                }}
+                onRestored={() => {
+                  library.reload()
+                  startAppearance()
+                  const restored = load().params
+                  if (restored) setParams({ ...DEFAULTS, ...restored })
+                }}
+              />
+            </Suspense>
           ) : (
             <Explore
               snapped={snapped}

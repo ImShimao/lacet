@@ -33,23 +33,9 @@ import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearanc
 /** Les familles du sommaire, dans leur ordre. */
 const GROUPS = ['Paramètres', 'Données', 'Infos']
 
-/**
- * Les pages de « Mon compte ». `tone` teinte la pastille : on retrouve une
- * ligne à sa couleur bien avant de l'avoir lue.
- */
-export const SECTIONS = [
-  { key: 'profile', group: null, icon: 'user', title: 'Profil' },
-  { key: 'search', group: 'Paramètres', icon: 'routes', title: 'Parcours' },
-  { key: 'run', group: 'Paramètres', icon: 'volume', title: 'Guidage et voix' },
-  { key: 'safety', group: 'Paramètres', icon: 'sos', title: 'Sécurité', tone: 'risk' },
-  { key: 'appearance', group: 'Paramètres', icon: 'appearance', title: 'Apparence' },
-  { key: 'storage', group: 'Données', icon: 'layers', title: 'Stockage' },
-  { key: 'backup', group: 'Données', icon: 'archive', title: 'Sauvegarde' },
-  { key: 'about', group: 'Infos', icon: 'info', title: 'À propos' },
-]
+import { SECTIONS } from './accountSections.js'
 
-/** Le titre d'une page, pour l'en-tête de l'app. */
-export const sectionTitle = (key) => SECTIONS.find((s) => s.key === key)?.title ?? 'Mon compte'
+export { SECTIONS, sectionTitle } from './accountSections.js'
 
 export default function Account({ page = null, onPage = () => {}, ...props }) {
   const top = useRef(null)

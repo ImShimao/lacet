@@ -28,7 +28,7 @@ Tiré de l'analyse complète du 10 novembre 2026. Les corrections et le nouvel
 
 ### À vérifier sur l'iPhone (version 1.0.98)
 
-Rien de ceci n'a pu être éprouvé hors du téléphone :
+Rien de ceci n'a pu être éprouvé hors du téléphone. La marche à suivre pour chaque point est dans [À vérifier sur l'iPhone](a-verifier-iphone.md) :
 
 - **Le partage en image** (`ShareSheet.jsx`, `shareCard.js`, `shareImage` dans
   `native.js`) : l'écriture du PNG et la feuille de partage d'iOS ; si l'image
@@ -51,8 +51,9 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 
 ### Ce qui existe et peut mieux faire
 
-- **Poids du paquet** : un seul fichier JS de 1,47 Mo. Charger « Mon compte » et
-  les filtres à la demande (`import()`) accélère le lancement.
+- **Poids du paquet** : un fichier JS de 1,48 Mo, dont l'essentiel est MapLibre,
+  nécessaire dès l'ouverture de la carte. « Mon compte » est déjà chargé à la
+  demande (28 ko de moins au lancement) ; le reste ne se découpe pas sans gain.
 - **Sorties anciennes** : elles n'ont ni heures ni altitudes par point, donc ni
   trace coloriée ni profil. Rien à rattraper — à savoir, c'est tout.
 
@@ -61,11 +62,22 @@ Rien de ceci n'a pu être éprouvé hors du téléphone :
 - Partage live d'une sortie en cours, couche communautaire de signalements avec
   seuil anti-abus : il y faut un serveur.
 
+### Fait
+
+- **`.vscode/`** n'est plus suivi par git (il reste ignoré, en local).
+- **Le compte de tests** : 1243 aujourd'hui (848 Vitest, 395 pytest).
+- **Icône de la doc et de la source AltStore** : celles du nouveau logo.
+- **Feuille « Mon compte »** : chargée à l'ouverture seulement.
+
 ### À enlever
 
-- **`.vscode/`**, suivi par git, s'il ne sert plus.
-- **Le compte de tests du README** : il annonce 1169 tests ; il y en a 1194
-  (799 Vitest, 395 pytest).
+_(rien pour l'instant)_
+
+### Reporté, et pourquoi
+
+- **Système de mesure km / miles** : `km()` et les allures sont appelés à une quarantaine d'endroits, dont la voix, le partage et les champs de saisie du moteur, qui restent en métrique. Le faire en une fois cassait des tests et laissait des écrans incohérents. À traiter comme un chantier à part, avec une décision sur la saisie.
+- **Choix de l'icône de l'app** : une icône alternative demande un changement natif (entrées `CFBundleAlternateIcons` et jeux d'icônes générés en compilation). Sans iPhone pour vérifier, c'est trop risqué pour un seul passage.
+- **Seuils du badge relief** (Probable / Possible / Peu probable) : leur calibrage demande des dizaines de recherches réelles sur OpenStreetMap, puis de juger les boucles obtenues. À faire avec du temps devant soi.
 
 ### Écartés, et pourquoi
 

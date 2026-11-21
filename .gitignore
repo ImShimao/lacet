@@ -33,3 +33,7 @@ altstore/
 obsidian/.obsidian/workspace*.json
 obsidian/.obsidian/cache
 obsidian/.trash/
+
+# Réglages locaux d'éditeurs : propres à chaque machine, jamais versionnés.
+.vscode/
+.obsidian/
