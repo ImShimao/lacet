@@ -172,6 +172,8 @@ export default function Explore({
   onScrub,
   onShowStep,
   onOpenDetail,
+  onBack = null,
+  freshImport = false,
   stops = { stops: [], loading: false, complete: true },
   poiPrefs = null,
 }) {
@@ -324,6 +326,18 @@ export default function Explore({
 
   return (
     <div className="panel panel--results">
+      {/* Le fichier vient d'entrer : la coche bondit, le temps de dire ce que
+          Lacet en a tiré — et qu'il ne s'est pas contenté de l'afficher. */}
+      {freshImport && (
+        <div className="notice notice--import" role="status">
+          <span className="notice__check">
+            <Icon name="check" size={16} />
+          </span>
+          {selected.matched
+            ? 'Boucle importée et analysée : note, voies, traversées et dénivelé.'
+            : 'Boucle importée. Ses points ne suivent aucune rue connue : elle reste sans note.'}
+        </div>
+      )}
       <RouteCards
         known={known}
         routes={routes}
@@ -521,6 +535,14 @@ export default function Explore({
           que soit l'endroit où l'on a fait défiler le détail. À côté, le seul
           autre geste qu'on fait avant de partir : garder la boucle. */}
       <div className="actionbar">
+        {/* Retour à l'accueil et à « Trouver ma boucle » : une boucle importée
+            ou un favori rouvert n'avaient pas d'autre sortie qu'une nouvelle
+            recherche lancée depuis la barre du haut. */}
+        {onBack && (
+          <button className="btn btn--icon" onClick={onBack} title="Revenir au générateur" aria-label="Revenir au générateur">
+            <Icon name="close" size={19} />
+          </button>
+        )}
         <button
           className={`btn btn--icon ${isFavorite ? 'btn--on' : ''}`}
           onClick={onFavorite}

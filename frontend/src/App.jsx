@@ -376,7 +376,14 @@ export default function App() {
     found.show(route)
     setTab('explore')
     setSheet('peek')
+    haptic('pulseHaptic')
+    // Le bandeau « importée et analysée » ne reste que le temps d'être lu.
+    setFreshImport(route.id)
+    clearTimeout(freshTimer.current)
+    freshTimer.current = setTimeout(() => setFreshImport(null), 4500)
   }
+  const [freshImport, setFreshImport] = useState(null)
+  const freshTimer = useRef(null)
 
   // Un GPX ouvert avec Lacet depuis une autre app — une boucle qu'un ami a
   // partagée — entre comme s'il venait du champ « Importer un GPX ».
@@ -865,6 +872,11 @@ export default function App() {
               onStart={() => beginRun('route')}
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
+              onBack={() => {
+                setDetail(false)
+                found.forget()
+              }}
+              freshImport={freshImport !== null && freshImport === selected?.id}
               onScrub={setScrub}
               // Une consigne touchée dans la feuille de route : dépliée, la
               // feuille couvrait le point, qui s'allumait dessous sans que la

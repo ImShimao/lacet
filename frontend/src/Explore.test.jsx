@@ -207,3 +207,17 @@ describe('l’accueil : la distance en grand', () => {
     expect(onQuickParams).toHaveBeenLastCalledWith({ mode: 'duration' })
   })
 })
+
+describe('une boucle importée', () => {
+  afterEach(cleanup)
+
+  it('se signale à son arrivée, et se referme pour revenir au générateur', () => {
+    // Après un import, l'écran ne montrait que le fichier : sans bouton,
+    // revenir à « Trouver ma boucle » demandait de deviner un autre chemin.
+    const onBack = vi.fn()
+    afficher({ routes: [boucle({ imported: true, matched: true })], freshImport: true, onBack })
+    expect(screen.getByRole('status')).toHaveTextContent('importée et analysée')
+    fireEvent.click(screen.getByRole('button', { name: 'Revenir au générateur' }))
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+})

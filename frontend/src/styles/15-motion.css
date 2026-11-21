@@ -250,3 +250,30 @@
     transform: none;
   }
 }
+
+/* Un GPX importé : le bandeau monte, puis la coche bondit. */
+.notice--import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--safe-soft);
+  border-color: var(--safe-line);
+  animation: rise 0.35s var(--ease);
+}
+.notice__check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--safe);
+  color: var(--surface);
+  animation: bounce-in 0.5s 0.2s ease-out backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice--import,
+  .notice__check {
+    animation: none;
+  }
+}
