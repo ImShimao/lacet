@@ -280,6 +280,29 @@ export const writeStoreCopy = (text) => Filesystem.writeFile({ ...STORE_COPY, da
 export const readStoreCopy = () => Filesystem.readFile(STORE_COPY).then(({ data }) => data, () => null)
 
 /** Écrit un fichier et ouvre la feuille de partage d'iOS pour l'emporter. */
+/**
+ * Un GPX ouvert avec Lacet — reçu dans Messages, AirDrop, Mail ou rangé dans
+ * Fichiers. iOS en dépose une copie dans la boîte de l'app et l'ouvre par son
+ * adresse `file://` (voir `CFBundleDocumentTypes`, `customize.py`) ; `handler`
+ * reçoit un objet qui se lit comme le fichier du champ « Importer un GPX ».
+ * Au démarrage à froid, le fichier qui a lancé l'app arrive par
+ * `getLaunchUrl` : d'où la mémoire des adresses déjà lues, pour ne pas
+ * l'importer deux fois.
+ */
+export function onOpenedFile(handler, onError) {
+  const seen = new Set()
+  const open = async (url) => {
+    if (!url?.startsWith('file:') || seen.has(url)) return
+    seen.add(url)
+    const { data } = await Filesystem.readFile({ path: url, encoding: Encoding.UTF8 })
+    await handler({ name: decodeURIComponent(url.split('/').pop()), text: async () => data })
+  }
+  App.addListener('appUrlOpen', ({ url }) => open(url).catch(onError))
+  App.getLaunchUrl()
+    .then((launch) => open(launch?.url))
+    .catch(onError)
+}
+
 export async function shareTextFile(filename, text, mime) {
   const { uri } = await Filesystem.writeFile({
     path: filename,

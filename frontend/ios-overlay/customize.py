@@ -77,6 +77,33 @@ def info_plist() -> None:
         {"CFBundleURLName": "fr.lacet.app", "CFBundleURLSchemes": ["lacet"]}
     ]
 
+    # Les GPX s'ouvrent avec Lacet : une boucle partagée par un autre coureur
+    # arrive en fichier dans Messages ou AirDrop, et « Ouvrir avec Lacet » la
+    # range dans ses favoris (`onOpenedFile`, `native.js`). iOS ne connaît pas
+    # le GPX : le type se déclare, sinon Lacet n'apparaît pas dans la liste.
+    # Copié plutôt qu'ouvert sur place : le fichier reste lisible sans droits
+    # d'accès à négocier avec l'app qui l'a fourni.
+    plist["UTImportedTypeDeclarations"] = [
+        {
+            "UTTypeIdentifier": "com.topografix.gpx",
+            "UTTypeDescription": "Parcours GPX",
+            "UTTypeConformsTo": ["public.xml", "public.data"],
+            "UTTypeTagSpecification": {
+                "public.filename-extension": ["gpx"],
+                "public.mime-type": ["application/gpx+xml"],
+            },
+        }
+    ]
+    plist["CFBundleDocumentTypes"] = [
+        {
+            "CFBundleTypeName": "Parcours GPX",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["com.topografix.gpx"],
+        }
+    ]
+    plist["LSSupportsOpeningDocumentsInPlace"] = False
+
     with path.open("wb") as fh:
         plistlib.dump(plist, fh)
     print(f"Info.plist réglé ({path})")

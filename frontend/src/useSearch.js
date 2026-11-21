@@ -128,10 +128,14 @@ export default function useSearch() {
      * Lance une recherche. `onStart` reçoit le point où la boucle commence
      * vraiment, quand il diffère de celui qu'on avait posé.
      *
+     * `lead`, un parcours importé, passe en tête des propositions : on le
+     * compare à ce que Lacet aurait proposé du même départ, à la même
+     * distance. Si la recherche échoue — pas de réseau —, il reste affiché seul.
+     *
      * Rend le résultat affiché, ou `null` si une autre recherche a pris la
      * main entre-temps.
      */
-    async run(request, { from = null, onStart = null } = {}) {
+    async run(request, { from = null, onStart = null, lead = null } = {}) {
       setBusy('search')
       setProgress(null)
       setError(null)
@@ -161,6 +165,7 @@ export default function useSearch() {
           }
         }
         if (mien !== token.current) return null
+        if (lead) payload = { ...payload, routes: [lead, ...payload.routes] }
 
         // Le détail du temps passé, gardé pour « Mon compte ». Mesurer sur le
         // téléphone est le seul moyen de savoir ce qui traîne vraiment : un PC
@@ -194,6 +199,11 @@ export default function useSearch() {
         return affiche
       } catch (err) {
         if (mien !== token.current) return null
+        if (lead) {
+          setResult({ routes: [lead], rejected: [], meta: {}, request })
+          setSelected(lead)
+          return null
+        }
         // On garde l'erreur entière : hors ligne, « réessayer » ne sert à rien
         // et il vaut mieux renvoyer vers les parcours déjà enregistrés.
         setError({ message: err.message, offline: Boolean(err.offline) })

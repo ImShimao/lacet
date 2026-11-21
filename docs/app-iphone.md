@@ -103,6 +103,12 @@ depuis la galerie de l'écran d'accueil. S'il s'affiche, l'extension tourne.
   prévient avant chaque traversée.
 - **Le GPX s'exporte par la feuille de partage** d'iOS (Fichiers, AirDrop…) —
   horodaté pour une sortie, pour qu'une montre ou un site y voie une activité.
+- **Un GPX s'ouvre avec Lacet** depuis Messages, AirDrop, Mail ou Fichiers :
+  l'app déclare le type `com.topografix.gpx` (`customize.py`) et lit le
+  fichier qu'iOS lui confie (`onOpenedFile`, `native.js`). C'est ainsi qu'une
+  boucle passe d'un coureur à l'autre. Le fichier est accroché aux rues, noté,
+  gardé en favori, puis comparé aux boucles de même longueur proposées depuis
+  son départ.
 - **Elle s'ouvre sans réseau** : ses fichiers sont sur le téléphone. Les zones
   déjà explorées se recalculent sans réseau aussi — les rues téléchargées sont
   gardées quatorze jours.

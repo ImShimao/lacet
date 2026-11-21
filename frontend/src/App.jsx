@@ -31,7 +31,7 @@ import { startAppearance, useAppearance } from './appearance'
 import { km } from './format'
 import { load, rememberShown, save, shownFrom } from './storage'
 import { ranFrom } from './knownRoutes'
-import { haptic } from './platform'
+import { haptic, isNative } from './platform'
 import { locateOnce } from './position'
 import { startHere } from './restart'
 import { announceDeparture, announcing } from './contact'
@@ -156,21 +156,21 @@ export default function App() {
   // faire autour — ranger les filtres, revenir à l'onglet, replier la feuille.
   // Le calcul, son jeton et son élargissement sont dans `useSearch.js`.
   const search = useCallback(
-    async (next, { regenerate = false, through = via } = {}) => {
+    async (next, { regenerate = false, through = via, at = start, lead = null } = {}) => {
       const active = next || params
       if (next) {
         setParams(next)
         save({ params: next })
       }
       setFiltersOpen(false)
-      if (!start) return
+      if (!at) return
 
       // Une recherche ordinaire repart de zéro ; « Régénérer » tourne les polygones
       // d'un cran de plus et s'écarte des directions qu'on vient de montrer. La
       // même demande relancée sur ses propres propositions — les filtres
       // rouverts et validés sans rien changer — en est une aussi : refaite à
       // l'identique, elle rendait exactement les mêmes boucles.
-      const request = { ...toRequest(active, start), ...(through ? { via: through } : {}) }
+      const request = { ...toRequest(active, at), ...(through ? { via: through } : {}) }
       const key = JSON.stringify(request)
       const again = regenerate || (Boolean(result?.request && result.routes.length) && key === lastAsked.current)
       lastAsked.current = key
@@ -186,7 +186,7 @@ export default function App() {
       // Le repère se pose ensuite sur la rue, là où la boucle commence ; la
       // demande, elle, repart toujours du point choisi — la maison, pas le
       // trottoir —, pour que chaque recherche sorte du même côté.
-      const asked = askedOf(start)
+      const asked = askedOf(at)
       // Ce qu'on a déjà vu d'ici — et déjà couru, quand on demande à l'éviter —
       // recule au choix, et une graine neuve fait varier chaque recherche : la
       // même demande, relancée un autre jour, rendait la même liste dans le
@@ -209,6 +209,7 @@ export default function App() {
         {
           from: asked,
           onStart: (point) => here.setPoint({ ...point, asked }),
+          lead,
         },
       )
       if (shown?.routes.length) rememberShown(asked, shown.routes)
@@ -375,7 +376,35 @@ export default function App() {
     found.show(route)
     setTab('explore')
     setSheet('peek')
+
+    // **Le comparer.** Seul, un parcours noté B ne dit pas grand-chose : y
+    // a-t-il mieux d'ici ? Le départ passe donc au sien, et Lacet cherche des
+    // boucles de la même longueur, que le fichier précède dans la liste. Les
+    // filtres prennent cette distance — c'est la question qu'on vient de poser.
+    // Un tracé non reconnu ne se compare pas : sa note manque, et ses rues
+    // aussi, souvent.
+    if (!route.matched) return
+    const [lon, lat] = route.geometry[0]
+    const point = { lat, lon }
+    applyStart(point, undefined, true)
+    const distance_km = Math.round(route.distance_m / 100) / 10
+    await search({ ...params, mode: 'distance', distance_km }, { at: point, through: null, lead: route })
   }
+
+  // Un GPX ouvert avec Lacet depuis une autre app — une boucle qu'un ami a
+  // partagée — entre comme s'il venait du champ « Importer un GPX ».
+  const importRef = useRef(importGpx)
+  importRef.current = importGpx
+  useEffect(() => {
+    if (!isNative()) return
+    import('./native').then((n) =>
+      n.onOpenedFile(
+        (file) => importRef.current(file),
+        (err) => found.fail(err?.message || "Ce fichier n'a pas pu être lu."),
+      ),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toggleRunView = () => {
     const next = runView === 'north' ? 'heading' : 'north'

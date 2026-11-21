@@ -121,6 +121,7 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 | 🚫 **Zone à éviter** | Un cercle de 100 m à 2 km que les boucles et le recalcul contournent, gardé d'une recherche à l'autre |
 | 🎥 **Survol 3D** | La boucle survolée sur le relief avant de partir, dix-sept secondes pour 10 km |
 | 🏁 **Ce que tu as couru** | Distance, allure, dénivelé, ta trace réelle, exportée en GPX horodaté pour une montre ou Strava |
+| 🤝 **Partager une boucle** | « Partager » l'envoie en GPX ; un ami qui a Lacet l'ouvre avec l'app. Tout GPX importé est accroché aux rues, noté A, B ou C, et comparé aux boucles que Lacet propose du même départ, à la même distance |
 | 💧 **Points d'eau** | Ceux qui bordent la boucle s'affichent, et la voix prévient cent mètres avant |
 | 🆘 **SOS** | Un bouton prépare un SMS avec ta position ; un proche peut recevoir l'heure prévue du retour |
 | 🚴 **Course ou vélo** | Allure en min/km ou vitesse en km/h, pause automatique aux feux ; à vélo, la voix donne les kilomètres tous les 5 km |

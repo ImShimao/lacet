@@ -491,9 +491,12 @@ export default function Explore({
             <span>Autre sens</span>
           </button>
         )}
-        <button className="loopact" onClick={exportGpx} disabled={exporting} title="Exporter en GPX" aria-label="Exporter en GPX">
-          <Icon name="fileExport" size={18} />
-          <span>GPX</span>
+        {/* Un GPX, par la feuille de partage : un ami qui a Lacet l'ouvre avec
+            l'app, qui le note et le compare ; les autres le prennent dans leur
+            montre ou leur app de course. */}
+        <button className="loopact" onClick={exportGpx} disabled={exporting} title="Partager en GPX" aria-label="Partager en GPX">
+          <Icon name="share" size={18} />
+          <span>Partager</span>
         </button>
         <button
           className="loopact"
@@ -726,7 +729,11 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     parcours à tours, où c'est le fait même d'en faire plusieurs —
                     et pour un « 8 », ses deux boucles. */}
                 <span className="rcard__dir">
-                  {r.figure_eight
+                  {/* Le fichier importé, en tête de ce que Lacet propose du même
+                      départ : il faut le reconnaître d'un coup d'œil. */}
+                  {r.imported
+                    ? 'Ton fichier'
+                    : r.figure_eight
                     ? `${km(r.lap_distances_m[0], 1)} + ${km(r.lap_distances_m[1], 1)} ${unitLabel()}`
                     : r.laps > 1
                       ? `${km(r.lap_distance_m, 1)} ${unitLabel()} × ${r.laps}`
