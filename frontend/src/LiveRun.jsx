@@ -39,6 +39,8 @@ const CROSSING_REARM_M = 500
 
 // En dessous de cette précision GPS, le point est trop douteux pour compter.
 const ACCURACY_LIMIT_M = 35
+// Les tranches de précision comptées pour le rapport de sortie : < 5, < 10, < 20, < 50 m, et au-delà.
+const ACCURACY_BUCKETS_M = [5, 10, 20, 50, Infinity]
 
 // Les deux temps du guidage — l'annonce, puis « maintenant » — se règlent sur
 // la vitesse du moment : voir `guidance.js`.
@@ -279,6 +281,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const splitAt = useRef(0)
   // Ce que la voix a dit, phrase par phrase — voir `talk`.
   const journal = useRef(resuming?.spoken ?? [])
+  // Ce que la voix ne dit pas, pour le rapport de sortie (`runReport.js`) : la
+  // précision des relevés GPS, ceux qu'on a écartés, et chaque recalcul.
+  const diag = useRef(resuming?.diag ?? { fixes: 0, rejected: 0, accuracy: [0, 0, 0, 0, 0], detours: [] })
   // La distance des dernières secondes, relevé par relevé : l'arrêt n'est sûr
   // qu'au bout de huit secondes, et le tremblement du GPS pendant ce temps —
   // une dizaine de mètres mesurés — doit être retiré, pas compté.
@@ -406,6 +411,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         const point = [longitude, latitude]
         here.current = point
         accuracyNow.current = Number.isFinite(accuracy) ? accuracy : null
+        diag.current.fixes += 1
+        if (Number.isFinite(accuracy)) diag.current.accuracy[ACCURACY_BUCKETS_M.findIndex((b) => accuracy < b)] += 1
         // Le cap du GPS : il dit dans quel sens on suit le tracé — voir `locate`.
         // Lu sur la vitesse, pas sur les positions : un reflet ne le fausse pas.
         // À l'arrêt, il ne vaut rien.
@@ -415,6 +422,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // Un point trop imprécis déplace le repère, mais ne compte pas et ne
         // réoriente pas la carte.
         if (accuracy > ACCURACY_LIMIT_M) {
+          diag.current.rejected += 1
           onPosition(point, heading.current)
           return
         }
@@ -534,6 +542,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       trailAlt: trace.current.alts,
       splits: splits.current,
       spoken: journal.current,
+      diag: diag.current,
       pausedS: pausedSeconds(now),
       rerouted: wasRerouted(),
       ...measuredAscent(),
@@ -1122,6 +1131,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // boucle qu'on a quittée.
     const homeward = home || Boolean(guided.home)
     setRerouting(homeward ? 'home' : true)
+    const t0 = Date.now()
+    // true : adopté ; false : pas de chemin ; 'moot' : revenu sur le tracé entre-temps.
+    let outcome = false
     try {
       const found = await detourOnDevice({
         // Les signalements sont relus ici, et non gardés avec la demande : le
@@ -1148,9 +1160,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // Revenu sur le tracé pendant le calcul : rien à changer. Sauf quand
       // c'est nous qui avons demandé le détour — là, le tracé n'est pas en
       // cause, c'est la rue devant qui est barrée.
-      if (!forced && strayCount.current < OFF_ROUTE_FIXES) return
+      if (!forced && strayCount.current < OFF_ROUTE_FIXES) {
+        outcome = 'moot'
+        return
+      }
       const next = spliceRoute(guided, found, track.cumulative[found.joinIndex] ?? 0, { home: homeward })
       adopt(next)
+      outcome = true
       // La consigne s'affiche tout de suite, sans attendre le relevé suivant.
       const first = nextInstruction(next.instructions, 0, announced.current)
       setCurrent(first)
@@ -1185,6 +1201,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         }
       }
     } finally {
+      diag.current.detours.push({ t: t0, m: Math.round(covered.current), ms: Date.now() - t0, outcome, forced, home })
       detouring.current = false
       setRerouting(false)
     }
@@ -1297,6 +1314,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       rerouted: wasRerouted(),
       splits: splits.current.slice(),
       spoken: journal.current.slice(),
+      diag: diag.current,
       pausedS: pausedSeconds(),
     })
   }

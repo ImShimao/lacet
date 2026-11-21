@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
-import { downloadRun } from './api'
+import { downloadRun, shareRunReport } from './api'
 import AscentNote from './AscentNote.jsx'
 import { duration, km, pace } from './format'
 import { standing } from './knownRoutes'
@@ -153,6 +153,10 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
             Exporter
           </button>
         )}
+        <button className="btn btn--fit" onClick={() => shareRunReport(entry)} aria-label="Envoyer le rapport de la sortie">
+          <Icon name="chart" size={16} />
+          Rapport
+        </button>
         {!entry.free && entry.geometry?.length > 1 && (
           <button className="btn btn--primary" onClick={() => onReplay(entry)}>
             <Icon name="refresh" size={16} />

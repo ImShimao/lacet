@@ -10,7 +10,7 @@ import { planOnDevice } from './engine/client'
 import { reverse, search } from './engine/geocode'
 import { buildGpx, gpxFilename } from './engine/gpx'
 import { buildRunGpx } from './runGpx'
-import { saveTextFile } from './platform'
+import { isNative, saveTextFile } from './platform'
 
 /**
  * Un échec de recherche, prêt à être montré.
@@ -76,4 +76,11 @@ export async function describePlace(lat, lon) {
  */
 export async function downloadRun(entry) {
   await saveTextFile(gpxFilename(`${entry.name} — trace`), buildRunGpx(entry), 'application/gpx+xml')
+}
+
+/** Le rapport de la sortie, en JSON, par la feuille de partage — voir `runReport.js`. */
+export async function shareRunReport(entry) {
+  const { runReport, reportFilename } = await import('./runReport')
+  const app = isNative() ? await import('./native').then((n) => n.appVersion()) : null
+  await saveTextFile(reportFilename(entry), runReport(entry, { app }), 'application/json')
 }

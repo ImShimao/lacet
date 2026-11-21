@@ -328,7 +328,9 @@ export function dropTracks() {
   const data = load()
   const avant = usage()?.bytes ?? 0
   const allegee = (sortie) =>
-    sortie.track || sortie.spoken ? { ...sortie, track: null, track_t: null, track_alt: null, spoken: null } : sortie
+    sortie.track || sortie.spoken || sortie.diag
+      ? { ...sortie, track: null, track_t: null, track_alt: null, spoken: null, diag: null }
+      : sortie
   save({ history: (data.history || []).map(allegee) })
   return Math.max(0, avant - (usage()?.bytes ?? 0))
 }

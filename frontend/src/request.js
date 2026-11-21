@@ -153,6 +153,8 @@ export function runEntry(stats, { route, free, sport }, params) {
     paused_s: stats.pausedS || 0,
     // Ce que la voix a dit, phrase par phrase — voir `RunDetail.jsx`.
     spoken: stats.spoken?.length ? stats.spoken : null,
+    // Précision du GPS et recalculs — pour le rapport de sortie (`runReport.js`).
+    diag: stats.diag ?? null,
     rerouted: Boolean(stats.rerouted),
     // Terminée d'elle-même, en revenant au départ — voir `arrival.js`.
     arrived: Boolean(stats.arrived),

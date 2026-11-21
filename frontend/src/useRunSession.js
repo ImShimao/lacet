@@ -107,6 +107,7 @@ export default function useRunSession({ toEntry, remember }) {
               trailAlt: pending.trailAlt,
               splits: pending.splits,
               spoken: pending.spoken,
+              diag: pending.diag,
               pausedS: pending.pausedS,
               rerouted: pending.rerouted,
               // Elle s'est arrêtée à sa dernière écriture, pas à l'instant où
@@ -155,6 +156,7 @@ export default function useRunSession({ toEntry, remember }) {
         rerouted: Boolean(entry.rerouted),
         splits: entry.splits ?? [],
         spoken: entry.spoken ?? [],
+        diag: entry.diag ?? undefined,
         ascent: entry.actual_ascent_m ?? null,
         ascentSource: entry.actual_ascent_source ?? null,
       })

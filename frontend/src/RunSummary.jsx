@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon, { SolidIcon } from './Icon.jsx'
-import { downloadRun } from './api'
+import { downloadRun, shareRunReport } from './api'
 import { duration, km, pace } from './format'
 import AscentNote from './AscentNote.jsx'
 import { Climb, Feeling, PlanGap, SlopePace, Splits, Standing, whenLabel } from './RunDetail.jsx'
@@ -224,6 +224,14 @@ export default function RunSummary({
             <Icon name="fileExport" size={18} />
           </button>
         )}
+        <button
+          className="btn btn--icon"
+          onClick={() => shareRunReport(entry)}
+          aria-label="Envoyer le rapport de la sortie"
+          title="Rapport de sortie"
+        >
+          <Icon name="chart" size={18} />
+        </button>
         {onKeep && (
           <button
             className={`btn btn--icon ${kept ? 'btn--on' : ''}`}
