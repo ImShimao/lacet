@@ -575,7 +575,7 @@ export default function MapView({
     const pin = new maplibregl.Marker({ element: el }).setLngLat(line[0]).addTo(m)
     // Le reste de la boucle s'efface un peu : ce qui est parcouru doit se détacher.
     m.setPaintProperty('route-line', 'line-opacity', 0.55)
-    m.setPaintProperty('route-arrows', 'line-opacity', 0.4)
+    m.setPaintProperty('route-arrows', 'icon-opacity', 0.4)
 
     const show = (d, paused) => {
       const box = hud.current
@@ -652,7 +652,7 @@ export default function MapView({
       m.getSource('flown')?.setData(empty())
       if (m.getLayer('route-line')) {
         m.setPaintProperty('route-line', 'line-opacity', 1)
-        m.setPaintProperty('route-arrows', 'line-opacity', 1)
+        m.setPaintProperty('route-arrows', 'icon-opacity', 1)
       }
       // Pas de relief en course : il coûte des tuiles et du calcul à chaque image.
       unrelief()
@@ -895,47 +895,40 @@ function visibleCentre(m) {
 }
 
 /**
- * Le motif de sens : un chevron isolé sur une bande transparente.
+ * La flèche de sens : une pointe pleine, blanche cernée de sombre.
  *
- * Il pointe vers la droite, et MapLibre déroule le motif **dans le sens où la
- * géométrie a été écrite**. Or le backend écrit chaque tronçon dans le sens du
- * parcours : le chevron indique donc la bonne direction sans aucun calcul.
+ * Elle pointe vers la droite, et une icône posée sur la ligne
+ * (`symbol-placement: 'line'`) suit la géométrie **dans le sens où elle a été
+ * écrite** — celui du parcours. Pas de calcul, donc, pour trouver le sens.
  *
- * La bande est bien plus large que le chevron — c'est ce vide qui espace les
- * répétitions. Un motif serré donnerait une frise illisible ; un motif trop
- * lâche laisserait de longues portions sans indication.
+ * Elle remplace un chevron en motif de ligne (`line-pattern`) : étiré sur
+ * chaque tronçon, il se coupait aux virages et aux jointures, se tordait dans
+ * les rues en zigzag, et ne ressemblait plus à une flèche — on ne savait plus
+ * dans quel sens tourner (retour d'essai sur l'iPhone, autour d'Illzach).
  *
- * Blanc cerné de sombre, et non d'une seule couleur : le tracé change de teinte
- * selon le niveau de sécurité (vert, jaune, orange), le fond change avec le
- * style, et l'imagerie satellite peut être de n'importe quelle couleur sous le
- * trait. Un chevron uni finissait par disparaître quelque part ; celui-ci porte
- * son propre contraste et se lit partout.
+ * Blanc cerné de sombre : le tracé change de teinte selon la sécurité, le fond
+ * selon le style, le satellite peut être de n'importe quelle couleur. La
+ * flèche porte son propre contraste et se lit partout.
  */
-function arrowPattern() {
-  const width = 96
-  const height = 24
+function arrowIcon() {
+  const size = 44
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-
+  canvas.width = size
+  canvas.height = size
   const ctx = canvas.getContext('2d')
-  ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  const middle = width / 2
-
-  const stroke = (lineWidth, color) => {
-    ctx.strokeStyle = color
-    ctx.lineWidth = lineWidth
-    ctx.beginPath()
-    ctx.moveTo(middle - 4, 6.5)
-    ctx.lineTo(middle + 4, 12)
-    ctx.lineTo(middle - 4, 17.5)
-    ctx.stroke()
-  }
-
-  stroke(7.5, mapToken('--map-arrow-casing'))
-  stroke(3.5, mapToken('--map-ink'))
-  return ctx.getImageData(0, 0, width, height)
+  ctx.beginPath()
+  ctx.moveTo(34, 22)
+  ctx.lineTo(11, 10)
+  ctx.lineTo(17, 22)
+  ctx.lineTo(11, 34)
+  ctx.closePath()
+  ctx.strokeStyle = mapToken('--map-arrow-casing')
+  ctx.lineWidth = 6
+  ctx.stroke()
+  ctx.fillStyle = mapToken('--map-ink')
+  ctx.fill()
+  return ctx.getImageData(0, 0, size, size)
 }
 
 /** Les hachures d'une zone à éviter : des diagonales rouges, sur fond à peine teinté. */
@@ -1053,23 +1046,27 @@ function addLayers(m) {
   // au mauvais moment, le vent de face à la fin, et un guidage qui annonce des
   // virages à gauche là où il faut tourner à droite.
   //
-  // Un motif de ligne, et non une couche de symboles. C'est contre-intuitif —
-  // `symbol-placement: 'line'` est fait pour ça — mais deux de nos cinq fonds
-  // (Relief et Satellite) sont des styles raster écrits à la main, sans champ
-  // `glyphs` : ils ne peuvent pas alimenter la chaîne de rendu des symboles.
-  // Le motif de ligne ne dépend d'aucune police, se comporte identiquement sur
-  // les cinq fonds, et suit la ligne exactement de la même façon.
-  if (!m.hasImage('route-chevron')) {
-    m.addImage('route-chevron', arrowPattern(), { pixelRatio: 2 })
+  // Une couche de symboles sans texte : les fonds Relief et Satellite, écrits
+  // à la main, n'ont pas de champ `glyphs`, mais seul `text-field` en a besoin.
+  // Les flèches qui se chevaucheraient s'effacent : aux jointures de deux
+  // tronçons, chacun en posait une, collées l'une à l'autre.
+  if (!m.hasImage('route-arrow')) {
+    m.addImage('route-arrow', arrowIcon(), { pixelRatio: 2 })
   }
   m.addLayer({
     id: 'route-arrows',
-    type: 'line',
+    type: 'symbol',
     source: 'route',
-    layout: { 'line-cap': 'butt', 'line-join': 'round' },
-    // La largeur commande la taille du chevron : le motif est étiré sur la
-    // hauteur du trait, et sa répétition suit dans les mêmes proportions.
-    paint: { 'line-pattern': 'route-chevron', 'line-width': 12 },
+    layout: {
+      'symbol-placement': 'line',
+      'symbol-spacing': 110,
+      'icon-image': 'route-arrow',
+      'icon-size': 1.2,
+      'icon-rotation-alignment': 'map',
+      'icon-keep-upright': false,
+      'icon-padding': 14,
+      'icon-allow-overlap': false,
+    },
   })
 
   // La traînée du survol : la part de boucle déjà parcourue par la pastille,
