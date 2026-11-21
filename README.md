@@ -32,13 +32,13 @@ sécurité, puis te guide à la voix, écran verrouillé.
 
 <div align="center">
 
-| Les boucles proposées | En course |
+| Les boucles proposées | Le détail |
 | :---: | :---: |
-| <img src="docs/images/1-boucles.png" width="300" alt="Une boucle de 10,4 km au départ de la vieille ville d'Annecy, notée A, tracée en vert sur la carte sombre, les autres propositions en pointillés, la barre Favori, GPX, Sens, Autres et Démarrer en bas"> | <img src="docs/images/2-course.png" width="300" alt="Pendant la sortie : « 30 m, tourne franchement à gauche sur le quai des Clarisses » en bandeau bleu, la carte inclinée, le chrono, la distance restante et le bouton pause en bas"> |
+| <img src="docs/images/1-boucles.png" width="300" alt="Une boucle de 10,4 km au départ de Guebwiller, notée A, tracée en vert sur la carte sombre avec ses flèches de sens, les autres propositions en pointillés, et le bouton Démarrer"> | <img src="docs/images/3-detail.png" width="300" alt="Le détail d'une boucle : la carte de la proposition, l'avis sur la nuit qui tombe, le profil de dénivelé coloré par revêtement et la part de voies protégées"> |
 
-| Le détail | Le survol 3D | Les filtres | L'apparence |
+| En course | Les filtres | Les réglages | Les fonds de carte |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/images/3-detail.png" width="200" alt="Le détail d'une boucle : revêtement, profil de dénivelé coloré par sécurité, feuille de route repliée"> | <img src="docs/images/4-survol.png" width="200" alt="Le survol 3D : une pastille court sur la boucle inclinée, la part déjà survolée en blanc, la distance et l'altitude en haut"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Apparence : thème auto, sombre ou clair, couleur d'accent bleu, violet, framboise ou graphite, taille du texte"> |
+| <img src="docs/images/2-course.png" width="200" alt="Pendant la sortie : la consigne en bandeau bleu, la carte inclinée, le chrono, la distance restante et le bouton pause"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km toujours visible"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Guidage et voix : une ligne par réglage, sa valeur et un menu, ou un interrupteur"> | <img src="docs/images/7-fonds.png" width="200" alt="La feuille Style de carte : un aperçu en grand et huit vignettes rendues sur l'endroit affiché"> |
 
 </div>
 
@@ -106,7 +106,7 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 
 | | |
 | --- | --- |
-| 🔁 **Des boucles** | Jusqu'à douze propositions qui partent dans des directions différentes et reviennent à la porte : 10 km, un semi au mètre près, ou une durée. Chaque recherche en tire d'autres, dans un autre ordre |
+| 🔁 **Des boucles** | Jusqu'à vingt propositions qui partent dans des directions différentes et reviennent à la porte : 10 km, un semi au mètre près, ou une durée. Chaque recherche en tire d'autres, dans un autre ordre |
 | ➰ **La forme au choix** | Une boucle entière, deux boucles en « 8 » qui repassent à la porte, ou plusieurs tours d'une même boucle — ou laisser Lacet choisir |
 | 🚸 **Le bon côté** | Au rond-point, on fait le tour du côté où l'on court : à gauche face aux voitures par défaut, comme le veut le code de la route ; la voix le dit en une phrase |
 | 🛡️ **Note A, B ou C** | Chaque tronçon est jugé : vitesse de la voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées. Ce qui ne passe pas est écarté, et l'app dit pourquoi |
@@ -116,7 +116,7 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 | 🧭 **Recalcul** | Vingt secondes hors du tracé, et un nouveau chemin part d'où tu es, calculé sur le téléphone, en tenant la distance prévue plutôt qu'en ramenant au plus près |
 | 📴 **Sans réseau** | Les rues d'Alsace sont livrées avec l'app ; ailleurs, elles se téléchargent une fois et restent. Le fond de carte se garde parcours par parcours |
 | 🌳 **Parcs et bords de l'eau** | À sécurité égale, les boucles préfèrent les parcs, les bois, l'eau et les sentiers balisés — sans rien céder sur la note |
-| 🌬️ **Vent et relief** | Le dernier tiers se court vent dans le dos quand il souffle à plus de 12 km/h ; plat, vallonné, côtes ou un D+ précis se choisit dans les filtres, et le moteur va chercher le bon terrain |
+| 🌬️ **Vent et relief** | Le dernier tiers se court vent dans le dos quand il souffle à plus de 12 km/h ; plat, vallonné, côtes ou un D+ précis se choisit dans les filtres, avec un badge qui dit d'avance si le terrain autour s'y prête |
 | 📍 **Passer par un point** | Un parc, une fontaine : toutes les boucles y passent, notées comme les autres |
 | 🚫 **Zone à éviter** | Un cercle de 100 m à 2 km que les boucles et le recalcul contournent, gardé d'une recherche à l'autre |
 | 🎥 **Survol 3D** | La boucle survolée sur le relief avant de partir, dix-sept secondes pour 10 km |
@@ -124,7 +124,9 @@ Le détail : [L'app iPhone](docs/app-iphone.md).
 | 💧 **Points d'eau** | Ceux qui bordent la boucle s'affichent, et la voix prévient cent mètres avant |
 | 🆘 **SOS** | Un bouton prépare un SMS avec ta position ; un proche peut recevoir l'heure prévue du retour |
 | 🚴 **Course ou vélo** | Allure en min/km ou vitesse en km/h, pause automatique aux feux ; à vélo, la voix donne les kilomètres tous les 5 km |
-| 🎨 **Apparence** | Thème sombre, clair ou celui de l'iPhone, quatre couleurs d'accent, texte agrandi |
+| 🎨 **Apparence** | Thème sombre, clair ou celui de l'iPhone, quatre couleurs d'accent, texte agrandi, huit fonds de carte en vignettes |
+| ⚙️ **Réglages en lignes** | Une ligne par réglage, sa valeur et un menu : voix, débit, anticipation des consignes, recalcul et arrivée automatiques, sécurité, direction, forme, voies à éviter |
+| 📝 **Rapport de sortie** | Depuis le bilan, un fichier JSON — trace, voix, précision du GPS, recalculs, réglages — pour comprendre une sortie qui s'est mal passée |
 | 🙈 **Rien ne part** | Pas de compte, pas de serveur, pas de suivi : favoris, sorties et réglages restent sur le téléphone |
 
 ### Les gestes sur la carte 👆

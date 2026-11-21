@@ -95,7 +95,9 @@ règles relatives de `.claude/settings.json` cessent alors de protéger les doss
   - `performances.md` (appareil, moteur Python, robustesse) · `developper.md` (démarrer, lancer,
     tester) · `limites.md` (limites, suite)
 - Les captures de `docs/images/` viennent de l'aperçu à taille d'iPhone (390 × 844, 3×), réduites à
-  780 px et ramenées à 256 couleurs : à refaire quand l'écran qu'elles montrent change.
+  780 px et ramenées à 256 couleurs : à refaire quand l'écran qu'elles montrent change, avec
+  `node scripts/captures.mjs` puis `python scripts/captures.py` dans `frontend/` (dev lancé).
+  « En course » (`2-course`) et « Le survol 3D » (`4-survol`) viennent du téléphone.
 - Lance seulement les tests liés au fichier modifié, pas toute la suite, sauf avant un commit.
   Un changement du moteur ajoute toujours `parity.test.js`.
 - Avant d'écrire du nouveau code, vérifie si une fonction existante du projet fait déjà le travail.

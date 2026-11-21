@@ -51,7 +51,7 @@ RELEASES = "https://github.com/ImShimao/lacet/releases/download"
 
 DESCRIPTION = (
     "Des boucles de course et de vélo depuis ta porte, qui évitent les routes "
-    "rapides sans trottoir. Jusqu'à douze propositions notées A, B ou C, "
+    "rapides sans trottoir. Jusqu'à vingt propositions notées A, B ou C, "
     "guidage vocal tour par tour, écran de verrouillage, recalcul si tu t'en "
     "écartes, et tout qui se calcule sur le téléphone — sans compte ni serveur."
 )
