@@ -10,7 +10,7 @@
 [![Tests](https://github.com/ImShimao/lacet/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/tests.yml)
 [![App iPhone (IPA)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml/badge.svg?branch=main)](https://github.com/ImShimao/lacet/actions/workflows/ios.yml)
 [![1247 tests](https://img.shields.io/badge/tests-1247%20%E2%9C%93-4ade80)](#tests-)
-[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+[![Tous droits réservés](https://img.shields.io/badge/licence-tous%20droits%20r%C3%A9serv%C3%A9s-lightgrey)](LICENSE)
 [![Capacitor 8](https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![MapLibre 5](https://img.shields.io/badge/MapLibre_GL-5-396CB2)](https://maplibre.org/)
 [![iOS 15+](https://img.shields.io/badge/iPhone-iOS%2015%2B-1F1B2E?logo=apple&logoColor=white)](#limitations-connues-)
@@ -339,8 +339,9 @@ la publication `v<version>` : 1.1.8 pour la compilation 108, 1.2.0 pour la 200
 
 ## Contribuer 🤝
 
-Les retours passent par une [issue](https://github.com/ImShimao/lacet/issues),
-le code par une pull request.
+Les retours passent par une [issue](https://github.com/ImShimao/lacet/issues).
+Le code est public pour être lu, pas repris : le copier, le modifier ou le
+redistribuer demande l'accord de l'auteur ([licence](LICENSE)).
 
 Avant de proposer une PR, vérifie que `npm test`, `pytest` et
 `parity_dump.py --check` passent. Les commentaires, les tests et les messages
@@ -352,7 +353,7 @@ kilomètre » »).
 
 <div align="center">
 
-Code sous [licence MIT](LICENSE) · Fait avec React, MapLibre et
+Code lisible, pas réutilisable : [tous droits réservés](LICENSE) · Fait avec React, MapLibre et
 [Capacitor](https://capacitorjs.com/) par [**ImShimao**](https://github.com/ImShimao)
 
 <sub>Rues © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL),
