@@ -49,6 +49,56 @@ Rien de ceci n'a pu être éprouvé hors du téléphone. La marche à suivre pou
   suivantes ». Le gain n'a pas été mesuré sur un historique de plusieurs
   centaines de sorties.
 
+### À vérifier sur l'iPhone (version 1.1.13)
+
+- **Un GPX reçu** par Messages ou AirDrop doit s'ouvrir avec Lacet (`onOpenedFile`
+  dans `native.js`, types déclarés dans `customize.py`), avec la vibration et le
+  bandeau d'import.
+- **Les flèches de sens** (`arrowIcon`, `MapView.jsx`) : espacées, dans le bon sens,
+  lisibles sur le téléphone.
+- **Le bilan de sortie**, **les miles** et **les badges relief**.
+
+### Pour vendre l'app (décidé le 22 novembre 2026)
+
+Les services gratuits appelés aujourd'hui limitent ou interdisent un usage
+commercial : à remplacer avant de faire payer.
+
+- **Fond de carte** : passer de Carto à Mapbox (le jeton Mapbox est déjà prévu
+  en option dans `mapStyles.js`).
+- **Satellite** : passer d'Esri à Mapbox satellite.
+- **Fond relief** : remplacer OpenTopoMap et les tuiles OSM par un ombrage
+  calculé depuis les tuiles d'altitude AWS que l'app lit déjà, **seulement si le
+  rendu est fiable** ; sinon garder une solution payante (relief MapTiler).
+- **Recherche d'adresse** : remplacer Nominatim et Photon publics par la
+  recherche Mapbox (déjà branchée en option dans `engine/geocode.js`).
+- **Valhalla public** (calcul de secours) : le retirer, le moteur sur le
+  téléphone suffit.
+- **Pages légales** : conditions d'utilisation, confidentialité, et un
+  avertissement clair que la note de sécurité est une estimation tirée
+  d'OpenStreetMap, pas une garantie.
+- **Choix de la langue** : français ou anglais.
+
+### Bêta, mise de côté pour plus tard
+
+Décidée, mais pas maintenant. À faire dans cet ordre le jour où on la lance :
+
+- Rues téléchargées autour de l'utilisateur et hébergées sur Cloudflare R2, au
+  lieu des 122 Mo d'Alsace dans l'IPA (`frontend/public/region`), Overpass en
+  secours seulement.
+- Compte Apple Developer (99 €/an), signature et envoi vers TestFlight dans
+  `.github/workflows/ios.yml`.
+- `PrivacyInfo.xcprivacy` et fiche App Privacy « aucune donnée collectée ».
+- Justification du GPS en arrière-plan pour la vérification d'Apple.
+- Mesures anonymes d'usage (TelemetryDeck) pour suivre activation et rétention.
+- **Lacet+** avec RevenueCat : page d'offre, « Restaurer mes achats », un
+  interrupteur `isPlus()` et les limites de la version gratuite. Le détail
+  des offres et des prix est dans la page « Lancement de Lacet ».
+
+### À évaluer
+
+- **Instructions de virage dans le GPX exporté** (points de parcours Garmin),
+  pour qu'une montre les annonce : à garder seulement si l'intérêt se confirme.
+
 ### Ce qui existe et peut mieux faire
 
 - **Poids du paquet** : un fichier JS de 1,48 Mo, dont l'essentiel est MapLibre,
