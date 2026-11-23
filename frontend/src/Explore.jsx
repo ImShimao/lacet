@@ -17,7 +17,7 @@ import SendSheet from './SendSheet.jsx'
 import { StopsList } from './Stops.jsx'
 import { Segmented, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
-import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch } from './explain'
+import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch, weatherAdvice } from './explain'
 import { km } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
@@ -344,6 +344,7 @@ export default function Explore({
   const relief =
     params.climb_m != null ? climbMismatch(params.climb_m, routes) : reliefMismatch(params.elevation, routes)
   const ground = surfaceMismatch(params.surface, routes)
+  const weather = weatherAdvice(meta.weather)
   // Partie maintenant, la boucle finit-elle de nuit ? C'est le moment où une
   // rue sans éclairage ni trottoir devient dangereuse : le dire avant de partir.
   const [startLon, startLat] = selected.geometry?.[0] ?? []
@@ -460,6 +461,12 @@ export default function Explore({
       )}
       {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
       {meta.wind && <WindNote wind={meta.wind} />}
+      {weather && (
+        <div className="windnote">
+          <Icon name={weather.icon} size={16} />
+          <span>{weather.text}</span>
+        </div>
+      )}
 
       {selected.laps > 1 && (
         <div className="laps">

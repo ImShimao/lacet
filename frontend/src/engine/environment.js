@@ -97,7 +97,13 @@ export async function currentWind(lat, lon, fetchImpl = fetch) {
     const current = await response.json()
     const speed = Number(current.speed_kmh)
     const from = Number(current.from_deg)
-    if (Number.isFinite(speed) && Number.isFinite(from)) wind = new Wind(pymod(from + 180, 360), speed)
+    if (Number.isFinite(speed) && Number.isFinite(from)) {
+      wind = new Wind(pymod(from + 180, 360), speed)
+      // Propre à l'app : la tenue conseillée, hors du classement et de la parité.
+      const temp = Number(current.temp_c)
+      const rain = Number(current.rain_mm)
+      if (Number.isFinite(temp)) wind.weather = { temp_c: temp, rain_mm: Number.isFinite(rain) ? rain : 0 }
+    }
   } catch {
     wind = null // la météo est un bonus, jamais un socle
   }

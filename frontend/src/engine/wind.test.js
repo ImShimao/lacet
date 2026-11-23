@@ -21,6 +21,12 @@ describe('currentWind', () => {
     expect(wind.bearing).toBe(90) // un vent d'ouest souffle vers l'est
   })
 
+  it('garde la température et la pluie quand le relais les donne', async () => {
+    const relay = async () => ({ ok: true, json: async () => ({ speed_kmh: 5, from_deg: 0, temp_c: 2.5, rain_mm: 1.2 }) })
+    const wind = await currentWind(30.5, 40.5, relay)
+    expect(wind.weather).toEqual({ temp_c: 2.5, rain_mm: 1.2 })
+  })
+
   it('sans relais, pas de vent — et pas d’erreur', async () => {
     const panne = async () => ({ ok: false, status: 502 })
     expect(await currentWind(10.5, 20.5, panne)).toBeNull()

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, reliefOf, surfaceMismatch } from './explain'
+import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, reliefOf, surfaceMismatch, weatherAdvice } from './explain'
+
+/** La tenue conseillée d'après la météo du relais ; rien sans température. */
+describe('weatherAdvice', () => {
+  it('la pluie passe avant le froid, et le chaud demande de l’eau', () => {
+    expect(weatherAdvice(null)).toBeNull()
+    expect(weatherAdvice({ temp_c: 2, rain_mm: 0.5 }).icon).toBe('rain')
+    expect(weatherAdvice({ temp_c: 2, rain_mm: 0 }).text).toMatch(/^2 °C au départ : gants/)
+    expect(weatherAdvice({ temp_c: 29, rain_mm: 0 }).text).toMatch(/eau/)
+    expect(weatherAdvice({ temp_c: 14.4, rain_mm: 0.1 }).text).toBe('14 °C et sec au départ.')
+  })
+})
 
 /**
  * Le caractère d'une boucle, dans l'en-tête de son profil. « Côtes » doit

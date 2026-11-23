@@ -73,7 +73,7 @@ payer tant que l'app reste petite.
 | AWS Terrain Tiles | Relief 3D, badge relief, altitude hors ligne | Données ouvertes | 0 € | Gardé |
 | Valhalla FOSSGIS | Itinéraire de secours | Politique introuvable | — | **Retiré** |
 | Valhalla FOSSGIS | Altitude hors de France | Politique introuvable | 0 € | À remplacer par AWS avant la vente hors de France |
-| MET Norway (via relais Cloudflare) | Vent | Oui, avec un User-Agent identifié et le cache jusqu'à l'expiration | 0 € | **Fait** : le relais ne garde rien, il cache par kilomètre |
+| MET Norway (via relais Cloudflare) | Vent, température et pluie de l'heure (tenue conseillée) | Oui, avec un User-Agent identifié et le cache jusqu'à l'expiration | 0 € | **Fait** : le relais ne garde rien, il cache par kilomètre |
 | Open-Meteo | Vent | **Non** : gratuit seulement hors usage commercial | Forfait payant, prix non affiché | **Retiré** du code (reste dans le moteur Python de référence) |
 | Photon (Komoot) | Recherche d'adresse | Rien d'écrit, « usage raisonnable » | 0 € | OK en bêta ; Mapbox à la vente |
 | Nominatim | Recherche, dernier recours | Toléré : 1 requête/s, pas d'autocomplétion | 0 € | Appelé seulement quand Photon ne trouve rien |

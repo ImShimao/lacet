@@ -695,6 +695,7 @@ export async function planLoops(input, deps) {
       wind !== null && wind.matters
         ? { bearing: pyRoundInt(wind.bearing), speed_kmh: pyRound(wind.speedKmh, 1) }
         : null,
+    weather: wind?.weather,
     elevation_skipped: elevationGaveUp || undefined,
     elapsed_s: pyRound((performance.now() - started) / 1000, 2),
     timings_s: timings,

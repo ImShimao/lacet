@@ -71,7 +71,7 @@ async function pack(name, request, env) {
   return new Response(request.method === 'HEAD' ? null : object.body, { headers })
 }
 
-/** Le vent du moment, en km/h, et d'où il vient, en degrés. */
+/** Le vent du moment, en km/h, et d'où il vient, en degrés ; la température et la pluie de l'heure, quand MET Norway les donne. */
 async function wind(url, ctx, cache, fetchImpl) {
   const lat = Number(url.searchParams.get('lat'))
   const lon = Number(url.searchParams.get('lon'))
@@ -86,15 +86,24 @@ async function wind(url, ctx, cache, fetchImpl) {
   const [la, lo] = at.split(',')
   const answer = await fetchImpl(`${MET_URL}?lat=${la}&lon=${lo}`, { headers: { 'User-Agent': USER_AGENT } })
   if (!answer.ok) return text(`MET Norway : HTTP ${answer.status}`, 502)
-  const details = (await answer.json())?.properties?.timeseries?.[0]?.data?.instant?.details ?? {}
+  const now = (await answer.json())?.properties?.timeseries?.[0]?.data ?? {}
+  const details = now.instant?.details ?? {}
   const speed = Number(details.wind_speed)
   const from = Number(details.wind_from_direction)
   if (!Number.isFinite(speed) || !Number.isFinite(from)) return text('Vent inconnu', 502)
+  // La même réponse dit aussi la température et la pluie de l'heure qui vient :
+  // de quoi conseiller la tenue sans une seconde question à MET Norway.
+  const temp = Number(details.air_temperature)
+  const rain = Number(now.next_1_hours?.details?.precipitation_amount)
+  const weather = {
+    ...(Number.isFinite(temp) ? { temp_c: Math.round(temp * 10) / 10 } : {}),
+    ...(Number.isFinite(rain) ? { rain_mm: rain } : {}),
+  }
 
   // MET Norway dit jusqu'à quand sa réponse vaut : on ne lui redemande rien avant.
   const expires = Date.parse(answer.headers.get('Expires') ?? '')
   const seconds = Number.isFinite(expires) ? Math.max(60, Math.min(3600, Math.round((expires - Date.now()) / 1000))) : 1800
-  const response = new Response(JSON.stringify({ speed_kmh: Math.round(speed * 3.6 * 10) / 10, from_deg: from }), {
+  const response = new Response(JSON.stringify({ speed_kmh: Math.round(speed * 3.6 * 10) / 10, from_deg: from, ...weather }), {
     headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${seconds}` },
   })
   ctx.waitUntil(cache.put(key, response.clone()))

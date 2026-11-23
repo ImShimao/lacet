@@ -120,6 +120,23 @@ export function reliefBadge(key, reachable, climbPerKm = null) {
 }
 
 /**
+ * La météo du départ, et ce qu'elle change à la tenue. Rend `{ icon, text }`,
+ * ou `null` sans température. Les seuils sont ceux des guides de tenue de
+ * course : sous 4 °C les extrémités gèlent, au-dessus de 26 °C la chaleur
+ * coûte de l'allure, et 0,2 mm dans l'heure suffit à tremper un t-shirt.
+ */
+export function weatherAdvice(weather) {
+  if (!Number.isFinite(weather?.temp_c)) return null
+  const temp = `${Math.round(weather.temp_c)} °C`
+  if (weather.rain_mm >= 0.2) {
+    return { icon: 'rain', text: `${temp}, pluie annoncée dans l'heure : une veste imperméable, et prudence sur les pavés et les feuilles.` }
+  }
+  if (weather.temp_c < 4) return { icon: 'moon', text: `${temp} au départ : gants, bonnet et une couche de plus — tu l'enlèveras après l'échauffement.` }
+  if (weather.temp_c > 26) return { icon: 'sun', text: `${temp} au départ : emporte de l'eau, et ralentis l'allure plutôt que de la tenir.` }
+  return { icon: 'sun', text: `${temp} et sec au départ.` }
+}
+
+/**
  * Le caractère d'une boucle, dans les mots des réglages : `Plat`, `Vallonné` ou
  * `Côtes`, ou `null` sans altitude. « Côtes » commence là où la bande de
  * `RELIEF_BAND_PER_KM.hilly` commence : une boucle rendue pour « Côtes » sans

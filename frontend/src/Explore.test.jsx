@@ -92,6 +92,11 @@ describe('les avertissements de l’écran', () => {
     expect(screen.getByText(/relief n'a pas répondu à temps/)).toBeInTheDocument()
   })
 
+  it('disent la météo du départ et la tenue qui va avec', () => {
+    afficher({ meta: { weather: { temp_c: 1.6, rain_mm: 0 } } })
+    expect(screen.getByText(/2 °C au départ : gants, bonnet/)).toBeInTheDocument()
+  })
+
   it('disent qu’une bordure de la zone n’est pas arrivée', () => {
     afficher({ meta: { partial: true } })
     expect(screen.getByText(/bord de la zone n'est pas encore arrivé/)).toBeInTheDocument()

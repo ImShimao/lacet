@@ -50,13 +50,17 @@ test('le vent : km/h, direction, et une seule question à MET Norway par kilomè
   const calls = []
   const met = async (url, init) => {
     calls.push({ url, agent: init.headers['User-Agent'] })
-    return new Response(JSON.stringify({ properties: { timeseries: [{ data: { instant: { details: { wind_speed: 5, wind_from_direction: 270 } } } }] } }), {
+    const data = {
+      instant: { details: { wind_speed: 5, wind_from_direction: 270, air_temperature: 11.43 } },
+      next_1_hours: { details: { precipitation_amount: 0.4 } },
+    }
+    return new Response(JSON.stringify({ properties: { timeseries: [{ data }] } }), {
       headers: { Expires: new Date(Date.now() + 600_000).toUTCString() },
     })
   }
   const env = { PACKS: packs, CACHE: memoryCache(), FETCH: met }
   const first = await (await worker.fetch(new Request('https://x/wind?lat=47.9012&lon=7.2109'), env, { waitUntil: (p) => p })).json()
-  assert.deepEqual(first, { speed_kmh: 18, from_deg: 270 })
+  assert.deepEqual(first, { speed_kmh: 18, from_deg: 270, temp_c: 11.4, rain_mm: 0.4 })
   await new Promise((r) => setTimeout(r, 0))
   await worker.fetch(new Request('https://x/wind?lat=47.9049&lon=7.2061'), env, ctx)
   assert.equal(calls.length, 1)
