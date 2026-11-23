@@ -73,14 +73,16 @@ payer tant que l'app reste petite.
 | AWS Terrain Tiles | Relief 3D, badge relief, altitude hors ligne | Données ouvertes | 0 € | Gardé |
 | Valhalla FOSSGIS | Itinéraire de secours | Politique introuvable | — | **Retiré** |
 | Valhalla FOSSGIS | Altitude hors de France | Politique introuvable | 0 € | À remplacer par AWS avant la vente hors de France |
-| Open-Meteo | Vent | **Non** : gratuit seulement hors usage commercial | Forfait payant, prix non affiché | OK pour une bêta gratuite ; avant Lacet+, passer par MET Norway via un petit relais Cloudflare (gratuit) ou payer |
+| MET Norway (via relais Cloudflare) | Vent | Oui, avec un User-Agent identifié et le cache jusqu'à l'expiration | 0 € | **Fait** : le relais ne garde rien, il cache par kilomètre |
+| Open-Meteo | Vent | **Non** : gratuit seulement hors usage commercial | Forfait payant, prix non affiché | **Retiré** du code (reste dans le moteur Python de référence) |
 | Photon (Komoot) | Recherche d'adresse | Rien d'écrit, « usage raisonnable » | 0 € | OK en bêta ; Mapbox à la vente |
 | Nominatim | Recherche, dernier recours | Toléré : 1 requête/s, pas d'autocomplétion | 0 € | Appelé seulement quand Photon ne trouve rien |
 | Overpass public | Rues hors archives | Usage commercial : instance propre conseillée | 0 € | Secours seulement : les archives couvrent la France |
 | GitHub (lacet-data) | Archives de rues | Toléré, coupé si « usage excessif » | 0 € | Passer sur Cloudflare R2 (10 Go et sortie gratuits) avant le lancement |
 
-À faire avant de faire payer, dans l'ordre : le vent (Open-Meteo), les
-archives sur R2, l'altitude hors de France, le jeton Mapbox en secret GitHub.
+À faire avant de faire payer, dans l'ordre : les archives sur R2 (le compte
+Cloudflare demande une carte pour l'activer ; le vent n'en a pas besoin),
+l'altitude hors de France, le jeton Mapbox en secret GitHub.
 Rien de cela ne coûte d'argent au départ.
 
 - **Choix de la langue** : français ou anglais.

@@ -25,6 +25,7 @@
 // Overpass reprend la main.
 
 import { fromRegionTile } from './region'
+import { RELAY_URL } from './relay'
 import { store } from './store'
 
 const MAGIC = 'LACETILE'
@@ -56,8 +57,14 @@ const PER_BLOCK = Math.round(BLOCK_DEG / TILE_DEG)
 // en gonflant celui-ci. Il suffit d'en ajouter l'adresse ici : un bloc absent du
 // premier est cherché dans le suivant, et celui qui a répondu est interrogé en
 // premier la fois d'après.
+//
+// **R2 d'abord, GitHub ensuite.** GitHub peut couper un dépôt servi comme CDN
+// en cas d'« usage excessif » ; R2, derrière le relais de Lacet, ne facture ni
+// la sortie ni les 10 premiers gigaoctets. GitHub reste en secours, avec les
+// mêmes fichiers (`rues.yml`, dans lacet-data, les copie dans R2).
 const SOURCES = [
   import.meta.env?.VITE_TILES_URL,
+  `${RELAY_URL}/packs`,
   'https://raw.githubusercontent.com/ImShimao/lacet-data/main/packs',
 ].filter(Boolean)
 

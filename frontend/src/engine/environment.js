@@ -1,10 +1,11 @@
 // Soleil, vent et altitude — portage de `solar.py`, `wind.py` et `elevation.py`.
 //
 // Les calculs sont fidèles aux modules Python. Les appels réseau, eux, partent
-// désormais du téléphone : même services, mêmes paramètres, mêmes précautions
-// (échec silencieux pour le vent, repli IGN → tuiles gardées → Valhalla pour
+// désormais du téléphone, avec les mêmes précautions — le vent seul passe par
+// le relais de Lacet, vers MET Norway (échec silencieux pour le vent, repli IGN → tuiles gardées → Valhalla pour
 // l'altitude, un envoi à la fois vers Valhalla), et le cache vit dans IndexedDB.
 
+import { RELAY_URL } from './relay'
 import { store } from './store'
 import { degrees, pyFixed, pyfloordiv, pyHypot, pymod, pyRound, pyRoundInt, radians } from './py'
 
@@ -54,7 +55,10 @@ export function isNight(lat, lon, when = new Date()) {
 
 // === Vent =====================================================================
 
-const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
+// Le vent passe par le relais de Lacet, qui le demande à MET Norway : l'offre
+// gratuite d'Open-Meteo, appelée avant, est interdite à une app commerciale.
+// Le moteur Python de référence garde Open-Meteo : il ne sort pas du dépôt.
+const WIND_URL = `${RELAY_URL}/wind`
 const MIN_SPEED_KMH = 12
 const FULL_SPEED_KMH = 35
 const WIND_TTL_MS = 3_600_000
@@ -86,17 +90,13 @@ export async function currentWind(lat, lon, fetchImpl = fetch) {
 
   let wind = null
   try {
-    const params = new URLSearchParams({
-      latitude: pyFixed(lat, 4),
-      longitude: pyFixed(lon, 4),
-      current: 'wind_speed_10m,wind_direction_10m',
-      wind_speed_unit: 'kmh',
-    })
-    const response = await withTimeout(fetchImpl(`${OPEN_METEO_URL}?${params}`), 6000)
+    // Au centième de degré : le relais n'en garde pas plus, et c'est sa clé de cache.
+    const params = new URLSearchParams({ lat: pyFixed(lat, 2), lon: pyFixed(lon, 2) })
+    const response = await withTimeout(fetchImpl(`${WIND_URL}?${params}`), 6000)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const current = (await response.json()).current ?? {}
-    const speed = Number(current.wind_speed_10m)
-    const from = Number(current.wind_direction_10m)
+    const current = await response.json()
+    const speed = Number(current.speed_kmh)
+    const from = Number(current.from_deg)
     if (Number.isFinite(speed) && Number.isFinite(from)) wind = new Wind(pymod(from + 180, 360), speed)
   } catch {
     wind = null // la météo est un bonus, jamais un socle

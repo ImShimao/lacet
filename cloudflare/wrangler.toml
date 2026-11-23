@@ -1,0 +1,7 @@
+# Le relais de Lacet : le vent (MET Norway). Les archives de rues (R2) sont
+# en attente : quand R2 sera activé, ajouter ici un bloc [[r2_buckets]]
+# (binding = "PACKS", bucket_name = "lacet-packs").
+# Déployer : (cd cloudflare && npx wrangler@4 deploy)
+name = "lacet"
+main = "worker.js"
+compatibility_date = "2026-11-01"
