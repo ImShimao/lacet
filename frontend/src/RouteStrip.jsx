@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { haversine, km, profileRange, surfaceLabel } from './format'
 import { unitLabel } from './units'
+import { reliefOf } from './explain'
+import { energy } from './Library.jsx'
 
 /**
  * La bande de parcours : le profil altimétrique et le niveau de sécurité sur un
@@ -43,7 +45,7 @@ const H = H_ELEV + H_BAND + 16
 // `.strip__tick`, un col des Alpes compris.
 const PAD = { top: 8, right: 6, left: 52 }
 
-export default function RouteStrip({ route, onScrub }) {
+export default function RouteStrip({ route, onScrub, weightKg = 70, sport = 'run' }) {
   const [cursor, setCursor] = useState(null)
   const svgRef = useRef(null)
 
@@ -78,11 +80,15 @@ export default function RouteStrip({ route, onScrub }) {
             ? `${km(readout.dist, 2)} ${unitLabel()} · ${Math.round(readout.ele)} m · ${
                 LEVEL_LABELS[readout.level]
               }`
-            : model.hasElevation
-              ? `D+ ${Math.round(route.ascent_m || 0)} m · D− ${Math.round(
-                  route.descent_m || 0,
-                )} m`
-              : 'altitude indisponible'}
+            : // Une boucle revient à son départ : son D− égale son D+, et la place
+              // sert mieux au caractère du relief et au coût de la sortie.
+              [
+                model.hasElevation ? reliefOf(route) : null,
+                model.hasElevation ? `D+ ${Math.round(route.ascent_m || 0)} m` : 'altitude indisponible',
+                `≈ ${Math.round(energy(route.distance_m || model.total, weightKg, sport)).toLocaleString('fr-FR')} kcal`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
         </span>
       </div>
 
@@ -125,6 +131,20 @@ export default function RouteStrip({ route, onScrub }) {
               />
             ))}
             <path d={`M${model.line}`} className="strip__line" />
+            {/* Le sommet, marqué et chiffré : c'est la question qu'on se pose
+                devant un profil — où ça monte le plus haut, et jusqu'où. */}
+            {model.peak && (
+              <g className="strip__peak">
+                <circle cx={model.x(model.peak.dist_m)} cy={model.y(model.peak.ele_m)} r="4" />
+                <text
+                  x={model.x(model.peak.dist_m) + (model.x(model.peak.dist_m) > W / 2 ? -8 : 8)}
+                  y={model.y(model.peak.ele_m) + 5}
+                  textAnchor={model.x(model.peak.dist_m) > W / 2 ? 'end' : 'start'}
+                >
+                  {Math.round(model.peak.ele_m)} m
+                </text>
+              </g>
+            )}
           </>
         )}
 
@@ -217,8 +237,10 @@ function build(route) {
   let areas = []
   let line = ''
   let ticks = []
+  let peak = null
 
   if (hasElevation) {
+    peak = points.reduce((a, b) => (b.ele_m > a.ele_m ? b : a))
     const [lo, hi] = profileRange(points.map((p) => p.ele_m))
     y =(e) => PAD.top + (1 - (e - lo) / (hi - lo)) * (H_ELEV - PAD.top)
     ticks = [lo, (lo + hi) / 2, hi]
@@ -258,6 +280,7 @@ function build(route) {
     x,
     y,
     ticks,
+    peak,
     areas,
     line,
     bands,

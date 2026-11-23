@@ -35,6 +35,24 @@ function afficher(onScrub) {
   return { strip: container.querySelector('.strip'), svg }
 }
 
+describe("l'en-tête du profil", () => {
+  it('dit le relief, le D+, les calories, et marque le sommet', () => {
+    const hilly = {
+      ...route,
+      ascent_m: 30,
+      elevation_profile: [
+        { dist_m: 0, ele_m: 300, surface: 'paved' },
+        { dist_m: 1000, ele_m: 330, surface: 'paved' },
+        { dist_m: 2000, ele_m: 300, surface: 'paved' },
+      ],
+    }
+    const { container } = render(<RouteStrip route={hilly} weightKg={80} sport="run" />)
+    // 30 m sur 2 km : 15 m/km, des côtes ; 2 km × 80 kg × 0,95 = 152 kcal.
+    expect(container.querySelector('.strip__read').textContent).toBe('Côtes · D+ 30 m · ≈ 152 kcal')
+    expect(container.querySelector('.strip__peak text').textContent).toBe('330 m')
+  })
+})
+
 describe('la bande parcourue du doigt', () => {
   it('se marque pendant le geste, et montre le point touché', () => {
     const onScrub = vi.fn()

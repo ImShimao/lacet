@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, surfaceMismatch } from './explain'
+import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, reliefOf, surfaceMismatch } from './explain'
+
+/**
+ * Le caractère d'une boucle, dans l'en-tête de son profil. « Côtes » doit
+ * commencer où commence la bande de « Côtes » : sinon une boucle rendue pour
+ * « Côtes », sans avertissement, se lirait « Vallonné ».
+ */
+describe('reliefOf', () => {
+  it('suit les mots des réglages, et se tait sans altitude', () => {
+    expect(reliefOf({ distance_m: 10000, ascent_m: 30 })).toBe('Plat')
+    expect(reliefOf({ distance_m: 10000, ascent_m: 100 })).toBe('Vallonné')
+    expect(reliefOf({ distance_m: 10000, ascent_m: 120 })).toBe('Côtes')
+    expect(reliefOf({ distance_m: 10000, ascent_m: null })).toBeNull()
+  })
+})
 
 /**
  * Le relief demandé que le terrain ne donne pas. À Colmar, « Côtes » rendait

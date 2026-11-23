@@ -491,7 +491,7 @@ export default function Explore({
       {/* Le détail, en sections : le relief, la sécurité, les surfaces, puis
           ce qu'on croise et la feuille de route. Les deux lignes de texte qui
           résumaient terrain et traversées au-dessus répétaient les tuiles. */}
-      <RouteStrip route={selected} onScrub={onScrub} />
+      <RouteStrip route={selected} onScrub={onScrub} weightKg={params.weight_kg} sport={params.sport} />
 
       {selected.safety ? (
         <SafetyPanel

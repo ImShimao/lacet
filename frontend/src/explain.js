@@ -120,6 +120,19 @@ export function reliefBadge(key, reachable, climbPerKm = null) {
 }
 
 /**
+ * Le caractère d'une boucle, dans les mots des réglages : `Plat`, `Vallonné` ou
+ * `Côtes`, ou `null` sans altitude. « Côtes » commence là où la bande de
+ * `RELIEF_BAND_PER_KM.hilly` commence : une boucle rendue pour « Côtes » sans
+ * avertissement se lit toujours « Côtes ». « Plat » s'arrête à 6 m/km, entre
+ * le plat (3) et le vallonné (10) des textes.
+ */
+export function reliefOf(route) {
+  if (route?.ascent_m == null || !(route.distance_m > 0)) return null
+  const perKm = route.ascent_m / (route.distance_m / 1000)
+  return perKm < 6 ? 'Plat' : perKm < RELIEF_BAND_PER_KM.hilly[0] ? 'Vallonné' : 'Côtes'
+}
+
+/**
  * Le relief demandé que le terrain n'a pas pu donner : « Côtes » en plaine,
  * « Plat » en montagne. Rend `{ kind, ascent }` — la boucle qui s'en approche
  * le plus, et son D+ — ou `null` quand au moins une boucle tient la bande.

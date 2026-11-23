@@ -70,4 +70,5 @@ avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
 position, SMS à un proche au départ (avec l'heure prévue du retour) et à
 l'arrivée, survol 3D de la boucle avant de partir, « Envoyer cette boucle » qui dit comment la
 faire entrer dans Garmin Connect, COROS, Suunto ou Komoot, export GPX horodaté vers une montre, boucle partagée à un ami en GPX — qu'il ouvre avec Lacet, qui la note et la décrit comme les siennes —, profil de dénivelé consultable
-en pleine sortie, historique avec totaux mensuels.
+en pleine sortie (avec son sommet marqué, le caractère du relief — plat, vallonné, côtes — et les
+calories estimées d'après le poids du profil), historique avec totaux mensuels.
