@@ -727,11 +727,33 @@ export function reachableClimbPerKm(lat, lon, distanceKm, pixelAt, z = TERRAIN_Z
 }
 
 /**
- * Le D+ possible autour du départ, lu sur les grilles d'altitude gardées de
- * l'appareil — voir `reachableClimbPerKm`. Sans réseau : une tuile absente
- * rend `null`, et la réponse aussi.
+ * Va chercher chez AWS les tuiles d'altitude qui manquent, et les garde avec
+ * celles des cartes hors ligne. Sans elles, le badge de relief ne s'affichait
+ * que là où l'on avait déjà gardé une carte : presque jamais. Données ouvertes,
+ * sans clé ni coût ; une à quatre tuiles d'environ 100 Ko par départ. Une tuile
+ * qui échoue reste absente.
  */
-export async function reliefHint(lat, lon, distanceKm) {
+export async function fetchTerrainTiles(tiles, fetchImpl = fetch) {
+  for (const [x, y] of tiles) {
+    const url = terrainTileUrl(x, y)
+    if (grids.has(url) || (await mapFiles.get(url))) continue
+    try {
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) })
+      if (!response.ok) continue
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      await mapFiles.set(url, { type: 'image/png', bytes })
+    } catch {
+      // hors ligne ou trop lent : le badge attendra
+    }
+  }
+}
+
+/**
+ * Le D+ possible autour du départ, lu sur les grilles d'altitude de l'appareil
+ * — voir `reachableClimbPerKm`. Les tuiles manquantes sont téléchargées une
+ * fois ; sans réseau, une tuile absente rend `null`, et la réponse aussi.
+ */
+export async function reliefHint(lat, lon, distanceKm, { fetchImpl = fetch } = {}) {
   const radius = Math.max(500, (distanceKm * 1000) / 2)
   const dLat = radius / 111_320
   const dLon = radius / (111_320 * Math.cos(radians(lat)))
@@ -741,7 +763,17 @@ export async function reliefHint(lat, lon, distanceKm) {
     [lon - dLon, lat + dLat],
     [lon + dLon, lat + dLat],
   ]
-  const here = await storedGrids(terrainTilesFor(corners))
+  // Toutes les tuiles entre les coins, pas seulement celles des coins : au-delà
+  // de 13 km, le disque en enjambe une troisième par le milieu.
+  const cornerTiles = terrainTilesFor(corners)
+  const xs = cornerTiles.map(([x]) => x)
+  const ys = cornerTiles.map(([, y]) => y)
+  const tiles = []
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 1) {
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y += 1) tiles.push([x, y])
+  }
+  await fetchTerrainTiles(tiles, fetchImpl)
+  const here = await storedGrids(tiles)
   const pixelAt = (x, y) => {
     const tx = Math.floor(x / 256)
     const ty = Math.floor(y / 256)

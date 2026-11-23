@@ -63,6 +63,8 @@ describe('Mon compte', () => {
     // La page s'ouvre en haut…
     expect(corps.scrollTop).toBe(0)
     expect(screen.getByText('Sources')).toBeTruthy()
+    // La note n'est jamais présentée comme une garantie.
+    expect(screen.getByText(/estimation, pas une garantie/)).toBeTruthy()
 
     await act(async () => {
       screen.getByText('Retour au sommaire').click()

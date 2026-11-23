@@ -183,10 +183,9 @@ les vingt secondes.
 
 ## Les fonds de carte
 
-Huit fonds gratuits et sans clé : Nuit et Clair et Plan (CARTO), Fjord et Rues
-(OpenFreeMap), Nature (OpenTopoMap), Satellite (Esri) et le rendu
-OpenStreetMap — ce dernier ne se garde pas hors ligne, ses conditions d'usage
-l'interdisent. Chaque fond a son aperçu et une phrase qui dit à quoi il sert.
+Six fonds gratuits et sans clé : Nuit, Clair, Plan, Fjord et Rues
+(OpenFreeMap), et Nature (OpenTopoMap, qui ne se garde pas hors ligne). Le
+satellite et trois fonds Mapbox s'ajoutent avec un jeton Mapbox. Chaque fond a son aperçu et une phrase qui dit à quoi il sert.
 
 Les fonds **Mapbox** (nuit, nature, satellite, standard) s'ajoutent avec une clé
 publique Mapbox (`pk.…`, gratuite jusqu'à un large quota) : dans

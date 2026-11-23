@@ -245,9 +245,10 @@ Le détail : [Comment c'est fait](docs/architecture.md),
 * **Une carte hors ligne pèse lourd en ville** : une quinzaine de mégaoctets pour
   une boucle de 10 km en plein centre, contre un ou deux à la campagne. Un
   plafond de 40 Mo par parcours empêche que ça dérape.
-* **Les fonds CARTO** sont gratuits pour un usage raisonnable, pas pour une app
-  distribuée à grande échelle. Les fonds Mapbox demandent une clé publique
-  (`VITE_MAPBOX_TOKEN`).
+* **Les fonds gratuits** viennent d'OpenFreeMap (usage commercial autorisé) et
+  d'OpenTopoMap. Le satellite et les fonds Mapbox demandent une clé publique
+  (`VITE_MAPBOX_TOKEN`). Le détail par service est dans
+  [limites.md](docs/limites.md).
 * **L'aperçu dans un navigateur n'a ni GPS, ni voix, ni baromètre**, ni écran de
   verrouillage : ils n'existent que dans l'app installée.
 
@@ -361,7 +362,7 @@ Code lisible, pas réutilisable : [tous droits réservés](LICENSE) · Fait avec
 
 <sub>Rues © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL),
 servies par Overpass et [lacet-data](https://github.com/ImShimao/lacet-data) ·
-fonds de carte © CARTO, © OpenFreeMap, © Esri, © OpenTopoMap · altitudes IGN RGE ALTI
+fonds de carte © OpenFreeMap, © OpenMapTiles, © OpenTopoMap, © Mapbox · altitudes IGN RGE ALTI
 et Valhalla (FOSSGIS) · relief Mapzen / Copernicus EU-DEM · recherche de lieux Photon
 (Komoot) et Nominatim · vent Open-Meteo</sub>
 

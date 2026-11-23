@@ -100,8 +100,7 @@ export function lengthOf(coords) {
 /**
  * Le parcours importé, au format que l'app sait afficher et suivre.
  *
- * La forme est celle d'un itinéraire calculé ailleurs (voir `remote.js`) : pas
- * de note, pas de traversées, un seul tronçon de niveau « inconnu » pour que la
+ * Un tracé que le moteur n'a pas calculé : pas de note, pas de traversées, un seul tronçon de niveau « inconnu » pour que la
  * carte ne le peigne pas en vert comme une voie protégée.
  */
 export function toRoute({ name, coords, elevations }, { sport = 'run', secondsPerKm = 390 } = {}) {

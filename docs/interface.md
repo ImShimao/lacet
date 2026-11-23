@@ -46,9 +46,9 @@ parce que les deux ne se lisent pas séparément : savoir qu'il y a 200 m
 d'exposition ne sert à rien tant qu'on ignore *où*. En la parcourant du
 doigt, le point correspondant s'allume sur la carte.
 
-**Fonds de carte** — cinq styles sans clé d'API : Nuit (le sombre de CARTO aux
-couleurs de l'app), Clair, Plan, Relief et Satellite, plus trois fonds Mapbox
-avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent au
+**Fonds de carte** — six styles sans clé d'API : Nuit (le sombre d'OpenFreeMap
+aux couleurs de l'app), Fjord, Rues, Clair, Plan et Nature, plus Satellite et
+trois fonds Mapbox avec un jeton. Le choix est mémorisé, et les couleurs du tracé s'adaptent au
 fond, pas au thème : sur un fond clair, le tracé est cerné de sombre, et le
 jaune s'y lit encore. Tant qu'on n'a pas choisi de fond, le thème clair part
 du fond Clair et le sombre de Nuit.
@@ -211,6 +211,6 @@ personnel. Leur feuille de style vectorielle, elle, désigne ses données par de
 adresses `mapbox://` que MapLibre ne sait pas lire.
 
 Sans jeton, le fond par défaut est **Nuit** (ou **Clair** en thème clair) : la
-carte sombre de CARTO, recolorée au chargement dans l'ardoise de l'interface —
+carte sombre d'OpenFreeMap, recolorée au chargement dans l'ardoise de l'interface —
 elle ne prend pas la couleur de l'accent — gratuit, mondial, sans clé. Tous ces
 fonds dessinent les mêmes données OpenStreetMap ; ce qui change, c'est le rendu.

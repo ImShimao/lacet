@@ -104,6 +104,17 @@ describe('frenchLabels', () => {
     expect(out.layers[0].layout['text-size']).toBe(12)
   })
 
+  it('lit aussi les expressions de nom des styles OpenFreeMap', () => {
+    const ofm = ['case', ['has', 'name:nonlatin'], ['concat', ['get', 'name:latin'], '\n', ['get', 'name:nonlatin']], ['coalesce', ['get', 'name_en'], ['get', 'name']]]
+    const ref = ['to-string', ['get', 'ref']]
+    const out2 = frenchLabels({ version: 8, sources: {}, layers: [
+      { id: 'place', type: 'symbol', layout: { 'text-field': ofm } },
+      { id: 'shield', type: 'symbol', layout: { 'text-field': ref } },
+    ] })
+    expect(out2.layers[0].layout['text-field']).toEqual(FR)
+    expect(out2.layers[1].layout['text-field']).toEqual(ref)
+  })
+
   it('laisse les libellés qui ne sont pas un simple nom', () => {
     expect(field('number')).toBe('{housenumber}')
     expect(field('peak')).toBe('{name}\n{ele} m')

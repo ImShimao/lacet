@@ -284,12 +284,11 @@ son cache : le réseau revenu, l'IGN reprend la main.
 
 Trois choses ont été apprises en mesurant, et chacune a changé le code :
 
-**Le zoom 14 suffit — pour les fonds vectoriels.** La source CARTO déclare
-`maxzoom: 14` : au-delà, le moteur agrandit la même tuile au lieu d'en demander
-d'autres. Garder du zoom 10 au zoom 14 donne donc, hors ligne, exactement ce
-qu'on voit en ligne. Relief et Satellite sont des images et déclarent 17 et 19 :
-elles continuent de demander des tuiles plus fines, et resteront vides si l'on
-zoome au-delà du 14. L'écran « Mon compte » le dit plutôt que de le taire.
+**Le zoom 14 suffit — pour les fonds vectoriels.** La source OpenFreeMap
+s'arrête au zoom 14 : au-delà, le moteur agrandit la même tuile au lieu d'en
+demander d'autres. Garder du zoom 10 au zoom 14 donne donc, hors ligne, exactement
+ce qu'on voit en ligne. Nature et Satellite, des images plus fines, ne se gardent
+pas : hors ligne, la carte prend le fond Nuit, et « Mon compte » le dit.
 
 **Peu de tuiles ne veut pas dire peu d'octets.** Une boucle de 10 km dans Paris
 tient en trente-deux tuiles — et pèse **seize mégaoctets**, parce qu'une tuile

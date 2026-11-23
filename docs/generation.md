@@ -259,8 +259,7 @@ la sécurité compte davantage que la direction.
 
 « Auto » n'envoie aucun cap, et la recherche est exactement celle d'avant :
 la parité avec Python n'en voit rien (voir `heading` dans `service.js`).
-Python ne connaît pas de direction imposée ; le calculateur de secours
-(`remote.js`) non plus.
+Python ne connaît pas de direction imposée.
 
 **Les noms sont choisis ensemble.** Nommer chaque boucle par sa voie la plus
 longue paraît naturel, mais échoue précisément quand on en propose beaucoup :

@@ -34,14 +34,14 @@ l'arrondi au pair.
 Les archives de rues couvrent la France, la Suisse, la Belgique et le
 Luxembourg, l'Allemagne du Sud-Ouest, l'Italie du Nord-Ouest, l'Espagne du
 Nord-Est, l'Autriche, les Pays-Bas et le Portugal. Ailleurs, les rues viennent
-d'Overpass, et un calculateur public prend le relais quand il ne répond pas.
+d'Overpass ; quand aucun miroir ne répond, l'app le dit plutôt que de proposer
+un tracé qu'elle n'a pas pu noter.
 Ajouter un pays se fait dans `zones.json` du dépôt de données ; quand celui-ci
 approchera des cinq gigaoctets que GitHub tolère, la suite ira dans un second
 dépôt, dont l'adresse s'ajoute à `SOURCES` (voir `engine/archive.js`).
 
 Aucune clé d'API n'est nécessaire. Données © OpenStreetMap (Overpass et les
 archives de `lacet-data`), altitude IGN puis Valhalla — OpenTopoData côté
-serveur, qui n'envoie pas d'en-têtes CORS —, itinéraire de secours Valhalla,
-vent Open-Meteo, fond de carte CARTO, recherche de lieux Photon (Komoot) et
+serveur, qui n'envoie pas d'en-têtes CORS —, vent Open-Meteo, fond de carte OpenFreeMap, recherche de lieux Photon (Komoot) et
 Nominatim — plus Mapbox pour les commerces, si un token est présent :
 OpenStreetMap ignore les enseignes ouvertes trop récemment.

@@ -5,6 +5,7 @@ import {
   ascentDescent,
   fetchMany,
   reachableClimbPerKm,
+  reliefHint,
   shapeRelief,
   smoothAlong,
   terrainTileUrl,
@@ -328,6 +329,26 @@ describe('reachableClimbPerKm', () => {
 
   it('rend null quand moins de la moitié du disque est gardée', () => {
     expect(reachableClimbPerKm(0, 0, 10, () => null)).toBeNull()
+  })
+
+  it('reliefHint télécharge une fois les tuiles manquantes, puis répond sans réseau', async () => {
+    // Le badge ne s'affichait que là où une carte hors ligne était gardée.
+    const rows = Array.from({ length: 256 }, () => Array.from({ length: 256 }, (_, x) => [128, x, 0]))
+    const tile = png(rows, rows.map(() => 0))
+    const demandes = []
+    const aws = async (url) => {
+      demandes.push(url)
+      return { ok: true, arrayBuffer: async () => tile.buffer.slice(tile.byteOffset, tile.byteOffset + tile.byteLength) }
+    }
+    const premier = await reliefHint(-33.9, 151.2, 5, { fetchImpl: aws })
+    expect(premier).toBeGreaterThan(0)
+    expect(demandes.length).toBeGreaterThan(0)
+    expect(demandes.every((u) => u.startsWith('https://s3.amazonaws.com/elevation-tiles-prod/'))).toBe(true)
+
+    const horsLigne = async () => {
+      throw new TypeError('Load failed')
+    }
+    expect(await reliefHint(-33.9, 151.2, 5, { fetchImpl: horsLigne })).toBe(premier)
   })
 
   it('compte la moitié de la pente, en m/km', () => {

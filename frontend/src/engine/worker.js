@@ -24,7 +24,6 @@ import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
 import { ELEVATION_STEP_M, currentWind, fetchMany, reliefHint, shapeRelief } from './environment'
 import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, pointKey, reverseRoute } from './service'
-import { planRemote } from './remote'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
 // extrait parisien compte 352 000 nœuds et occupe 260 Mo. Au-delà d'une grande
@@ -193,18 +192,9 @@ self.onmessage = async ({ data }) => {
   const progress = (stage, fraction) => self.postMessage({ id, type: 'progress', stage, fraction })
 
   if (type === 'plan') {
-    // Le filet : quand les rues ne sont pas là et qu'aucun miroir ne répond, un
-    // calculateur public rend un tracé plutôt que rien. Annoncé pour ce qu'il
-    // est — voir `remote.js`.
-    const secours = async () => {
-      progress('routing', 0)
-      try {
-        return await planRemote(normalizeRequest(payload))
-      } catch {
-        return null
-      }
-    }
-
+    // Plus de calculateur public en secours : Valhalla (FOSSGIS) n'est pas offert
+    // à un usage commercial, et son tracé sans note contredisait la promesse de
+    // l'app. Sans rues, on le dit plutôt que de proposer un parcours non jugé.
     try {
       const load = { fetch: 0, graph: 0, partial: false, sources: null }
       // Ce qu'on gardait pour retourner les boucles d'avant tient un graphe
@@ -252,24 +242,8 @@ self.onmessage = async ({ data }) => {
           if (route) route.oneway = true
         }
       }
-
-      // Le moteur a tourné mais n'a rien trouvé : le réseau du coin est peut-être
-      // trop maigre dans ce qu'on a pu en charger. On essaie le secours avant de
-      // rendre un écran vide.
-      if (!result?.routes?.length) {
-        const replacement = await secours()
-        if (replacement?.routes?.length) {
-          self.postMessage({ id, type: 'result', result: replacement })
-          return
-        }
-      }
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
-      const replacement = await secours()
-      if (replacement?.routes?.length) {
-        self.postMessage({ id, type: 'result', result: replacement })
-        return
-      }
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
     }
     return

@@ -349,12 +349,9 @@ export default function Explore({
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
           proposition, ils ne doivent pas la pousser sous le pli. */}
-      {/* Et un tracé venu du calculateur public le dit d'emblée : son absence
-          de note ne se lisait que dans le détail replié, et l'on pouvait partir
-          sans savoir que rien n'avait été jugé. */}
-      {/* De même quand la direction demandée n'a rien donné : les boucles
+      {/* Et quand la direction demandée n'a rien donné : les boucles
           montrées partent d'ailleurs, et il faut le savoir avant d'y aller. */}
-      {(meta.relaxed || meta.remote || meta.heading_missed) && (
+      {(meta.relaxed || meta.heading_missed) && (
         <div className="notice notice--warn">{meta.message}</div>
       )}
       {/* Une bordure de la zone n'est pas arrivée à temps — la carte livrée

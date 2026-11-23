@@ -182,7 +182,7 @@ function summaryOf(key, { params, poiPrefs }) {
     case 'backup':
       return 'Exporter, restaurer ou tout effacer'
     case 'about':
-      return 'Version, confidentialité, sources'
+      return 'Version, conditions, confidentialité, sources'
     default:
       return ''
   }
@@ -272,17 +272,37 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
           <h3 className="section">Version</h3>
           <BuildStamp />
           <LastSearch />
+          {/* Les pages légales qu'Apple et le RGPD demandent, dans l'app même : sans
+              compte ni serveur, il n'y a rien d'autre à consulter ailleurs. */}
+          <h3 className="section">Conditions d'utilisation</h3>
+          <p className="muted small">
+            <b>La note A, B ou C est une estimation, pas une garantie.</b> Elle est calculée à partir
+            d'OpenStreetMap, qui peut être incomplet ou dépassé : un trottoir manquant, un chantier,
+            une rue mal éclairée n'y figurent pas toujours. Regarde la route, respecte le Code de la
+            route et reste seul juge de ton parcours.
+          </p>
+          <p className="muted small">
+            Lacet est fourni tel quel, sans garantie que les boucles, les distances, le dénivelé ou
+            le guidage soient exacts. Le bouton SOS prépare un SMS : il n'appelle pas les secours et
+            ne remplace pas le 112.
+          </p>
           <h3 className="section">Confidentialité</h3>
           <p className="muted small">
-            Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil. Seuls partent
-            sur le réseau : les rues et les altitudes autour du départ, et le lieu qu'on cherche par
-            son nom. Une sortie ne quitte le téléphone que si tu exportes sa trace.
+            Aucun compte, aucune mesure d'usage, aucune publicité. Favoris, sorties, réglages et
+            contact d'urgence ne quittent pas cet appareil. Seuls partent sur le réseau, sans rien
+            qui t'identifie : la zone autour du départ (rues, altitudes, vent, fond de carte) et le
+            lieu qu'on cherche par son nom. Une sortie ne quitte le téléphone que si tu l'exportes ou
+            la partages.
+          </p>
+          <p className="muted small">
+            « Tout effacer », dans Sauvegarde, supprime tout ce que l'app a gardé. Pour toute
+            question : la page du projet sur GitHub.
           </p>
           <h3 className="section">Sources</h3>
           <p className="disclaimer">
-            Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © CARTO, © OpenFreeMap,
-            © Esri, © OpenTopoMap · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors
-            ligne) et Valhalla (FOSSGIS) · Recherche de
+            Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © OpenFreeMap, © OpenMapTiles,
+            © OpenTopoMap (CC-BY-SA), © Mapbox · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors
+            ligne) et Valhalla (FOSSGIS) hors de France · Recherche de
             lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
           </p>
         </>
@@ -862,8 +882,8 @@ function OfflineStorage() {
         Chaque sortie garde d'elle-même la carte de son parcours, pour les cinq
         dernières : si le réseau tombe en route, elle reste là. Les tuiles sont
         partagées : deux boucles de la même ville ne se paient qu'une fois. Le
-        détail va jusqu'au zoom {offline.TILE_ZOOM} — au-delà, Relief et
-        Satellite restent vides hors ligne.
+        détail va jusqu'au zoom {offline.TILE_ZOOM}. Nature et Satellite ne se
+        gardent pas : hors ligne, c'est le fond Nuit qui est gardé.
       </p>
       {count > 0 &&
         (confirm ? (

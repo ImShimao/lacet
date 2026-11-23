@@ -35,7 +35,6 @@ vi.mock('./environment', () => ({
   fetchMany: async () => [],
   shapeRelief: () => ({}),
 }))
-vi.mock('./remote', () => ({ planRemote: async () => null }))
 vi.mock('./service', () => {
   const args = (lat) => ({ lat, lon: 0, radiusM: 1000, targetM: 1000, sport: 'run', allowTrail: false })
   return {

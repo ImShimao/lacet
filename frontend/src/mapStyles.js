@@ -1,6 +1,11 @@
-// Fonds de carte disponibles. Tous fonctionnent sans clé d'API ; ceux de
-// Mapbox s'ajoutent automatiquement si VITE_MAPBOX_TOKEN est présent — dans
+// Fonds de carte disponibles. Ceux sans clé viennent d'OpenFreeMap (usage
+// commercial autorisé, sans quota) et d'OpenTopoMap (CC-BY-SA) ; ceux de
+// Mapbox, satellite compris, s'ajoutent si VITE_MAPBOX_TOKEN est présent — dans
 // frontend/.env pour le site, en secret du dépôt GitHub pour l'app iPhone.
+//
+// CARTO (clé obligatoire en usage commercial), Esri (compte ArcGIS) et les
+// tuiles d'openstreetmap.org (réservées à un usage léger) ont été retirés avant
+// la mise en vente : l'app les appelait sans clé ni accord.
 //
 // `contrast` indique sur quel fond le tracé se détache : les couleurs du
 // parcours et des libellés s'y adaptent, sinon un tracé vert sur imagerie
@@ -21,51 +26,9 @@
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
-const ESRI_IMAGERY = {
-  version: 8,
-  sources: {
-    imagery: {
-      type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics',
-    },
-    labels: {
-      type: 'raster',
-      tiles: ['https://basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© contributeurs OpenStreetMap, © CARTO',
-    },
-  },
-  layers: [
-    { id: 'imagery', type: 'raster', source: 'imagery' },
-    { id: 'labels', type: 'raster', source: 'labels' },
-  ],
-}
-
-// Le rendu de référence d'OpenStreetMap, celui du site openstreetmap.org. Des
-// tuiles image, servies par la fondation : utilisables pour consulter, pas
-// pour aspirer — d'où `offline: false` plus bas.
-const OSM_STANDARD = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© contributeurs OpenStreetMap',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-}
-
 // Les fonds d'OpenFreeMap : des cartes OpenStreetMap vectorielles, gratuites et
-// sans clé, hébergées bénévolement. Même données que Mapbox, rendu comparable.
+// sans clé, usage commercial autorisé. Hors ligne, leur règle est d'au plus
+// 3 000 tuiles ou 50 Mo par zone : le plafond de 40 Mo par parcours la tient.
 const OPENFREEMAP = 'https://tiles.openfreemap.org/styles'
 
 const TOPO = {
@@ -135,7 +98,7 @@ export function traceColors(contrast) {
   }
 }
 
-// --- « Nuit » : la carte sombre de CARTO, aux couleurs de l'interface --------
+// --- « Nuit » : la carte sombre d'OpenFreeMap, aux couleurs de l'interface ---
 
 const WATER_LAYERS = /^water/
 
@@ -220,15 +183,29 @@ const onlyName = (v) =>
   typeof v === 'string'
     ? /^\{name(_en)?\}$/.test(v)
     : Array.isArray(v)
-      ? v.every((x) => typeof x === 'number' || onlyName(x))
+      ? isNameExpression(v) || v.every((x) => typeof x === 'number' || onlyName(x))
       : v && typeof v === 'object'
         ? Object.values(v).every(onlyName)
         : false
 
+// Les styles d'OpenFreeMap écrivent le nom en expression (`name:latin`, puis
+// `name_en`) : on la reconnaît à ce qu'elle ne lit que des champs de nom.
+const NAME_FIELD = /^name(:latin|:nonlatin|_en|_int)?$/
+function fieldsRead(expr, out = []) {
+  if (!Array.isArray(expr)) return out
+  if (expr[0] === 'get' || expr[0] === 'has') out.push(expr[1])
+  else expr.forEach((x) => fieldsRead(x, out))
+  return out
+}
+function isNameExpression(expr) {
+  const fields = fieldsRead(expr)
+  return fields.length > 0 && fields.every((f) => NAME_FIELD.test(f))
+}
+
 /**
- * Les styles de CARTO nomment les lieux en anglais : « 5th Arrondissement »,
- * « Latin Quarter » en pleine carte de Paris. Leurs tuiles portent pourtant le
- * nom français (`name:fr`) ; on le leur fait lire.
+ * Certains styles nomment les lieux en anglais (`{name_en}`) : « Latin
+ * Quarter » en pleine carte de Paris. Leurs tuiles portent pourtant le nom
+ * français (`name:fr`) ; on le leur fait lire.
  */
 export function frenchLabels(style) {
   const layers = style.layers.map((layer) => {
@@ -250,7 +227,7 @@ export const MAP_STYLES = [
     swatch: '#15121d',
     contrast: 'dark',
     description: "Sombre, aux couleurs de l'app : le tracé ressort, et l'écran éblouit moins le soir.",
-    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    style: `${OPENFREEMAP}/dark`,
     transform: (style) => tintNight(frenchLabels(style), nightHues()),
   },
   {
@@ -275,7 +252,7 @@ export const MAP_STYLES = [
     swatch: '#e8eaed',
     contrast: 'light',
     description: 'Clair et épuré, presque sans couleur : le plus lisible en plein soleil.',
-    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    style: `${OPENFREEMAP}/positron`,
     transform: frenchLabels,
   },
   {
@@ -284,7 +261,7 @@ export const MAP_STYLES = [
     swatch: '#cfd8c8',
     contrast: 'light',
     description: "Plan en couleurs, parcs, eau et bâtiments : le plus proche d'une carte routière.",
-    style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+    style: `${OPENFREEMAP}/bright`,
     transform: frenchLabels,
   },
   {
@@ -295,27 +272,21 @@ export const MAP_STYLES = [
     contrast: 'light',
     description: 'Relief, courbes de niveau, sentiers et chemins : pour les terrains mixtes et la montagne.',
     style: TOPO,
-  },
-  {
-    key: 'satellite',
-    label: 'Satellite',
-    swatch: '#3d4a35',
-    contrast: 'dark',
-    description: "Photo aérienne avec le nom des rues : pour voir l'ombre d'une allée, un parc, un chemin de terre.",
-    style: ESRI_IMAGERY,
-  },
-  {
-    key: 'osm',
-    // « OpenStreetMap » ne tenait pas sous sa vignette, dans le choix du fond.
-    label: 'OSM',
-    swatch: '#aad3df',
-    contrast: 'light',
-    description: "Le rendu du site OpenStreetMap, celui des contributeurs. Ne se garde pas hors ligne : OpenStreetMap l'interdit.",
-    style: OSM_STANDARD,
+    // OpenTopoMap est offert par des bénévoles et demande qu'on ne l'aspire pas.
     offline: false,
   },
   ...(MAPBOX_TOKEN
     ? [
+        {
+          // La clé reste `satellite` : celle que les réglages ont mémorisée.
+          key: 'satellite',
+          label: 'Satellite',
+          swatch: '#3d4a35',
+          contrast: 'dark',
+          description: "Photo aérienne avec le nom des rues : pour voir l'ombre d'une allée, un parc, un chemin de terre.",
+          style: mapboxRaster('satellite-streets-v12'),
+          offline: false,
+        },
         {
           key: 'mapbox',
           label: 'Mapbox nuit',
@@ -334,15 +305,6 @@ export const MAP_STYLES = [
           contrast: 'light',
           description: 'Relief ombré, sentiers de randonnée et courbes de niveau, par Mapbox.',
           style: mapboxRaster('outdoors-v12'),
-          offline: false,
-        },
-        {
-          key: 'mapbox-satellite',
-          label: 'Mapbox satellite',
-          swatch: '#33402c',
-          contrast: 'dark',
-          description: 'Imagerie satellite haute résolution de Mapbox, avec les rues par-dessus.',
-          style: mapboxRaster('satellite-streets-v12'),
           offline: false,
         },
         {

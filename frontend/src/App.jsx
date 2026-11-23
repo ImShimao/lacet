@@ -319,12 +319,12 @@ export default function App() {
   // la recalcule à partir du candidat qu'il a gardé ; si le graphe a été
   // remplacé entre-temps, il le dit, et on ne prétend pas savoir.
   const [reversing, setReversing] = useState(false)
-  // Le moteur ne retourne que ce qu'il vient de calculer : un favori rouvert, un
-  // fichier importé ou un tracé du calculateur public aboutissaient à « cette
+  // Le moteur ne retourne que ce qu'il vient de calculer : un favori rouvert ou un
+  // fichier importé aboutissaient à « cette
   // boucle n'est plus en mémoire ». À vélo, une boucle à sens unique ne se
   // retourne pas (`worker.js`).
   const canReverse = Boolean(
-    selected && !selected.remote && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id),
+    selected && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id),
   )
   const reverseSelected = async () => {
     if (!selected || reversing) return
