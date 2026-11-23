@@ -174,5 +174,7 @@ export function requestFor(route, result, params) {
   if (result?.request && result.routes?.some((r) => r.id === route.id)) return result.request
   const [lon, lat] = route.geometry[0]
   const distanceKm = Math.max(0.5, Math.round((route.distance_m || 0) / 100) / 10)
-  return toRequest({ ...params, mode: 'distance', distance_km: distanceKm }, { lat, lon })
+  // Un trajet gardé en favori finit ailleurs : le recalcul en course doit le savoir.
+  const to = route.destination ? { to: { lat: route.destination.lat, lon: route.destination.lon } } : {}
+  return { ...toRequest({ ...params, mode: 'distance', distance_km: distanceKm }, { lat, lon }), ...to }
 }

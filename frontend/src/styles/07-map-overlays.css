@@ -344,6 +344,12 @@
 .viapin svg {
   display: block;
 }
+/* L'arrivée : plein, pour qu'on la distingue du point de passage d'un coup d'œil. */
+.destpin {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--marker-ring);
+}
 
 /* Le centre de la zone à éviter qu'on pose : une poignée à saisir, du rouge
    des hachures. 34 px, la taille d'un pouce qui vise. */

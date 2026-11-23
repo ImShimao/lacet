@@ -35,6 +35,33 @@
   font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
 }
+/* L'arrivée d'un trajet : le texte prend la place, le bouton se range à droite. */
+.origin--dest > div {
+  flex: 1;
+  min-width: 0;
+}
+.origin--dest .origin__pin {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.origin__act {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 700;
+}
+.origin__act--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
 
 .grade {
   font-family: var(--mono);

@@ -46,6 +46,9 @@ const svg = (inner) =>
   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`
 const FLAG_SVG =
   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V3.5"/><path d="M6 4.5h12l-2.6 4 2.6 4H6"/></svg>'
+// Le drapeau à damier de l'arrivée.
+const FINISH_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M5 4h14v9H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 4h3.5v3H5zM12 4h3.5v3H12zM8.5 7H12v3H8.5zM15.5 7H19v3h-3.5zM5 10h3.5v3H5zM12 10h3.5v3H12z" fill="currentColor"/></svg>'
 // Quatre flèches : ce qu'on glisse, dans tous les sens.
 const MOVE_SVG =
   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>'
@@ -80,6 +83,9 @@ export default function MapView({
   zones = [],
   zoneDraft = null,
   onZoneCenter,
+  destination = null,
+  placingDest = false,
+  onDestination,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -93,7 +99,7 @@ export default function MapView({
   const handlers = useRef({})
   handlers.current = {
     onPlace, onPickRoute, onUserMove, onFlyoverEnd, onVia, placing, placingVia, compassRef, navigate,
-    drawingZone: Boolean(zoneDraft), onZoneCenter, zones, zoneDraft,
+    drawingZone: Boolean(zoneDraft), onZoneCenter, zones, zoneDraft, placingDest, onDestination,
   }
 
   // En course, la carte suit — jusqu'à ce qu'un doigt la déplace ou la tourne.
@@ -250,6 +256,10 @@ export default function MapView({
         handlers.current.onVia?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
       }
+      if (handlers.current.placingDest) {
+        handlers.current.onDestination?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+        return
+      }
       if (handlers.current.placing) {
         handlers.current.onPlace?.({ lat: event.lngLat.lat, lon: event.lngLat.lng })
         return
@@ -280,6 +290,8 @@ export default function MapView({
       startMarker.current = null
       viaMarker.current?.remove()
       viaMarker.current = null
+      destMarker.current?.remove()
+      destMarker.current = null
       zoneMarker.current?.remove()
       zoneMarker.current = null
       liveMarker.current?.remove()
@@ -383,6 +395,35 @@ export default function MapView({
       viaMarker.current.setLngLat([via.lon, via.lat])
     }
   }, [via, revision])
+
+  // --- arrivée d'un trajet de A à B, déplaçable --------------------------------
+  // Un damier au bout d'une hampe : l'arrivée se distingue du départ (le rond)
+  // et du point de passage (le fanion) sans légende.
+  const destMarker = useRef(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m || !revision) return
+    if (!destination) {
+      destMarker.current?.remove()
+      destMarker.current = null
+      return
+    }
+    if (!destMarker.current) {
+      const el = document.createElement('div')
+      el.className = 'viapin destpin'
+      el.setAttribute('role', 'img')
+      el.setAttribute('aria-label', "Arrivée — fais-la glisser pour la déplacer")
+      el.innerHTML = FINISH_SVG
+      destMarker.current = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
+      destMarker.current.on('dragend', () => {
+        const { lat, lng } = destMarker.current.getLngLat()
+        handlers.current.onDestination?.({ lat, lon: lng })
+      })
+      destMarker.current.setLngLat([destination.lon, destination.lat]).addTo(m)
+    } else {
+      destMarker.current.setLngLat([destination.lon, destination.lat])
+    }
+  }, [destination, revision])
 
   // --- zones à éviter -----------------------------------------------------------
   // Hachurées, celles qui comptent ; en pointillés, celles qu'on a mises de côté

@@ -22,7 +22,7 @@ import { unitLabel } from './units'
  * résultat le faisait disparaître, puisque quitter le champ fermait la liste
  * avant qu'on ait pu l'atteindre.
  */
-export default function SearchBar({ onPick, near = null }) {
+export default function SearchBar({ onPick, near = null, label = 'Chercher un lieu de départ' }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -157,7 +157,7 @@ export default function SearchBar({ onPick, near = null }) {
         autoComplete="off"
         enterKeyHint="search"
         value={query}
-        placeholder="Chercher un lieu de départ…"
+        placeholder={`${label}…`}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setOpen(true)}
         // Un champ déjà actif ne redonne pas le focus : sans ce clic, après
@@ -165,7 +165,7 @@ export default function SearchBar({ onPick, near = null }) {
         onClick={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
-        aria-label="Chercher un lieu de départ"
+        aria-label={label}
         role="combobox"
         aria-expanded={visible}
         aria-controls="search-results"

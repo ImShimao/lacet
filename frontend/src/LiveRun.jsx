@@ -1417,7 +1417,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         <div className="live__paused" role="status">
           <Icon name="flag" size={17} />
           <div>
-            <b>De retour au départ</b>
+            <b>{route?.destination ? 'Arrivé à destination' : 'De retour au départ'}</b>
             <span>Termine ici, ou continue : la sortie suit.</span>
           </div>
           <button className="live__home" onClick={() => finish(arrivedShown.current ? { arrived: true } : null)}>

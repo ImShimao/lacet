@@ -157,6 +157,42 @@ function QuickLength({ params, onQuickParams }) {
 }
 
 /**
+ * L'arrivée d'un trajet : cherchée en haut de l'écran, posée d'un toucher sur
+ * la carte, ou glissée. Tant qu'elle manque, la carte dit quoi faire.
+ */
+function Destination({ destination, placing, onPlace, onClear }) {
+  return (
+    <div className="origin origin--dest">
+      <span className="origin__pin">
+        <Icon name="flag" size={18} />
+      </span>
+      <div>
+        <b>{destination ? destination.label || "Point d'arrivée" : 'Où vas-tu ?'}</b>
+        <em>
+          {destination
+            ? "arrivée du trajet — fais-la glisser sur la carte"
+            : placing
+              ? "touche la carte là où tu veux arriver"
+              : "cherche une adresse en haut, ou pose-la sur la carte"}
+        </em>
+      </div>
+      {destination ? (
+        <button className="origin__act" onClick={onClear} aria-label="Effacer l'arrivée">
+          <Icon name="close" size={15} />
+        </button>
+      ) : (
+        onPlace && (
+          <button className={`origin__act ${placing ? 'origin__act--on' : ''}`} onClick={onPlace} aria-pressed={placing}>
+            <Icon name="pin" size={15} />
+            Carte
+          </button>
+        )
+      )}
+    </div>
+  )
+}
+
+/**
  * Un avertissement, et la recherche qui y répond à portée de pouce : dire
  * « rien de plat d'ici » sans proposer « Vallonné » obligeait à rouvrir les
  * filtres pour faire le seul geste évident (RunnrZ le propose en un toucher).
@@ -214,6 +250,13 @@ export default function Explore({
   freshImport = false,
   stops = { stops: [], loading: false, complete: true },
   poiPrefs = null,
+  journey = false,
+  onGoal = null,
+  destination = null,
+  placingDest = false,
+  onPlaceDestination = null,
+  onClearDestination = null,
+  onReturnTrip = null,
 }) {
   const [exporting, setExporting] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -277,14 +320,32 @@ export default function Explore({
             <em>
               {geo.accuracy && geo.status === 'ready'
                 ? `précision ± ${Math.round(geo.accuracy)} m`
-                : 'départ de la boucle'}
+                : journey
+                  ? 'départ du trajet'
+                  : 'départ de la boucle'}
             </em>
           </div>
         </div>
-        {onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />}
+        {/* Revenir à sa porte, ou aller quelque part : les deux sorties qu'on
+            fait. Le trajet garde tout le reste — note, voix, relief. */}
+        {onGoal && (
+          <Segmented
+            options={[
+              { key: 'loop', label: 'Boucle' },
+              { key: 'journey', label: 'Aller à…' },
+            ]}
+            value={journey ? 'journey' : 'loop'}
+            onChange={onGoal}
+          />
+        )}
+        {journey ? (
+          <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+        ) : (
+          onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />
+        )}
         <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
           <Icon name="search" size={18} />
-          Trouver ma boucle
+          {journey ? (destination ? 'Trouver mon trajet' : "Choisir l'arrivée") : 'Trouver ma boucle'}
         </button>
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
@@ -341,9 +402,15 @@ export default function Explore({
     )
   }
 
-  const relief =
-    params.climb_m != null ? climbMismatch(params.climb_m, routes) : reliefMismatch(params.elevation, routes)
-  const ground = surfaceMismatch(params.surface, routes)
+  // Un trajet ne cherche ni relief ni terrain : il va où l'on va. Les aveux
+  // « pas de boucle plate d'ici » n'y auraient pas de sens.
+  const isJourney = Boolean(meta.journey)
+  const relief = isJourney
+    ? null
+    : params.climb_m != null
+      ? climbMismatch(params.climb_m, routes)
+      : reliefMismatch(params.elevation, routes)
+  const ground = isJourney ? null : surfaceMismatch(params.surface, routes)
   const weather = weatherAdvice(meta.weather)
   // Partie maintenant, la boucle finit-elle de nuit ? C'est le moment où une
   // rue sans éclairage ni trottoir devient dangereuse : le dire avant de partir.
@@ -578,15 +645,27 @@ export default function Explore({
           <Icon name="share" size={18} />
           <span>Partager</span>
         </button>
-        <button
-          className="loopact"
-          onClick={onRegenerate ?? onSearch}
-          title="Régénérer d'autres boucles"
-          aria-label="Régénérer d'autres boucles"
-        >
-          <Icon name="shuffle" size={18} />
-          <span>Autres boucles</span>
-        </button>
+        {/* Un trajet ne se régénère pas — ses trois chemins sont déjà là —,
+            mais il a un retour : de B vers A, avec ses propres sens uniques,
+            ses propres traversées, et parfois une autre note. */}
+        {isJourney ? (
+          onReturnTrip && (
+            <button className="loopact" onClick={onReturnTrip} title="Calculer le trajet retour" aria-label="Calculer le trajet retour">
+              <Icon name="uturn" size={18} />
+              <span>Trajet retour</span>
+            </button>
+          )
+        ) : (
+          <button
+            className="loopact"
+            onClick={onRegenerate ?? onSearch}
+            title="Régénérer d'autres boucles"
+            aria-label="Régénérer d'autres boucles"
+          >
+            <Icon name="shuffle" size={18} />
+            <span>Autres boucles</span>
+          </button>
+        )}
       </div>
       {sharing && <SendSheet onSend={exportGpx} busy={exporting} onClose={() => setSharing(false)} />}
 

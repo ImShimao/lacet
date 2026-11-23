@@ -11,6 +11,12 @@ qui y répond, en un toucher (« Viser 120 m », « Passer en Mixte »).
 Chaque boucle est mesurée, notée, et **rejetée** si elle ne passe pas le
 contrôle : l'app dit aussi ce qu'elle a écarté, et pourquoi.
 
+**Il va aussi de A à B.** « Aller à… » : on cherche une adresse ou on pose
+l'arrivée sur la carte, et Lacet propose jusqu'à trois chemins — le plus sûr,
+l'équilibré, le plus direct —, chacun noté A, B ou C, pour voir ce que coûte en
+sécurité le kilomètre gagné. Même guidage à la voix, même relief, même recalcul
+si l'on s'écarte, et « Trajet retour » refait le chemin de B vers A.
+
 **Il refuse les routes dangereuses.** Chaque tronçon est évalué : vitesse de la
 voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées ou non.
 Une boucle notée **A** est presque entièrement protégée ; une **C** demande de

@@ -23,6 +23,7 @@ import { haversineM, resample } from './geo'
 import { matchTrace } from './matcher'
 import { clearTiles, detailLevel, fetchArea, tilesFor } from './overpass'
 import { ELEVATION_STEP_M, currentWind, fetchMany, reliefHint, shapeRelief } from './environment'
+import { journeyRequest, planJourney } from './journey'
 import { graphRequest, matchedRoute, normalizeRequest, planDetour, planLoops, pointKey, reverseRoute } from './service'
 
 // Plafond de nœuds gardés en mémoire, toutes zones confondues. Mesuré : le pire
@@ -190,6 +191,21 @@ const traceLength = (trace) => {
 self.onmessage = async ({ data }) => {
   const { id, type, payload } = data
   const progress = (stage, fraction) => self.postMessage({ id, type: 'progress', stage, fraction })
+
+  // De A à B : la même réponse qu'une recherche de boucles, pour que l'écran,
+  // l'enregistrement et le guidage n'aient rien à apprendre.
+  if (type === 'plan' && payload?.to) {
+    try {
+      lastReversible = null
+      const load = {}
+      const result = await planJourney(payload, { loadGraph: (args) => loadGraph(args, progress, load), onProgress: progress })
+      if (load.partial) result.meta.partial = true
+      self.postMessage({ id, type: 'result', result })
+    } catch (error) {
+      self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })
+    }
+    return
+  }
 
   if (type === 'plan') {
     // Plus de calculateur public en secours : Valhalla (FOSSGIS) n'est pas offert
@@ -375,7 +391,12 @@ self.onmessage = async ({ data }) => {
   // encore en mémoire, et sinon ses rues sont sur l'appareil.
   if (type === 'detour') {
     try {
-      const result = await planDetour(payload, { loadGraph: (args) => loadGraph(args, () => {}) })
+      // Un trajet de A à B a chargé un disque qui contient B : le recalcul doit
+      // redemander le même, pas celui de la distance réglée dans les filtres.
+      const asked = payload.request?.to
+        ? { ...payload, request: { ...payload.request, distance_km: journeyRequest(payload.request).req.distance_km, duration_min: null } }
+        : payload
+      const result = await planDetour(asked, { loadGraph: (args) => loadGraph(args, () => {}) })
       self.postMessage({ id, type: 'result', result })
     } catch (error) {
       self.postMessage({ id, type: 'error', error: { name: error.name, message: error.message } })

@@ -17,3 +17,4 @@ souvent avec la mesure ou le bug qui a décidé du choix.
 | [Performances](performances.md) | ce que ça coûte, sur le téléphone et dans le moteur de référence |
 | [Développer](developper.md) | installer les dépendances, lancer l'app, faire tourner les tests |
 | [Limites et suite](limites.md) | ce que Lacet ne sait pas faire, et ce qui vient |
+| [Feuille de route](feuille-de-route.md) | ce que Lacet fait de plus que Roovr et RunnrZ, et les options qui viennent, dans l'ordre |

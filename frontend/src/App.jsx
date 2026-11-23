@@ -32,6 +32,7 @@ import { km } from './format'
 import { load, rememberShown, save, shownFrom } from './storage'
 import { ranFrom } from './knownRoutes'
 import { haptic, isNative } from './platform'
+import { describePlace } from './api'
 import { locateOnce } from './position'
 import { startHere } from './restart'
 import { announceDeparture, announcing } from './contact'
@@ -136,6 +137,12 @@ export default function App() {
   // hors du geste, `{ radius_m, name }` puis le centre une fois la carte touchée.
   const [zones, setZones] = useState(listZones)
   const [zoneDraft, setZoneDraft] = useState(null)
+  // Boucle ou trajet : revenir à sa porte, ou aller quelque part (`engine/journey.js`).
+  // Le choix reste d'une ouverture à l'autre ; l'arrivée, non : c'est celle d'un jour.
+  const [goal, setGoal] = useState(stored.goal === 'journey' ? 'journey' : 'loop')
+  const [destination, setDestination] = useState(null)
+  const [placingDest, setPlacingDest] = useState(false)
+  const journey = goal === 'journey'
   // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
   // allumé, il serait reparti au retour sur la carte.
   useEffect(() => setFlying(false), [running, tab, viewing, summary, selected?.id])
@@ -156,21 +163,30 @@ export default function App() {
   // faire autour — ranger les filtres, revenir à l'onglet, replier la feuille.
   // Le calcul, son jeton et son élargissement sont dans `useSearch.js`.
   const search = useCallback(
-    async (next, { regenerate = false, through = via } = {}) => {
+    async (next, { regenerate = false, through = via, from = start, to = destination } = {}) => {
       const active = next || params
       if (next) {
         setParams(next)
         save({ params: next })
       }
       setFiltersOpen(false)
-      if (!start) return
+      if (!from) return
+      // Un trajet sans arrivée : la recherche ne peut rien, la carte attend qu'on la pose.
+      if (journey && !to) {
+        setPlacing(false)
+        setPlacingVia(false)
+        setPlacingDest(true)
+        return
+      }
 
       // Une recherche ordinaire repart de zéro ; « Régénérer » tourne les polygones
       // d'un cran de plus et s'écarte des directions qu'on vient de montrer. La
       // même demande relancée sur ses propres propositions — les filtres
       // rouverts et validés sans rien changer — en est une aussi : refaite à
       // l'identique, elle rendait exactement les mêmes boucles.
-      const request = { ...toRequest(active, start), ...(through ? { via: through } : {}) }
+      const request = journey
+        ? { ...toRequest(active, from), to: { lat: to.lat, lon: to.lon, ...(to.label ? { label: to.label } : {}) } }
+        : { ...toRequest(active, from), ...(through ? { via: through } : {}) }
       const key = JSON.stringify(request)
       const again = regenerate || (Boolean(result?.request && result.routes.length) && key === lastAsked.current)
       lastAsked.current = key
@@ -186,7 +202,7 @@ export default function App() {
       // Le repère se pose ensuite sur la rue, là où la boucle commence ; la
       // demande, elle, repart toujours du point choisi — la maison, pas le
       // trottoir —, pour que chaque recherche sorte du même côté.
-      const asked = askedOf(start)
+      const asked = askedOf(from)
       // Ce qu'on a déjà vu d'ici — et déjà couru, quand on demande à l'éviter —
       // recule au choix, et une graine neuve fait varier chaque recherche : la
       // même demande, relancée un autre jour, rendait la même liste dans le
@@ -214,8 +230,37 @@ export default function App() {
       if (shown?.routes.length) rememberShown(asked, shown.routes)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params, start, result, via, history],
+    [params, start, result, via, history, journey, destination],
   )
+
+  // L'arrivée posée ou cherchée. Un point touché sur la carte n'a pas de nom :
+  // on le demande, comme pour le départ, pour le favori et la carte du panneau.
+  const pickDestination = async (point, label) => {
+    setPlacingDest(false)
+    haptic('tickHaptic')
+    found.forget()
+    const placed = { lat: point.lat, lon: point.lon, label: label ?? null }
+    setDestination(placed)
+    if (label !== undefined) return
+    const place = await describePlace(point.lat, point.lon).catch(() => null)
+    if (place?.label) setDestination((d) => (d === placed ? { ...placed, label: place.label } : d))
+  }
+  const chooseGoal = (next) => {
+    setGoal(next)
+    save({ goal: next })
+    setPlacingDest(false)
+    found.forget()
+  }
+  // Le retour : B devient le départ, A l'arrivée, et la recherche repart.
+  const returnTrip = () => {
+    if (!start || !destination) return
+    const home = askedOf(start)
+    const back = { lat: home.lat, lon: home.lon, label: startLabel ?? null }
+    const from = { lat: destination.lat, lon: destination.lon }
+    applyStart(from, destination.label ?? undefined, true)
+    setDestination(back)
+    search(undefined, { from, to: back })
+  }
 
   // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient
   // de poser. Retiré, elle repart sans lui — si des boucles étaient affichées.
@@ -324,7 +369,11 @@ export default function App() {
   // boucle n'est plus en mémoire ». À vélo, une boucle à sens unique ne se
   // retourne pas (`worker.js`).
   const canReverse = Boolean(
-    selected && !selected.oneway && result?.meta?.engine === 'local' && result.routes.some((r) => r.id === selected.id),
+    selected &&
+      !selected.oneway &&
+      !result?.meta?.journey &&
+      result?.meta?.engine === 'local' &&
+      result.routes.some((r) => r.id === selected.id),
   )
   const reverseSelected = async () => {
     if (!selected || reversing) return
@@ -501,6 +550,9 @@ export default function App() {
           onVia={running || tab !== 'explore' ? null : passBy}
           zones={zones}
           zoneDraft={running ? null : zoneDraft}
+          destination={running || !journey ? null : destination}
+          placingDest={placingDest}
+          onDestination={(p) => pickDestination(p)}
           // En contour, chaque toucher ajoute un sommet ; en cercle, il pose le centre.
           onZoneCenter={(p) =>
             setZoneDraft(
@@ -541,7 +593,10 @@ export default function App() {
                     ? start
                     : null
               }
-              onPick={(p) => applyStart(placeOf(p), p.label, true)}
+              // En trajet, la recherche d'en haut cherche l'arrivée : le départ
+              // est presque toujours là où l'on est, l'arrivée jamais.
+              label={journey ? 'Chercher une arrivée' : undefined}
+              onPick={(p) => (journey ? pickDestination(p, p.label) : applyStart(placeOf(p), p.label, true))}
             />
           </div>
         )}
@@ -607,6 +662,11 @@ export default function App() {
             Touche la carte pour poser le départ — ou fais glisser le repère.
           </div>
         )}
+        {placingDest && !running && (
+          <button className="stage__hint" onClick={() => setPlacingDest(false)}>
+            Touche la carte là où tu veux arriver. (Annuler)
+          </button>
+        )}
         {zoneDraft && !running && (
           <ZoneDraft draft={zoneDraft} onChange={setZoneDraft} onKeep={keepZone} onCancel={() => setZoneDraft(null)} />
         )}
@@ -659,7 +719,10 @@ export default function App() {
               <button className="sportpill" onClick={() => setFiltersOpen(true)}>
                 <Icon name={sport?.icon} size={19} />
                 <b>{sport?.label}</b>
-                <span className="sportpill__spec">{summarise(params)}</span>
+                {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
+                <span className="sportpill__spec">
+                  {result.meta?.journey ? `Trajet · ${summarise(params).split(' · ').slice(1).join(' · ')}` : summarise(params)}
+                </span>
                 <Icon name="sliders" size={17} className="sportpill__gear" />
               </button>
             )}
@@ -878,6 +941,21 @@ export default function App() {
               onStart={() => beginRun('route')}
               onFreeRun={() => beginRun('free')}
               onOpenSaved={() => setTab('routes')}
+              journey={journey}
+              onGoal={chooseGoal}
+              destination={destination}
+              placingDest={placingDest}
+              onPlaceDestination={() => {
+                setPlacing(false)
+                setPlacingVia(false)
+                setSheet('peek')
+                setPlacingDest((on) => !on)
+              }}
+              onClearDestination={() => {
+                setDestination(null)
+                found.forget()
+              }}
+              onReturnTrip={journey && destination ? returnTrip : null}
               onBack={() => {
                 setDetail(false)
                 found.forget()
