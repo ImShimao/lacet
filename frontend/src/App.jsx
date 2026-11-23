@@ -234,7 +234,7 @@ export default function App() {
   // La zone gardée, les boucles affichées sont refaites sans elle : c'est la
   // question qu'on vient de poser, comme pour le point de passage.
   const keepZone = () => {
-    setZones(addZone(zoneDraft))
+    setZones(addZone(zoneDraft.shape === 'polygon' ? { ...zoneDraft, polygon: zoneDraft.points } : zoneDraft))
     setZoneDraft(null)
     haptic('tickHaptic')
     if (result) search()
@@ -501,7 +501,12 @@ export default function App() {
           onVia={running || tab !== 'explore' ? null : passBy}
           zones={zones}
           zoneDraft={running ? null : zoneDraft}
-          onZoneCenter={(p) => setZoneDraft((d) => d && { ...d, ...p })}
+          // En contour, chaque toucher ajoute un sommet ; en cercle, il pose le centre.
+          onZoneCenter={(p) =>
+            setZoneDraft(
+              (d) => d && (d.shape === 'polygon' ? { ...d, points: [...(d.points ?? []), [p.lon, p.lat]].slice(0, 64) } : { ...d, ...p }),
+            )
+          }
           onPickRoute={(id) => {
             const match = result?.routes.find((r) => r.id === id)
             if (match) setSelected(match)
@@ -855,6 +860,7 @@ export default function App() {
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
               onSearch={() => search()}
+              onSearchWith={(patch) => search({ ...params, ...patch })}
               onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
               reversing={reversing}

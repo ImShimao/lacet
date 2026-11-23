@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { haversineM } from './geo'
+import { insideRing } from './blocked'
 import { RouteStats, runGate } from './safety'
 import { SALVAGED_MESSAGE, SETTINGS, extractRadiusM, planLoops, pointKey, reverseRoute, selectVaried } from './service'
 import { Candidate, bearingGap } from './loops'
@@ -116,6 +117,39 @@ describe('la boucle', () => {
       expect(route.geometry.at(-1)).toEqual(route.geometry[0])
     }
   }, 60_000)
+
+  it('contourne aussi une zone posée point par point', async () => {
+    // Un contour au lieu d'un cercle : un carré d'environ 300 m de côté posé sur
+    // la boucle d'origine. Aucun point des propositions ne tombe dedans.
+    const demande = { lat: 47.0245, lon: 4.8395, distance_km: 5, sport: 'run', limit: 3 }
+    const avant = await planLoops({ ...demande, limit: 1 }, deps)
+    const chemin = avant.routes[0].geometry
+    const [lon, lat] = chemin[Math.floor(chemin.length / 2)]
+    const dLon = 150 / (111_320 * Math.cos((lat * Math.PI) / 180))
+    const dLat = 150 / 110_540
+    const polygon = [
+      [lon - dLon, lat - dLat],
+      [lon + dLon, lat - dLat],
+      [lon + dLon, lat + dLat],
+      [lon - dLon, lat + dLat],
+    ]
+    const apres = await planLoops({ ...demande, zones: [{ polygon }] }, deps)
+    expect(apres.routes.length).toBeGreaterThan(0)
+    for (const route of apres.routes) {
+      expect(route.geometry.some((c) => insideRing(c, polygon))).toBe(false)
+    }
+  }, 60_000)
+
+  it('refuse un contour plus large que la ville', async () => {
+    const polygon = [
+      [4.7, 47.0],
+      [4.9, 47.0],
+      [4.9, 47.1],
+    ]
+    await expect(planLoops({ lat: 47.0245, lon: 4.8395, distance_km: 5, zones: [{ polygon }] }, deps)).rejects.toThrow(
+      /zones invalide/,
+    )
+  })
 
   it('trouve encore des boucles quand le départ est dans la zone', async () => {
     // Interdire la zone, ce serait n'avoir aucune boucle depuis chez soi : elle

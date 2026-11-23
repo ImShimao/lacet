@@ -4,7 +4,10 @@
 
 **Il trouve des boucles, pas des allers-retours.** Douze propositions par
 recherche au plus, choisies pour partir dans des directions différentes, à la
-distance demandée — 10 km, un semi au mètre près (21,0975 km), ou une durée.
+distance demandée — 10 km, un semi au mètre près (21,0975 km), ou une durée,
+avec sous la règle des raccourcis (3, 5, 10, 15 km) qu'on règle soi-même.
+Quand le coin n'a pas ce qu'on demande, l'avertissement propose la recherche
+qui y répond, en un toucher (« Viser 120 m », « Passer en Mixte »).
 Chaque boucle est mesurée, notée, et **rejetée** si elle ne passe pas le
 contrôle : l'app dit aussi ce qu'elle a écarté, et pourquoi.
 
@@ -54,8 +57,10 @@ fontaine, la rue d'un ami — et toutes les boucles proposées y passent, notée
 comme les autres.
 
 **Et il évite ce que tu ne veux pas.** Un quartier, une forêt de chasse, un
-chantier qui dure : le cercle hachuré des outils de carte pose une zone que
-toutes les boucles contournent, et le recalcul en course aussi. Elle reste
+chantier qui dure : le cercle hachuré des outils de carte pose une zone — un
+cercle, ou un contour posé coin par coin, avec sa raison (dangereuse, travaux,
+privé, impraticable) — que toutes les boucles contournent, et le recalcul en
+course aussi. Elle reste
 d'une recherche à l'autre, et se renomme, se désactive ou se supprime dans
 « Mon compte › Sécurité ».
 
@@ -63,5 +68,6 @@ Et le reste, qui compte le jour où il sert : départs enregistrés (« Chez moi
 « Le club ») à une touche, pause automatique aux feux, alerte
 avant chaque traversée non protégée, bouton SOS qui prépare un SMS avec ta
 position, SMS à un proche au départ (avec l'heure prévue du retour) et à
-l'arrivée, survol 3D de la boucle avant de partir, export GPX horodaté vers une montre, boucle partagée à un ami en GPX — qu'il ouvre avec Lacet, qui la note et la décrit comme les siennes —, profil de dénivelé consultable
+l'arrivée, survol 3D de la boucle avant de partir, « Envoyer cette boucle » qui dit comment la
+faire entrer dans Garmin Connect, COROS, Suunto ou Komoot, export GPX horodaté vers une montre, boucle partagée à un ami en GPX — qu'il ouvre avec Lacet, qui la note et la décrit comme les siennes —, profil de dénivelé consultable
 en pleine sortie, historique avec totaux mensuels.

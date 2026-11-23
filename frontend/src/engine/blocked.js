@@ -65,19 +65,81 @@ export function blockedEdges(graph, reports, radiusM = BLOCK_RADIUS_M) {
 /**
  * Les arêtes qui entrent dans une zone à éviter, ajoutées à celles des signalements.
  *
- * Une zone est un disque `{ lon, lat, radius_m }` : le même calcul qu'un
- * signalement, avec un rayon choisi au lieu de vingt-cinq mètres. Elle pèse donc
- * comme lui — un mur, sauf quand il n'y a pas d'autre chemin : c'est ce qui
- * laisse sortir d'une zone qu'on a dessinée autour de son propre départ, au lieu
- * de ne trouver aucune boucle.
+ * Une zone est un disque `{ lon, lat, radius_m }` — le même calcul qu'un
+ * signalement, avec un rayon choisi au lieu de vingt-cinq mètres — ou un
+ * contour `{ polygon: [[lon, lat], …] }`, posé point par point : un bois en
+ * longueur ou un quartier coincé entre deux avenues ne tiennent pas dans un
+ * cercle sans déborder sur les rues d'à côté. Elle pèse comme un signalement —
+ * un mur, sauf quand il n'y a pas d'autre chemin : c'est ce qui laisse sortir
+ * d'une zone qu'on a dessinée autour de son propre départ, au lieu de ne
+ * trouver aucune boucle.
  */
 export function withZones(graph, blocked, zones) {
   let out = blocked
   for (const zone of zones || []) {
-    const hit = blockedEdges(graph, [[zone.lon, zone.lat]], zone.radius_m)
+    const hit = zone.polygon ? polygonEdges(graph, zone.polygon) : blockedEdges(graph, [[zone.lon, zone.lat]], zone.radius_m)
     if (hit) out = out ? new Set([...out, ...hit]) : hit
   }
   return out
+}
+
+/**
+ * Les arêtes qui entrent dans un contour : un point dedans, ou un segment qui
+ * coupe son bord — une avenue qui traverse un parc de part en part sans s'y
+ * arrêter y entre aussi. Calcul à plat en degrés : à l'échelle d'un quartier,
+ * l'écart avec la sphère ne se mesure pas.
+ */
+export function polygonEdges(graph, ring) {
+  if (!graph.edgeCount || !ring || ring.length < 3) return null
+  let minLon = Infinity
+  let minLat = Infinity
+  let maxLon = -Infinity
+  let maxLat = -Infinity
+  for (const [lon, lat] of ring) {
+    minLon = Math.min(minLon, lon)
+    maxLon = Math.max(maxLon, lon)
+    minLat = Math.min(minLat, lat)
+    maxLat = Math.max(maxLat, lat)
+  }
+  const out = new Set()
+  for (let e = 0; e < graph.edgeCount; e += 1) {
+    const start = graph.edgeCoordStart[e]
+    const count = graph.edgeCoordCount[e]
+    for (let i = 0; i + 1 < count; i += 1) {
+      const a = [graph.coords[2 * (start + i)], graph.coords[2 * (start + i) + 1]]
+      const b = [graph.coords[2 * (start + i + 1)], graph.coords[2 * (start + i + 1) + 1]]
+      if (Math.max(a[0], b[0]) < minLon || Math.min(a[0], b[0]) > maxLon) continue
+      if (Math.max(a[1], b[1]) < minLat || Math.min(a[1], b[1]) > maxLat) continue
+      if (insideRing(a, ring) || insideRing(b, ring) || crossesRing(a, b, ring)) {
+        out.add(e)
+        break
+      }
+    }
+  }
+  return out.size ? out : null
+}
+
+/** Le point est-il dans l'anneau ? Le rayon lancé vers l'est compte les bords franchis. */
+export function insideRing([x, y], ring) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+const side = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]))
+
+/** Le segment [a, b] coupe-t-il un bord de l'anneau ? */
+function crossesRing(a, b, ring) {
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const c = ring[j]
+    const d = ring[i]
+    if (side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0) return true
+  }
+  return false
 }
 
 /** Distance d'un point à un segment, en mètres locaux. */

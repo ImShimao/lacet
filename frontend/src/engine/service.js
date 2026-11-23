@@ -311,11 +311,30 @@ export function normalizeRequest(input) {
   // Le curseur (`zones.js`) va de 100 m à 2 km ; le moteur tolère un peu plus
   // large, mais pas une zone plus vaste que la ville : ce ne serait plus un
   // évitement, mais une recherche sans réseau.
-  req.zones = req.zones.map((z) => ({
-    lon: bounded(z?.lon, 'zones', { min: -180, max: 180 }),
-    lat: bounded(z?.lat, 'zones', { min: -90, max: 90 }),
-    radius_m: bounded(z?.radius_m, 'zones', { min: 25, max: 5000 }),
-  }))
+  req.zones = req.zones.map((z) => {
+    if (z?.polygon === undefined) {
+      return {
+        lon: bounded(z?.lon, 'zones', { min: -180, max: 180 }),
+        lat: bounded(z?.lat, 'zones', { min: -90, max: 90 }),
+        radius_m: bounded(z?.radius_m, 'zones', { min: 25, max: 5000 }),
+      }
+    }
+    // Un contour : de trois à soixante-quatre points, et pas plus large que la
+    // ville — la même borne que le rayon d'un disque (5 km), en diagonale.
+    if (!Array.isArray(z.polygon) || z.polygon.length < 3 || z.polygon.length > 64) {
+      throw new PlanningError('Paramètre zones invalide.')
+    }
+    const polygon = z.polygon.map((p) => [
+      bounded(p?.[0], 'zones', { min: -180, max: 180 }),
+      bounded(p?.[1], 'zones', { min: -90, max: 90 }),
+    ])
+    const lats = polygon.map((p) => p[1])
+    const lons = polygon.map((p) => p[0])
+    const kx = 111_320 * Math.cos((lats[0] * Math.PI) / 180)
+    const span = Math.hypot((Math.max(...lons) - Math.min(...lons)) * kx, (Math.max(...lats) - Math.min(...lats)) * 110_540)
+    if (span > 10_000) throw new PlanningError('Paramètre zones invalide.')
+    return { polygon }
+  })
 
   req.seconds_per_km = req.sport === 'bike' ? 3600 / req.speed_kmh : req.pace_sec_per_km
 

@@ -491,6 +491,18 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent-line);
 }
+/* La recherche qui répond à l'avertissement, sous son texte. */
+.notice__act {
+  display: block;
+  margin-top: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+}
 .notice--error {
   background: var(--risk-soft);
   border-color: var(--risk-line);
@@ -598,6 +610,14 @@
 /* La règle : une bande qui défile sous une aiguille fixe. Les deux cales
    d'une demi-largeur laissent la première et la dernière graduation venir
    jusqu'au milieu. Les bords s'effacent, comme une molette. */
+/* Les raccourcis sous la règle : la distance de tous les jours en un toucher. */
+.presets {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
 .ruler {
   position: relative;
   height: 34px;

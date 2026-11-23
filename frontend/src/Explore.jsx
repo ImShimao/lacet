@@ -21,7 +21,8 @@ import { km } from './format'
 import { haptic } from './platform'
 import { summarise } from './request'
 import { clockTime, turnIcon } from './runFormat'
-import { fromKm, speedIn, speedLabel, unitLabel, units } from './units'
+import { fromKm, speedIn, speedLabel, toKm, unitLabel, units } from './units'
+import { presets } from './presets'
 
 // Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
 // et une grande graduation tous les `major` pas.
@@ -133,6 +134,67 @@ function QuickLength({ params, onQuickParams }) {
         </div>
         <span className="ruler__needle" aria-hidden="true" />
       </div>
+      <div className="presets">
+        {presets(duration ? 'duration' : params.sport === 'bike' ? 'bike' : 'run').map((p) => {
+          const target = duration ? p : toKm(p)
+          return (
+            <button
+              key={p}
+              className={Math.abs(target - value) < 0.01 ? 'chip chip--on' : 'chip'}
+              onClick={() => {
+                haptic('tickHaptic')
+                onQuickParams({ [key]: Math.round(target * 1000) / 1000, mode: duration ? 'duration' : 'distance' })
+              }}
+            >
+              {String(p).replace('.', ',')} {unit}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Un avertissement, et la recherche qui y répond à portée de pouce : dire
+ * « rien de plat d'ici » sans proposer « Vallonné » obligeait à rouvrir les
+ * filtres pour faire le seul geste évident (RunnrZ le propose en un toucher).
+ */
+function Notice({ warn = false, action = null, onAct = null, children }) {
+  return (
+    <div className={warn ? 'notice notice--warn' : 'notice'}>
+      {children}
+      {action && onAct && (
+        <button className="notice__act" onClick={onAct}>
+          {action}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Où envoyer une boucle, et comment l'y faire entrer. Le fichier est le même
+// GPX partout ; ce qui manquait, c'était le chemin de chaque app — Roovr le dit
+// ligne par ligne, et « Partager » seul laissait chercher dans la feuille d'iOS.
+const SEND_TO = [
+  { key: 'friend', title: 'Un ami', how: "Il l'ouvre avec Lacet, qui la note comme les siennes." },
+  { key: 'garmin', title: 'Garmin Connect', how: "Choisis Connect dans le partage : la boucle devient un parcours à envoyer sur la montre." },
+  { key: 'coros', title: 'COROS', how: "Choisis COROS dans le partage : elle l'importe comme itinéraire." },
+  { key: 'suunto', title: 'Suunto', how: "Choisis Suunto dans le partage : elle l'importe comme itinéraire." },
+  { key: 'komoot', title: 'Komoot', how: 'Enregistre le fichier, puis importe-le sur komoot.com, dans « Planifier ».' },
+  { key: 'file', title: 'Fichier GPX', how: 'Pour toute autre montre ou app : le fichier, tel quel.' },
+]
+
+/** « Envoyer cette boucle » : chaque ligne ouvre le partage d'iOS avec le même GPX. */
+function SendTo({ onSend, busy }) {
+  return (
+    <div className="sendto" role="group" aria-label="Envoyer cette boucle">
+      {SEND_TO.map((d) => (
+        <button key={d.key} className="sendto__row" onClick={onSend} disabled={busy}>
+          <b>{d.title}</b>
+          <em>{d.how}</em>
+        </button>
+      ))}
     </div>
   )
 }
@@ -159,6 +221,7 @@ export default function Explore({
   onSelect,
   onToggleDetail,
   onSearch,
+  onSearchWith = null,
   onCancel = null,
   onRegenerate,
   onReverse,
@@ -178,6 +241,7 @@ export default function Explore({
   poiPrefs = null,
 }) {
   const [exporting, setExporting] = useState(false)
+  const [sharing, setSharing] = useState(false)
   // Ce qu'on reconnaît de l'historique, calculé une fois par liste de
   // propositions : le tri grossier écarte presque tout sans rien mesurer, mais
   // le refaire à chaque rendu serait gratuit pour personne.
@@ -359,40 +423,49 @@ export default function Explore({
           faire attendre devant une barre figée, on a cherché avec le reste ; le
           dire évite de croire que le coin n'a rien de mieux à offrir. */}
       {meta.partial && (
-        <div className="notice">
+        <Notice action="Relancer" onAct={onSearch}>
           Le bord de la zone n'est pas encore arrivé : ces boucles sont tracées sur les rues
           déjà là. Relance la recherche dans un instant pour en profiter.
-        </div>
+        </Notice>
       )}
       {/* Sans altitude, le dénivelé n'est pas seulement absent de l'affichage :
           il n'a pas pu servir au classement. Demander « des côtes » et recevoir
           cinq boucles plates sans un mot serait incompréhensible. */}
       {meta.elevation_skipped && (
-        <div className="notice">
+        <Notice action="Relancer" onAct={onSearch}>
           Le relief n'a pas répondu à temps : ces boucles sont classées sans lui, et leur
           dénivelé reste inconnu. Relance la recherche — les altitudes arrivées entre-temps
           sont gardées.
-        </div>
+        </Notice>
       )}
       {/* Le relief, lui, a répondu — mais le coin n'a pas celui qu'on demande.
           Le dire, plutôt que de laisser croire que ces boucles sont des côtes. */}
       {relief && (
-        <div className="notice">
+        <Notice
+          action={relief.kind === 'climb' ? `Viser ${relief.ascent} m` : 'Chercher en Vallonné'}
+          onAct={
+            onSearchWith &&
+            (() =>
+              onSearchWith(
+                relief.kind === 'climb' ? { climb_m: relief.ascent } : { elevation: 'rolling', climb_m: null },
+              ))
+          }
+        >
           {relief.kind === 'climb'
             ? `Rien autour de ${params.climb_m} m d'ici : la boucle la plus proche monte de ${relief.ascent} m.`
             : relief.kind === 'hilly'
               ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
               : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
-        </div>
+        </Notice>
       )}
       {/* Le même aveu pour le terrain : ces boucles passent devant parce
           qu'elles s'en approchent le plus, pas parce qu'elles le tiennent. */}
       {ground && (
-        <div className="notice">
+        <Notice action="Passer en Mixte" onAct={onSearchWith && (() => onSearchWith({ surface: 'mixed' }))}>
           {ground.kind === 'trail'
             ? `Peu de chemins à portée d'ici : la boucle la plus nature n'en compte que ${ground.share} %.`
             : `Pas de boucle toute goudronnée d'ici : la plus roulante a encore ${ground.share} % de chemins.`}
-        </div>
+        </Notice>
       )}
       {dusk && (
         <div className="notice notice--warn">
@@ -505,7 +578,13 @@ export default function Explore({
         {/* Un GPX, par la feuille de partage : un ami qui a Lacet l'ouvre avec
             l'app, qui le note et le décrit comme ses propres boucles ; les
             autres le prennent dans leur montre ou leur app de course. */}
-        <button className="loopact" onClick={exportGpx} disabled={exporting} title="Partager en GPX" aria-label="Partager en GPX">
+        <button
+          className={`loopact ${sharing ? 'loopact--on' : ''}`}
+          onClick={() => setSharing((s) => !s)}
+          aria-expanded={sharing}
+          title="Envoyer cette boucle"
+          aria-label="Envoyer cette boucle"
+        >
           <Icon name="share" size={18} />
           <span>Partager</span>
         </button>
@@ -519,6 +598,7 @@ export default function Explore({
           <span>Autres boucles</span>
         </button>
       </div>
+      {sharing && <SendTo onSend={exportGpx} busy={exporting} />}
 
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 

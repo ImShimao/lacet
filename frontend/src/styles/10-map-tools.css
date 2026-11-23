@@ -351,6 +351,24 @@
   /* Seize pixels : voir `.search input`. */
   font-size: calc(16px * var(--text-scale));
 }
+/* Les raccourcis de l'accueil : le libellé, puis la liste à taper. */
+.presetrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.presetrow input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: right;
+  font-size: calc(16px * var(--text-scale));
+}
+.presetrow input:focus,
 .zonerow__name:focus {
   outline: none;
   border-bottom: 1px solid var(--accent);

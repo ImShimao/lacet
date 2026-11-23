@@ -29,6 +29,7 @@ import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
 import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
+import { formatPresets, parsePresets, presets, setPresets } from './presets'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
 /** Les familles du sommaire, dans leur ordre. */
@@ -303,7 +304,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
             Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © OpenFreeMap, © OpenMapTiles,
             © OpenTopoMap (CC-BY-SA), © Mapbox · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors
             ligne) et Valhalla (FOSSGIS) hors de France · Recherche de
-            lieux Photon (Komoot) et Nominatim · Vent Open-Meteo.
+            lieux Photon (Komoot) et Nominatim · Vent MET Norway (CC BY 4.0).
           </p>
         </>
       )
@@ -585,8 +586,37 @@ function SearchSettings({ params, onProfile }) {
         />
       </PrefsCard>
 
+      <PrefsCard
+        title="Raccourcis de l'accueil"
+        foot="Les touches sous la règle de distance. Sépare les valeurs par des espaces : « 3 5 10 15 »."
+      >
+        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label={`Distances (${unitLabel()})`} />
+        <PresetRow kind="duration" label="Durées (min)" />
+      </PrefsCard>
+
       <ShownFilters params={params} onProfile={onProfile} />
     </>
+  )
+}
+
+/** Une liste de raccourcis, tapée d'un trait ; une saisie illisible garde l'ancienne. */
+function PresetRow({ kind, label }) {
+  const [list, setList] = useState(() => presets(kind))
+  return (
+    <label className="rows__row presetrow">
+      <span>{label}</span>
+      <input
+        key={list.join()}
+        defaultValue={formatPresets(list)}
+        inputMode="decimal"
+        aria-label={label}
+        onBlur={(e) => {
+          const next = parsePresets(e.target.value)
+          if (next) setPresets(kind, next)
+          setList(next ?? [...list])
+        }}
+      />
+    </label>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
-import { ZONE_RADIUS } from './zones'
+import { Segmented } from './FiltersSheet.jsx'
+import { ZONE_RADIUS, ZONE_REASONS } from './zones'
 
 /**
  * La colonne de boutons posée sur la carte, hors course.
@@ -150,12 +151,61 @@ export function MapTools({
  * contour : voir `zones.js`.
  */
 export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
-  const placed = Number.isFinite(draft.lon)
+  const polygon = draft.shape === 'polygon'
+  const points = draft.points ?? []
+  const placed = polygon ? points.length >= 3 : Number.isFinite(draft.lon)
   const km = draft.radius_m >= 1000
   return (
     <div className="zonedraft" role="dialog" aria-label="Zone à éviter">
       <b>Zone à éviter</b>
-      {placed ? (
+      {/* Changer de forme repart d'une zone vide : un centre ne fait pas un contour. */}
+      <Segmented
+        options={[
+          { key: 'circle', label: 'Cercle' },
+          { key: 'polygon', label: 'Contour' },
+        ]}
+        value={polygon ? 'polygon' : 'circle'}
+        onChange={(shape) => onChange({ shape, radius_m: draft.radius_m, name: draft.name, reason: draft.reason })}
+      />
+      <div className="presets" role="group" aria-label="Raison">
+        {ZONE_REASONS.map((r) => (
+          <button
+            key={r.key}
+            className={draft.reason === r.key ? 'chip chip--on' : 'chip'}
+            aria-pressed={draft.reason === r.key}
+            onClick={() => onChange({ ...draft, reason: draft.reason === r.key ? null : r.key })}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {polygon ? (
+        <>
+          <p className="muted small">
+            {points.length < 3
+              ? `Touche la carte pour poser les coins de la zone (${points.length} sur 3 au moins).`
+              : `${points.length} points posés. Touche la carte pour en ajouter.`}
+          </p>
+          {points.length > 0 && (
+            <button className="linkish" onClick={() => onChange({ ...draft, points: points.slice(0, -1) })}>
+              Retirer le dernier point
+            </button>
+          )}
+          {placed && (
+            <input
+              className="field"
+              type="text"
+              autoCapitalize="sentences"
+              autoCorrect="off"
+              maxLength={60}
+              placeholder="Forêt de chasse, chantier, quartier…"
+              aria-label="Nom de la zone"
+              value={draft.name}
+              onChange={(e) => onChange({ ...draft, name: e.target.value })}
+            />
+          )}
+        </>
+      ) : placed ? (
         <>
           <label className="zonedraft__radius">
             <span>

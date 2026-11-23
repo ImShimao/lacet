@@ -37,6 +37,30 @@ describe('les zones à éviter', () => {
     expect(listZones()[0].name).toBe('Chantier')
   })
 
+  it('garde un contour, et son nom vient de la raison', () => {
+    const polygon = [
+      [7.2, 47.9],
+      [7.21, 47.9],
+      [7.21, 47.91],
+    ]
+    addZone({ polygon, reason: 'works' })
+    const [zone] = listZones()
+    expect(zone.name).toBe('Zone travaux')
+    expect(zone.reason).toBe('works')
+    expect(avoidedZones()).toEqual([{ polygon }])
+  })
+
+  it('refuse un contour de moins de trois points', () => {
+    expect(
+      addZone({
+        polygon: [
+          [7.2, 47.9],
+          [7.21, 47.9],
+        ],
+      }),
+    ).toEqual([])
+  })
+
   it('se supprime', () => {
     const [zone] = addZone({ lon: 7.2, lat: 47.9, radius_m: 300 })
     expect(removeZone(zone.id)).toEqual([])

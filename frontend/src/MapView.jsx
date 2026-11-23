@@ -988,6 +988,7 @@ function paintLayers(m, contrast) {
   set('cursor-dot', 'circle-stroke-color', mapToken('--map-ink'))
   set('zones-line', 'line-color', mapToken('--map-zone'))
   set('zones-off', 'line-color', c.ghost)
+  set('zones-pts', 'circle-stroke-color', mapToken('--map-zone'))
 }
 
 // Les couleurs des couches sont posées par `paintLayers`, juste après.
@@ -1137,18 +1138,37 @@ function addLayers(m) {
     filter: ['!', ['get', 'on']],
     paint: { 'line-width': 2, 'line-dasharray': [2, 2] },
   }, 'ghost-line')
+  // Les coins d'un contour qu'on pose.
+  m.addLayer({
+    id: 'zones-pts',
+    type: 'circle',
+    source: 'zones',
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: { 'circle-radius': 6, 'circle-color': '#ffffff', 'circle-stroke-width': 3 },
+  }, 'ghost-line')
 }
 
 const empty = () => ({ type: 'FeatureCollection', features: [] })
 
 /** Les zones gardées, et celle qu'on pose quand son centre est choisi. */
 function drawZones(m, zones, draft) {
+  const ring = (points) => ({ type: 'Polygon', coordinates: [[...points, points[0]]] })
   const features = zones.map((z) => ({
     type: 'Feature',
     properties: { on: z.on !== false },
-    geometry: circlePolygon([z.lon, z.lat], z.radius_m),
+    geometry: z.polygon ? ring(z.polygon) : circlePolygon([z.lon, z.lat], z.radius_m),
   }))
-  if (draft && Number.isFinite(draft.lon)) {
+  if (draft?.shape === 'polygon') {
+    // Le contour en cours : ses coins, le trait qui les relie, puis la surface
+    // dès qu'il en a trois.
+    const points = draft.points ?? []
+    for (const p of points) features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: { type: 'Point', coordinates: p } })
+    if (points.length === 2) {
+      features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: { type: 'LineString', coordinates: points } })
+    } else if (points.length >= 3) {
+      features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: ring(points) })
+    }
+  } else if (draft && Number.isFinite(draft.lon)) {
     features.push({
       type: 'Feature',
       properties: { on: true, draft: true },

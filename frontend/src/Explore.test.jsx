@@ -97,6 +97,28 @@ describe('les avertissements de l’écran', () => {
     expect(screen.getByText(/bord de la zone n'est pas encore arrivé/)).toBeInTheDocument()
   })
 
+  it('proposent la recherche qui répond, en un toucher', () => {
+    const onSearchWith = vi.fn()
+    const onSearch = vi.fn()
+    afficher({
+      onSearchWith,
+      onSearch,
+      meta: { partial: true },
+      params: { sport: 'run', surface: 'mixed', elevation: 'rolling', climb_m: 300, safety: 'safe', distance_km: 10, mode: 'distance' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Viser 66 m' }))
+    expect(onSearchWith).toHaveBeenCalledWith({ climb_m: 66 })
+    fireEvent.click(screen.getByRole('button', { name: 'Relancer' }))
+    expect(onSearch).toHaveBeenCalled()
+  })
+
+  it('« Partager » dit où envoyer la boucle, et comment', () => {
+    afficher()
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer cette boucle' }))
+    expect(screen.getByText('Garmin Connect')).toBeInTheDocument()
+    expect(screen.getByText(/komoot\.com/)).toBeInTheDocument()
+  })
+
   it('n’inventent pas de note quand le moteur n’a pas pu juger', () => {
     // Le calculateur de secours ne regarde ni trottoirs ni traversées : sans
     // cette règle, la pastille affichait « A » et le tracé passait pour sûr.
