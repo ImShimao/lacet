@@ -461,6 +461,14 @@ export default function Explore({
       )}
       {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
       {meta.wind && <WindNote wind={meta.wind} />}
+      {/* L'heure de retour, si l'on part maintenant : c'est elle qu'on donne à
+          la maison. La nuit tombante la dit déjà, avec sa mise en garde. */}
+      {!dusk && selected.duration_s > 0 && (
+        <div className="windnote">
+          <Icon name="clock" size={16} />
+          <span>Partie maintenant, retour vers {clockTime(Date.now() + selected.duration_s * 1000)}.</span>
+        </div>
+      )}
       {weather && (
         <div className="windnote">
           <Icon name={weather.icon} size={16} />
