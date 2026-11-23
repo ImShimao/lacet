@@ -1,6 +1,6 @@
 /** Le tracé qui se dessine s'arrête au bon endroit, dans le bon tronçon, et finit entier. */
 import { describe, expect, it } from 'vitest'
-import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, profilePath, sketch, slopeAt } from './routeDraw'
+import { alongLine, bearingOf, cumulativeGain, drawPlan, drawnPart, easeBearing, profileAt, profilePath, sketch, slopeAt } from './routeDraw'
 
 const line = (coordinates, level = 'safe') => ({
   type: 'Feature',
@@ -102,5 +102,25 @@ describe('la courbe d’altitude du survol', () => {
     expect(slopeAt(profil, 250)).toBeCloseTo(10)
     expect(slopeAt(profil, 750)).toBeCloseTo(-10)
     expect(slopeAt(null, 10)).toBeNull()
+  })
+})
+
+describe('cumulativeGain', () => {
+  const profile = [
+    { dist_m: 0, ele_m: 100 },
+    { dist_m: 100, ele_m: 110 },
+    { dist_m: 200, ele_m: 105 },
+    { dist_m: 300, ele_m: 125 },
+  ]
+
+  it('compte les montées seulement, et finit sur le D+ annoncé', () => {
+    const gainAt = cumulativeGain(profile, 15)
+    expect(gainAt(0)).toBe(0)
+    expect(gainAt(150)).toBeCloseTo(5)
+    expect(gainAt(300)).toBeCloseTo(15)
+  })
+
+  it('sans profil, ne dit rien', () => {
+    expect(cumulativeGain(null, 10)(50)).toBeNull()
   })
 })

@@ -52,6 +52,3 @@ export function parsePresets(text) {
   const unique = [...new Set(numbers)].sort((a, b) => a - b).slice(0, MAX)
   return unique.length ? unique : null
 }
-
-/** La liste comme on la tape : « 3, 5, 10,5, 15 ». */
-export const formatPresets = (list) => list.map((n) => String(n).replace('.', ',')).join(' · ')

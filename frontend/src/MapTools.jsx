@@ -167,15 +167,19 @@ export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
         value={polygon ? 'polygon' : 'circle'}
         onChange={(shape) => onChange({ shape, radius_m: draft.radius_m, name: draft.name, reason: draft.reason })}
       />
-      <div className="presets" role="group" aria-label="Raison">
+      {/* La raison, en tuiles à icône : se reconnaît d'un coup d'œil, sur la
+          carte comme dans la liste de « Mon compte ». */}
+      <div className="reasons" role="group" aria-label="Raison">
         {ZONE_REASONS.map((r) => (
           <button
             key={r.key}
-            className={draft.reason === r.key ? 'chip chip--on' : 'chip'}
+            className="reason"
+            data-reason={r.key}
             aria-pressed={draft.reason === r.key}
             onClick={() => onChange({ ...draft, reason: draft.reason === r.key ? null : r.key })}
           >
-            {r.label}
+            <Icon name={r.icon} size={20} />
+            <span>{r.label}</span>
           </button>
         ))}
       </div>

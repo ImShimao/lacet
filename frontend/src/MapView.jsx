@@ -5,8 +5,9 @@ import { loadOptions, mapToken, styleByKey, traceColors } from './mapStyles'
 import { rememberCamera } from './camera'
 import { OFFLINE_PROTOCOL, loadOffline, offlineRequest } from './offlineMaps'
 import { isNative } from './platform'
-import { alongLine, bearingOf, drawPlan, drawnPart, easeBearing, profileAt, profilePath, slopeAt } from './routeDraw'
+import { alongLine, bearingOf, cumulativeGain, drawPlan, drawnPart, easeBearing, profilePath, slopeAt } from './routeDraw'
 import { km } from './format'
+import { unitLabel } from './units'
 import { useAppearance } from './appearance'
 
 // Les cartes gardées hors ligne : `offlineRequest` détourne
@@ -544,6 +545,9 @@ export default function MapView({
   // courir. Toucher la carte met en pause et reprend ; la faire glisser arrête
   // le survol, et la carte revient à plat sur toute la boucle.
   const hud = useRef(null)
+  // Les commandes du tableau (lecture, vitesse, vue, barre de temps) : posées
+  // par l'effet du survol, appelées par `FlyHud` sans passer par l'état React.
+  const flyCtl = useRef(null)
   const flying = useRef(false)
   useEffect(() => {
     const m = map.current
@@ -560,14 +564,39 @@ export default function MapView({
     flying.current = true
     const { total, at } = alongLine(line)
     const plan = drawPlan({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } })
-    // Environ 600 m par seconde : une boucle de 10 km se survole en 17 s.
-    const ms = Math.min(30_000, Math.max(10_000, total / 0.6))
+    const ms = flyDuration(total)
     // Mouvement réduit : la caméra ne bouge pas, la boucle se voit d'un bloc,
     // inclinée, et seule la pastille avance.
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches
-    const camera = (center, bearing) => ({ center, bearing, pitch: FLY_PITCH, zoom: FLY_ZOOM })
+    const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
+    // Trois vues, comme chez Roovr : « Coureur » au ras des rues, « Drone » plus
+    // haut pour voir venir les carrefours, « Orbite » qui tourne autour de toute
+    // la boucle pendant que la pastille avance.
+    // Le tableau du survol couvre le bas de l'écran : la caméra vise le milieu
+    // de ce qui reste au-dessus. Sans cela, en « Orbite », la boucle entière
+    // était cadrée sur tout l'écran, et la pastille passait derrière le texte.
+    const before = m.getPadding()
+    const pad = () => ({ top: 80, bottom: (hud.current?.offsetHeight ?? 0) + 40, left: 30, right: 30 })
+    // L'orbite tourne : la boucle doit tenir dans le cadre sous tous les angles,
+    // d'où un cran de recul sur le zoom qui la fait tenir à plat.
+    const orbitZoom = () => {
+      const fit = m.cameraForBounds(bounds, { padding: pad() })?.zoom ?? 13
+      return Math.max(10, fit - 0.6)
+    }
+    const VIEWS = {
+      runner: { zoom: FLY_ZOOM, pitch: FLY_PITCH },
+      drone: { zoom: FLY_ZOOM - 1.6, pitch: 48 },
+      orbit: { zoom: 13, pitch: 55 },
+    }
+    let view = 'runner'
+    let orbit = 0
+    const camera = (center, bearing) =>
+      view === 'orbit'
+        ? { center: bounds.getCenter(), bearing: orbit, ...VIEWS.orbit, padding: pad() }
+        : { center, bearing, ...VIEWS[view], padding: pad() }
     const ahead = (d) => bearingOf(at(d), at(d + FLY_AHEAD_M))
     const unrelief = relief(m)
+    const gainAt = cumulativeGain(route.elevation_profile, route.ascent_m)
 
     const el = document.createElement('div')
     el.className = 'flypin'
@@ -583,8 +612,11 @@ export default function MapView({
       box.querySelector('[data-km]').textContent = km(d, 1)
       const profile = route.elevation_profile
       const along = (d / total) * (profile?.at(-1)?.dist_m ?? total)
-      const ele = profileAt(profile, along)
-      box.querySelector('[data-ele]').textContent = ele == null ? '—' : `${Math.round(ele)} m`
+      const gain = gainAt(along)
+      box.querySelector('[data-gain]').textContent = gain == null ? '—' : String(Math.round(gain))
+      box.querySelector('[data-time]').textContent = clock(elapsed)
+      const seek = box.querySelector('[data-seek]')
+      if (seek && document.activeElement !== seek) seek.value = String(Math.round((d / total) * 1000))
       // La pente du moment, sur 100 m : c'est elle qui dit, en survolant, à
       // quel kilomètre ça monte et où ça redescend.
       const slope = slopeAt(profile, along)
@@ -601,11 +633,14 @@ export default function MapView({
     let elapsed = 0
     let last = null
     let paused = false
+    let speed = 1
+    // Pendant le fondu d'une vue à l'autre, la caméra n'est plus poussée à chaque image.
+    let blendUntil = 0
     const frame = (now) => {
       const dt = last == null ? 0 : now - last
       last = now
-      if (!paused) elapsed += dt
-      const t = Math.min(1, elapsed / ms)
+      if (!paused) elapsed = Math.min(ms, elapsed + dt * speed)
+      const t = elapsed / ms
       const d = t * total
       // La pastille est au bout de la traînée : tirées du même calcul, elles
       // ne se décollent jamais l'une de l'autre.
@@ -613,16 +648,18 @@ export default function MapView({
       const head = flown.features[0]?.geometry.coordinates.at(-1) ?? line[0]
       m.getSource('flown')?.setData(flown)
       pin.setLngLat(head)
-      if (!still && !paused) {
-        bearing = easeBearing(bearing, ahead(d), dt)
+      if (!still && !paused && now > blendUntil) {
+        bearing = easeBearing(bearing, ahead(d), dt * speed)
+        orbit = (orbit + dt * speed * 0.012) % 360
         m.jumpTo(camera(head, bearing))
       }
+      // Arrivé au bout, le survol s'arrête sur la porte au lieu de se fermer :
+      // « Recommencer » ou la barre de temps le relancent.
+      if (t >= 1) paused = true
       show(d, paused)
-      if (t < 1) raf = requestAnimationFrame(frame)
-      else handlers.current.onFlyoverEnd?.()
+      raf = requestAnimationFrame(frame)
     }
     if (still) {
-      const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
       m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 50, duration: 0 })
     } else {
       m.easeTo({ ...camera(line[0], bearing), duration: 1200 })
@@ -631,7 +668,31 @@ export default function MapView({
     const begin = setTimeout(() => (raf = requestAnimationFrame(frame)), still ? 0 : 1200)
 
     const toggle = () => {
+      // Au bout, « lecture » repart du début.
+      if (paused && elapsed >= ms) elapsed = 0
       paused = !paused
+    }
+    flyCtl.current = {
+      toggle,
+      restart: () => {
+        elapsed = 0
+        paused = false
+      },
+      setSpeed: (value) => {
+        speed = value
+      },
+      seek: (t) => {
+        elapsed = Math.max(0, Math.min(1, t)) * ms
+      },
+      setView: (next) => {
+        view = next
+        if (next === 'orbit') VIEWS.orbit.zoom = orbitZoom()
+        if (still) return
+        const d = (elapsed / ms) * total
+        bearing = ahead(d)
+        m.easeTo({ ...camera(at(d), bearing), duration: 700 })
+        blendUntil = performance.now() + 700
+      },
     }
     const stop = (event) => {
       if (event.originalEvent) handlers.current.onFlyoverEnd?.()
@@ -641,6 +702,7 @@ export default function MapView({
     m.on('click', toggle)
     return () => {
       flying.current = false
+      flyCtl.current = null
       clearTimeout(begin)
       cancelAnimationFrame(raf)
       for (const name of events) m.off(name, stop)
@@ -650,6 +712,8 @@ export default function MapView({
       // à chaud) : la toucher encore plantait l'app.
       if (map.current !== m) return
       m.getSource('flown')?.setData(empty())
+      // Le cadrage au-dessus du tableau ne doit pas survivre au survol.
+      m.setPadding(before)
       if (m.getLayer('route-line')) {
         m.setPaintProperty('route-line', 'line-opacity', 1)
         m.setPaintProperty('route-arrows', 'icon-opacity', 1)
@@ -658,7 +722,6 @@ export default function MapView({
       unrelief()
       // Le départ d'une sortie reprend la caméra lui-même.
       if (nav.current.navigate) return
-      const bounds = line.reduce((acc, c) => acc.extend(c), new maplibregl.LngLatBounds(line[0], line[0]))
       m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 0, duration: 900 })
     }
   }, [flyover])
@@ -779,7 +842,7 @@ export default function MapView({
   return (
     <>
       <div ref={container} className="map" />
-      {flyover && <FlyHud hud={hud} profile={route?.elevation_profile} />}
+      {flyover && <FlyHud hud={hud} ctl={flyCtl} route={route} onClose={() => handlers.current.onFlyoverEnd?.()} />}
       {navigate && !locked && (
         <button
           className="recenter"
@@ -1313,20 +1376,49 @@ function ghostToGeoJson(routes, active) {
  * survol (`--p`, `data-*`), sans rendu React : soixante rendus par seconde
  * pour trois nombres seraient du gâchis.
  */
-function FlyHud({ hud, profile }) {
+function FlyHud({ hud, ctl, route, onClose }) {
+  const profile = route?.elevation_profile
   const chart = profilePath(profile)
+  const [view, setView] = useState('runner')
+  const [speed, setSpeed] = useState(1)
+  const call = (name, ...args) => ctl.current?.[name]?.(...args)
   return (
     <div className="flyhud" ref={hud} data-paused="false" data-trend="flat">
+      <div className="flyhud__head">
+        <span className="flyhud__title">
+          <em>Aperçu 3D</em>
+          <b>{route?.name ?? 'Boucle'}</b>
+        </span>
+        <button className="flyhud__close" onClick={onClose} aria-label="Fermer l'aperçu 3D">
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+      <div className="flyhud__views" role="group" aria-label="Vue">
+        {FLY_VIEWS.map((v) => (
+          <button
+            key={v.key}
+            aria-pressed={view === v.key}
+            onClick={() => {
+              setView(v.key)
+              call('setView', v.key)
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
       <div className="flyhud__stats">
         <span>
           <em>Distance</em>
           <b>
-            <span data-km>0,0</span> <small>km</small>
+            <span data-km>0,0</span> <small>/ {km(route?.distance_m ?? 0, 1)} {unitLabel()}</small>
           </b>
         </span>
         <span>
-          <em>Altitude</em>
-          <b data-ele>—</b>
+          <em>D+</em>
+          <b>
+            <span data-gain>0</span> <small>/ {route?.ascent_m != null ? Math.round(route.ascent_m) : '—'} m</small>
+          </b>
         </span>
         <span className="flyhud__slope">
           <em>Pente</em>
@@ -1346,7 +1438,62 @@ function FlyHud({ hud, profile }) {
           <i className="flyhud__cursor" />
         </div>
       )}
-      <span className="flyhud__hint">En pause · touche la carte pour reprendre</span>
+      <input
+        className="flyhud__seek"
+        data-seek
+        type="range"
+        min="0"
+        max="1000"
+        defaultValue="0"
+        aria-label="Avancer dans l'aperçu"
+        onInput={(e) => call('seek', Number(e.currentTarget.value) / 1000)}
+        onPointerUp={(e) => e.currentTarget.blur()}
+      />
+      <div className="flyhud__times">
+        <span data-time>0:00</span>
+        <span>{clock(flyDuration(route?.distance_m ?? 0))}</span>
+      </div>
+      <div className="flyhud__controls">
+        <button className="flyhud__round" onClick={() => call('restart')} aria-label="Recommencer">
+          <Icon name="refresh" size={18} />
+        </button>
+        <button className="btn btn--primary flyhud__play" onClick={() => call('toggle')}>
+          <span className="flyhud__pause">
+            <Icon name="pause" size={16} /> Pause
+          </span>
+          <span className="flyhud__resume">
+            <Icon name="play" size={16} /> Lecture
+          </span>
+        </button>
+        <button
+          className="flyhud__round"
+          aria-label={`Vitesse ${speed}×`}
+          onClick={() => {
+            const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]
+            setSpeed(next)
+            call('setSpeed', next)
+          }}
+        >
+          {String(speed).replace('.', ',')}×
+        </button>
+      </div>
     </div>
   )
 }
+
+const FLY_VIEWS = [
+  { key: 'runner', label: 'Coureur' },
+  { key: 'drone', label: 'Drone' },
+  { key: 'orbit', label: 'Orbite' },
+]
+const SPEEDS = [1, 2, 0.5]
+
+// Environ 600 m par seconde : une boucle de 10 km se survole en 17 s.
+const flyDuration = (metres) => Math.min(30_000, Math.max(10_000, metres / 0.6))
+
+/** « 1:05 » à partir de millisecondes. */
+const clock = (ms) => {
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+

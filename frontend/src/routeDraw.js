@@ -181,3 +181,21 @@ export function bandPaths(points, bands) {
   }
   return out
 }
+
+/**
+ * Le D+ monté jusqu'à une distance du profil, pour le compteur du survol 3D.
+ * Les montées du profil brut comptent aussi les petites ondulations que le
+ * moteur lisse : on les ramène au D+ annoncé de la boucle, pour que le
+ * compteur finisse pile sur lui.
+ */
+export function cumulativeGain(profile, ascent) {
+  if (!(profile?.length > 1) || ascent == null) return () => null
+  const sums = [0]
+  for (let i = 1; i < profile.length; i += 1) sums.push(sums[i - 1] + Math.max(0, profile[i].ele_m - profile[i - 1].ele_m))
+  const scale = sums.at(-1) > 0 ? ascent / sums.at(-1) : 0
+  return (along) => {
+    let i = 0
+    while (i + 1 < profile.length && profile[i + 1].dist_m <= along) i += 1
+    return sums[i] * scale
+  }
+}

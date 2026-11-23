@@ -116,7 +116,10 @@ describe('les avertissements de l’écran', () => {
     afficher()
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer cette boucle' }))
     expect(screen.getByText('Garmin Connect')).toBeInTheDocument()
-    expect(screen.getByText(/komoot\.com/)).toBeInTheDocument()
+    // Komoot ne lit pas le partage d'iOS : la ligne ouvre un guide pas à pas.
+    fireEvent.click(screen.getByRole('button', { name: /Komoot/ }))
+    expect(screen.getByText('Pousser cette boucle sur Komoot')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ouvrir Komoot' })).toBeInTheDocument()
   })
 
   it('n’inventent pas de note quand le moteur n’a pas pu juger', () => {

@@ -270,14 +270,108 @@
   background: var(--text);
   box-shadow: 0 0 8px var(--accent-glow);
 }
-.flyhud__hint {
-  display: none;
-  text-align: center;
-  color: var(--text-2);
-  font-size: calc(12px * var(--text-scale));
+/* Les commandes reçoivent le toucher ; le reste du tableau le laisse à la carte. */
+.flyhud button,
+.flyhud input {
+  pointer-events: auto;
 }
-.flyhud[data-paused='true'] .flyhud__hint {
-  display: block;
+.flyhud__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.flyhud__title {
+  display: grid;
+  min-width: 0;
+}
+.flyhud__title em {
+  font-style: normal;
+  font-family: var(--eyebrow);
+  font-size: calc(9.5px * var(--text-scale));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.flyhud__title b {
+  font-size: calc(16px * var(--text-scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flyhud__close,
+.flyhud__round {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: calc(13px * var(--text-scale));
+}
+.flyhud__round {
+  width: 44px;
+  height: 44px;
+}
+.flyhud__views {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.flyhud__views button {
+  padding: 6px 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 700;
+}
+.flyhud__views button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.flyhud__seek {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.flyhud__times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6px;
+  color: var(--text-3);
+  font-size: calc(11px * var(--text-scale));
+  font-variant-numeric: tabular-nums;
+}
+.flyhud__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.flyhud__play {
+  flex: 1;
+}
+.flyhud__play > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flyhud__resume,
+.flyhud[data-paused='true'] .flyhud__pause {
+  display: none !important;
+}
+.flyhud[data-paused='true'] .flyhud__resume {
+  display: inline-flex !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -351,24 +445,121 @@
   /* Seize pixels : voir `.search input`. */
   font-size: calc(16px * var(--text-scale));
 }
-/* Les raccourcis de l'accueil : le libellé, puis la liste à taper. */
+/* Les raisons d'une zone : cinq tuiles à icône, la choisie à sa couleur. */
+.reasons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.reason {
+  --tone: var(--text-2);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 9px 2px 7px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 600;
+}
+.reason span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reason[data-reason='danger'] {
+  --tone: var(--risk);
+}
+.reason[data-reason='works'] {
+  --tone: var(--warn, #f59e0b);
+}
+.reason[data-reason='private'] {
+  --tone: var(--accent-text);
+}
+.reason[data-reason='impassable'] {
+  --tone: var(--risk);
+}
+.reason svg {
+  color: var(--tone);
+}
+.reason[aria-pressed='true'] {
+  border-color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 16%, var(--surface-2));
+  color: var(--text);
+}
+/* Les raccourcis de l'accueil : le libellé, puis une puce par valeur — ce que
+   l'accueil montrera —, une croix pour en retirer une, « + » pour en ajouter. */
 .presetrow {
+  display: grid;
+  gap: 10px;
+}
+.presetrow__label {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  font-weight: 600;
 }
-.presetrow input {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 0;
+.presetrow__label svg {
+  color: var(--text-3);
+}
+.presetrow__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.presetrow__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.presetrow__chip small {
+  font-weight: 600;
+  opacity: 0.75;
+}
+.presetrow__chip button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
   border: none;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.12);
+  color: inherit;
+}
+.presetrow__add {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px dashed var(--line-strong, var(--line));
   background: none;
+  color: var(--text-2);
+}
+.presetrow__chips input {
+  width: 72px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  text-align: right;
+  /* Seize pixels : en dessous, iOS zoome toute l'app au toucher. */
   font-size: calc(16px * var(--text-scale));
 }
-.presetrow input:focus,
 .zonerow__name:focus {
   outline: none;
   border-bottom: 1px solid var(--accent);

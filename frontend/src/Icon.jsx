@@ -269,6 +269,29 @@ const PATHS = {
       <path d="M6 18 18 6M9.5 19.5l10-10M4.5 14.5l10-10" />
     </>
   ),
+  // Un cadenas : un terrain privé.
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+      <path d="M12 14.5v2.5" />
+    </>
+  ),
+  // Un sens interdit : un passage impraticable.
+  ban: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M7.5 12h9" />
+    </>
+  ),
+  // Trois points : une autre raison.
+  more: (
+    <>
+      <circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
   warning: (
     <>
       <path d="M12 3.5 22 20.5H2z" />

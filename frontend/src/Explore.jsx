@@ -13,6 +13,7 @@ import Icon, { SolidIcon } from './Icon.jsx'
 import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
+import SendSheet from './SendSheet.jsx'
 import { StopsList } from './Stops.jsx'
 import { Segmented, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
@@ -169,32 +170,6 @@ function Notice({ warn = false, action = null, onAct = null, children }) {
           {action}
         </button>
       )}
-    </div>
-  )
-}
-
-// Où envoyer une boucle, et comment l'y faire entrer. Le fichier est le même
-// GPX partout ; ce qui manquait, c'était le chemin de chaque app — Roovr le dit
-// ligne par ligne, et « Partager » seul laissait chercher dans la feuille d'iOS.
-const SEND_TO = [
-  { key: 'friend', title: 'Un ami', how: "Il l'ouvre avec Lacet, qui la note comme les siennes." },
-  { key: 'garmin', title: 'Garmin Connect', how: "Choisis Connect dans le partage : la boucle devient un parcours à envoyer sur la montre." },
-  { key: 'coros', title: 'COROS', how: "Choisis COROS dans le partage : elle l'importe comme itinéraire." },
-  { key: 'suunto', title: 'Suunto', how: "Choisis Suunto dans le partage : elle l'importe comme itinéraire." },
-  { key: 'komoot', title: 'Komoot', how: 'Enregistre le fichier, puis importe-le sur komoot.com, dans « Planifier ».' },
-  { key: 'file', title: 'Fichier GPX', how: 'Pour toute autre montre ou app : le fichier, tel quel.' },
-]
-
-/** « Envoyer cette boucle » : chaque ligne ouvre le partage d'iOS avec le même GPX. */
-function SendTo({ onSend, busy }) {
-  return (
-    <div className="sendto" role="group" aria-label="Envoyer cette boucle">
-      {SEND_TO.map((d) => (
-        <button key={d.key} className="sendto__row" onClick={onSend} disabled={busy}>
-          <b>{d.title}</b>
-          <em>{d.how}</em>
-        </button>
-      ))}
     </div>
   )
 }
@@ -598,7 +573,7 @@ export default function Explore({
           <span>Autres boucles</span>
         </button>
       </div>
-      {sharing && <SendTo onSend={exportGpx} busy={exporting} />}
+      {sharing && <SendSheet onSend={exportGpx} busy={exporting} onClose={() => setSharing(false)} />}
 
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 

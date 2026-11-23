@@ -29,11 +29,11 @@ const MAX = 30
 
 /** Pourquoi on évite une zone : le nom par défaut, et ce que dit la liste. */
 export const ZONE_REASONS = [
-  { key: 'danger', label: 'Dangereuse' },
-  { key: 'works', label: 'Travaux' },
-  { key: 'private', label: 'Privé' },
-  { key: 'impassable', label: 'Impraticable' },
-  { key: 'other', label: 'Autre' },
+  { key: 'danger', label: 'Dangereuse', icon: 'warning' },
+  { key: 'works', label: 'Travaux', icon: 'cone' },
+  { key: 'private', label: 'Privé', icon: 'lock' },
+  { key: 'impassable', label: 'Impraticable', icon: 'ban' },
+  { key: 'other', label: 'Autre', icon: 'more' },
 ]
 
 const isRing = (p) => Array.isArray(p) && p.length >= 3 && p.every((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]))

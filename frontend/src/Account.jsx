@@ -29,7 +29,7 @@ import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
 import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
-import { formatPresets, parsePresets, presets, setPresets } from './presets'
+import { parsePresets, presets, setPresets } from './presets'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
 /** Les familles du sommaire, dans leur ordre. */
@@ -588,10 +588,10 @@ function SearchSettings({ params, onProfile }) {
 
       <PrefsCard
         title="Raccourcis de l'accueil"
-        foot="Les touches sous la règle de distance. Sépare les valeurs par des espaces : « 3 5 10 15 »."
+        foot="Les touches sous la règle de distance : la sortie de tous les jours en un toucher. Six au plus."
       >
-        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label={`Distances (${unitLabel()})`} />
-        <PresetRow kind="duration" label="Durées (min)" />
+        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label="Distances" icon="routes" unit={unitLabel()} />
+        <PresetRow kind="duration" label="Durées" icon="clock" unit="min" />
       </PrefsCard>
 
       <ShownFilters params={params} onProfile={onProfile} />
@@ -599,24 +599,58 @@ function SearchSettings({ params, onProfile }) {
   )
 }
 
-/** Une liste de raccourcis, tapée d'un trait ; une saisie illisible garde l'ancienne. */
-function PresetRow({ kind, label }) {
+/**
+ * Une liste de raccourcis en puces : la croix en retire un, « + » en ajoute un.
+ * Une liste tapée d'un trait (« 3 · 5 · 10 ») se lisait comme un texte, pas
+ * comme des touches ; ici, on voit ce que l'accueil montrera.
+ */
+function PresetRow({ kind, label, icon, unit }) {
   const [list, setList] = useState(() => presets(kind))
+  const [adding, setAdding] = useState(false)
+  const keep = (next) => {
+    setPresets(kind, next)
+    setList(next)
+  }
+  const add = (text) => {
+    const [value] = parsePresets(text) ?? []
+    if (value) keep(parsePresets([...list, value].join(' ')))
+    setAdding(false)
+  }
   return (
-    <label className="rows__row presetrow">
-      <span>{label}</span>
-      <input
-        key={list.join()}
-        defaultValue={formatPresets(list)}
-        inputMode="decimal"
-        aria-label={label}
-        onBlur={(e) => {
-          const next = parsePresets(e.target.value)
-          if (next) setPresets(kind, next)
-          setList(next ?? [...list])
-        }}
-      />
-    </label>
+    <div className="rows__row presetrow">
+      <span className="presetrow__label">
+        <Icon name={icon} size={17} />
+        {label}
+      </span>
+      <div className="presetrow__chips" role="group" aria-label={label}>
+        {list.map((v) => (
+          <span className="presetrow__chip" key={v}>
+            {String(v).replace('.', ',')} <small>{unit}</small>
+            {list.length > 1 && (
+              <button onClick={() => keep(list.filter((x) => x !== v))} aria-label={`Retirer ${v} ${unit}`}>
+                <Icon name="close" size={12} />
+              </button>
+            )}
+          </span>
+        ))}
+        {adding ? (
+          <input
+            autoFocus
+            inputMode="decimal"
+            aria-label={`Nouvelle valeur, en ${unit}`}
+            placeholder={unit}
+            onBlur={(e) => add(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          />
+        ) : (
+          list.length < 6 && (
+            <button className="presetrow__add" onClick={() => setAdding(true)} aria-label={`Ajouter une valeur, en ${unit}`}>
+              <Icon name="plus" size={14} />
+            </button>
+          )
+        )}
+      </div>
+    </div>
   )
 }
 
