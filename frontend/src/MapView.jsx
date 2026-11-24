@@ -579,6 +579,57 @@ export default function MapView({
     m.fitBounds(bounds, { padding: dockPadding(m), bearing: 0, pitch: 0, duration: 800 })
   }, [overview])
 
+  // --- le sens, en mouvement ---------------------------------------------------
+  // Une flèche lumineuse fait le tour de la boucle, dans son sens, puis repart :
+  // les chevrons fixes disent le sens quand on cherche, elle le montre d'un coup
+  // d'œil, sans qu'on ait à suivre la ligne. Un marqueur du DOM, pas une couche :
+  // la carte ne se redessine pas à chaque image. Ni en course, où la position
+  // suffit, ni pendant le survol, qui a sa propre pastille, ni si iOS demande
+  // moins de mouvement.
+  const flowLine = route?.geometry
+  useEffect(() => {
+    const m = map.current
+    if (!m || navigate || flyover || !(flowLine?.length > 1)) return undefined
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    const { total, at } = alongLine(flowLine)
+    if (total < 200) return undefined
+    const el = document.createElement('div')
+    el.className = 'flowarrow'
+    el.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M5.5 16.5 12 5.5l6.5 11-6.5-3z" /></svg>'
+    const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' })
+      .setLngLat(flowLine[0])
+      .addTo(m)
+    // Un tour en six à douze secondes selon la longueur, puis un temps de pause :
+    // assez lent pour se suivre, assez court pour revenir avant qu'on détourne
+    // les yeux.
+    const lap = Math.min(12_000, Math.max(6_000, total * 1.1))
+    const rest = 1_400
+    // Elle attend que le tracé ait fini de se dessiner.
+    const t0 = performance.now() + DRAW_MS
+    let frame = 0
+    const tick = (now) => {
+      const t = (now - t0) % (lap + rest)
+      if (now < t0 || t > lap) {
+        el.style.opacity = '0'
+      } else {
+        // Ralentie aux deux bouts, comme un coureur qui part et qui arrive.
+        const k = t / lap
+        const d = total * (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2)
+        marker.setLngLat(at(d))
+        // Le cap entre un point un peu avant et un peu après : les virages
+        // s'arrondissent au lieu de faire pivoter la flèche d'un coup.
+        marker.setRotation(bearingOf(at(d - 18), at(d + 18)))
+        el.style.opacity = String(Math.min(1, d / 60, (total - d) / 60))
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(frame)
+      marker.remove()
+    }
+  }, [flowLine, navigate, flyover])
+
   // --- survol 3D ------------------------------------------------------------------
   // La boucle vue d'en haut, carte inclinée sur le relief, de la porte à la
   // porte : une pastille y court, la caméra la suit, et la part déjà parcourue
@@ -999,7 +1050,7 @@ function visibleCentre(m) {
 }
 
 /**
- * La flèche de sens : une pointe pleine, blanche cernée de sombre.
+ * La flèche de sens : un chevron blanc, cerné de sombre.
  *
  * Elle pointe vers la droite, et une icône posée sur la ligne
  * (`symbol-placement: 'line'`) suit la géométrie **dans le sens où elle a été
@@ -1015,23 +1066,29 @@ function visibleCentre(m) {
  * flèche porte son propre contraste et se lit partout.
  */
 function arrowIcon() {
-  const size = 44
+  // Un chevron ouvert, au trait arrondi, qui tient dans la largeur du tracé :
+  // la pointe pleine d'avant débordait de la ligne et la hachait de blanc.
+  const size = 32
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
   ctx.lineJoin = 'round'
-  ctx.beginPath()
-  ctx.moveTo(34, 22)
-  ctx.lineTo(11, 10)
-  ctx.lineTo(17, 22)
-  ctx.lineTo(11, 34)
-  ctx.closePath()
+  ctx.lineCap = 'round'
+  const chevron = () => {
+    ctx.beginPath()
+    ctx.moveTo(12, 9.5)
+    ctx.lineTo(19.5, 16)
+    ctx.lineTo(12, 22.5)
+  }
+  chevron()
   ctx.strokeStyle = mapToken('--map-arrow-casing')
-  ctx.lineWidth = 6
+  ctx.lineWidth = 7
   ctx.stroke()
-  ctx.fillStyle = mapToken('--map-ink')
-  ctx.fill()
+  chevron()
+  ctx.strokeStyle = mapToken('--map-ink')
+  ctx.lineWidth = 3.4
+  ctx.stroke()
   return ctx.getImageData(0, 0, size, size)
 }
 
@@ -1164,12 +1221,14 @@ function addLayers(m) {
     source: 'route',
     layout: {
       'symbol-placement': 'line',
-      'symbol-spacing': 110,
+      'symbol-spacing': 90,
       'icon-image': 'route-arrow',
-      'icon-size': 1.2,
+      // Discrets de loin, lisibles de près : à petite échelle, des chevrons
+      // pleine taille faisaient un pointillé blanc sur toute la boucle.
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.75, 15, 1, 17, 1.15],
       'icon-rotation-alignment': 'map',
       'icon-keep-upright': false,
-      'icon-padding': 14,
+      'icon-padding': 6,
       'icon-allow-overlap': false,
     },
   })

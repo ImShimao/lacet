@@ -147,12 +147,15 @@ précis**. La parcourir à l'envers donne les côtes au mauvais moment, le vent 
 face à la fin, et un guidage qui annonce des virages à gauche là où il faut
 tourner à droite.
 
-Techniquement c'est un motif de ligne, pas une couche de symboles : deux des
-cinq fonds de carte (Relief et Satellite) sont des styles raster écrits à la
-main, sans champ `glyphs`, donc incapables d'alimenter la chaîne de rendu des
-symboles. Le motif suit la ligne dans le sens où la géométrie a été écrite — et
-le backend écrit chaque tronçon dans le sens du parcours, si bien que le chevron
-indique la bonne direction sans aucun calcul supplémentaire.
+Les chevrons sont petits, ouverts et arrondis, blancs cernés de sombre : ils
+tiennent dans la largeur du tracé et se lisent sur tous les fonds, satellite
+compris. C'est une couche de symboles sans texte (`arrowIcon`, `MapView.jsx`),
+qui suit la géométrie dans le sens où elle est écrite — celui du parcours — sans
+calcul. **Une flèche plus grande fait le tour de la boucle**, ralentie au départ
+et à l'arrivée, puis repart après une courte pause : le sens se voit d'un coup
+d'œil, sans suivre la ligne. C'est un marqueur, la carte ne se redessine donc pas
+à chaque image ; elle s'efface en course, pendant le survol, et quand l'iPhone
+demande de réduire les animations.
 
 **La boucle se dessine** depuis le départ, dans son sens, à chaque nouvelle
 proposition choisie : on voit d'un coup d'œil par où elle part et par où elle
