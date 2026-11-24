@@ -177,7 +177,7 @@ function endpoints(graph, req, to, weights) {
   const target = graph.nearestNode(to.lon, to.lat, SNAP_M, reach.mask)
   if (target === null) throw new PlanningError("Pas de rue reliée au départ près de l'arrivée.")
   if (target === source) throw new PlanningError("L'arrivée est au départ : pour revenir à ta porte, cherche une boucle.")
-  return { source, target }
+  return { source, target, reach: reach.mask }
 }
 
 function pathLength(graph, edges) {
@@ -280,13 +280,13 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
   const blocked = withZones(graph, blockedEdges(graph, req.blocked), req.zones) ?? new Set()
   const closed = closedZones(graph, req, to)
   const direct = variantWeights(graph, 'direct', req, night, blocked, closed)
-  const { source, target } = endpoints(graph, req, to, direct)
+  const { source, target, reach } = endpoints(graph, req, to, direct)
 
   const found = wanted
-    ? stretchedPaths(graph, source, target, variantWeights(graph, 'safe', req, night, blocked, closed), wanted, reachable(graph, source, direct).mask)
+    ? stretchedPaths(graph, source, target, variantWeights(graph, 'safe', req, night, blocked, closed), wanted, reach)
     : []
   for (const variant of wanted ? [] : JOURNEY_VARIANTS) {
-    const weights = variantWeights(graph, variant.key, req, night, blocked, closed)
+    const weights = variant.key === 'direct' ? direct : variantWeights(graph, variant.key, req, night, blocked, closed)
     const tree = dijkstra(graph, source, weights, { target, slack: 1 })
     if (tree.dist[target] === INF) continue
     let edges = reconstruct(tree, target)
