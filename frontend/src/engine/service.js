@@ -11,7 +11,7 @@
 
 import { bearingDeg, resample, haversineM } from './geo'
 import { Candidate, GOLDEN, figureEight, generateLoops, measure, repeatLoop, reverseCandidate, similarity } from './loops'
-import { blockedEdges, withZones } from './blocked'
+import { blockedEdges, insideRing, withZones } from './blocked'
 import { carryBlocked, openDoor } from './door'
 import { buildInstructions } from './navigation'
 import { pyFixed, pyfloordiv, pymod, pyRound, pyRoundInt, pySum, sortByKey } from './py'
@@ -479,6 +479,14 @@ export async function planLoops(input, deps) {
   // Les signalements se rapprochent des rues du graphe partagé : le graphe
   // dérivé ci-dessous partage ses géométries, pas ses tranches de coordonnées.
   let blocked = withZones(graph, blockedEdges(graph, req.blocked), req.zones)
+  // Les arêtes des zones à éviter, à part : le poids les rend chères, mais un
+  // point de passage du générateur tombé dans la zone y fait entrer la boucle
+  // quand même — mesuré à Beaune, de jour, 32 points d'une boucle dans un carré
+  // évité. Une zone se contourne toujours : ce qui y passe est écarté — sauf
+  // celle où l'on part, dont il faut bien sortir.
+  const here = [req.lon, req.lat]
+  const around = (z) => (z.polygon ? insideRing(here, z.polygon) : haversineM(here, [z.lon, z.lat]) <= z.radius_m)
+  let zone = withZones(graph, null, req.zones.filter((z) => !around(z)))
 
   // Le départ devant la porte, sur la rue — voir `door.js`. Le graphe de la
   // zone reste en cache tel quel ; la recherche travaille sur un dérivé qui
@@ -495,6 +503,7 @@ export async function planLoops(input, deps) {
       graph = door.graph
       start = door.start
       blocked = carryBlocked(graph, blocked)
+      zone = carryBlocked(graph, zone)
     }
   }
 
@@ -561,7 +570,7 @@ export async function planLoops(input, deps) {
   const lo = targetM * (1 - req.tolerance)
   const hi = targetM * (1 + req.tolerance)
 
-  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
+  let [unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn, zone })
 
   // **Rien de ce côté.** Une rivière sans pont, une voie ferrée, une frontière :
   // la direction demandée n'offre aucune boucle qui tienne les seuils. On le dit,
@@ -572,13 +581,13 @@ export async function planLoops(input, deps) {
     missedHeading = req.heading
     req = { ...req, heading: null }
     raw = generate()
-    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
+    ;[unique, rejected, offTarget] = collect(raw, lo, hi, req.safety, req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn, zone })
   }
 
   let relaxed = false
   let salvaged = null
   if (!unique.length && req.safety === 'safe') {
-    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn })
+    ;[unique] = collect(raw, lo, hi, 'standard', req, graph, start, profile, targetM, trace, terrain, { deadline, reuse, via, seedTurn, zone })
     relaxed = unique.length > 0
   }
 
@@ -610,6 +619,8 @@ export async function planLoops(input, deps) {
   // altitude — voir `shortlistKey`.
   // Une boucle déjà vue recule dès la réserve : sinon les neuves n'y entraient
   // pas, faute de place, et ne pouvaient plus passer devant au choix final.
+  // Les tours et le repêchage ne passent pas par `collect` : le même tri, ici.
+  unique = unique.filter((c) => !entersZone(c, zone))
   const known = req.familiar.length ? new Set(unique.filter((c) => familiarTo(c.geometry, req.familiar))) : null
   const familiarCost = (c) => (known?.has(c) ? FAMILIAR_PENALTY : 0)
   sortByKey(unique, (c) => -(shortlistKey(c, targetM, req, terrain) - familiarCost(c)))
@@ -752,9 +763,14 @@ export async function planDetour(input, { loadGraph, now = () => new Date() }) {
   return planRejoin(graph, profile.precompute(graph), { ...input, blocked: req.blocked, sport: req.sport })
 }
 
+/** La boucle emprunte-t-elle une rue d'une zone à éviter ? */
+function entersZone(cand, zone) {
+  return Boolean(zone && cand.edges?.some((e) => zone.has(e)))
+}
+
 function collect(
   raw, lo, hi, mode, req, graph, start, profile, targetM, trace, terrain = null,
-  { deadline = Infinity, reuse = {}, via = null, seedTurn = null } = {},
+  { deadline = Infinity, reuse = {}, via = null, seedTurn = null, zone = null } = {},
 ) {
   const [passed, rejected, offTarget] = applyGate(raw, lo, hi, mode, req.sport)
   sortByKey(passed, (c) => -preliminaryScore(c, targetM, req.tolerance))
@@ -762,6 +778,7 @@ function collect(
   const unique = []
   const keep = (cands) => {
     for (const cand of cands) {
+      if (entersZone(cand, zone)) continue
       if (unique.some((kept) => similarity(cand, kept) > DUPLICATE_THRESHOLD)) {
         trace.duplicate?.(cand)
         continue
