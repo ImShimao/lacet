@@ -586,14 +586,15 @@ export default function MapView({
   // MapLibre ne sait pas décaler des pointillés : on fait tourner le motif en
   // réécrivant `line-dasharray` (voir `flowDashes`).
   //
-  // Chaque cran redessine toute la carte : c'est le prix de l'effet. D'où trois
+  // Chaque cran redessine toute la carte : c'est le prix de l'effet. D'où quatre
   // économies. Vingt crans par seconde, pas soixante : à vingt-cinq pixels par
   // seconde, l'œil ne voit pas la différence. Rien sous une page qui cache la
-  // carte. Et **une pause au repos** : quand personne n'a touché la carte depuis
-  // `FLOW_IDLE_MS`, les traits s'arrêtent et les chevrons fixes prennent le
-  // relais ; le moindre geste sur la carte, ou une autre boucle, relance. Les
-  // chevrons restent seuls en course, pendant le survol, et quand iOS demande
-  // moins de mouvement.
+  // carte. Rien de loin (`FLOW_MIN_ZOOM`), où les traits ne font qu'un
+  // scintillement. Et **une pause au repos** : quand personne n'a touché la
+  // carte depuis `FLOW_IDLE_MS`, les traits s'arrêtent ; le moindre geste sur la
+  // carte, ou une autre boucle, relance. Partout où rien ne bouge, les chevrons
+  // fixes disent le sens — en course aussi, pendant le survol, et quand iOS
+  // demande moins de mouvement.
   const hasRoute = route?.geometry?.length > 1
   const routeId = route?.id
   useEffect(() => {
@@ -618,11 +619,16 @@ export default function MapView({
       frame = requestAnimationFrame(tick)
       // Une carte détruite n'a plus de style : `getLayer` y lèverait une erreur.
       if (!m.style || !m.getLayer('route-flow')) return
-      // Un changement de thème repose les couches, cachées : on les reprend.
-      if (m.getLayoutProperty('route-flow', 'visibility') !== 'visible') {
-        show(true)
+      // De loin, les traits ne font plus qu'un scintillement : les chevrons
+      // fixes disent mieux le sens, et la carte n'a plus à se redessiner.
+      // L'état se relit sur la carte : un changement de thème repose les
+      // couches, traits cachés.
+      const near = m.getZoom() >= FLOW_MIN_ZOOM
+      if (near !== (m.getLayoutProperty('route-flow', 'visibility') === 'visible')) {
+        show(near)
         last = -1
       }
+      if (!near) return
       const step = Math.floor(now / FLOW_STEP_MS) % FLOW_STEPS
       if (step === last) return
       last = step
@@ -1078,6 +1084,8 @@ const FLOW_STEPS = 28
 const FLOW_STEP_MS = 50
 // Le temps sans geste sur la carte après lequel les traits s'arrêtent.
 const FLOW_IDLE_MS = 20_000
+// En dessous de ce zoom, toute une ville tient à l'écran : chevrons fixes.
+const FLOW_MIN_ZOOM = 12.5
 
 /**
  * Le motif de pointillés décalé de `step` crans dans le sens du tracé.
@@ -1312,6 +1320,9 @@ function addLayers(m) {
     id: 'route-start-arrow',
     type: 'symbol',
     source: 'route-start',
+    // De loin, quatre-vingts mètres ne font que quelques pixels : la flèche
+    // recouvrirait le départ au lieu de montrer par où partir.
+    minzoom: 13,
     layout: {
       'icon-image': 'route-start-arrow',
       'icon-rotate': ['-', ['get', 'bearing'], 90],

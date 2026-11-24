@@ -156,7 +156,9 @@ des pointillés ; le motif tourne donc en réécrivant `line-dasharray`
 (`flowDashes`, `MapView.jsx`), vingt crans par seconde. Chaque cran redessine la
 carte : **au bout de vingt secondes sans geste, les traits s'arrêtent** et des
 chevrons fixes prennent le relais ; glisser, pincer ou toucher la carte, ou
-choisir une autre boucle, les relance. Sur un fond sombre, un liseré blanc
+choisir une autre boucle, les relance. De loin, où une ville entière tient à l'écran, les
+traits ne feraient qu'un scintillement : les chevrons reprennent aussi la main,
+et la flèche du départ s'efface pour ne pas recouvrir le point de départ. Sur un fond sombre, un liseré blanc
 détache le tracé des rues, comme chez RunnrZ ; sur un fond clair, il se fond
 dans le halo. En course,
 pendant le survol et quand l'iPhone demande de réduire les animations, rien ne
