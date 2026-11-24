@@ -15,6 +15,7 @@ import * as offline from './offlineMaps'
 import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
 import MonthReport from './MonthReport.jsx'
+import Challenges from './Challenges.jsx'
 import { dailyMetres, monthKey, monthLabel } from './monthSummary'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
@@ -73,6 +74,8 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
         <>
           <Totals history={shown} profile={profile} />
           <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} goalKm={profile?.weekly_km} />
+          {/* Les séries suivent le filtre d'activité ; le défi du mois, son sport — la course, si « Tout ». */}
+          <Challenges history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} sport={sport === 'bike' ? 'bike' : 'run'} />
         </>
       )}
       <div className="seg">

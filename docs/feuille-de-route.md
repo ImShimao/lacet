@@ -54,7 +54,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 | Bilan, records, historique par mois | non | oui | **Fait** |
 | Export Garmin, COROS, Suunto, Strava, Komoot | oui | non | **Fait** (guide pas à pas) |
 | Objectif hebdomadaire | non | non | **Fait** |
-| Défis et séries (jours d'affilée, km du mois) | non | non | *À faire* |
+| Défis et séries (jours d'affilée, km du mois) | non | non | **Fait** : semaines et jours d'affilée avec record, défi du mois par paliers et rythme par jour |
 
 ## Ordre retenu
 
@@ -62,4 +62,4 @@ Légende : **Fait** · **En cours** · *À faire*.
 2. **Aller-retour vers un point** — fait le 24 novembre 2026.
 3. **Comparer deux propositions** — fait le 24 novembre 2026.
 4. **Séance fractionnée guidée à la voix** — fait le 24 novembre 2026.
-5. Défis et séries.
+5. **Défis et séries** — fait le 24 novembre 2026.

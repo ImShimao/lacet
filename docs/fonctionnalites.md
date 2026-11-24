@@ -66,6 +66,12 @@ story. Elle s'exporte aussi en GPX — chaque point à son
 heure et à son altitude — pour une montre, Garmin Connect ou le site de Strava. Et si l'app est fermée en plein effort, par iOS ou par une
 batterie vide, elle propose de reprendre la sortie là où elle s'est arrêtée.
 
+**Il donne envie de ressortir.** Dans « Mes parcours », la série de semaines
+d'affilée avec au moins une sortie (et son record), les jours d'affilée quand
+il y en a, et le défi du mois par paliers — 25, 50, 100 km… — avec ce qui reste
+et ce qu'il faut par jour pour l'atteindre (« encore 36 km en 7 jours, soit 5,1
+par jour »).
+
 **Il sait où boire.** Coche « Point d'eau » dans « Mon compte » : ceux —
 potables, gratuits, ouverts à tous — qui bordent la boucle apparaissent sur la carte, le détail dit
 le plus long tronçon sans, et pendant la sortie la voix prévient cent mètres

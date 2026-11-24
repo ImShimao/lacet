@@ -404,3 +404,70 @@
   color: var(--on-color);
   box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--safe-fill) 60%, transparent);
 }
+
+/* Séries et défis : la flamme des semaines, puis la barre du défi du mois. */
+.challenges {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 4px;
+  padding: 14px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.challenges__streaks {
+  display: grid;
+  gap: 10px;
+}
+.challenges__streak {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.challenges__streak .icon {
+  color: var(--accent-text);
+}
+.challenges__streak b {
+  font-size: calc(26px * var(--text-scale));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.challenges__streak span {
+  display: grid;
+  gap: 1px;
+  font-weight: 600;
+}
+.challenges__streak em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: calc(12.5px * var(--text-scale));
+  color: var(--text-2);
+}
+.challenges__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.challenges__head em {
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.challenges__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.challenges__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.challenges__month p {
+  margin: 8px 0 0;
+}
