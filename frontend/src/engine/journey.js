@@ -19,6 +19,13 @@
 // `REUSE_FACTOR` fois plus chères : il les reprend seulement quand il n'y a pas
 // d'autre passage (un pont, une impasse), et la note juge le tout.
 //
+// **Le trajet allongé (`stretch`) tient une distance ou une durée.** B est à
+// 3 km, mais on veut en courir 15 : le chemin passe par un point choisi sur
+// une ellipse dont A et B sont les foyers — tout point de l'ellipse met A et B
+// à la même somme de distances —, puis l'ellipse grandit ou rétrécit jusqu'à
+// ce que le chemin réel tombe sur la longueur demandée. Plusieurs côtés sont
+// essayés ; les meilleurs, de directions différentes, sont proposés.
+//
 // **La zone chargée est un disque autour de A qui contient B**, et non le
 // rectangle des deux : c'est celle que le recalcul en course (`planDetour`)
 // redemande à partir de la même demande, et il retrouve ainsi le même graphe.
@@ -26,7 +33,7 @@
 import { INF, dijkstra, nodeSequence, reconstruct } from './dijkstra'
 import { blockedEdges, withZones } from './blocked'
 import { ELEVATION_STEP_M, fetchMany, isNight, shapeRelief } from './environment'
-import { haversineM, resample } from './geo'
+import { bearingDeg, haversineM, resample } from './geo'
 import { PlanningError, graphRequest, matchedRoute, normalizeRequest } from './service'
 import { BLOCKED_FACTOR, buildProfile } from './weights'
 
@@ -40,6 +47,15 @@ const SNAP_M = 400
 // détour de deux ou trois fois sa longueur passe avant, pas assez pour faire
 // d'un pont unique un mur.
 const REUSE_FACTOR = 4
+
+// Ce que les rues ajoutent, en moyenne, au vol d'oiseau : le premier essai.
+const ROAD_FACTOR = 1.25
+// Écart toléré entre la longueur demandée et celle du chemin trouvé.
+const STRETCH_TOLERANCE = 0.08
+// Les côtés de l'ellipse essayés, en degrés depuis l'axe A → B : les flancs
+// d'abord, qui éloignent le plus du trajet direct.
+const STRETCH_ANGLES = [90, 270, 50, 130, 230, 310]
+const CARDINALS = ['le nord', 'le nord-est', "l'est", 'le sud-est', 'le sud', 'le sud-ouest', "l'ouest", 'le nord-ouest']
 
 export const JOURNEY_VARIANTS = [
   { key: 'safe', label: 'Le plus sûr' },
@@ -63,10 +79,22 @@ export function journeyRequest(input) {
     const km = Math.round(MAX_JOURNEY_M[sport] / 1000)
     throw new PlanningError(`Arrivée trop loin : ${km} km au plus à vol d'oiseau ${sport === 'bike' ? 'à vélo' : 'à pied'}.`)
   }
-  const reach = (2 * (crow + 1000)) / 1.1 / 1000
+  const roundtrip = Boolean(input.roundtrip)
+  // La longueur voulue, lue comme pour une boucle (distance, ou durée à l'allure).
+  let target = null
+  if (input.stretch && !roundtrip) {
+    target = normalizeRequest({ ...input, to: undefined }).distance_km * 1000
+    if (target < crow * 1.15) {
+      const km = (crow / 1000).toFixed(1).replace('.', ',')
+      throw new PlanningError(`L'arrivée est déjà à ${km} km à vol d'oiseau : demande plus long, ou « Au plus court ».`)
+    }
+  }
+  // Le disque doit contenir l'ellipse : son point le plus loin de A en est à a + c.
+  const far = target ? (target / ROAD_FACTOR + crow) / 2 : crow
+  const reach = (2 * (far + 1000)) / 1.1 / 1000
   const req = normalizeRequest({ ...input, distance_km: Math.ceil(reach * 10) / 10, duration_min: null, tolerance: 0.1 })
   const label = typeof to.label === 'string' && to.label.trim() ? to.label.trim().slice(0, 60) : null
-  return { req, to: { lat: to.lat, lon: to.lon }, label, crow, roundtrip: Boolean(input.roundtrip) }
+  return { req, to: { lat: to.lat, lon: to.lon }, label, crow, roundtrip, target }
 }
 
 /** Les poids de chaque variante. Les zones et les signalements pèsent dans toutes. */
@@ -128,6 +156,70 @@ function endpoints(graph, req, to, weights) {
   return { source, target }
 }
 
+function reachMask(graph, source) {
+  return reachable(graph, source, Float64Array.from(graph.edgeLen)).mask
+}
+
+function pathLength(graph, edges) {
+  let m = 0
+  for (const e of edges) m += graph.edgeLen[e]
+  return m
+}
+
+/**
+ * Les chemins de A à B qui passent par un point de l'ellipse, à la longueur
+ * voulue. Chaque côté s'ajuste en quelques essais : la longueur trouvée corrige
+ * la taille de l'ellipse, en proportion.
+ */
+function stretchedPaths(graph, source, target, weights, wanted, mask) {
+  const a0 = graph.node(source)
+  const b0 = graph.node(target)
+  const kx = 111_320 * Math.cos((a0[1] * Math.PI) / 180)
+  const ky = 110_540
+  const bx = (b0[0] - a0[0]) * kx
+  const by = (b0[1] - a0[1]) * ky
+  const c = Math.hypot(bx, by) / 2
+  const ux = bx / (2 * c)
+  const uy = by / (2 * c)
+  const out = []
+  for (const angle of STRETCH_ANGLES) {
+    const t = (angle * Math.PI) / 180
+    let sum = wanted / ROAD_FACTOR
+    let best = null
+    for (let tries = 0; tries < 4; tries += 1) {
+      const a = Math.max(sum / 2, c * 1.02)
+      const b = Math.sqrt(a * a - c * c)
+      const x = bx / 2 + a * Math.cos(t) * ux - b * Math.sin(t) * uy
+      const y = by / 2 + a * Math.cos(t) * uy + b * Math.sin(t) * ux
+      const via = graph.nearestNode(a0[0] + x / kx, a0[1] + y / ky, SNAP_M * 2, mask)
+      if (via === null || via === source || via === target) break
+      const there = dijkstra(graph, source, weights, { target: via, slack: 1 })
+      if (there.dist[via] === INF) break
+      const first = reconstruct(there, via)
+      const second = returnEdges(graph, via, target, weights, first)
+      if (!first?.length || !second) break
+      const edges = [...first, ...second]
+      const length = pathLength(graph, edges)
+      const error = Math.abs(length - wanted) / wanted
+      if (!best || error < best.error) best = { edges, error, via }
+      if (error <= STRETCH_TOLERANCE) break
+      sum *= wanted / length
+    }
+    if (best && best.error <= STRETCH_TOLERANCE * 2) out.push(best)
+  }
+  // Les plus justes d'abord ; deux chemins par le même côté n'en font qu'un.
+  out.sort((p, q) => p.error - q.error)
+  const kept = []
+  for (const p of out) {
+    const side = Math.round(bearingDeg(graph.node(source), graph.node(p.via)) / 45) % 8
+    const path = p.edges.join(',')
+    if (kept.some((k) => k.side === side || k.path === path)) continue
+    kept.push({ key: 'stretch', side, label: `Par ${CARDINALS[side]}`, path, edges: p.edges, nodes: nodeSequence(graph, source, p.edges) })
+    if (kept.length === 3) break
+  }
+  return kept
+}
+
 /** Le retour de B vers A, les rues de l'aller rendues plus chères. */
 function returnEdges(graph, from, to, weights, outbound) {
   const w = Float64Array.from(weights)
@@ -160,7 +252,7 @@ function geometryOf(graph, start, edges) {
  */
 export async function planJourney(input, { loadGraph, fetchElevations = fetchMany, now = () => new Date(), onProgress = () => {} }) {
   const started = performance.now()
-  const { req, to, label, crow, roundtrip } = journeyRequest(input)
+  const { req, to, label, crow, roundtrip, target: wanted } = journeyRequest(input)
   const graph = await loadGraph(graphRequest({ ...input, distance_km: req.distance_km, duration_min: null }))
   onProgress('routing', 0)
 
@@ -168,8 +260,10 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
   const blocked = withZones(graph, blockedEdges(graph, req.blocked), req.zones) ?? new Set()
   const { source, target } = endpoints(graph, req, to, variantWeights(graph, 'direct', req, night, blocked))
 
-  const found = []
-  for (const variant of JOURNEY_VARIANTS) {
+  const found = wanted
+    ? stretchedPaths(graph, source, target, variantWeights(graph, 'safe', req, night, blocked), wanted, reachMask(graph, source))
+    : []
+  for (const variant of wanted ? [] : JOURNEY_VARIANTS) {
     const weights = variantWeights(graph, variant.key, req, night, blocked)
     const tree = dijkstra(graph, source, weights, { target, slack: 1 })
     if (tree.dist[target] === INF) continue
@@ -184,6 +278,7 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
     if (found.some((f) => f.path === path)) continue
     found.push({ ...variant, path, edges, nodes: nodeSequence(graph, source, edges) })
   }
+  if (!found.length && wanted) throw new PlanningError("Pas de chemin de cette longueur vers l'arrivée : essaie un peu plus court, ou plus long.")
   if (!found.length) throw new PlanningError("Aucun chemin praticable entre ces deux points : un fleuve, une autoroute ou une zone évitée les sépare.")
 
   // Le relief de tous les chemins en une seule demande.
@@ -212,7 +307,7 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
     // L'identifiant d'une boucle : la variante et la longueur, pour qu'un trajet
     // gardé en favori ne prenne pas la place d'un autre.
     const { imported, matched, ...plain } = route
-    const id = `${roundtrip ? 'aba' : 'ab'}-${f.key}-${Math.trunc(route.distance_m)}`
+    const id = `${roundtrip ? 'aba' : 'ab'}-${f.key}${f.side ?? ''}-${Math.trunc(route.distance_m)}`
     return { ...plain, id, journey: f.key, destination: to, ...(roundtrip ? { roundtrip: true } : {}) }
   })
 

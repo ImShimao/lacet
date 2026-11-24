@@ -18,6 +18,9 @@ sécurité le kilomètre gagné. Même guidage à la voix, même relief, même r
 si l'on s'écarte, et « Trajet retour » refait le chemin de B vers A. En
 **aller-retour**, Lacet va jusqu'à B puis revient à la porte par d'autres rues
 que l'aller — la sortie jusqu'au lac et retour, sans courir deux fois la même.
+Et **plus long** tient une distance ou une durée : le bureau est à 3 km, mais
+on veut en courir 10, ou 45 minutes — Lacet propose des chemins vers B qui font
+ce compte, chacun par un côté différent (« Par le nord-ouest »).
 
 **Il refuse les routes dangereuses.** Chaque tronçon est évalué : vitesse de la
 voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées ou non.

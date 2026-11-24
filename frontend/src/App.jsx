@@ -142,8 +142,9 @@ export default function App() {
   const [goal, setGoal] = useState(stored.goal === 'journey' ? 'journey' : 'loop')
   const [destination, setDestination] = useState(null)
   const [placingDest, setPlacingDest] = useState(false)
-  // Aller jusqu'à B et revenir, par d'autres rues : un choix d'habitude, gardé.
-  const [roundTrip, setRoundTrip] = useState(Boolean(stored.roundTrip))
+  // Au plus court, plus long (à la distance ou la durée des réglages), ou
+  // aller-retour par d'autres rues : un choix d'habitude, gardé.
+  const [tripKind, setTripKind] = useState(['stretch', 'round'].includes(stored.tripKind) ? stored.tripKind : 'oneway')
   const journey = goal === 'journey'
   // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
   // allumé, il serait reparti au retour sur la carte.
@@ -190,7 +191,7 @@ export default function App() {
         ? {
             ...toRequest(active, from),
             to: { lat: to.lat, lon: to.lon, ...(to.label ? { label: to.label } : {}) },
-            ...(roundTrip ? { roundtrip: true } : {}),
+            ...(tripKind === 'round' ? { roundtrip: true } : tripKind === 'stretch' ? { stretch: true } : {}),
           }
         : { ...toRequest(active, from), ...(through ? { via: through } : {}) }
       const key = JSON.stringify(request)
@@ -236,7 +237,7 @@ export default function App() {
       if (shown?.routes.length) rememberShown(asked, shown.routes)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params, start, result, via, history, journey, destination, roundTrip],
+    [params, start, result, via, history, journey, destination, tripKind],
   )
 
   // L'arrivée posée ou cherchée. Un point touché sur la carte n'a pas de nom :
@@ -257,11 +258,9 @@ export default function App() {
     setPlacingDest(false)
     found.forget()
   }
-  const toggleRoundTrip = () => {
-    setRoundTrip((on) => {
-      save({ roundTrip: !on })
-      return !on
-    })
+  const chooseTripKind = (next) => {
+    setTripKind(next)
+    save({ tripKind: next })
     found.forget()
   }
   // Le retour : B devient le départ, A l'arrivée, et la recherche repart.
@@ -969,8 +968,8 @@ export default function App() {
                 found.forget()
               }}
               onReturnTrip={journey && destination && !result?.meta?.roundtrip ? returnTrip : null}
-              roundTrip={roundTrip}
-              onRoundTrip={toggleRoundTrip}
+              tripKind={tripKind}
+              onTripKind={chooseTripKind}
               onBack={() => {
                 setDetail(false)
                 found.forget()

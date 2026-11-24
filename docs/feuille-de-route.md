@@ -17,6 +17,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 | Point de passage | non | oui | **Fait** |
 | Zones à éviter (cercle, contour) | non | oui | **Fait** (+ raison et icône) |
 | **De A à B** | non | non | **Fait** : trois chemins notés, trajet retour |
+| De A à B à la distance ou à la durée voulue | non | non | **Fait** : par plusieurs côtés, à 8 % près |
 | Aller-retour vers un point (A → B → A) | non | non | **Fait** : le retour évite les rues de l'aller |
 | Tours d'un circuit, boucle en 8 | non | non | **Fait** |
 | Note de sécurité A, B, C de chaque proposition | non | non | **Fait** |

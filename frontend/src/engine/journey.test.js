@@ -61,6 +61,21 @@ describe('le trajet de A à B', () => {
     }
   })
 
+  it('allongé, il tient la distance demandée et finit quand même à B', async () => {
+    const { routes } = await planJourney({ ...A, to: B, sport: 'run', stretch: true, distance_km: 4 }, deps)
+    expect(routes.length).toBeGreaterThan(0)
+    for (const r of routes) {
+      expect(haversineM(r.geometry.at(-1), [B.lon, B.lat])).toBeLessThan(200)
+      expect(Math.abs(r.distance_m - 4000) / 4000).toBeLessThan(0.17)
+      expect(r.name).toMatch(/^Par /)
+    }
+    expect(new Set(routes.map((r) => r.id)).size).toBe(routes.length)
+  })
+
+  it('allongé, il refuse une longueur plus courte que le vol d’oiseau', () => {
+    expect(() => journeyRequest({ ...A, to: B, stretch: true, distance_km: 0.5 })).toThrow(/demande plus long/)
+  })
+
   it('refuse une arrivée au départ, ou trop loin', () => {
     expect(() => journeyRequest({ ...A, to: A })).toThrow(/arrivée est au départ/)
     expect(() => journeyRequest({ ...A, to: { lat: 47.5, lon: 4.84 } })).toThrow(/trop loin/)
