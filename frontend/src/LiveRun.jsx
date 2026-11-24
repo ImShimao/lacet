@@ -32,9 +32,9 @@ const haptic = (kind) => {
 }
 
 // Distance à laquelle on prévient d'une traversée à venir.
-// Le débit supposé de la voix pour savoir quand une phrase de la séance est
-// finie : un peu bas, pour la redire plutôt que la perdre si on se trompe.
-const COACH_CHARS_PER_S = 12
+// Le débit supposé de la voix pour savoir quand une annonce est finie : un peu
+// bas, pour la redire plutôt que la perdre si on se trompe.
+const SPOKEN_CHARS_PER_S = 12
 const CROSSING_ALERT_M = 120
 // Ce qu'il faut avoir couru depuis l'alerte pour qu'une même traversée se
 // signale de nouveau. Plus que les 240 m d'un passage — 120 m pour y arriver,
@@ -193,10 +193,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // shortcut: la séance ne survit pas à une reprise, à garder dans `runState` si ça gêne.
   const coach = useRef(workoutSettings().on ? createCoach(blocksOf()) : null)
   const [block, setBlock] = useState(null)
-  // Les phrases de la séance pas encore finies de dire, avec l'heure où elles le
+  // Les annonces « à redire » pas encore finies, avec l'heure où elles le
   // seront. Une consigne de guidage vide la file de la voix : celles qu'elle
-  // coupe sont redites derrière elle (`talk`).
-  const coachPending = useRef([])
+  // coupe sont redites derrière elle (`talk`, option `keep`).
+  const pending = useRef([])
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
   const homeShown = useRef(false)
@@ -421,7 +421,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       if (!gpsLost.current && lastGoodAt.current && Date.now() - lastGoodAt.current > GPS_LOST_MS) {
         gpsLost.current = true
         setLostSignal(true)
-        talk('Signal GPS perdu. Je reprends dès qu’il revient.', { priority: false })
+        talk('Signal GPS perdu. Je reprends dès qu’il revient.', { priority: false, keep: true })
       }
     }, 1000)
 
@@ -453,7 +453,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (gpsLost.current) {
           gpsLost.current = false
           setLostSignal(false)
-          talk('Signal GPS retrouvé.', { priority: false })
+          talk('Signal GPS retrouvé.', { priority: false, keep: true })
         }
         if (door.current === undefined) {
           const first = route?.geometry?.[0]
@@ -642,7 +642,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setPaused(kind)
     setState((s) => ({ ...s, elapsed: movingSeconds(), distance: covered.current }))
     if (kind === 'auto') {
-      talk('Pause automatique.', { priority: false })
+      talk('Pause automatique.', { priority: false, keep: true })
       haptic('pulseHaptic')
     }
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
@@ -656,7 +656,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     resumedAt.current = Date.now()
     setPaused(null)
     setHomeNote(null)
-    if (spoken) talk('Reprise.', { priority: false })
+    if (spoken) talk('Reprise.', { priority: false, keep: true })
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
 
@@ -777,14 +777,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   function coachTick() {
     if (!coach.current) return
     const { said, status } = coach.current.update(movingSeconds(), covered.current)
-    for (const text of said) {
-      talk(text, { priority: false })
-      // Ce que dure la phrase, à une douzaine de caractères par seconde — la voix
-      // d'iOS en dit un peu plus : mieux vaut redire une phrase finie que perdre
-      // une phrase coupée.
-      const from = Math.max(Date.now(), coachPending.current.at(-1)?.until ?? 0)
-      coachPending.current.push({ text, until: from + (text.length / COACH_CHARS_PER_S) * 1000 })
-    }
+    for (const text of said) talk(text, { priority: false, keep: true })
     setBlock(status)
     if (!status) coach.current = null
   }
@@ -801,7 +794,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const ran = crossed && total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      talk(`${done} ${word}s.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false })
+      talk(`${done} ${word}s.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false, keep: true })
       return
     }
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
@@ -816,7 +809,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       said = own ? `${which} à ${spoken(each)}.` : `${which}.`
       if (average && !(own && done === 1)) said += ` Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
     }
-    talk([said, hint].filter(Boolean).join(' ') + ran, { priority: false })
+    talk([said, hint].filter(Boolean).join(' ') + ran, { priority: false, keep: true })
   }
 
   /**
@@ -986,21 +979,34 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   function talk(text, ...options) {
     if (!text || !voice.speak(text, ...options)) return
     const [lon, lat] = (here.current ?? [null, null]).map((x) => (x == null ? null : Math.round(x * 1e5) / 1e5))
-    journal.current.push({ t: Date.now(), lon, lat, m: Math.round(covered.current), text })
-    // Une consigne prioritaire coupe la phrase en cours et vide la file. Celles
-    // de la séance qu'elle a coupées reviennent derrière elle : mesuré sur une
-    // sortie simulée, « Répétition 1 sur 8 » se perdait en entier sous la
-    // première consigne de départ (`LiveRun.voice.test.jsx`).
-    if ((options[0]?.priority ?? true) && coachPending.current.length) {
-      const now = Date.now()
-      const cut = coachPending.current.filter((p) => p.until > now)
-      coachPending.current = []
+    const note = (said) => journal.current.push({ t: Date.now(), lon, lat, m: Math.round(covered.current), text: said })
+    note(text)
+    // Une consigne prioritaire coupe la phrase en cours et vide la file. Les
+    // annonces marquées `keep` qu'elle a coupées reviennent derrière elle :
+    // mesuré sur une sortie simulée, « Répétition 1 sur 8 » se perdait en entier
+    // sous la première consigne de départ (`LiveRun.voice.test.jsx`). Pas les
+    // autres : l'annonce d'un virage, redite après son « maintenant », ou un
+    // point d'eau « dans cent mètres » déjà passé, seraient fausses.
+    const { priority = true, keep = false } = options[0] ?? {}
+    const now = Date.now()
+    // Ce que dure une phrase, à une douzaine de caractères par seconde — la voix
+    // d'iOS en dit un peu plus : mieux vaut redire une phrase finie que perdre
+    // une phrase coupée.
+    const lasts = (t) => (t.length / SPOKEN_CHARS_PER_S) * 1000
+    if (priority) {
+      const cut = pending.current.filter((p) => p.until > now)
+      pending.current = []
+      // Redites après la consigne, qui passe devant.
+      let from = now + lasts(text)
       for (const p of cut) {
         voice.speak(p.text, { priority: false })
-        // Redite après la consigne, qui passe devant.
-        const from = coachPending.current.at(-1)?.until ?? now + (text.length / COACH_CHARS_PER_S) * 1000
-        coachPending.current.push({ text: p.text, until: from + (p.text.length / COACH_CHARS_PER_S) * 1000 })
+        note(p.text)
+        from += lasts(p.text)
+        pending.current.push({ text: p.text, until: from })
       }
+    } else if (keep) {
+      const until = Math.max(now, pending.current.at(-1)?.until ?? 0) + lasts(text)
+      pending.current.push({ text, until })
     }
   }
 
@@ -1034,7 +1040,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const say = (key, text) => {
       if (milestones.current.has(key)) return
       milestones.current.add(key)
-      talk(text, { priority: false })
+      talk(text, { priority: false, keep: true })
     }
     const half = (covered.current + left) / 2
     if (!guideRef.current.route?.home && covered.current + left >= HALF_MIN_M && covered.current >= half && covered.current - half <= MILESTONE_SLACK_M) {
@@ -1168,7 +1174,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     homeShown.current = true
     setBackHome(true)
     haptic('pulseHaptic')
-    talk('Retour au point de départ. Touche « Terminer » pour finir la sortie.', { priority: false })
+    talk('Retour au point de départ. Touche « Terminer » pour finir la sortie.', { priority: false, keep: true })
   }
 
   /**

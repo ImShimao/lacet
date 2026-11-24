@@ -581,7 +581,13 @@ function defauts(route, run, { km = 1, avance = 1 } = {}) {
 
   // **Les bornes** : « Troisième kilomètre » au troisième kilomètre, pas à
   // deux mille cinq cents mètres parce qu'un reflet a compté pour cent.
-  const bornes = dites.filter((x) => /^[^,]+ kilomètre(?: à|\.)/.test(x.texte) && !/^(Dans|Maintenant)/.test(x.texte))
+  const toutes = dites.filter((x) => /^[^,]+ kilomètre(?: à|\.)/.test(x.texte) && !/^(Dans|Maintenant)/.test(x.texte))
+  // Coupée par une consigne de virage, une borne est redite derrière elle : elle
+  // compte une fois, à sa première demande — et doit être entendue en entier.
+  const bornes = toutes.filter((d, i) => toutes.findIndex((x) => x.texte === d.texte) === i)
+  for (const b of bornes) {
+    if (!toutes.some((x) => x.texte === b.texte && x.entendu === x.texte.length)) out.push(`borne jamais entendue en entier : ${b.texte}`)
+  }
   // Réglées une sur deux, au deuxième, au quatrième ; tues, jamais.
   if (!km && bornes.length) out.push(`bornes dites alors qu'elles sont tues : ${bornes[0].texte}`)
   bornes.forEach((d, i) => {
