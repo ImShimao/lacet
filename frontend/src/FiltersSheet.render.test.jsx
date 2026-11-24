@@ -34,7 +34,7 @@ const conversion = () => screen.getByText(/Converti en distance/).textContent.re
 describe('le panneau des filtres', () => {
   it('convertit la durée en distance, et suit l’allure qu’on règle', () => {
     ouvrir({ ...DEFAULTS, mode: 'duration', duration_min: 60, pace_sec_per_km: 390 })
-    déplier('Longueur')
+    déplier('(Distance|Durée)')
     expect(conversion()).toContain('environ 9,2 km')
 
     // Une allure plus lente, c'est moins de kilomètres dans la même heure.
@@ -127,12 +127,12 @@ describe('le panneau des filtres', () => {
 
   it('replie la longueur en une ligne qui dit sa valeur, mais laisse l’allure ouverte', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, precise: true, pace_sec_per_km: 390 })
-    expect(screen.getByRole('button', { name: /^Longueur.*10 km · exacte/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: /^Distance.*10 km · exacte/ })).toHaveAttribute('aria-expanded', 'false')
     // L'allure se lit et se règle sans rien dérouler (demandé le 21 novembre).
     expect(screen.getByRole('button', { name: 'min/km' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Allure/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
-    déplier('Longueur')
+    déplier('(Distance|Durée)')
     expect(screen.getByRole('button', { name: 'Semi' })).toBeInTheDocument()
   })
 
@@ -140,14 +140,14 @@ describe('le panneau des filtres', () => {
     ouvrir({ ...DEFAULTS, hiddenFilters: ['terrain'] })
     expect(screen.queryByRole('radiogroup', { name: 'Terrain' })).not.toBeInTheDocument()
     // Les essentiels et les autres filtres restent.
-    expect(screen.getByText('Longueur')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^(Distance|Durée)/ })).toBeInTheDocument()
     expect(screen.getByText('Allure')).toBeInTheDocument()
     expect(screen.getByText('Relief')).toBeInTheDocument()
   })
 
   it('propose à vélo des distances et des durées de cycliste', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', mode: 'distance', distance_km: 40 })
-    déplier('Longueur')
+    déplier('(Distance|Durée)')
     expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
     const usuelles = within(screen.getByRole('group', { name: 'Distances usuelles' }))
     fireEvent.click(usuelles.getByRole('button', { name: '75 km' }))

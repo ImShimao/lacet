@@ -7,6 +7,7 @@ import { reliefHintOnDevice } from './engine/client'
 import { pace } from './format'
 import { fromKm, paceLabel, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 
+import { t } from './i18n'
 export const SPORTS = [
   { key: 'run', label: 'Course', icon: 'run' },
   { key: 'bike', label: 'Vélo', icon: 'bike' },
@@ -314,25 +315,23 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Filtres de recherche"
+        aria-label={t('Filtres de recherche')}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal__head">
           <span />
-          <h2>Filtres</h2>
+          <h2>{t('Filtres')}</h2>
           <button
             className="modal__reset"
             onClick={() =>
               setDraft({ ...DEFAULTS, ...Object.fromEntries(KEPT_ON_RESET.map((k) => [k, draft[k] ?? DEFAULTS[k]])) })
             }
-          >
-            Réinitialiser
-          </button>
+          >{t('Réinitialiser')}</button>
         </div>
 
         <div className="modal__body">
           {shown('sport') && (
-            <Field label="Activité" info="sport" sport={draft.sport}>
+            <Field label={t('Activité')} info="sport" sport={draft.sport}>
               <div className="tiles">
                 {SPORTS.map((s) => (
                   <Tile
@@ -357,8 +356,8 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
           )}
 
           {shown('terrain') && (
-            <Field label="Terrain" info="terrain" sport={draft.sport}>
-              <Choices label="Terrain" options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
+            <Field label={t('Terrain')} info="terrain" sport={draft.sport}>
+              <Choices label={t('Terrain')} options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
               <div className="checks checks--after">
                 <button
                   role="checkbox"
@@ -369,9 +368,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
                   <span className="check__box">
                     <Icon name="check" size={13} />
                   </span>
-                  <span>
-                    Voies sans voitures d'abord
-                    <em>Pistes, chemins et allées ; la route quand il le faut</em>
+                  <span>{t('Voies sans voitures d\'abord')}<em>{t('Pistes, chemins et allées ; la route quand il le faut')}</em>
                   </span>
                 </button>
               </div>
@@ -380,7 +377,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
 
           {shown('relief') && (
             <Field
-              label="Relief"
+              label={t('Relief')}
               info="relief"
               sport={draft.sport}
               value={climbing ? `${draft.climb_m} m de D+` : RELIEFS.find((o) => o.key === draft.elevation)?.label ?? 'Auto'}
@@ -390,7 +387,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
                   (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
                   cible de Vallonné. */}
               <Choices
-                label="Relief"
+                label={t('Relief')}
                 options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }].map((o) => ({
                   ...o,
                   badge: reliefBadge(o.key, reachable, o.key === 'climb' ? draft.climb_m / km : null),
@@ -418,12 +415,12 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
                     canUp={draft.climb_m < MAX_CLIMB}
                   />
                   <p className="field__hint">
-                    {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
+                    {t('Environ {v1} m par kilomètre. Les boucles entre {v2} m passent devant ; entre elles, la sécurité décide.', { v1: formatKm(Math.round((draft.climb_m / km) * 10) / 10), v2: climbBand(
                       draft.climb_m,
                       km,
                     )
                       .map(Math.round)
-                      .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
+                      .join(' et ') })}
                   </p>
                 </>
               )}
@@ -434,9 +431,12 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               replie en une ligne, et ne s'ouvre que pour le semi au mètre près,
               la saisie au clavier ou la tolérance. Même chose pour l'allure,
               qu'on règle une fois. Ouvertes, les deux poussaient le terrain et le
-              relief — ce qu'on vient vraiment changer ici — sous le pli. */}
+              relief — ce qu'on vient vraiment changer ici — sous le pli. (L'allure
+              a été rouverte depuis : voir plus bas.) Le nom suit le mode :
+              « Distance · 5 km » ou « Durée · 45 min » se lisent sans détour, là
+              où « Longueur » ne se disait pas d'une durée. */}
           <Field
-            label="Longueur"
+            label={draft.mode === 'distance' ? t('Distance') : t('Durée')}
             value={
               draft.mode === 'distance'
                 ? `${formatDistance(draft.distance_km)} ${unitLabel()} · ${draft.precise ? 'exacte' : 'souple'}`
@@ -452,7 +452,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               onChange={(mode) => set({ mode })}
             />
             {draft.mode === 'distance' && isBike && (
-              <div className="races" role="group" aria-label="Distances usuelles">
+              <div className="races" role="group" aria-label={t('Distances usuelles')}>
                 {RIDES.map((ride) => {
                   const on = Math.abs(draft.distance_km - ride) < 0.01
                   return (
@@ -469,7 +469,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               </div>
             )}
             {draft.mode === 'distance' && !isBike && (
-              <div className="races" role="group" aria-label="Distances de course">
+              <div className="races" role="group" aria-label={t('Distances de course')}>
                 {RACES.map((race) => {
                   const on = Math.abs(draft.distance_km - race.km) < 0.01
                   return (
@@ -510,7 +510,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               />
             ) : (
               <>
-              <div className="races" role="group" aria-label="Durées courantes">
+              <div className="races" role="group" aria-label={t('Durées courantes')}>
                 {(DURATIONS[draft.sport] ?? DURATIONS.run).map((minutes) => {
                   const on = draft.duration_min === minutes
                   return (
@@ -556,12 +556,12 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
             <p className="field__hint">
               {draft.mode === 'duration'
                 ? // Une estimation à trois décimales se lirait comme une promesse.
-                  `Converti en distance selon l'allure : environ ${formatDistance(
+                  t('Converti en distance selon l\'allure : environ {v1} {v2}.', { v1: formatDistance(
                     Math.round(estimateKm(draft) * 10) / 10,
-                  )} ${unitLabel()}.`
-                : `Entre ${formatDistance(draft.distance_km * (draft.precise ? 0.975 : 0.9))} et ${formatDistance(
+                  ), v2: unitLabel() })
+                : t('Entre {v1} et {v2} {v3}{v4}', { v1: formatDistance(draft.distance_km * (draft.precise ? 0.975 : 0.9)), v2: formatDistance(
                     draft.distance_km * (draft.precise ? 1.025 : 1.1),
-                  )} ${unitLabel()}${draft.precise ? ' ; élargi tout seul s’il n’y a rien.' : '.'}`}
+                  ), v3: unitLabel(), v4: draft.precise ? t(' ; élargi tout seul s’il n’y a rien.') : '.' })}
             </p>
 
             {/* L'allure appartient à ce champ : c'est elle qui convertit une
@@ -574,7 +574,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
           {/* L'allure reste ouverte : min/km ou km/h et le compteur se lisent
               sans rien dérouler (demandé le 21 novembre, dd784ff). Repliée par
               le désencombrage du 24, elle a été rouverte. */}
-          <Field label={isBike ? 'Vitesse' : 'Allure'}>
+          <Field label={isBike ? t('Vitesse') : t('Allure')}>
             <div className="field__pace">
               {!isBike && (
                 <Segmented
@@ -603,23 +603,19 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               )}
               <p className="field__hint">
                 {draft.mode === 'duration'
-                  ? 'Convertit la durée en distance ; ne change pas le tracé.'
-                  : `Environ ${formatMinutes(
+                  ? t('Convertit la durée en distance ; ne change pas le tracé.')
+                  : t('Environ {v1} pour cette boucle ; ne change pas le tracé.', { v1: formatMinutes(
                       Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
-                    )} pour cette boucle ; ne change pas le tracé.`}
+                    ) })}
               </p>
             </div>
           </Field>
         </div>
 
         <div className="modal__foot">
-          <button className="btn" onClick={onClose}>
-            Annuler
-          </button>
+          <button className="btn" onClick={onClose}>{t('Annuler')}</button>
           <button className="btn btn--primary" onClick={() => onApply(draft)}>
-            <Icon name="search" size={17} />
-            Rechercher
-          </button>
+            <Icon name="search" size={17} />{t('Rechercher')}</button>
         </div>
       </div>
     </div>
@@ -752,23 +748,23 @@ export function Stepper({ text, onStep, canDown, canUp, editable }) {
             if (e.key === 'Enter') commit()
             if (e.key === 'Escape') setTyping(null)
           }}
-          aria-label="Valeur"
+          aria-label={t('Valeur')}
         />
       ) : (
         <button
           className={`stepper__value ${editable ? 'stepper__value--editable' : ''}`}
           onClick={() => editable && setTyping(String(editable.value))}
           disabled={!editable}
-          title={editable ? 'Cliquer pour saisir une valeur' : undefined}
+          title={editable ? t('Cliquer pour saisir une valeur') : undefined}
         >
           {text}
         </button>
       )}
       <div className="stepper__pad">
-        <button onClick={() => onStep(-1)} disabled={!canDown} aria-label="Diminuer">
+        <button onClick={() => onStep(-1)} disabled={!canDown} aria-label={t('Diminuer')}>
           <Icon name="minus" size={18} />
         </button>
-        <button onClick={() => onStep(1)} disabled={!canUp} aria-label="Augmenter">
+        <button onClick={() => onStep(1)} disabled={!canUp} aria-label={t('Augmenter')}>
           <Icon name="plus" size={18} />
         </button>
       </div>
