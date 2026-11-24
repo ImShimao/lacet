@@ -1039,9 +1039,9 @@ function visibleCentre(m) {
 
 // Les traits qui coulent dans le tracé, en largeurs de ligne : un trait de
 // FLOW_DASH, un blanc de FLOW_GAP. Le motif avance d'un pixel par cran, vingt-cinq par seconde.
-const FLOW_DASH = 4
-const FLOW_GAP = 7
-const FLOW_STEPS = 22
+const FLOW_DASH = 3.5
+const FLOW_GAP = 14
+const FLOW_STEPS = 35
 const FLOW_STEP_MS = 40
 
 /**
