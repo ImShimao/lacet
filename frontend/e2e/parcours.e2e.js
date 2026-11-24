@@ -16,7 +16,7 @@ test('le lancement se joue puis disparaît', async ({ page }) => {
   await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
 })
 
-test("l'allure reste ouverte dans les filtres, comme la longueur", async ({ page }) => {
+test("l'allure reste ouverte dans les filtres", async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Explorer' }).first().click()
@@ -50,7 +50,10 @@ test("les fonds de carte tiennent sur l'écran, sans défilement latéral", asyn
   await page.getByRole('button', { name: /^Apparence/ }).click()
   await page.getByRole('button', { name: /^Style de carte/ }).click()
 
-  await expect(page.locator('.mapsheet__tile')).toHaveCount(8)
+  // Six fonds toujours là, deux de plus quand une clé Mapbox est posée — la
+  // CI n'en a pas : ce qui compte, c'est que tous tiennent à l'écran.
+  await expect(page.locator('.mapsheet__tile').first()).toBeVisible()
+  expect(await page.locator('.mapsheet__tile').count()).toBeGreaterThanOrEqual(6)
   for (const tile of await page.locator('.mapsheet__tile').all()) {
     await expect(tile).toBeInViewport()
   }

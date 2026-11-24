@@ -35,7 +35,6 @@ describe('le panneau des filtres', () => {
   it('convertit la durée en distance, et suit l’allure qu’on règle', () => {
     ouvrir({ ...DEFAULTS, mode: 'duration', duration_min: 60, pace_sec_per_km: 390 })
     déplier('Longueur')
-    déplier('Allure')
     expect(conversion()).toContain('environ 9,2 km')
 
     // Une allure plus lente, c'est moins de kilomètres dans la même heure.
@@ -47,7 +46,6 @@ describe('le panneau des filtres', () => {
 
   it('annonce la durée de la boucle quand on règle une distance', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
-    déplier('Allure')
     expect(screen.getByText(/Environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
   })
 
@@ -120,19 +118,19 @@ describe('le panneau des filtres', () => {
 
   it('montre la vitesse et non l’allure à vélo', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', speed_kmh: 20 })
-    déplier('Vitesse')
     expect(screen.getByText('Vitesse')).toBeInTheDocument()
-    // Dans la ligne repliée et sur le réglage ouvert.
-    expect(screen.getAllByText(/20 km\/h/).length).toBe(2)
+    expect(screen.getByText(/20 km\/h/)).toBeInTheDocument()
     // Le choix d'unité n'a pas de sens à vélo : c'est la vitesse qui part au
     // moteur, quoi qu'on affiche.
     expect(screen.queryByRole('button', { name: 'min/km' })).not.toBeInTheDocument()
   })
 
-  it('replie la longueur et l’allure en une ligne qui dit leur valeur', () => {
+  it('replie la longueur en une ligne qui dit sa valeur, mais laisse l’allure ouverte', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, precise: true, pace_sec_per_km: 390 })
     expect(screen.getByRole('button', { name: /^Longueur.*10 km · exacte/ })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: /^Allure.*6:30/ })).toBeInTheDocument()
+    // L'allure se lit et se règle sans rien dérouler (demandé le 21 novembre).
+    expect(screen.getByRole('button', { name: 'min/km' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Allure/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
     déplier('Longueur')
     expect(screen.getByRole('button', { name: 'Semi' })).toBeInTheDocument()

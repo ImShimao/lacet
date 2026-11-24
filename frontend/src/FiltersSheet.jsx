@@ -571,14 +571,10 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
                 6:30 » ne font pas la même sortie, et ça se lit tout de suite. */}
           </Field>
 
-          <Field
-            label={isBike ? 'Vitesse' : 'Allure'}
-            value={
-              usesSpeed
-                ? `${formatKm(Math.round(speedIn(draft.speed_kmh) * 10) / 10)} ${speedLabel()}`
-                : `${pace(draft.pace_sec_per_km)} ${paceLabel()}`
-            }
-          >
+          {/* L'allure reste ouverte : min/km ou km/h et le compteur se lisent
+              sans rien dérouler (demandé le 21 novembre, dd784ff). Repliée par
+              le désencombrage du 24, elle a été rouverte. */}
+          <Field label={isBike ? 'Vitesse' : 'Allure'}>
             <div className="field__pace">
               {!isBike && (
                 <Segmented
