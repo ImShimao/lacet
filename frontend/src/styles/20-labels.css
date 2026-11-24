@@ -108,3 +108,30 @@
   background: var(--surface-2);
   border-color: transparent;
 }
+
+/* ══ en course ═══════════════════════════════════════════════════════════ */
+
+/* Les chiffres de course : plus grands, l'unité en petit à côté. */
+.stats--live b {
+  font-size: calc(22px * var(--text-scale));
+  letter-spacing: -0.02em;
+}
+.stats--live b small {
+  margin-left: 3px;
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-3);
+}
+.stats--live span {
+  font-size: calc(11.5px * var(--text-scale));
+}
+/* « Signaler un problème ici » : un geste rare, dit en une ligne discrète et
+   non plus en cadre pointillé — mais toujours assez haut pour le pouce. */
+.signal:not(.signal--open) {
+  min-height: 40px;
+  border: 0;
+  padding: 6px;
+  margin-bottom: 2px;
+  font-weight: 500;
+}

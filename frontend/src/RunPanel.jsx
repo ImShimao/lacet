@@ -56,18 +56,30 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
         {clock(state.elapsed)}
       </div>
 
+      {/* L'unité collée au chiffre, en petit, et un mot dessous : « Distance
+          (km) » en 10 px se lisait mal en courant, et les parenthèses n'y
+          ajoutaient rien. */}
       <div className="stats stats--live">
         <div>
-          <b>{km(state.distance)}</b>
-          <span>Distance (km)</span>
+          <b>
+            {km(state.distance)}
+            <small>{unitLabel()}</small>
+          </b>
+          <span>Distance</span>
         </div>
         <div>
-          <b>{bike ? speed(state.distance, state.elapsed) : pace(moving)}</b>
-          <span>{bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}</span>
+          <b>
+            {bike ? speed(state.distance, state.elapsed) : pace(moving)}
+            <small>{bike ? speedLabel() : paceLabel()}</small>
+          </b>
+          <span>{bike ? 'Vitesse' : 'Allure'}</span>
         </div>
         <div>
-          <b>{remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}</b>
-          <span>{remaining === null ? (bike ? `Allure (${paceLabel()})` : `Vitesse (${speedLabel()})`) : `Restant (${unitLabel()})`}</span>
+          <b>
+            {remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}
+            <small>{remaining === null ? (bike ? paceLabel() : speedLabel()) : unitLabel()}</small>
+          </b>
+          <span>{remaining === null ? (bike ? 'Allure' : 'Vitesse') : 'Restant'}</span>
         </div>
       </div>
 

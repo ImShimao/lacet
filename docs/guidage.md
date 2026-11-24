@@ -184,6 +184,11 @@ pouce, « Partager » et « Terminer » ; au-dessus, une rangée nommée — GPX
 Rapport, Favori, Autre sens. L'image partagée pose la trace sur une lueur de
 l'accent, d'un trait auréolé, et suit l'unité choisie (km ou miles).
 
+**En course**, le panneau du bas (`RunPanel.jsx`) donne le chrono en grand,
+puis distance, allure et restant, l'unité en petit collée au chiffre et un mot
+dessous ; « Signaler un problème ici » n'est plus qu'une ligne discrète sous
+les chiffres, au-dessus de Dénivelé, Pause et SOS.
+
 **Le décompte** (`Countdown.jsx`) : un cercle qui se vide en une seconde sous
 chaque chiffre, une onde à chaque battement — la vibration en même temps —,
 trois points qui se remplissent, puis « Partez ! » en vert, pendant que le voile
