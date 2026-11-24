@@ -60,25 +60,35 @@ export function drawRunCard(canvas, entry, verdict = null) {
 
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
+  // Une lueur de l'accent derrière la trace : sur un noir plat, la carte
+  // ressemblait à une capture d'écran plutôt qu'à une image qu'on a envie
+  // d'envoyer.
+  const glow = ctx.createRadialGradient(W / 2, 470, 30, W / 2, 470, 720)
+  glow.addColorStop(0, accent)
+  glow.addColorStop(1, bg)
+  ctx.globalAlpha = 0.22
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, W, H)
+  ctx.globalAlpha = 1
   write('Lacet', 80, 110, 46, accent, { weight: 700 })
   const day = new Date(entry.ranAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   write(day, W - 80, 110, 34, muted, { align: 'right' })
 
   // La trace, dans le tiers haut : le fond d'un trait, les allures par-dessus.
-  drawTrace(ctx, entry, { x: 80, y: 150, w: 920, h: 640, width: 12, base: accent, dot: text, shades: [safe, mix(safe, caution), caution, mix(caution, risk), risk] })
+  drawTrace(ctx, entry, { x: 80, y: 150, w: 920, h: 640, width: 12, base: accent, dot: text, glow: true, shades: [safe, mix(safe, caution), caution, mix(caution, risk), risk] })
 
   const distance = entry.actual_distance_m || 0
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
   write(km(distance), 80, 990, 190, text, { weight: 700 })
   const wide = ctx.measureText(km(distance)).width
-  write('km', 80 + wide + 24, 990, 64, muted)
+  write(unitLabel(), 80 + wide + 24, 990, 64, muted)
 
   const figures = [
     [duration(seconds), 'Temps'],
     bike
       ? [(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ','), 'km/h']
-      : [distance > 100 ? pace(seconds / (distance / 1000)) : '—', 'Allure /km'],
+      : [distance > 100 ? pace(seconds / (distance / 1000)) : '—', `Allure ${paceLabel()}`],
     [entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—', 'Dénivelé +'],
   ]
   figures.forEach(([value, label], i) => {
@@ -96,7 +106,7 @@ export function drawRunCard(canvas, entry, verdict = null) {
  * tronçons par allure par-dessus quand la trace a ses heures, un point au départ.
  * Rien sans trace.
  */
-function drawTrace(ctx, entry, { x, y, w, h, width, base, dot, shades }) {
+function drawTrace(ctx, entry, { x, y, w, h, width, base, dot, shades, glow = false }) {
   const drawn = sketch(entry.track, w, h, width * 2)
   if (!drawn) return
   ctx.save()
@@ -105,7 +115,14 @@ function drawTrace(ctx, entry, { x, y, w, h, width, base, dot, shades }) {
   ctx.lineJoin = 'round'
   ctx.lineWidth = width
   ctx.strokeStyle = base
+  // Un halo sous le trait, sur la carte seulement : les autocollants se posent
+  // sur une photo, où il salirait le fond.
+  if (glow) {
+    ctx.shadowColor = base
+    ctx.shadowBlur = width * 2.5
+  }
   ctx.stroke(new Path2D(drawn.d))
+  ctx.shadowBlur = 0
   const bands = paceBands(entry.track, entry.track_t)
   for (const part of bands ? bandPaths(drawn.points, bands) : []) {
     ctx.strokeStyle = shades[part.band]

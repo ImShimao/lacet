@@ -51,12 +51,24 @@ export default function Countdown({ onDone, onCancel, note = null }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])
 
+  // Le cercle se vide pendant chaque seconde : on voit le temps passer, pas
+  // seulement le chiffre changer. Au « Partez ! », il est plein, et vert.
+  const go = n === 0
   return (
-    <div className="countdown" role="status" aria-live="assertive">
-      <div className="countdown__ring" key={n}>
-        <span className={`countdown__n ${n > 0 ? '' : 'countdown__n--go'}`}>
-          {n > 0 ? n : 'Partez !'}
-        </span>
+    <div className={`countdown ${go ? 'countdown--go' : ''}`} role="status" aria-live="assertive">
+      <div className="countdown__dial" key={n} style={{ '--step': `${go ? GO_MS : STEP_MS}ms` }}>
+        <span className="countdown__wave" aria-hidden="true" />
+        <svg className="countdown__ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle className="countdown__track" cx="60" cy="60" r="54" />
+          <circle className="countdown__arc" cx="60" cy="60" r="54" pathLength="1" />
+        </svg>
+        <span className={`countdown__n ${go ? 'countdown__n--go' : ''}`}>{go ? 'Partez !' : n}</span>
+      </div>
+      {/* Trois points : où l'on en est, sans avoir à lire. */}
+      <div className="countdown__steps" aria-hidden="true">
+        {[3, 2, 1].map((i) => (
+          <i key={i} className={n <= i ? 'countdown__step--done' : ''} />
+        ))}
       </div>
       {note && <p className="countdown__note">{note}</p>}
       <button className="btn countdown__cancel" onClick={onCancel}>

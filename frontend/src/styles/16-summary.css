@@ -20,8 +20,7 @@
   font-variant-numeric: tabular-nums;
 }
 .summary__big span {
-  font-size: calc(10.5px * var(--text-scale));
-  letter-spacing: 0.08em;
+  font-size: calc(13px * var(--text-scale));
   color: var(--text-3);
 }
 .summary .row {
@@ -90,6 +89,20 @@
 }
 .summary__actions .btn--primary {
   flex: 1;
+}
+.summary__share {
+  flex: 0 0 auto;
+  padding-inline: 18px;
+}
+.summary__more {
+  margin-top: 2px;
+}
+/* L'unité, petite, collée au chiffre. */
+.summary__stats b small {
+  margin-left: 2px;
+  font-size: 0.62em;
+  font-weight: 600;
+  color: var(--text-3);
 }
 
 /* La sortie interrompue, retrouvée au lancement : à l'accent et non en rouge — ce

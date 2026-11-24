@@ -178,8 +178,16 @@ devant sa porte pour un second tour.
 la distance, le temps, l'allure, le D+ et les calories estimées ; un record — la
 plus longue sortie, l'allure la plus rapide sur 3 km ou plus — passe devant ;
 puis la comparaison aux passages d'avant sur le même chemin, les temps au
-kilomètre, l'écart au prévu, et le cumul du mois. Partager, exporter en GPX, et
-garder le parcours en favori se font de là.
+kilomètre, l'écart au prévu, et le cumul du mois. Un record sur ce chemin ne
+se dit qu'une fois, dans la carte « Ton meilleur passage ». En bas, collés au
+pouce, « Partager » et « Terminer » ; au-dessus, une rangée nommée — GPX,
+Rapport, Favori, Autre sens. L'image partagée pose la trace sur une lueur de
+l'accent, d'un trait auréolé, et suit l'unité choisie (km ou miles).
+
+**Le décompte** (`Countdown.jsx`) : un cercle qui se vide en une seconde sous
+chaque chiffre, une onde à chaque battement — la vibration en même temps —,
+trois points qui se remplissent, puis « Partez ! » en vert, pendant que le voile
+se lève déjà sur la carte. Sans animation quand iOS en demande moins.
 
 **Le journal de la voix.** Chaque phrase dite pendant la sortie est gardée avec
 elle — l'heure, la distance courue, la position, les mots — et se relit dans le

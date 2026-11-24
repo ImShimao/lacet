@@ -101,33 +101,123 @@
   animation: countdown-in 180ms ease-out;
 }
 
-.countdown__ring {
+/* Au « Partez ! », le voile se lève déjà sur la carte : la sortie commence
+   sous les yeux, pas après un écran qui disparaît d'un coup. */
+.countdown--go {
+  animation: countdown-out 650ms ease-in forwards;
+}
+@keyframes countdown-out {
+  0%,
+  45% {
+    background: var(--scrim-strong);
+    backdrop-filter: blur(6px);
+  }
+  100% {
+    background: transparent;
+    backdrop-filter: blur(0);
+  }
+}
+
+.countdown__dial {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 168px;
-  height: 168px;
+  width: 196px;
+  height: 196px;
+}
+.countdown__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Le cercle part d'en haut, comme une aiguille à midi. */
+  transform: rotate(-90deg);
+}
+.countdown__ring circle {
+  fill: none;
+  stroke-width: 6;
+}
+.countdown__track {
+  stroke: var(--line);
+}
+/* L'arc se vide en une seconde, d'un mouvement régulier : c'est le temps. */
+.countdown__arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: countdown-drain var(--step) linear forwards;
+}
+.countdown--go .countdown__arc {
+  stroke: var(--safe);
+  animation: none;
+}
+.countdown--go .countdown__track {
+  stroke: var(--safe-line);
+}
+
+/* À chaque seconde, une onde part du cercle : le battement qu'on sent aussi
+   en vibration. */
+.countdown__wave {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  border: 3px solid var(--accent);
-  background: var(--accent-soft);
-  /* Une clé qui change à chaque chiffre relance l'animation : le cercle enfle
-     et s'efface, comme un battement. */
-  animation: countdown-beat 900ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: countdown-wave 700ms ease-out;
+}
+.countdown--go .countdown__wave {
+  border-color: var(--safe);
+  background: var(--safe-soft);
 }
 
 .countdown__n {
-  font-size: 84px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 96px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   line-height: 1;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+  /* Le chiffre tombe en place, un peu flou, puis net : il arrive, il ne
+     clignote pas. */
+  animation: countdown-drop 420ms cubic-bezier(0.2, 0.9, 0.25, 1.15);
 }
 
 /* « Partez ! » tient en toutes lettres : il lui faut moins de place par lettre
    qu'un chiffre, et pas de coupure au milieu du mot. */
 .countdown__n--go {
-  font-size: 30px;
-  letter-spacing: 0;
+  font-size: 34px;
+  letter-spacing: -0.01em;
   white-space: nowrap;
+  color: var(--safe);
+  animation: countdown-go 650ms cubic-bezier(0.2, 0.9, 0.25, 1.1) forwards;
+}
+
+.countdown__steps {
+  display: flex;
+  gap: 10px;
+  margin-top: -8px;
+}
+.countdown__steps i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  transition:
+    background 0.25s ease,
+    transform 0.25s ease;
+}
+.countdown__steps i.countdown__step--done {
+  background: var(--accent);
+  transform: scale(1.15);
+}
+.countdown--go .countdown__steps i.countdown__step--done {
+  background: var(--safe);
+}
+/* Trop tard pour annuler : le bouton s'efface avec le voile. */
+.countdown--go .countdown__cancel {
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .countdown__cancel {
@@ -146,26 +236,63 @@
     opacity: 0;
   }
 }
-
-@keyframes countdown-beat {
-  0% {
-    transform: scale(0.72);
-    opacity: 0.2;
+@keyframes countdown-drain {
+  to {
+    stroke-dashoffset: -1;
   }
-  35% {
-    transform: scale(1.06);
+}
+@keyframes countdown-wave {
+  from {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+@keyframes countdown-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(1.25);
+    filter: blur(6px);
+  }
+  to {
     opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+/* « Partez ! » jaillit, puis tout s'éclaircit et s'efface vers la carte. */
+@keyframes countdown-go {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
   }
   100% {
-    transform: scale(1);
-    opacity: 1;
+    opacity: 0;
+    transform: scale(1.25);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .countdown,
-  .countdown__ring {
+  .countdown__arc,
+  .countdown__wave,
+  .countdown__n,
+  .countdown__n--go {
     animation: none;
+  }
+  .countdown__n--go {
+    opacity: 1;
   }
 }
 

@@ -10,7 +10,7 @@ import { announcing, arrivalText, contactOf, textTo } from './contact'
 import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
-import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
+import { paceLabel, speedIn, speedLabel, unitLabel, units } from './units'
 
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
@@ -96,42 +96,40 @@ export default function RunSummary({
         <em>
           {entry.name} · {whenLabel(entry.ranAt)}
         </em>
-        {verdict && <strong className="summary__verdict">{verdict}</strong>}
+        {/* Un record sur ce chemin, la carte « Ton meilleur passage » le dit
+            juste en dessous : la phrase ici le répétait mot pour mot. */}
+        {verdict && !rang?.record && <strong className="summary__verdict">{verdict}</strong>}
       </div>
 
       <div className="summary__big">
         <b>{km(shown)}</b>
-        <span>KILOMÈTRES</span>
+        <span>{units() === 'mi' ? 'miles' : 'kilomètres'}</span>
       </div>
 
-      <div className="stats stats--four">
+      {/* Des étiquettes d'un mot, l'unité à côté du chiffre : « Allure (/km) »
+          et « kcal estimées » passaient sur deux lignes dans des cases étroites. */}
+      <div className="stats stats--four summary__stats">
         <div>
           <b>{duration(seconds)}</b>
-          <span>
-            <Icon name="clock" size={12} />
-            Temps
-          </span>
+          <span>Temps</span>
         </div>
         <div>
-          <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
-          <span>
-            <Icon name="gauge" size={12} />
-            {bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}
-          </span>
+          <b>
+            {bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}
+            <small>{bike ? speedLabel() : paceLabel()}</small>
+          </b>
+          <span>{bike ? 'Vitesse' : 'Allure'}</span>
         </div>
         <div>
-          <b>{entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—'}</b>
-          <span>
-            <Icon name="trendUp" size={12} />
-            Dénivelé +
-          </span>
+          <b>
+            {entry.actual_ascent_m != null ? entry.actual_ascent_m : '—'}
+            {entry.actual_ascent_m != null && <small>m</small>}
+          </b>
+          <span>D+</span>
         </div>
         <div>
           <b>{kcal > 0 ? kcal.toLocaleString('fr-FR') : '—'}</b>
-          <span>
-            <Icon name="flame" size={12} />
-            kcal estimées
-          </span>
+          <span title="Estimées d'après ton poids">kcal</span>
         </div>
       </div>
 
@@ -177,6 +175,40 @@ export default function RunSummary({
           : 'Première sortie du mois.'}
       </p>
 
+      {/* Les gestes secondaires, avec leur nom : cinq ronds sans libellé à
+          côté de « Terminer » se devinaient mal, et le partage s'y perdait. */}
+      <div className="loopacts summary__more" role="group" aria-label="Cette sortie">
+        {entry.track?.length > 1 && (
+          <button className="loopact" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
+            <Icon name="fileExport" size={18} />
+            <span>GPX</span>
+          </button>
+        )}
+        <button className="loopact" onClick={() => shareRunReport(entry)} aria-label="Envoyer le rapport de la sortie">
+          <Icon name="chart" size={18} />
+          <span>Rapport</span>
+        </button>
+        {onKeep && (
+          <button
+            className={`loopact ${kept ? 'loopact--on' : ''}`}
+            onClick={onKeep}
+            aria-pressed={kept}
+            aria-label={kept ? 'Retirer le parcours des favoris' : 'Garder ce parcours en favori'}
+          >
+            {kept ? <SolidIcon name="heart" size={18} /> : <Icon name="heart" size={18} />}
+            <span>Favori</span>
+          </button>
+        )}
+        {/* La même boucle à l'envers est une autre sortie — les côtes en
+            descente, le vent dans le dos : c'est en arrivant qu'on se le dit. */}
+        {onReverse && (
+          <button className="loopact" onClick={onReverse} aria-label="Préparer ce parcours dans l'autre sens">
+            <Icon name="uturn" size={18} />
+            <span>Autre sens</span>
+          </button>
+        )}
+      </div>
+
       {/* Comment les chiffres sont mesurés, pour qui se le demande : dit en
           clair mais replié, pour que les gestes de la fin restent à l'écran. */}
       <details className="spoken">
@@ -212,50 +244,10 @@ export default function RunSummary({
       )}
 
       <div className="summary__actions">
-        <button className="btn btn--icon" onClick={() => setSharing(true)} aria-label="Partager la sortie en image" title="Partager">
-          <Icon name="share" size={18} />
+        <button className="btn summary__share" onClick={() => setSharing(true)} aria-label="Partager la sortie en image">
+          <Icon name="share" size={17} />
+          Partager
         </button>
-        {entry.track?.length > 1 && (
-          <button
-            className="btn btn--icon"
-            onClick={() => downloadRun(entry)}
-            aria-label="Exporter la trace en GPX"
-            title="Exporter en GPX"
-          >
-            <Icon name="fileExport" size={18} />
-          </button>
-        )}
-        <button
-          className="btn btn--icon"
-          onClick={() => shareRunReport(entry)}
-          aria-label="Envoyer le rapport de la sortie"
-          title="Rapport de sortie"
-        >
-          <Icon name="chart" size={18} />
-        </button>
-        {onKeep && (
-          <button
-            className={`btn btn--icon ${kept ? 'btn--on' : ''}`}
-            onClick={onKeep}
-            aria-pressed={kept}
-            aria-label={kept ? 'Retirer le parcours des favoris' : 'Garder ce parcours en favori'}
-            title={kept ? 'Retirer des favoris' : 'Garder en favori'}
-          >
-            {kept ? <SolidIcon name="heart" size={18} /> : <Icon name="heart" size={18} />}
-          </button>
-        )}
-        {/* La même boucle à l'envers est une autre sortie — les côtes en
-            descente, le vent dans le dos : c'est en arrivant qu'on se le dit. */}
-        {onReverse && (
-          <button
-            className="btn btn--icon"
-            onClick={onReverse}
-            aria-label="Préparer ce parcours dans l'autre sens"
-            title="La prochaine fois, dans l'autre sens"
-          >
-            <Icon name="uturn" size={18} />
-          </button>
-        )}
         <button className="btn btn--primary" onClick={onClose}>
           Terminer
         </button>
