@@ -21,7 +21,7 @@ import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch, weatherAdvice } from './explain'
 import { km } from './format'
 import { haptic } from './platform'
-import { summarise } from './request'
+import { filtersLine } from './request'
 import { clockTime, turnIcon } from './runFormat'
 import { fromKm, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 import { presets } from './presets'
@@ -396,7 +396,7 @@ export default function Explore({
             <Icon name="sliders" size={17} />
             <span>
               Filtres
-              <em>{summarise(params).split(' · ').slice(1).join(' · ')}</em>
+              <em>{filtersLine(params)}</em>
             </span>
           </button>
           <button className="btn btn--ghost" onClick={onFreeRun}>

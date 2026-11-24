@@ -2,7 +2,7 @@
 // terminée à son entrée d'historique. Rien ici ne dépend de React : ce sont des
 // traductions, et elles se testent comme telles.
 
-import { directionOf, estimateKm, formatDistance, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
+import { RELIEFS, TERRAINS, directionOf, estimateKm, formatDistance, formatKm, raceOf, secondsPerKm } from './FiltersSheet.jsx'
 import { pace } from './format'
 import { slim } from './storage'
 import { paceLabel, unitLabel } from './units'
@@ -94,6 +94,19 @@ export function summarise(p) {
   // « Éviter › Boucles déjà courues » : ce qu'on cherche, ce sont des inédites.
   const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null
   return [dist, form, fresh, speed].filter(Boolean).join(' · ')
+}
+
+/**
+ * « Mixte · Vallonné » — ce que règlent les filtres, sous leur bouton. La
+ * longueur est écrite en grand juste au-dessus, et l'allure ne change pas le
+ * tracé : ce sont le terrain et le relief qu'on vient y changer.
+ */
+export function filtersLine(p) {
+  const terrain = (TERRAINS[p.sport] ?? TERRAINS.run).find((t) => t.key === p.surface)?.label
+  const relief = p.climb_m != null ? `D+ ${p.climb_m} m` : RELIEFS.find((r) => r.key === p.elevation)?.label
+  const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
+  const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null
+  return [terrain, relief, form, fresh].filter(Boolean).join(' · ')
 }
 
 /** Entrée d'historique d'une sortie sans itinéraire. */

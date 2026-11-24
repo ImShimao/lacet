@@ -29,7 +29,7 @@ export const TERRAINS = {
 
 // Les cibles de `engine/service.js`, en mètres de montée par kilomètre : ce
 // que dit aussi « Comprendre le relief » (`explain.js`).
-const RELIEFS = [
+export const RELIEFS = [
   { key: 'flat', label: 'Plat', icon: 'flat', sub: 'Le moins de montée possible · vers 3 m/km' },
   { key: 'rolling', label: 'Vallonné', icon: 'rolling', sub: 'Un peu de relief · vers 10 m/km' },
   { key: 'hilly', label: 'Côtes', icon: 'hilly', sub: 'Les montées recherchées · 20 m/km et plus' },
@@ -275,9 +275,8 @@ function climbStep(m) {
  * de propositions : trois réglages qu'on touche une fois puis plus jamais, au
  * milieu de ceux qu'on ajuste à chaque sortie. Ils sont passés dans « Mon
  * compte », sous « Recherche ». Ce qui reste ici agit sur les boucles
- * proposées, dans l'ordre où on y touche : l'activité, la longueur, le terrain,
- * le dénivelé, la sécurité. La longueur est passée devant le terrain — c'est le
- * réglage qu'on vient changer, et il demandait de faire défiler.
+ * proposées : l'activité, le terrain, le relief — puis la longueur et l'allure,
+ * repliées en une ligne chacune, puisque l'accueil règle déjà la longueur.
  */
 export default function FiltersSheet({ value, origin = null, onApply, onClose }) {
   const [draft, setDraft] = useState(value)
@@ -357,7 +356,93 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
             </Field>
           )}
 
-          <Field label="Longueur">
+          {shown('terrain') && (
+            <Field label="Préférences de parcours" info="terrain" sport={draft.sport}>
+              <Choices label="Terrain" options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
+              <div className="checks checks--after">
+                <button
+                  role="checkbox"
+                  aria-checked={draft.carfree !== false}
+                  className={`check ${draft.carfree !== false ? 'check--on' : ''}`}
+                  onClick={() => set({ carfree: draft.carfree === false })}
+                >
+                  <span className="check__box">
+                    <Icon name="check" size={13} />
+                  </span>
+                  <span>
+                    Voies sans voitures d'abord
+                    <em>Pistes, chemins et allées ; la route quand il le faut</em>
+                  </span>
+                </button>
+              </div>
+            </Field>
+          )}
+
+          {shown('relief') && (
+            <Field
+              label="Relief"
+              info="relief"
+              sport={draft.sport}
+              value={climbing ? `${draft.climb_m} m de D+` : RELIEFS.find((o) => o.key === draft.elevation)?.label ?? 'Auto'}
+            >
+              {/* « On ne peut pas demander un D+ en particulier » : la plainte
+                  revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
+                  (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
+                  cible de Vallonné. */}
+              <Choices
+                label="Relief"
+                options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }].map((o) => ({
+                  ...o,
+                  badge: reliefBadge(o.key, reachable, o.key === 'climb' ? draft.climb_m / km : null),
+                }))}
+                value={climbing ? 'climb' : draft.elevation}
+                onChange={(key) =>
+                  key === 'climb'
+                    ? set({ climb_m: climbing ? draft.climb_m : Math.max(10, Math.round(km) * 10) })
+                    : set({ elevation: key, climb_m: null })
+                }
+              />
+              {climbing && (
+                <>
+                  <Stepper
+                    text={`${draft.climb_m} m de D+`}
+                    editable={{
+                      value: draft.climb_m,
+                      onCommit: (v) => set({ climb_m: Math.round(clamp(v, 0, MAX_CLIMB)) }),
+                    }}
+                    onStep={(d) => {
+                      const step = climbStep(draft.climb_m + (d > 0 ? 0 : -0.001))
+                      set({ climb_m: round(clamp(draft.climb_m + d * step, 0, MAX_CLIMB), step) })
+                    }}
+                    canDown={draft.climb_m > 0}
+                    canUp={draft.climb_m < MAX_CLIMB}
+                  />
+                  <p className="field__hint">
+                    {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
+                      draft.climb_m,
+                      km,
+                    )
+                      .map(Math.round)
+                      .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
+                  </p>
+                </>
+              )}
+            </Field>
+          )}
+
+          {/* La longueur se règle déjà sur l'accueil, à la règle : ici elle se
+              replie en une ligne, et ne s'ouvre que pour le semi au mètre près,
+              la saisie au clavier ou la tolérance. Même chose pour l'allure,
+              qu'on règle une fois. Ouvertes, les deux poussaient le terrain et le
+              relief — ce qu'on vient vraiment changer ici — sous le pli. */}
+          <Field
+            label="Longueur"
+            value={
+              draft.mode === 'distance'
+                ? `${formatDistance(draft.distance_km)} ${unitLabel()} · ${draft.precise ? 'exacte' : 'souple'}`
+                : formatMinutes(draft.duration_min)
+            }
+          >
             <Segmented
               options={[
                 { key: 'duration', label: 'Durée' },
@@ -488,6 +573,11 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
 
           <Field
             label={isBike ? 'Vitesse' : 'Allure'}
+            value={
+              usesSpeed
+                ? `${formatKm(Math.round(speedIn(draft.speed_kmh) * 10) / 10)} ${speedLabel()}`
+                : `${pace(draft.pace_sec_per_km)} ${paceLabel()}`
+            }
           >
             <div className="field__pace">
               {!isBike && (
@@ -524,81 +614,6 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               </p>
             </div>
           </Field>
-
-          {shown('terrain') && (
-            <Field label="Préférences de parcours" info="terrain" sport={draft.sport}>
-              <Choices label="Terrain" options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
-              <div className="checks checks--after">
-                <button
-                  role="checkbox"
-                  aria-checked={draft.carfree !== false}
-                  className={`check ${draft.carfree !== false ? 'check--on' : ''}`}
-                  onClick={() => set({ carfree: draft.carfree === false })}
-                >
-                  <span className="check__box">
-                    <Icon name="check" size={13} />
-                  </span>
-                  <span>
-                    Voies sans voitures d'abord
-                    <em>Pistes, chemins et allées ; la route quand il le faut</em>
-                  </span>
-                </button>
-              </div>
-            </Field>
-          )}
-
-          {shown('relief') && (
-            <Field
-              label="Relief"
-              info="relief"
-              sport={draft.sport}
-              value={climbing ? `${draft.climb_m} m de D+` : RELIEFS.find((o) => o.key === draft.elevation)?.label ?? 'Auto'}
-            >
-              {/* « On ne peut pas demander un D+ en particulier » : la plainte
-                  revient chez RunnrZ. 150 m sur 10 km tombaient entre Vallonné
-                  (100 m) et Côtes (220 m). On part de 10 m par kilomètre, la
-                  cible de Vallonné. */}
-              <Choices
-                label="Relief"
-                options={[...RELIEFS, { key: 'climb', label: 'Un D+ précis', sub: '« Environ 150 m », au mètre près', icon: 'trendUp' }].map((o) => ({
-                  ...o,
-                  badge: reliefBadge(o.key, reachable, o.key === 'climb' ? draft.climb_m / km : null),
-                }))}
-                value={climbing ? 'climb' : draft.elevation}
-                onChange={(key) =>
-                  key === 'climb'
-                    ? set({ climb_m: climbing ? draft.climb_m : Math.max(10, Math.round(km) * 10) })
-                    : set({ elevation: key, climb_m: null })
-                }
-              />
-              {climbing && (
-                <>
-                  <Stepper
-                    text={`${draft.climb_m} m de D+`}
-                    editable={{
-                      value: draft.climb_m,
-                      onCommit: (v) => set({ climb_m: Math.round(clamp(v, 0, MAX_CLIMB)) }),
-                    }}
-                    onStep={(d) => {
-                      const step = climbStep(draft.climb_m + (d > 0 ? 0 : -0.001))
-                      set({ climb_m: round(clamp(draft.climb_m + d * step, 0, MAX_CLIMB), step) })
-                    }}
-                    canDown={draft.climb_m > 0}
-                    canUp={draft.climb_m < MAX_CLIMB}
-                  />
-                  <p className="field__hint">
-                    {`Environ ${formatKm(Math.round((draft.climb_m / km) * 10) / 10)} m par kilomètre. Les boucles entre ${climbBand(
-                      draft.climb_m,
-                      km,
-                    )
-                      .map(Math.round)
-                      .join(' et ')} m passent devant ; entre elles, la sécurité décide.`}
-                  </p>
-                </>
-              )}
-            </Field>
-          )}
-
         </div>
 
         <div className="modal__foot">

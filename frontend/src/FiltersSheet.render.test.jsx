@@ -34,6 +34,8 @@ const conversion = () => screen.getByText(/Converti en distance/).textContent.re
 describe('le panneau des filtres', () => {
   it('convertit la durée en distance, et suit l’allure qu’on règle', () => {
     ouvrir({ ...DEFAULTS, mode: 'duration', duration_min: 60, pace_sec_per_km: 390 })
+    déplier('Longueur')
+    déplier('Allure')
     expect(conversion()).toContain('environ 9,2 km')
 
     // Une allure plus lente, c'est moins de kilomètres dans la même heure.
@@ -45,6 +47,7 @@ describe('le panneau des filtres', () => {
 
   it('annonce la durée de la boucle quand on règle une distance', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
+    déplier('Allure')
     expect(screen.getByText(/Environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
   })
 
@@ -117,11 +120,22 @@ describe('le panneau des filtres', () => {
 
   it('montre la vitesse et non l’allure à vélo', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', speed_kmh: 20 })
+    déplier('Vitesse')
     expect(screen.getByText('Vitesse')).toBeInTheDocument()
-    expect(screen.getByText(/20 km\/h/)).toBeInTheDocument()
+    // Dans la ligne repliée et sur le réglage ouvert.
+    expect(screen.getAllByText(/20 km\/h/).length).toBe(2)
     // Le choix d'unité n'a pas de sens à vélo : c'est la vitesse qui part au
     // moteur, quoi qu'on affiche.
     expect(screen.queryByRole('button', { name: 'min/km' })).not.toBeInTheDocument()
+  })
+
+  it('replie la longueur et l’allure en une ligne qui dit leur valeur', () => {
+    ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, precise: true, pace_sec_per_km: 390 })
+    expect(screen.getByRole('button', { name: /^Longueur.*10 km · exacte/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: /^Allure.*6:30/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
+    déplier('Longueur')
+    expect(screen.getByRole('button', { name: 'Semi' })).toBeInTheDocument()
   })
 
   it('n’affiche pas un filtre masqué dans les réglages, mais garde la longueur', () => {
@@ -135,6 +149,7 @@ describe('le panneau des filtres', () => {
 
   it('propose à vélo des distances et des durées de cycliste', () => {
     ouvrir({ ...DEFAULTS, sport: 'bike', speedUnit: 'speed', mode: 'distance', distance_km: 40 })
+    déplier('Longueur')
     expect(screen.queryByRole('button', { name: 'Semi' })).not.toBeInTheDocument()
     const usuelles = within(screen.getByRole('group', { name: 'Distances usuelles' }))
     fireEvent.click(usuelles.getByRole('button', { name: '75 km' }))

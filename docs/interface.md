@@ -82,9 +82,13 @@ du soleil (le même calcul que le moteur, `isNight`), un avertissement le dit
 avec l'heure — c'est le moment où une rue sans éclairage ni trottoir devient
 dangereuse.
 
-**Avant de chercher**, le bouton « Filtres » dit ce qu'on va chercher —
-« 10 km · 6:30/km », « 10 km · 3 tours · inédites · 6:30/km » — sans avoir à
-l'ouvrir.
+**Avant de chercher**, le bouton « Filtres » dit ce qu'il règle — « Mixte ·
+Vallonné », « VTT · D+ 300 m · 3 tours » — sans avoir à l'ouvrir
+(`filtersLine`) ; la longueur est écrite en grand juste au-dessus. Dans le
+panneau, l'activité, le terrain et le relief viennent d'abord ; la longueur et
+l'allure, déjà réglées sur l'accueil ou une fois pour toutes, s'y replient en
+une ligne qui dit leur valeur (« 5 km · souple », « 6:30 /km ») et s'ouvrent
+pour le semi au mètre près, la saisie au clavier ou la tolérance.
 
 **Les longueurs usuelles** : à pied, 5 km, 10 km, Semi et Marathon, au mètre
 près ; à vélo, 25, 50, 75 et 100 km, sans resserrer la tolérance. En durée, la

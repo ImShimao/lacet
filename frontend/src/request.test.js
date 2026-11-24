@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULTS } from './FiltersSheet.jsx'
-import { freeRunName, runEntry, summarise, toRequest } from './request'
+import { filtersLine, freeRunName, runEntry, summarise, toRequest } from './request'
 
 const start = { lat: 47.9, lon: 7.2 }
 
@@ -82,6 +82,13 @@ describe('la pastille d’activité', () => {
 
   it('ne parle pas de « Semi » à vélo', () => {
     expect(summarise({ ...DEFAULTS, sport: 'bike', mode: 'distance', distance_km: 21.0975 })).toBe('21,098 km · 20 km/h')
+  })
+})
+
+describe('la ligne des filtres', () => {
+  it('dit le terrain et le relief, pas la longueur ni l’allure', () => {
+    expect(filtersLine(DEFAULTS)).toBe('Mixte · Vallonné')
+    expect(filtersLine({ ...DEFAULTS, sport: 'bike', surface: 'trail', climb_m: 300, form: 'laps', laps: 3 })).toBe('VTT · D+ 300 m · 3 tours')
   })
 })
 
