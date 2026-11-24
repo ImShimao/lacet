@@ -408,9 +408,12 @@ export default function App() {
   // qu'on n'a pas calculé, et de là qu'on le lance. Accroché aux rues, il est
   // décrit comme une boucle de Lacet : note, types de voie, revêtement,
   // traversées, dénivelé, consignes — voir `matchedRoute`, `engine/service.js`.
-  const importGpx = async (file) => {
+  const importGpx = async (file, onTrace) => {
     const { parseGpx, toRoute } = await import('./engine/gpxImport')
     const lu = parseGpx(await file.text(), { name: file.name.replace(/\.gpx$/i, '') })
+    // Le dessin du fichier, tout de suite : l'écran d'attente le trace pendant
+    // que les rues se reconnaissent.
+    onTrace?.(lu.coords, lu.name)
     const brut = toRoute(lu, {
       sport: params.sport,
       secondsPerKm:
@@ -855,6 +858,7 @@ export default function App() {
             <Library
               initialView={routesView}
               onImport={importGpx}
+              importProgress={busy === 'work' ? progress : null}
               saved={saved}
               history={history}
               profile={params}

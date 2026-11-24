@@ -149,3 +149,35 @@ describe('le volume par semaine', () => {
     expect(container.querySelector('.weeks__goal')).toBeNull()
   })
 })
+
+/**
+ * L'import d'un GPX, vu depuis « Mes parcours ». On y reste pendant que les
+ * rues se reconnaissent, et rien n'y bougeait : l'écran doit dire le fichier,
+ * en montrer le dessin et l'étape en cours, puis rendre le bouton.
+ */
+describe('l’import d’un GPX', () => {
+  afterEach(cleanup)
+
+  it('montre le fichier, son tracé et l’étape, le temps de l’import', async () => {
+    let finir
+    const onImport = (file, onTrace) =>
+      new Promise((resolve) => {
+        onTrace([[7.21, 47.91], [7.22, 47.91], [7.22, 47.92]], 'Tour du lac')
+        finir = resolve
+      })
+    const { container, rerender } = render(<Library saved={[]} history={[]} initialView="saved" onImport={onImport} />)
+    const champ = container.querySelector('input[type="file"]')
+    fireEvent.change(champ, { target: { files: [new File(['<gpx/>'], 'tour.gpx')] } })
+
+    const attente = await screen.findByRole('status', { name: /Import de Tour du lac/ })
+    expect(attente.textContent).toContain('Reconnaissance des rues')
+    expect(attente.querySelector('.import__line')).toBeTruthy()
+
+    // Les étapes du moteur passent jusqu'ici, téléchargement compris.
+    rerender(<Library saved={[]} history={[]} initialView="saved" onImport={onImport} importProgress={{ stage: 'download', fraction: 0.42 }} />)
+    expect(screen.getByRole('status').textContent).toContain('Téléchargement des rues… 42 %')
+
+    finir()
+    expect(await screen.findByRole('button', { name: /Importer un GPX/ })).toBeTruthy()
+  })
+})

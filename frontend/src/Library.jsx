@@ -19,7 +19,7 @@ import Challenges from './Challenges.jsx'
 import { dailyMetres, monthKey, monthLabel } from './monthSummary'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
-export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, onExplore, onRename, onForget, profile, mapStyle }) {
+export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, importProgress, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu. Un avis
   // qui y mène (« 40 favoris, c'est le plafond ») ouvre là où il le dit.
@@ -97,7 +97,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
         </div>
       )}
 
-      {view === 'saved' && onImport && <ImportRow onImport={onImport} />}
+      {view === 'saved' && onImport && <ImportRow onImport={onImport} progress={importProgress} />}
 
       {view === 'history' && history.length > 0 && (
         <div className="histfilter">
@@ -364,8 +364,10 @@ function Forget({ route, run, shared, onCancel, onConfirm }) {
  * reconnaissance échoue — un chemin absent du réseau, un fichier de bateau —,
  * le tracé est gardé tel quel et l'app dit qu'elle n'a rien pu juger.
  */
-function ImportRow({ onImport }) {
+function ImportRow({ onImport, progress = null }) {
   const [erreur, setErreur] = useState(null)
+  // Pendant l'import : le nom et le dessin du fichier, dès qu'il est lu.
+  const [enCours, setEnCours] = useState(null)
   const champ = useRef(null)
 
   const choisir = async (event) => {
@@ -375,12 +377,17 @@ function ImportRow({ onImport }) {
     event.target.value = ''
     if (!fichier) return
     setErreur(null)
+    setEnCours({ name: fichier.name.replace(/\.gpx$/i, ''), line: null })
     try {
-      await onImport(fichier)
+      await onImport(fichier, (line, name) => setEnCours({ name, line }))
     } catch (err) {
       setErreur(err.message)
+    } finally {
+      setEnCours(null)
     }
   }
+
+  if (enCours) return <ImportProgress {...enCours} progress={progress} />
 
   return (
     <div className="import">
@@ -402,6 +409,53 @@ function ImportRow({ onImport }) {
           Le tracé d'un ami ou d'une course : Lacet le note et le guide comme les siens.
         </p>
       )}
+    </div>
+  )
+}
+
+/** Ce que fait l'import, étape par étape : les mêmes que la recherche, dites pour un fichier. */
+const IMPORT_STAGES = {
+  data: 'Lecture des rues du coin',
+  download: 'Téléchargement des rues',
+  graph: 'Assemblage des rues',
+  elevation: 'Calcul du relief',
+}
+
+/**
+ * L'attente d'un import. On reste sur cet onglet pendant que les rues se
+ * reconnaissent — parfois dix secondes —, et la barre de la recherche vit dans
+ * Explorer : rien ne bougeait ici, et l'app semblait avoir avalé le fichier.
+ * Le tracé du fichier se dessine, puis une lueur le parcourt tant que Lacet
+ * cherche les rues qu'il emprunte : on voit que c'est bien le bon fichier, et
+ * qu'il se passe quelque chose.
+ */
+function ImportProgress({ name, line, progress }) {
+  const drawn = useMemo(() => sketch(line, 64, 44, 5), [line])
+  const stage = progress?.stage
+  const fraction = stage === 'download' ? (progress?.fraction ?? 0) : 0
+  const label = !line ? 'Lecture du fichier' : (IMPORT_STAGES[stage] ?? 'Reconnaissance des rues')
+  return (
+    <div className="import import--busy" role="status" aria-label={`Import de ${name} : ${label}`}>
+      <span className="import__trace" aria-hidden="true">
+        {drawn ? (
+          <svg viewBox="0 0 64 44" width="64" height="44">
+            <path d={drawn.d} className="import__line" pathLength="1" />
+            <path d={drawn.d} className="import__scan" pathLength="1" />
+            <circle cx={drawn.start[0]} cy={drawn.start[1]} r="2.6" className="import__start" />
+          </svg>
+        ) : (
+          <Icon name="fileImport" size={20} />
+        )}
+      </span>
+      <span className="import__text">
+        <b>{name}</b>
+        <span>
+          {label}…{fraction > 0 && ` ${Math.round(fraction * 100)} %`}
+        </span>
+      </span>
+      <div className={`progress__bar ${fraction ? '' : 'progress__bar--busy'}`}>
+        <i style={fraction ? { transform: `scaleX(${Math.max(0.04, fraction)})` } : undefined} />
+      </div>
     </div>
   )
 }

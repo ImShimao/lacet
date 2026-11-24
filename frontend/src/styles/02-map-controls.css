@@ -177,6 +177,109 @@
   color: var(--risk);
 }
 
+/* L'import en cours : le tracé du fichier se dessine, puis une lueur le
+   parcourt tant que les rues se reconnaissent. */
+.import--busy {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 10px;
+  border-style: solid;
+  border-color: transparent;
+  background: var(--surface-2);
+  animation: import-in 0.25s ease-out;
+}
+.import--busy .progress__bar {
+  grid-column: 1 / -1;
+}
+.import__trace {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+.import__trace path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.import__line {
+  stroke: var(--text-3);
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: import-draw 0.9s ease-out forwards;
+}
+.import__scan {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 0.14 0.86;
+  filter: drop-shadow(0 0 2px var(--accent));
+  animation: import-scan 1.5s linear 0.8s infinite both;
+}
+.import__start {
+  fill: var(--accent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: import-pop 0.3s ease-out both;
+}
+.import__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: calc(13px * var(--text-scale));
+  color: var(--text-3);
+}
+.import__text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(15px * var(--text-scale));
+  font-weight: 600;
+  color: var(--text);
+}
+@keyframes import-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes import-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes import-scan {
+  from {
+    stroke-dashoffset: 0.14;
+  }
+  to {
+    stroke-dashoffset: -0.86;
+  }
+}
+@keyframes import-pop {
+  from {
+    transform: scale(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .import--busy,
+  .import__start {
+    animation: none;
+  }
+  .import__line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .import__scan {
+    display: none;
+  }
+}
+
 /* Ce que la liste annonce quand elle ne répond pas à une frappe. */
 .search__title {
   margin: 0;
