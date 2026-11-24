@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { fromCompact } from './extract'
 import { buildGraph } from './graph'
 import { haversineM } from './geo'
+import { insideRing } from './blocked'
 import { journeyRequest, planJourney } from './journey'
 
 /**
@@ -74,6 +75,30 @@ describe('le trajet de A à B', () => {
 
   it('allongé, il refuse une longueur plus courte que le vol d’oiseau', () => {
     expect(() => journeyRequest({ ...A, to: B, stretch: true, distance_km: 0.5 })).toThrow(/demande plus long/)
+  })
+
+  it('ne traverse jamais une zone à éviter, sauf celle où il arrive', async () => {
+    // Un carré de 120 m posé au milieu d'un trajet allongé : c'est là que l'ancien
+    // calcul, qui ne faisait que rendre la zone chère, passait quand même — son
+    // point de passage se posait sans la regarder.
+    const stretched = (await planJourney({ ...A, to: B, sport: 'run', stretch: true, distance_km: 4 }, deps)).routes[0]
+    const [lon, lat] = stretched.geometry[Math.floor(stretched.geometry.length / 2)]
+    const dLon = 60 / (111_320 * Math.cos((lat * Math.PI) / 180))
+    const dLat = 60 / 110_540
+    const polygon = [
+      [lon - dLon, lat - dLat],
+      [lon + dLon, lat - dLat],
+      [lon + dLon, lat + dLat],
+      [lon - dLon, lat + dLat],
+    ]
+    for (const mode of [{}, { roundtrip: true }, { stretch: true, distance_km: 4 }]) {
+      const { routes } = await planJourney({ ...A, to: B, sport: 'run', zones: [{ polygon }], ...mode }, deps)
+      expect(routes.length).toBeGreaterThan(0)
+      for (const r of routes) expect(r.geometry.some((c) => insideRing(c, polygon)), JSON.stringify(mode)).toBe(false)
+    }
+    // Une zone autour de l'arrivée ne ferme pas le trajet : il faut bien y entrer.
+    const around = { lat: B.lat, lon: B.lon, radius_m: 150 }
+    expect((await planJourney({ ...A, to: B, sport: 'run', zones: [around] }, deps)).routes.length).toBeGreaterThan(0)
   })
 
   it('refuse une arrivée au départ, ou trop loin', () => {

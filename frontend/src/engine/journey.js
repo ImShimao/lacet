@@ -31,7 +31,7 @@
 // redemande à partir de la même demande, et il retrouve ainsi le même graphe.
 
 import { INF, dijkstra, nodeSequence, reconstruct } from './dijkstra'
-import { blockedEdges, withZones } from './blocked'
+import { blockedEdges, insideRing, withZones } from './blocked'
 import { ELEVATION_STEP_M, fetchMany, isNight, shapeRelief } from './environment'
 import { bearingDeg, haversineM, resample } from './geo'
 import { PlanningError, graphRequest, matchedRoute, normalizeRequest } from './service'
@@ -97,21 +97,45 @@ export function journeyRequest(input) {
   return { req, to: { lat: to.lat, lon: to.lon }, label, crow, roundtrip, target }
 }
 
-/** Les poids de chaque variante. Les zones et les signalements pèsent dans toutes. */
-function variantWeights(graph, key, req, night, blocked) {
+/**
+ * Les zones à éviter que le trajet peut vraiment contourner : toutes, sauf
+ * celle où l'on part et celle où l'on arrive — il faut bien en sortir, ou y
+ * entrer.
+ */
+function closedZones(graph, req, to) {
+  const ends = [
+    [req.lon, req.lat],
+    [to.lon, to.lat],
+  ]
+  const holds = (z, p) => (z.polygon ? insideRing(p, z.polygon) : haversineM(p, [z.lon, z.lat]) <= z.radius_m)
+  return withZones(graph, null, (req.zones ?? []).filter((z) => !ends.some((p) => holds(z, p))))
+}
+
+/**
+ * Les poids de chaque variante. Les signalements pèsent dans toutes ; les rues
+ * d'une zone à éviter y sont fermées. Un poids seulement lourd ne suffit pas :
+ * le plus direct, ou le passage d'un trajet allongé, y entrait quand le détour
+ * coûtait plus cher que la pénalité.
+ */
+function variantWeights(graph, key, req, night, blocked, closed) {
+  let out
   if (key === 'direct') {
-    const out = Float64Array.from(graph.edgeLen)
+    out = Float64Array.from(graph.edgeLen)
     for (const e of blocked) out[e] *= BLOCKED_FACTOR
     for (const e of graph.gatedEdges ?? []) out[e] *= BLOCKED_FACTOR
-    return out
+  } else {
+    out = Float64Array.from(
+      buildProfile(req.surface, key === 'safe' ? 'safe' : 'standard', night, req.sport, {
+        avoid: req.avoid,
+        blocked,
+        carfree: req.carfree,
+        nature: req.nature,
+        side: req.side,
+      }).precompute(graph),
+    )
   }
-  return buildProfile(req.surface, key === 'safe' ? 'safe' : 'standard', night, req.sport, {
-    avoid: req.avoid,
-    blocked,
-    carfree: req.carfree,
-    nature: req.nature,
-    side: req.side,
-  }).precompute(graph)
+  for (const e of closed ?? []) out[e] = Infinity
+  return out
 }
 
 // Moins de nœuds atteints que ça depuis le départ : on est sur un quai, une
@@ -154,10 +178,6 @@ function endpoints(graph, req, to, weights) {
   if (target === null) throw new PlanningError("Pas de rue reliée au départ près de l'arrivée.")
   if (target === source) throw new PlanningError("L'arrivée est au départ : pour revenir à ta porte, cherche une boucle.")
   return { source, target }
-}
-
-function reachMask(graph, source) {
-  return reachable(graph, source, Float64Array.from(graph.edgeLen)).mask
 }
 
 function pathLength(graph, edges) {
@@ -258,13 +278,15 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
 
   const night = req.time_of_day === 'auto' ? isNight(req.lat, req.lon, now()) : req.time_of_day === 'night'
   const blocked = withZones(graph, blockedEdges(graph, req.blocked), req.zones) ?? new Set()
-  const { source, target } = endpoints(graph, req, to, variantWeights(graph, 'direct', req, night, blocked))
+  const closed = closedZones(graph, req, to)
+  const direct = variantWeights(graph, 'direct', req, night, blocked, closed)
+  const { source, target } = endpoints(graph, req, to, direct)
 
   const found = wanted
-    ? stretchedPaths(graph, source, target, variantWeights(graph, 'safe', req, night, blocked), wanted, reachMask(graph, source))
+    ? stretchedPaths(graph, source, target, variantWeights(graph, 'safe', req, night, blocked, closed), wanted, reachable(graph, source, direct).mask)
     : []
   for (const variant of wanted ? [] : JOURNEY_VARIANTS) {
-    const weights = variantWeights(graph, variant.key, req, night, blocked)
+    const weights = variantWeights(graph, variant.key, req, night, blocked, closed)
     const tree = dijkstra(graph, source, weights, { target, slack: 1 })
     if (tree.dist[target] === INF) continue
     let edges = reconstruct(tree, target)
