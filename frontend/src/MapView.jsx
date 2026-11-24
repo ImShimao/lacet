@@ -580,55 +580,43 @@ export default function MapView({
   }, [overview])
 
   // --- le sens, en mouvement ---------------------------------------------------
-  // Une flèche lumineuse fait le tour de la boucle, dans son sens, puis repart :
-  // les chevrons fixes disent le sens quand on cherche, elle le montre d'un coup
-  // d'œil, sans qu'on ait à suivre la ligne. Un marqueur du DOM, pas une couche :
-  // la carte ne se redessine pas à chaque image. Ni en course, où la position
-  // suffit, ni pendant le survol, qui a sa propre pastille, ni si iOS demande
-  // moins de mouvement.
-  const flowLine = route?.geometry
+  // De petits traits blancs coulent sans fin dans le tracé, dans son sens, comme
+  // chez RunnrZ : le sens se voit sans chercher, et la boucle paraît vivante.
+  // MapLibre ne sait pas décaler des pointillés : on fait tourner le motif, un
+  // pixel à la fois, en réécrivant `line-dasharray` (voir `flowDashes`). Les
+  // chevrons fixes reviennent là où rien ne doit bouger : en course, pendant le
+  // survol, et quand iOS demande moins de mouvement.
+  const hasRoute = route?.geometry?.length > 1
   useEffect(() => {
     const m = map.current
-    if (!m || navigate || flyover || !(flowLine?.length > 1)) return undefined
+    if (!m || navigate || flyover || !hasRoute) return undefined
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
-    const { total, at } = alongLine(flowLine)
-    if (total < 200) return undefined
-    const el = document.createElement('div')
-    el.className = 'flowarrow'
-    el.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M5.5 16.5 12 5.5l6.5 11-6.5-3z" /></svg>'
-    const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' })
-      .setLngLat(flowLine[0])
-      .addTo(m)
-    // Un tour en six à douze secondes selon la longueur, puis un temps de pause :
-    // assez lent pour se suivre, assez court pour revenir avant qu'on détourne
-    // les yeux.
-    const lap = Math.min(12_000, Math.max(6_000, total * 1.1))
-    const rest = 1_400
-    // Elle attend que le tracé ait fini de se dessiner.
-    const t0 = performance.now() + DRAW_MS
     let frame = 0
+    let last = -1
     const tick = (now) => {
-      const t = (now - t0) % (lap + rest)
-      if (now < t0 || t > lap) {
-        el.style.opacity = '0'
-      } else {
-        // Ralentie aux deux bouts, comme un coureur qui part et qui arrive.
-        const k = t / lap
-        const d = total * (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2)
-        marker.setLngLat(at(d))
-        // Le cap entre un point un peu avant et un peu après : les virages
-        // s'arrondissent au lieu de faire pivoter la flèche d'un coup.
-        marker.setRotation(bearingOf(at(d - 18), at(d + 18)))
-        el.style.opacity = String(Math.min(1, d / 60, (total - d) / 60))
-      }
       frame = requestAnimationFrame(tick)
+      // Une carte détruite n'a plus de style : `getLayer` y lèverait une erreur.
+      if (!m.style || !m.getLayer('route-flow')) return
+      // Un changement de thème repose les couches, cachées : on les reprend.
+      if (m.getLayoutProperty('route-flow', 'visibility') !== 'visible') {
+        m.setLayoutProperty('route-flow', 'visibility', 'visible')
+        m.setLayoutProperty('route-arrows', 'visibility', 'none')
+        last = -1
+      }
+      const step = Math.floor(now / FLOW_STEP_MS) % FLOW_STEPS
+      if (step === last) return
+      last = step
+      m.setPaintProperty('route-flow', 'line-dasharray', flowDashes(step))
     }
     frame = requestAnimationFrame(tick)
     return () => {
       cancelAnimationFrame(frame)
-      marker.remove()
+      if (m.style && m.getLayer('route-flow')) {
+        m.setLayoutProperty('route-flow', 'visibility', 'none')
+        m.setLayoutProperty('route-arrows', 'visibility', 'visible')
+      }
     }
-  }, [flowLine, navigate, flyover])
+  }, [hasRoute, navigate, flyover, styleKey])
 
   // --- survol 3D ------------------------------------------------------------------
   // La boucle vue d'en haut, carte inclinée sur le relief, de la porte à la
@@ -1049,6 +1037,26 @@ function visibleCentre(m) {
   return [(p.left - p.right) / 2, (p.top - p.bottom) / 2]
 }
 
+// Les traits qui coulent dans le tracé, en largeurs de ligne : un trait de
+// FLOW_DASH, un blanc de FLOW_GAP. Le motif avance d'un pixel par cran, vingt-cinq par seconde.
+const FLOW_DASH = 4
+const FLOW_GAP = 7
+const FLOW_STEPS = 22
+const FLOW_STEP_MS = 40
+
+/**
+ * Le motif de pointillés décalé de `step` crans dans le sens du tracé.
+ * `line-dasharray` commence toujours par un trait : pour le déplacer, on
+ * l'écrit en commençant par un trait de longueur nulle, ou par le bout d'un
+ * trait coupé au bord de la période.
+ */
+export function flowDashes(step) {
+  const period = FLOW_DASH + FLOW_GAP
+  const o = (step / FLOW_STEPS) * period
+  if (o + FLOW_DASH <= period) return [0, o, FLOW_DASH, period - o - FLOW_DASH]
+  return [o + FLOW_DASH - period, period - FLOW_DASH, period - o, 0]
+}
+
 /**
  * La flèche de sens : un chevron blanc, cerné de sombre.
  *
@@ -1200,6 +1208,20 @@ function addLayers(m) {
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-width': 5 },
+  })
+
+  // Les traits qui coulent dans le tracé (voir « le sens, en mouvement ») :
+  // cachés tant que l'animation ne les a pas pris en main.
+  m.addLayer({
+    id: 'route-flow',
+    type: 'line',
+    source: 'route',
+    layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' },
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.6, 15, 2, 17, 2.6],
+      'line-dasharray': flowDashes(0),
+    },
   })
 
   // Le sens de parcours. Il n'est pas décoratif : les consignes de navigation,

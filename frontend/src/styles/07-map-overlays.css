@@ -572,22 +572,3 @@
   color: var(--on-accent);
 }
 
-/* La flèche qui fait le tour de la boucle : blanche cernée de sombre, comme
-   les chevrons du tracé, avec un halo clair. Pas de bleu : elle se confondait
-   avec le point de la position. */
-.flowarrow {
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s linear;
-}
-.flowarrow svg {
-  display: block;
-  overflow: visible;
-  filter: drop-shadow(0 0 5px rgb(255 255 255 / 0.55)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
-}
-.flowarrow path {
-  fill: #fff;
-  stroke: var(--map-arrow-casing);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}

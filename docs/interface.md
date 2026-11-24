@@ -147,15 +147,14 @@ précis**. La parcourir à l'envers donne les côtes au mauvais moment, le vent 
 face à la fin, et un guidage qui annonce des virages à gauche là où il faut
 tourner à droite.
 
-Les chevrons sont petits, ouverts et arrondis, blancs cernés de sombre : ils
-tiennent dans la largeur du tracé et se lisent sur tous les fonds, satellite
-compris. C'est une couche de symboles sans texte (`arrowIcon`, `MapView.jsx`),
-qui suit la géométrie dans le sens où elle est écrite — celui du parcours — sans
-calcul. **Une flèche plus grande fait le tour de la boucle**, ralentie au départ
-et à l'arrivée, puis repart après une courte pause : le sens se voit d'un coup
-d'œil, sans suivre la ligne. C'est un marqueur, la carte ne se redessine donc pas
-à chaque image ; elle s'efface en course, pendant le survol, et quand l'iPhone
-demande de réduire les animations.
+**De petits traits blancs coulent sans fin dans le tracé**, dans son sens : le
+sens se voit d'un coup d'œil, sans suivre la ligne. MapLibre ne sait pas décaler
+des pointillés ; le motif tourne donc d'un pixel à la fois, vingt-cinq fois par
+seconde, en réécrivant `line-dasharray` (`flowDashes`, `MapView.jsx`). En course,
+pendant le survol et quand l'iPhone demande de réduire les animations, rien ne
+bouge : de petits chevrons fixes, blancs cernés de sombre, prennent le relais
+(`arrowIcon`). Ils suivent la géométrie dans le sens où elle est écrite — celui
+du parcours — sans calcul.
 
 **La boucle se dessine** depuis le départ, dans son sens, à chaque nouvelle
 proposition choisie : on voit d'un coup d'œil par où elle part et par où elle
