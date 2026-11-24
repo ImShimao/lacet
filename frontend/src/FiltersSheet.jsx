@@ -457,35 +457,26 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               </>
             )}
             {draft.mode === 'distance' && (
-              <>
-                <Segmented
-                  options={[
-                    { key: 'loose', label: 'Souple · ±10 %' },
-                    { key: 'exact', label: 'Exacte · ±2,5 %' },
-                  ]}
-                  value={draft.precise ? 'exact' : 'loose'}
-                  onChange={(v) => set({ precise: v === 'exact' })}
-                />
-                <p className="field__hint">
-                  {draft.precise
-                    ? `La boucle tombera entre ${formatDistance(draft.distance_km * 0.975)} et ${formatDistance(
-                        draft.distance_km * 1.025,
-                      )} ${unitLabel()}. Moins de boucles conviennent : s'il n'y en a aucune, Lacet élargit tout seul et le dit.`
-                    : `La boucle tombera entre ${formatDistance(draft.distance_km * 0.9)} et ${formatDistance(
-                        draft.distance_km * 1.1,
-                      )} ${unitLabel()} — de quoi suivre les rues plutôt que le chiffre.`}
-                </p>
-              </>
+              <Segmented
+                options={[
+                  { key: 'loose', label: 'Souple · ±10 %' },
+                  { key: 'exact', label: 'Exacte · ±2,5 %' },
+                ]}
+                value={draft.precise ? 'exact' : 'loose'}
+                onChange={(v) => set({ precise: v === 'exact' })}
+              />
             )}
+            {/* Une ligne, pas deux paragraphes : la fourchette suffit, le reste
+                (pas du réglage, champ au clavier) se découvre en touchant. */}
             <p className="field__hint">
               {draft.mode === 'duration'
                 ? // Une estimation à trois décimales se lirait comme une promesse.
                   `Converti en distance selon l'allure : environ ${formatDistance(
                     Math.round(estimateKm(draft) * 10) / 10,
                   )} ${unitLabel()}.`
-                : `Pas de ${formatDistance(distanceStep(draft.distance_km))} ${unitLabel()} · jusqu'à ${formatDistance(maxKm)} ${unitLabel()} ${
-                    isBike ? 'à vélo' : 'à pied'
-                  }. Le champ est modifiable au clavier.`}
+                : `Entre ${formatDistance(draft.distance_km * (draft.precise ? 0.975 : 0.9))} et ${formatDistance(
+                    draft.distance_km * (draft.precise ? 1.025 : 1.1),
+                  )} ${unitLabel()}${draft.precise ? ' ; élargi tout seul s’il n’y a rien.' : '.'}`}
             </p>
 
             {/* L'allure appartient à ce champ : c'est elle qui convertit une
@@ -526,10 +517,10 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
               )}
               <p className="field__hint">
                 {draft.mode === 'duration'
-                  ? 'Ne change pas le tracé : elle convertit la durée en distance.'
-                  : `Ne change pas le tracé : elle donne la durée annoncée — environ ${formatMinutes(
+                  ? 'Convertit la durée en distance ; ne change pas le tracé.'
+                  : `Environ ${formatMinutes(
                       Math.round((draft.distance_km * secondsPerKm(draft)) / 60),
-                    )} pour cette boucle.`}
+                    )} pour cette boucle ; ne change pas le tracé.`}
               </p>
             </div>
           </Field>

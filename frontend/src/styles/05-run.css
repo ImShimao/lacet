@@ -165,6 +165,38 @@
   color: var(--info);
 }
 
+/* Retour, météo, vent : des pastilles sur une ligne, pas trois cadres. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: calc(12px * var(--text-scale));
+  color: var(--text-2);
+}
+.facts .icon {
+  color: var(--info);
+}
+.facts li.facts--warn {
+  background: var(--caution-soft);
+  border-color: var(--caution-line);
+}
+.facts__advice {
+  margin: -4px 2px 0;
+  color: var(--text-2);
+}
+
 .notice--warn {
   background: var(--caution-soft);
   border-color: var(--caution-line);

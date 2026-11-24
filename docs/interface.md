@@ -11,6 +11,12 @@ sécurité, points d'eau — et la poignée grise le replie. L'app reste en
 portrait (`customize.py`) : on court téléphone en main ou au bras, et une app
 qui pivote au moindre mouvement est inutilisable en courant.
 
+**Peu de texte à l'écran.** Dans le détail, l'heure de retour, la météo et le
+vent tiennent sur une rangée de pastilles (`Facts` dans `Explore.jsx`) ; seul
+un conseil qui change la tenue (pluie, froid, chaleur) garde sa phrase. Dans
+les filtres et les réglages, une ligne suffit sous chaque champ : la
+fourchette de distance, la durée estimée. Le reste se lit dans l'aide (i).
+
 Le cadrage d'une boucle tient compte de tout ce qui flotte — la recherche, la
 pastille d'activité, les boutons, le panneau du bas — pour qu'aucune partie du
 tracé ne passe dessous (`dockPadding` dans `MapView.jsx`).

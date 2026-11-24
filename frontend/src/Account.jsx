@@ -221,10 +221,6 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
           <p className="muted small">
             L'objectif trace un repère sur « Volume par semaine », dans tes sorties. À 0, pas de repère.
           </p>
-          <p className="muted small">
-            L'activité, le terrain et le niveau de sécurité se règlent dans les filtres, au moment
-            de chercher une boucle : ils changent d'une sortie à l'autre.
-          </p>
         </>
       )
     case 'search':
@@ -719,9 +715,8 @@ function KeptStreets() {
         <Row label="Plafond" value={usage ? offline.formatBytes(usage.budget) : '—'} />
       </div>
       <p className="muted small">
-        Les rues d'un coin se gardent toutes seules dès qu'on y cherche une boucle, et y
-        restent trois mois. Au plafond, les plus anciennement utilisées laissent la place —
-        rien à préparer avant un voyage, rien à effacer au retour.
+        Gardées toutes seules dès qu'on cherche une boucle, pour trois mois : rien à
+        préparer avant un voyage.
       </p>
     </>
   )
@@ -788,8 +783,7 @@ function StoredData() {
       <p className="muted small">
         <b>{mo(info.bytes)}</b> sur environ {mo(info.quota)} — {info.counts.history} sortie
         {info.counts.history > 1 ? 's' : ''} ({mo(info.parts.history)}), {info.counts.favorites} favori
-        {info.counts.favorites > 1 ? 's' : ''} ({mo(info.parts.favorites)}). La limite est celle du
-        moteur web de l'app, pas du téléphone : elle vaut pour toute l'app, et chaque caractère y compte double.
+        {info.counts.favorites > 1 ? 's' : ''} ({mo(info.parts.favorites)}).
       </p>
 
       {info.counts.traces > 0 && (
@@ -837,10 +831,8 @@ function MyReports() {
   if (!items.length) {
     return (
       <p className="muted small">
-        Rien de signalé. Pendant une sortie, le bouton « Signaler un problème ici » note des
-        travaux, un passage fermé ou un danger à l'endroit où tu te trouves : les boucles
-        suivantes passeront ailleurs, et la sortie en cours se recalcule aussitôt. Ces points
-        restent sur l'appareil — personne d'autre ne les voit — et s'effacent au bout de six mois.
+        Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou
+        dangereux pour six mois.
       </p>
     )
   }
@@ -884,9 +876,8 @@ function MyZones({ zones, onZones }) {
   if (!zones.length) {
     return (
       <p className="muted small">
-        Aucune zone. Sur la carte, le bouton au cercle hachuré pose une zone à éviter — un
-        quartier, une forêt de chasse, un chantier qui dure : toutes les boucles passent autour,
-        et le recalcul en course aussi.
+        Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs
+        passent autour.
       </p>
     )
   }
@@ -946,11 +937,8 @@ function OfflineStorage() {
         <Row label="Espace occupé" value={offline.formatBytes(total)} />
       </div>
       <p className="muted small">
-        Chaque sortie garde d'elle-même la carte de son parcours, pour les cinq
-        dernières : si le réseau tombe en route, elle reste là. Les tuiles sont
-        partagées : deux boucles de la même ville ne se paient qu'une fois. Le
-        détail va jusqu'au zoom {offline.TILE_ZOOM}. Nature et Satellite ne se
-        gardent pas : hors ligne, c'est le fond Nuit qui est gardé.
+        Les cinq dernières sorties gardent leur carte, au cas où le réseau tombe. Hors
+        ligne, c'est le fond Nuit qui sert.
       </p>
       {count > 0 &&
         (confirm ? (
@@ -1004,7 +992,7 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
   return (
     <PrefsCard
       title="Pendant la sortie"
-      foot="Sans recalcul automatique, le bouton « Recalculer » reste là. Sans arrêt automatique, l'arrivée propose de terminer, et la sortie continue."
+      foot="Éteints, « Recalculer » et « Terminer » restent à portée de main."
     >
       <ToggleRow
         icon="refresh"
@@ -1118,7 +1106,7 @@ function VoiceSetting() {
 
       <PrefsCard
         title="Annonces"
-        foot="La distance est toujours dite ; le reste, à ton choix. À vélo, la voix parle tous les 5 ou 10 km."
+        foot="La distance est toujours dite. À vélo, tous les 5 ou 10 km."
       >
         <PickRow icon="flag" label={units() === 'mi' ? 'Miles' : 'Kilomètres'} value={prefs.km} options={kmEvery()} onChange={(km) => change({ km })} />
         {prefs.km !== 0 &&
@@ -1154,7 +1142,7 @@ function WorkoutSetting() {
   return (
     <PrefsCard
       title="Séance fractionnée"
-      foot="La voix dit chaque bloc à son début, prévient dix secondes ou cent mètres avant sa fin, et donne le temps de chaque répétition. Sur une boucle comme en course libre."
+      foot="Chaque bloc annoncé, prévenu avant sa fin, et chaque répétition chronométrée."
     >
       <ToggleRow icon="repeat" label="Guider une séance" on={prefs.on} onChange={(on) => change({ on })} />
       {prefs.on && (

@@ -94,7 +94,7 @@ describe('les avertissements de l’écran', () => {
 
   it('disent l’heure de retour si l’on part maintenant', () => {
     afficher()
-    expect(screen.getByText(/Partie maintenant, retour vers/)).toBeInTheDocument()
+    expect(screen.getByText(/Retour vers \d/)).toBeInTheDocument()
   })
 
   it('disent la météo du départ et la tenue qui va avec', () => {

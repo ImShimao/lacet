@@ -45,7 +45,7 @@ describe('le panneau des filtres', () => {
 
   it('annonce la durée de la boucle quand on règle une distance', () => {
     ouvrir({ ...DEFAULTS, mode: 'distance', distance_km: 10, pace_sec_per_km: 390 })
-    expect(screen.getByText(/environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
+    expect(screen.getByText(/Environ 1 h 05 pour cette boucle/)).toBeInTheDocument()
   })
 
   it('ne lance rien tant qu’on n’a pas demandé', () => {

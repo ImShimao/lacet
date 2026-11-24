@@ -410,7 +410,7 @@ export default function Explore({
         {streetsReady ? (
           <p className="ready small">
             <Icon name="check" size={14} />
-            Rues du coin prêtes : la recherche sera presque instantanée.
+            Rues du coin prêtes, même sans réseau.
           </p>
         ) : (
           streetsLoading && (
@@ -578,21 +578,14 @@ export default function Explore({
         </div>
       )}
       {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
-      {meta.wind && <WindNote wind={meta.wind} />}
-      {/* L'heure de retour, si l'on part maintenant : c'est elle qu'on donne à
-          la maison. La nuit tombante la dit déjà, avec sa mise en garde. */}
-      {!dusk && selected.duration_s > 0 && (
-        <div className="windnote">
-          <Icon name="clock" size={16} />
-          <span>Partie maintenant, retour vers {clockTime(Date.now() + selected.duration_s * 1000)}.</span>
-        </div>
-      )}
-      {weather && (
-        <div className="windnote">
-          <Icon name={weather.icon} size={16} />
-          <span>{weather.text}</span>
-        </div>
-      )}
+      {/* Retour, météo, vent : trois cadres pleine largeur poussaient le tracé
+          et la note sous le pli. Une rangée de pastilles les dit d'un coup
+          d'œil ; seul un conseil qui change la tenue garde sa phrase. */}
+      <Facts
+        back={!dusk && selected.duration_s > 0 ? clockTime(Date.now() + selected.duration_s * 1000) : null}
+        weather={weather}
+        wind={meta.wind}
+      />
 
       {selected.laps > 1 && (
         <div className="laps">
@@ -1034,16 +1027,34 @@ function minutes(seconds) {
  * dépend. Le cap annoncé est celui d'où le vent vient — c'est la convention de
  * tout le monde, et l'inverse de celui que le moteur manipule.
  */
-function WindNote({ wind }) {
-  const from = CARDINALS[Math.round(((wind.bearing + 180) % 360) / 45) % 8]
+function Facts({ back, weather, wind }) {
+  if (!back && !weather && !wind) return null
+  const from = wind && CARDINALS[Math.round(((wind.bearing + 180) % 360) / 45) % 8]
   return (
-    <div className="windnote">
-      <Icon name="compass" size={16} />
-      <span>
-        Vent de {from}, {Math.round(speedIn(wind.speed_kmh))} {speedLabel()} — à qualité égale, les boucles
-        qui finissent vent dans le dos sont proposées en premier.
-      </span>
-    </div>
+    <>
+      <ul className="facts" aria-label="Avant de partir">
+        {back && (
+          <li>
+            <Icon name="clock" size={14} />
+            Retour vers {back}
+          </li>
+        )}
+        {weather && (
+          <li className={weather.advice ? 'facts--warn' : undefined}>
+            <Icon name={weather.icon} size={14} />
+            {weather.short}
+          </li>
+        )}
+        {wind && (
+          // Le classement en tient compte : à qualité égale, l'arrivée vent dans le dos passe devant.
+          <li title="À qualité égale, les boucles qui finissent vent dans le dos passent devant.">
+            <Icon name="compass" size={14} />
+            Vent {/^[aeiou]/.test(from) ? `d’${from}` : `de ${from}`} · {Math.round(speedIn(wind.speed_kmh))} {speedLabel()}
+          </li>
+        )}
+      </ul>
+      {weather?.advice && <p className="facts__advice small">{weather.text}</p>}
+    </>
   )
 }
 

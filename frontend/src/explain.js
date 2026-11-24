@@ -130,12 +130,13 @@ export function reliefBadge(key, reachable, climbPerKm = null) {
 export function weatherAdvice(weather) {
   if (!Number.isFinite(weather?.temp_c)) return null
   const temp = `${Math.round(weather.temp_c)} °C`
+  // `short` tient dans une pastille ; `advice` dit que la phrase change la tenue.
   if (weather.rain_mm >= 0.2) {
-    return { icon: 'rain', text: `${temp}, pluie annoncée dans l'heure : une veste imperméable, et prudence sur les pavés et les feuilles.` }
+    return { icon: 'rain', short: `${temp} · pluie`, advice: true, text: `${temp}, pluie annoncée dans l'heure : une veste imperméable, et prudence sur les pavés et les feuilles.` }
   }
-  if (weather.temp_c < 4) return { icon: 'moon', text: `${temp} au départ : gants, bonnet et une couche de plus — tu l'enlèveras après l'échauffement.` }
-  if (weather.temp_c > 26) return { icon: 'sun', text: `${temp} au départ : emporte de l'eau, et ralentis l'allure plutôt que de la tenir.` }
-  return { icon: 'sun', text: `${temp} et sec au départ.` }
+  if (weather.temp_c < 4) return { icon: 'moon', short: temp, advice: true, text: `${temp} au départ : gants, bonnet et une couche de plus — tu l'enlèveras après l'échauffement.` }
+  if (weather.temp_c > 26) return { icon: 'sun', short: temp, advice: true, text: `${temp} au départ : emporte de l'eau, et ralentis l'allure plutôt que de la tenir.` }
+  return { icon: 'sun', short: `${temp} · sec`, advice: false, text: `${temp} et sec au départ.` }
 }
 
 /**
