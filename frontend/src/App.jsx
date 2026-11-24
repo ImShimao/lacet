@@ -13,6 +13,7 @@ import RunDetail from './RunDetail.jsx'
 import { sectionTitle } from './accountSections.js'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import Launch from './Launch.jsx'
+import Welcome from './Welcome.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
 import { GeoBanner, LibraryNotice, ResumeBanner } from './Banners.jsx'
@@ -728,7 +729,7 @@ export default function App() {
             {tab === 'explore' && result && (
               <button className="sportpill" onClick={() => setFiltersOpen(true)}>
                 <Icon name={sport?.icon} size={19} />
-                <b>{sport?.label}</b>
+                <b>{t(sport?.label)}</b>
                 {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
                 <span className="sportpill__spec">
                   {result.meta?.journey
@@ -1034,6 +1035,7 @@ export default function App() {
         />
       )}
       <Launch />
+      <Welcome />
     </div>
   )
 }

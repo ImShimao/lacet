@@ -4,6 +4,21 @@
  * rester les mêmes des deux côtés — `i18n.test.js` le vérifie.
  */
 export default {
+  "Des boucles qui reviennent à ta porte": "Loops that bring you back to your door",
+  "Indique une distance ou une durée : Lacet trace des parcours qui partent de chez toi et y reviennent.": "Set a distance or a duration: Lacet draws routes that start from home and come back to it.",
+  "Chaque boucle est notée": "Every loop is graded",
+  "La note ne juge que la sécurité du tracé : ni sa beauté, ni sa longueur, ni son dénivelé.": "The grade rates the route's safety only: not its beauty, its length or its climb.",
+  "Au plus 1 % du parcours au contact du trafic, et aucune traversée non protégée.": "At most 1% of the route exposed to traffic, and no unprotected crossing.",
+  "Au plus 3 % du parcours au contact du trafic.": "At most 3% of the route exposed to traffic.",
+  "Plus exposée. Proposée seulement en mode Standard, jamais en mode Sûr.": "More exposed. Only offered in Standard mode, never in Safe mode.",
+  "« Au contact du trafic » : une route à 80 km/h ou plus, sans trottoir ni accotement. Autoroutes, voies rapides et tunnels sans trottoir sont écartés d'office.": "“Exposed to traffic”: a road at 80 km/h or more, with no sidewalk or shoulder. Motorways, expressways and tunnels without a sidewalk are always left out.",
+  "Guidé à la voix": "Voice guidance",
+  "Pendant la sortie, chaque virage est annoncé à voix haute, même écran verrouillé. Le téléphone peut rester en poche.": "During your run, every turn is announced aloud, even with the screen locked. Your phone can stay in your pocket.",
+  "Dans 150 m, à droite": "In 150 m, turn right",
+  "Page {n} sur {total}": "Page {n} of {total}",
+  "Passer": "Skip",
+  "Continuer": "Continue",
+  "Commencer": "Get started",
   "Profil local": "Local profile",
   "Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.": "No account. Favorites, runs and settings never leave this device.",
   "Poids {v1} kg{v2}": "Weight {v1} kg{v2}",

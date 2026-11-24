@@ -59,6 +59,10 @@ export default function RunSummary({
   const bests = useMemo(() => distanceRecords(entry, history), [entry, history])
   const splits = entry.splits?.length ? entry.splits : null
   const shown = useCountUp(distance)
+  // Le temps et le D+ comptent jusqu'à leur valeur comme la distance, pour que
+  // le bilan se lise d'un bloc. Le D+ absent reste « — », sans compter.
+  const shownTime = useCountUp(seconds)
+  const shownAscent = useCountUp(entry.actual_ascent_m ?? 0)
   const kcal = Math.round(energy(distance, weightKg, entry.sport))
   // La trace courue, en grand, et ses tronçons par allure quand elle a ses
   // heures — une sortie d'avant, ou reprise sans elles, reste d'un seul trait.
@@ -109,7 +113,7 @@ export default function RunSummary({
           et « kcal estimées » passaient sur deux lignes dans des cases étroites. */}
       <div className="stats stats--four summary__stats">
         <div>
-          <b>{duration(seconds)}</b>
+          <b>{duration(Math.round(shownTime))}</b>
           <span>{t('Temps')}</span>
         </div>
         <div>
@@ -121,7 +125,7 @@ export default function RunSummary({
         </div>
         <div>
           <b>
-            {entry.actual_ascent_m != null ? entry.actual_ascent_m : '—'}
+            {entry.actual_ascent_m != null ? Math.round(shownAscent) : '—'}
             {entry.actual_ascent_m != null && <small>m</small>}
           </b>
           <span>D+</span>

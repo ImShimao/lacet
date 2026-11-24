@@ -73,6 +73,15 @@
   /* Le fond teinté dit déjà la note : un filet en plus en faisait un cadre de
      plus sur chaque carte. Les couleurs de bord restent pour qui en remet un. */
   border: 0;
+  /* La note arrive d'un coup de légère surbrillance : on la repère sans la
+     chercher. Une seule fois au montage, pas à chaque geste sur la carte. */
+  animation: grade-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes grade-in {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 .grade--A {
   background: var(--safe-soft);

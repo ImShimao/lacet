@@ -189,7 +189,9 @@
   /* Le geste de fermeture : la feuille descend avec le doigt, puis revient
      ou s'efface. Sans transformation au repos (`0px` compte comme une
      transformation), les éléments en position fixe se caleraient sur elle. */
-  transition: transform 0.18s ease-out;
+  /* Courbe d'iOS plutôt que `ease-out` : la feuille part vite puis se pose sans
+     à-coup, comme les feuilles natives. */
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .shell[data-sheet='full'][data-dragging] .side {
   transform: translateY(var(--sheet-drag, 0px));
