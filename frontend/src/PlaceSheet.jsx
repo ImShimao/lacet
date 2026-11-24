@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import useModal from './useModal'
 
+import { t } from './i18n'
 /**
  * Nommer un point de départ pour le retrouver d'un geste.
  *
@@ -14,18 +15,16 @@ export default function PlaceSheet({ suggestion, onSave, onClose }) {
   const panel = useModal(onClose)
 
   return createPortal(
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="Enregistrer ce départ">
+    <div className="sheet" role="dialog" aria-modal="true" aria-label={t('Enregistrer ce départ')}>
       <div className="sheet__panel" ref={panel} tabIndex={-1}>
-        <h3>Enregistrer ce départ</h3>
-        <p className="muted">
-          Il apparaîtra dans le menu du point de départ, et restera sur cet appareil.
-        </p>
+        <h3>{t('Enregistrer ce départ')}</h3>
+        <p className="muted">{t('Il apparaîtra dans le menu du point de départ, et restera sur cet appareil.')}</p>
         <input
           className="field"
           type="text"
           autoCapitalize="sentences"
           autoCorrect="off"
-          placeholder="Chez moi, Le boulot, Le club…"
+          placeholder={t('Chez moi, Le boulot, Le club…')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
@@ -33,12 +32,8 @@ export default function PlaceSheet({ suggestion, onSave, onClose }) {
           }}
         />
         <div className="row">
-          <button className="btn" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn btn--primary" disabled={!name.trim()} onClick={() => onSave(name.trim())}>
-            Enregistrer
-          </button>
+          <button className="btn" onClick={onClose}>{t('Annuler')}</button>
+          <button className="btn btn--primary" disabled={!name.trim()} onClick={() => onSave(name.trim())}>{t('Enregistrer')}</button>
         </div>
       </div>
     </div>,

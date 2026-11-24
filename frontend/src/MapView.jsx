@@ -10,6 +10,8 @@ import { km } from './format'
 import { unitLabel } from './units'
 import { useAppearance } from './appearance'
 
+import { t, dec } from './i18n'
+import { routeName } from './stepText'
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
 maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
@@ -354,7 +356,7 @@ export default function MapView({
       const el = document.createElement('div')
       el.className = 'pin'
       el.innerHTML = '<span class="pin__dot"></span><span class="pin__stem"></span>'
-      el.title = 'Fais-moi glisser pour déplacer le départ'
+      el.title = t('Fais-moi glisser pour déplacer le départ')
       startMarker.current = new maplibregl.Marker({
         element: el,
         draggable: true,
@@ -384,7 +386,7 @@ export default function MapView({
       const el = document.createElement('div')
       el.className = 'viapin'
       el.setAttribute('role', 'img')
-      el.setAttribute('aria-label', 'Point de passage — fais-le glisser pour le déplacer')
+      el.setAttribute('aria-label', t('Point de passage — fais-le glisser pour le déplacer'))
       el.innerHTML = FLAG_SVG
       viaMarker.current = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
       viaMarker.current.on('dragend', () => {
@@ -413,7 +415,7 @@ export default function MapView({
       const el = document.createElement('div')
       el.className = 'viapin destpin'
       el.setAttribute('role', 'img')
-      el.setAttribute('aria-label', "Arrivée — fais-la glisser pour la déplacer")
+      el.setAttribute('aria-label', t('Arrivée — fais-la glisser pour la déplacer'))
       el.innerHTML = FINISH_SVG
       destMarker.current = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
       destMarker.current.on('dragend', () => {
@@ -455,7 +457,7 @@ export default function MapView({
       const el = document.createElement('div')
       el.className = 'zonepin'
       el.setAttribute('role', 'img')
-      el.setAttribute('aria-label', 'Centre de la zone — fais-le glisser pour la déplacer')
+      el.setAttribute('aria-label', t('Centre de la zone — fais-le glisser pour la déplacer'))
       el.innerHTML = MOVE_SVG
       const marker = new maplibregl.Marker({ element: el, draggable: true })
       marker.on('drag', () => {
@@ -737,7 +739,7 @@ export default function MapView({
       const slope = slopeAt(profile, along)
       const flat = slope == null || Math.abs(slope) < 1
       box.querySelector('[data-slope]').textContent =
-        slope == null ? '—' : flat ? 'Plat' : `${slope > 0 ? '↗' : '↘'} ${Math.round(Math.abs(slope))} %`
+        slope == null ? '—' : flat ? t('Plat') : `${slope > 0 ? '↗' : '↘'} ${Math.round(Math.abs(slope))} %`
       box.dataset.trend = flat ? 'flat' : slope > 0 ? 'up' : 'down'
       box.style.setProperty('--p', String(d / total))
       box.dataset.paused = String(paused)
@@ -884,7 +886,7 @@ export default function MapView({
       const el = document.createElement('div')
       el.className = 'poi'
       el.setAttribute('role', 'img')
-      el.setAttribute('aria-label', `Point d'eau${stop.name ? ` — ${stop.name}` : ''}`)
+      el.setAttribute('aria-label', t('Point d\'eau{v1}', { v1: stop.name ? ` — ${stop.name}` : '' }))
       el.innerHTML = POI_SVG
       return new maplibregl.Marker({ element: el }).setLngLat([stop.lon, stop.lat]).addTo(m)
     })
@@ -970,9 +972,7 @@ export default function MapView({
             setLocked(true)
           }}
         >
-          <Icon name="navigation" size={17} />
-          Recentrer
-        </button>
+          <Icon name="navigation" size={17} />{t('Recentrer')}</button>
       )}
     </>
   )
@@ -1632,14 +1632,14 @@ function FlyHud({ hud, ctl, route, onClose }) {
     <div className="flyhud" ref={hud} data-paused="false" data-trend="flat">
       <div className="flyhud__head">
         <span className="flyhud__title">
-          <em>Aperçu 3D</em>
-          <b>{route?.name ?? 'Boucle'}</b>
+          <em>{t('Aperçu 3D')}</em>
+          <b>{routeName(route?.name) ?? t("Boucle")}</b>
         </span>
-        <button className="flyhud__close" onClick={onClose} aria-label="Fermer l'aperçu 3D">
+        <button className="flyhud__close" onClick={onClose} aria-label={t('Fermer l\'aperçu 3D')}>
           <Icon name="close" size={16} />
         </button>
       </div>
-      <div className="flyhud__views" role="group" aria-label="Vue">
+      <div className="flyhud__views" role="group" aria-label={t('Vue')}>
         {FLY_VIEWS.map((v) => (
           <button
             key={v.key}
@@ -1649,13 +1649,13 @@ function FlyHud({ hud, ctl, route, onClose }) {
               call('setView', v.key)
             }}
           >
-            {v.label}
+            {t(v.label)}
           </button>
         ))}
       </div>
       <div className="flyhud__stats">
         <span>
-          <em>Distance</em>
+          <em>{t('Distance')}</em>
           <b>
             <span data-km>0,0</span> <small>/ {km(route?.distance_m ?? 0, 1)} {unitLabel()}</small>
           </b>
@@ -1667,7 +1667,7 @@ function FlyHud({ hud, ctl, route, onClose }) {
           </b>
         </span>
         <span className="flyhud__slope">
-          <em>Pente</em>
+          <em>{t('Pente')}</em>
           <b data-slope>—</b>
         </span>
       </div>
@@ -1691,7 +1691,7 @@ function FlyHud({ hud, ctl, route, onClose }) {
         min="0"
         max="1000"
         defaultValue="0"
-        aria-label="Avancer dans l'aperçu"
+        aria-label={t('Avancer dans l\'aperçu')}
         onInput={(e) => call('seek', Number(e.currentTarget.value) / 1000)}
         onPointerUp={(e) => e.currentTarget.blur()}
       />
@@ -1700,27 +1700,25 @@ function FlyHud({ hud, ctl, route, onClose }) {
         <span>{clock(flyDuration(route?.distance_m ?? 0))}</span>
       </div>
       <div className="flyhud__controls">
-        <button className="flyhud__round" onClick={() => call('restart')} aria-label="Recommencer">
+        <button className="flyhud__round" onClick={() => call('restart')} aria-label={t('Recommencer')}>
           <Icon name="refresh" size={18} />
         </button>
         <button className="btn btn--primary flyhud__play" onClick={() => call('toggle')}>
           <span className="flyhud__pause">
-            <Icon name="pause" size={16} /> Pause
-          </span>
+            <Icon name="pause" size={16} />{' '}{t('Pause')}</span>
           <span className="flyhud__resume">
-            <Icon name="play" size={16} /> Lecture
-          </span>
+            <Icon name="play" size={16} />{' '}{t('Lecture')}</span>
         </button>
         <button
           className="flyhud__round"
-          aria-label={`Vitesse ${speed}×`}
+          aria-label={t('Vitesse {speed}×', { speed })}
           onClick={() => {
             const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]
             setSpeed(next)
             call('setSpeed', next)
           }}
         >
-          {String(speed).replace('.', ',')}×
+          {String(speed).replace('.', dec())}×
         </button>
       </div>
     </div>

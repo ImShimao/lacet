@@ -2,6 +2,7 @@ import Icon from './Icon.jsx'
 import { km } from './format'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 /**
  * La sortie interrompue, retrouvée au lancement : l'app a été fermée en plein
  * effort — par iOS, par une batterie vide. On la reprend, on la garde telle
@@ -12,21 +13,15 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
     <div className="banner banner--resume">
       <Icon name="pause" size={16} />
       <span>
-        <b>Sortie interrompue</b> · {km(pending.covered, 1)} {unitLabel()} en {Math.round(pending.elapsed / 60)} min,{' '}
-        {ago(Date.now() - pending.at)}.
-      </span>
-      <button className="banner__close" onClick={onDrop} aria-label="Oublier">
+        <b>{t('Sortie interrompue')}</b>{' '}{t('· {v1} {v2} en {v3} min, {v4}.', { v1: km(pending.covered, 1), v2: unitLabel(), v3: Math.round(pending.elapsed / 60), v4: ago(Date.now() - pending.at) })}</span>
+      <button className="banner__close" onClick={onDrop} aria-label={t('Oublier')}>
         <Icon name="close" size={15} />
       </button>
       {/* Sous le texte, pas à côté : sur une ligne, la phrase se cassait en
           quatre morceaux entre l'icône et deux boutons. */}
       <div className="banner__acts">
-        <button className="banner__act" onClick={onResume}>
-          Reprendre
-        </button>
-        <button className="banner__act banner__act--soft" onClick={onKeep}>
-          Enregistrer
-        </button>
+        <button className="banner__act" onClick={onResume}>{t('Reprendre')}</button>
+        <button className="banner__act banner__act--soft" onClick={onKeep}>{t('Enregistrer')}</button>
       </div>
     </div>
   )
@@ -39,9 +34,9 @@ export function ResumeBanner({ pending, onResume, onKeep, onDrop }) {
  */
 export function ago(ms) {
   const minutes = Math.round(ms / 60_000)
-  if (minutes < 1) return "à l'instant"
-  if (minutes < 60) return `il y a ${minutes} min`
-  return `il y a ${Math.round(minutes / 60)} h`
+  if (minutes < 1) return t('à l\'instant')
+  if (minutes < 60) return t('il y a {minutes} min', { minutes })
+  return t('il y a {v1} h', { v1: Math.round(minutes / 60) })
 }
 
 /**
@@ -55,14 +50,12 @@ export function GeoBanner({ onPlace, onClose }) {
     <div className="banner">
       <Icon name="warning" size={16} />
       <span>
-        <b>Position indisponible.</b>
+        <b>{t('Position indisponible.')}</b>
       </span>
       {onPlace && (
-        <button className="banner__act" onClick={onPlace}>
-          Placer
-        </button>
+        <button className="banner__act" onClick={onPlace}>{t('Placer')}</button>
       )}
-      <button className="banner__close" onClick={onClose} aria-label="Masquer">
+      <button className="banner__close" onClick={onClose} aria-label={t('Masquer')}>
         <Icon name="close" size={15} />
       </button>
     </div>
@@ -80,14 +73,12 @@ export function LibraryNotice({ notice, onAct, onClose }) {
     <div className="banner banner--notice" role="status">
       <Icon name="warning" size={16} />
       <span>{notice.text}</span>
-      <button className="banner__close" onClick={onClose} aria-label="Masquer">
+      <button className="banner__close" onClick={onClose} aria-label={t('Masquer')}>
         <Icon name="close" size={15} />
       </button>
       {onAct && (
         <div className="banner__acts">
-          <button className="banner__act" onClick={onAct}>
-            Mes favoris
-          </button>
+          <button className="banner__act" onClick={onAct}>{t('Mes favoris')}</button>
         </div>
       )}
     </div>

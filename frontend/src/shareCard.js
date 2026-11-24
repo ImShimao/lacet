@@ -11,6 +11,7 @@ import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
+import { t, locale, dec } from './i18n'
 // Le format portrait des réseaux et des messageries : il occupe l'écran d'un
 // téléphone sans être rogné.
 const W = 1080
@@ -71,7 +72,7 @@ export function drawRunCard(canvas, entry, verdict = null) {
   ctx.fillRect(0, 0, W, H)
   ctx.globalAlpha = 1
   write('Lacet', 80, 110, 46, accent, { weight: 700 })
-  const day = new Date(entry.ranAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const day = new Date(entry.ranAt).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
   write(day, W - 80, 110, 34, muted, { align: 'right' })
 
   // La trace, dans le tiers haut : le fond d'un trait, les allures par-dessus.
@@ -85,18 +86,18 @@ export function drawRunCard(canvas, entry, verdict = null) {
   write(unitLabel(), 80 + wide + 24, 990, 64, muted)
 
   const figures = [
-    [duration(seconds), 'Temps'],
+    [duration(seconds), t('Temps')],
     bike
-      ? [speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ','), speedLabel()]
-      : [distance > 100 ? pace(seconds / (distance / 1000)) : '—', `Allure ${paceLabel()}`],
-    [entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—', 'Dénivelé +'],
+      ? [speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', dec()), speedLabel()]
+      : [distance > 100 ? pace(seconds / (distance / 1000)) : '—', t('Allure {v1}', { v1: paceLabel() })],
+    [entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—', t('Dénivelé +')],
   ]
   figures.forEach(([value, label], i) => {
     write(value, 80 + i * 320, 1120, 68, text, { weight: 700 })
     write(label, 80 + i * 320, 1168, 30, muted)
   })
 
-  write(String(entry.name || 'Sortie').slice(0, 44), 80, 1256, 38, text)
+  write(String(entry.name || t('Sortie')).slice(0, 44), 80, 1256, 38, text)
   if (verdict) write(verdict.slice(0, 52), 80, 1308, 34, accent)
   return canvas
 }
@@ -141,12 +142,12 @@ export function figuresOf(entry) {
   const seconds = entry.actual_duration_s || 0
   const bike = entry.sport === 'bike'
   return [
-    [`${km(distance)} ${unitLabel()}`, 'Distance'],
+    [`${km(distance)} ${unitLabel()}`, t('Distance')],
     bike
-      ? [`${speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ',')} ${speedLabel()}`, 'Vitesse']
-      : [distance > 100 ? `${pace(seconds / (distance / 1000))} ${paceLabel()}` : '—', 'Allure'],
-    [duration(seconds), 'Temps'],
-    ...(entry.actual_ascent_m != null ? [[`${entry.actual_ascent_m} m`, 'Dénivelé +']] : []),
+      ? [`${speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', dec())} ${speedLabel()}`, t('Vitesse')]
+      : [distance > 100 ? `${pace(seconds / (distance / 1000))} ${paceLabel()}` : '—', t('Allure')],
+    [duration(seconds), t('Temps')],
+    ...(entry.actual_ascent_m != null ? [[`${entry.actual_ascent_m} m`, t('Dénivelé +')]] : []),
   ]
 }
 
@@ -202,7 +203,7 @@ function drawBandSticker(canvas, entry) {
   const S = 1080
   const { ctx, write } = sticker(canvas, S, 360)
   write('Lacet', 50, 80, 44, WHITE, { weight: 800 })
-  const day = new Date(entry.ranAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const day = new Date(entry.ranAt).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
   write(day, S - 50, 80, 34, SOFT, { align: 'right' })
   ctx.fillStyle = SOFT
   ctx.fillRect(50, 116, S - 100, 3)
@@ -226,7 +227,7 @@ function drawSplitsSticker(canvas, entry) {
   const row = 62
   const top = 170
   const { ctx, write, safe } = sticker(canvas, S, top + splits.length * row + 110)
-  write(entry.sport === 'bike' ? 'Temps au kilomètre' : 'Allure au kilomètre', 50, 90, 56, WHITE, { weight: 800 })
+  write(entry.sport === 'bike' ? t('Temps au kilomètre') : t('Allure au kilomètre'), 50, 90, 56, WHITE, { weight: 800 })
   const times = splits.map((s) => s.seconds)
   const [lo, hi] = [Math.min(...times), Math.max(...times)]
   const x0 = 140
@@ -255,11 +256,11 @@ export function templatesFor(entry) {
   const track = entry.track?.length > 1
   const splits = entry.splits?.length > 1
   return [
-    { key: 'card', label: 'Carte', clear: false, hint: 'Une image complète, à envoyer telle quelle.', draw: drawRunCard },
-    track && { key: 'trace', label: 'Trace', clear: true, hint: 'Fond transparent : copie-la, puis colle-la sur une photo de ta story.', draw: drawTraceSticker },
-    { key: 'figures', label: 'Chiffres', clear: true, hint: 'Fond transparent : tes chiffres, à poser sur une photo.', draw: drawFiguresSticker },
-    { key: 'band', label: 'Bandeau', clear: true, hint: 'Fond transparent : une ligne à glisser en bas d’une photo.', draw: drawBandSticker },
-    splits && { key: 'splits', label: 'Kilomètres', clear: true, hint: 'Fond transparent : ton allure à chaque kilomètre.', draw: drawSplitsSticker },
+    { key: 'card', label: t('Carte'), clear: false, hint: t('Une image complète, à envoyer telle quelle.'), draw: drawRunCard },
+    track && { key: 'trace', label: t('Trace'), clear: true, hint: t('Fond transparent : copie-la, puis colle-la sur une photo de ta story.'), draw: drawTraceSticker },
+    { key: 'figures', label: t('Chiffres'), clear: true, hint: t('Fond transparent : tes chiffres, à poser sur une photo.'), draw: drawFiguresSticker },
+    { key: 'band', label: t('Bandeau'), clear: true, hint: t('Fond transparent : une ligne à glisser en bas d’une photo.'), draw: drawBandSticker },
+    splits && { key: 'splits', label: t('Kilomètres'), clear: true, hint: t('Fond transparent : ton allure à chaque kilomètre.'), draw: drawSplitsSticker },
   ].filter(Boolean)
 }
 
@@ -276,7 +277,7 @@ export function drawMonthCard(canvas, summary, label) {
   ctx.fillRect(0, 0, W, H)
   write('Lacet', 80, 110, 46, accent, { weight: 700 })
   write(label, W - 80, 110, 34, muted, { align: 'right' })
-  write('Bilan du mois', 80, 300, 56, muted)
+  write(t('Bilan du mois'), 80, 300, 56, muted)
 
   write(km(summary.distance_m), 80, 620, 190, text, { weight: 700 })
   const wide = ctx.measureText(km(summary.distance_m)).width
@@ -284,15 +285,15 @@ export function drawMonthCard(canvas, summary, label) {
 
   const figures = [
     [String(summary.count), summary.count > 1 ? 'sorties' : 'sortie'],
-    [summary.ascent_m != null ? `${summary.ascent_m} m` : '—', 'Dénivelé +'],
-    [summary.longest ? `${km(summary.longest.actual_distance_m, 1)} ${unitLabel()}` : '—', 'Plus longue'],
+    [summary.ascent_m != null ? `${summary.ascent_m} m` : '—', t('Dénivelé +')],
+    [summary.longest ? `${km(summary.longest.actual_distance_m, 1)} ${unitLabel()}` : '—', t('Plus longue')],
   ]
   figures.forEach(([value, lib], i) => {
     write(value, 80 + i * 320, 820, 68, text, { weight: 700 })
     write(lib, 80 + i * 320, 868, 30, muted)
   })
   const { active, total } = summary.weeks
-  write(`${active} semaine${active > 1 ? 's' : ''} sur ${total} avec une sortie`, 80, 1000, 40, accent)
+  write(t('{active} semaine{v2} sur {total} avec une sortie', { active, v2: active > 1 ? 's' : '', total }), 80, 1000, 40, accent)
   return canvas
 }
 
@@ -301,5 +302,5 @@ export async function shareMonthCard(summary, label) {
   const canvas = drawMonthCard(document.createElement('canvas'), summary, label)
   const base64 = canvas.toDataURL('image/png').split(',')[1]
   const { shareImage } = await import('./native')
-  await shareImage('lacet-bilan.png', base64, `Bilan ${label}`)
+  await shareImage('lacet-bilan.png', base64, t('Bilan {label}', { label }))
 }

@@ -16,6 +16,7 @@
 import { useSyncExternalStore } from 'react'
 import { load, save } from './storage'
 
+import { t } from './i18n'
 /** Les accents proposés. La pastille se peint avec le jeton de l'accent lui-même. */
 export const ACCENTS = [
   { key: 'blue', label: 'Bleu' },

@@ -28,6 +28,7 @@ import { blockedPoints } from './reports'
 import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
 import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
 import { startAppearance, useAppearance } from './appearance'
+import { startLang, t, useLang } from './i18n'
 import { km } from './format'
 import { load, rememberShown, save, shownFrom } from './storage'
 import { ranFrom } from './knownRoutes'
@@ -38,6 +39,7 @@ import { startHere } from './restart'
 import { announceDeparture, announcing } from './contact'
 import * as offline from './offlineMaps'
 import { clearEngineData, matchOnDevice, reverseOnDevice } from './engine/client'
+import { routeName } from './stepText'
 
 // « Mon compte » ne s'ouvre pas au lancement : son code n'est chargé qu'à l'ouverture.
 const Account = lazy(() => import('./Account.jsx'))
@@ -49,6 +51,7 @@ export default function App() {
   // Le fond choisi ; tant qu'on n'en a pas choisi, celui qui va avec le thème —
   // clair sur le thème clair, « Nuit » sur le sombre.
   const look = useAppearance()
+  useLang() // Un changement de langue redessine toute l'app, sans la recharger.
   const [chosenMap, setMapStyle] = useState(stored.mapStyle || null)
   const mapStyle = chosenMap || (look.resolved === 'light' ? LIGHT_STYLE : DEFAULT_STYLE)
   // Les points d'eau à montrer le long des boucles — voir `pois.js`.
@@ -397,7 +400,7 @@ export default function App() {
       const { route } = await reverseOnDevice(selected.id)
       found.swap(selected.id, route)
     } catch (err) {
-      found.fail(err.message)
+      found.fail(t(err.message))
     } finally {
       setReversing(false)
     }
@@ -461,7 +464,7 @@ export default function App() {
     import('./native').then((n) =>
       n.onOpenedFile(
         (file) => importRef.current(file),
-        (err) => found.fail(err?.message || "Ce fichier n'a pas pu être lu."),
+        (err) => found.fail(err?.message || t('Ce fichier n\'a pas pu être lu.')),
       ),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -511,18 +514,16 @@ export default function App() {
   )
 
   const announcement = busy
-    ? 'Recherche des itinéraires en cours.'
+    ? t('Recherche des itinéraires en cours.')
     : error
-      ? `Échec de la recherche. ${error.message}`
+      ? t('Échec de la recherche. {message}', { message: t(error.message) })
       : result
         ? result.routes.length
-          ? `${result.routes.length} itinéraire${result.routes.length > 1 ? 's' : ''} ` +
-            `proposé${result.routes.length > 1 ? 's' : ''}. ` +
-            `Le premier : ${result.routes[0].name}, ${km(result.routes[0].distance_m, 1)} ` +
+          ? `${t(result.routes.length > 1 ? '{n} itinéraires proposés.' : '{n} itinéraire proposé.', { n: result.routes.length })} ` +
             (result.routes[0].safety
-              ? `kilomètres, note ${result.routes[0].safety.grade}.`
-              : 'kilomètres, sécurité non évaluée.')
-          : 'Aucun itinéraire ne convient depuis ce point.'
+              ? t('Le premier : {name}, {km} kilomètres, note {grade}.', { name: routeName(result.routes[0].name), km: km(result.routes[0].distance_m, 1), grade: result.routes[0].safety.grade })
+              : t('Le premier : {name}, {km} kilomètres, sécurité non évaluée.', { name: routeName(result.routes[0].name), km: km(result.routes[0].distance_m, 1) }))
+          : t('Aucun itinéraire ne convient depuis ce point.')
         : ''
 
   return (
@@ -540,7 +541,7 @@ export default function App() {
       <main className="stage" ref={stageRef}>
         {/* Le titre de l'app, pour VoiceOver : c'est le premier repère annoncé
             en arrivant, et il est dans la région principale. */}
-        <h1 className="visually-hidden">Lacet — boucles de course et de vélo</h1>
+        <h1 className="visually-hidden">{t('Lacet — boucles de course et de vélo')}</h1>
         <MapView
           styleKey={mapStyle}
           start={start}
@@ -588,7 +589,7 @@ export default function App() {
             secondes, il n'y a rien d'autre à faire que partir. */}
         {starting && (
           <Countdown
-            note={shifted ? 'Départ recalé sur ta position' : null}
+            note={shifted ? t('Départ recalé sur ta position') : null}
             onCancel={() => {
               shifting.current = false
               run.cancelCountdown()
@@ -614,7 +615,7 @@ export default function App() {
               }
               // En trajet, la recherche d'en haut cherche l'arrivée : le départ
               // est presque toujours là où l'on est, l'arrivée jamais.
-              label={journey ? 'Chercher une arrivée' : undefined}
+              label={journey ? t('Chercher une arrivée') : undefined}
               onPick={(p) => (journey ? pickDestination(p, p.label) : applyStart(placeOf(p), p.label, true))}
             />
           </div>
@@ -677,31 +678,23 @@ export default function App() {
         {/* Seule une consigne transitoire flotte sur la carte. Un message
             permanent y masquerait le tracé — il appartient au panneau. */}
         {placing && (
-          <div className="stage__hint">
-            Touche la carte pour poser le départ — ou fais glisser le repère.
-          </div>
+          <div className="stage__hint">{t('Touche la carte pour poser le départ — ou fais glisser le repère.')}</div>
         )}
         {placingDest && !running && (
-          <button className="stage__hint" onClick={() => setPlacingDest(false)}>
-            Touche la carte là où tu veux arriver. (Annuler)
-          </button>
+          <button className="stage__hint" onClick={() => setPlacingDest(false)}>{t('Touche la carte là où tu veux arriver. (Annuler)')}</button>
         )}
         {zoneDraft && !running && (
           <ZoneDraft draft={zoneDraft} onChange={setZoneDraft} onKeep={keepZone} onCancel={() => setZoneDraft(null)} />
         )}
         {placingVia && (
-          <button className="stage__hint" onClick={() => setPlacingVia(false)}>
-            Touche la carte là où la boucle doit passer. (Annuler)
-          </button>
+          <button className="stage__hint" onClick={() => setPlacingVia(false)}>{t('Touche la carte là où la boucle doit passer. (Annuler)')}</button>
         )}
 
         {/* Le point de passage, dit et retirable d'un geste : sans lui, on
             oublierait pourquoi toutes les boucles filent du même côté. */}
         {via && !running && (
           <div className={`viapill ${tab === 'explore' && result ? 'viapill--low' : ''}`}>
-            <Icon name="flag" size={15} />
-            Par ce point
-            <button onClick={dropVia} aria-label="Ne plus passer par ce point">
+            <Icon name="flag" size={15} />{t('Par ce point')}<button onClick={dropVia} aria-label={t('Ne plus passer par ce point')}>
               <Icon name="close" size={13} />
             </button>
           </div>
@@ -717,14 +710,12 @@ export default function App() {
             {!viewing && tab === 'account' && accountPage ? (
               <div className="side__nav">
                 <button className="side__back" onClick={() => setAccountPage(null)}>
-                  <Icon name="chevronLeft" size={19} />
-                  Mon compte
-                </button>
+                  <Icon name="chevronLeft" size={19} />{t('Mon compte')}</button>
                 <h2 className="side__title">{sectionTitle(accountPage)}</h2>
               </div>
             ) : (
               !viewing &&
-              tab !== 'explore' && <h2 className="side__title">{tab === 'routes' ? 'Mes parcours' : 'Mon compte'}</h2>
+              tab !== 'explore' && <h2 className="side__title">{tab === 'routes' ? t('Mes parcours') : t('Mon compte')}</h2>
             )}
             {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
                 une fois les boucles affichées — le panneau ne montre plus alors
@@ -741,7 +732,7 @@ export default function App() {
                 {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
                 <span className="sportpill__spec">
                   {result.meta?.journey
-                    ? `${result.meta.roundtrip ? 'Aller-retour' : 'Trajet'} · ${(result.meta.stretched ? summarise(params).split(' · ') : summarise(params).split(' · ').slice(1)).join(' · ')}`
+                    ? `${result.meta.roundtrip ? t('Aller-retour') : t('Trajet')} · ${(result.meta.stretched ? summarise(params).split(' · ') : summarise(params).split(' · ').slice(1)).join(' · ')}`
                     : summarise(params)}
                 </span>
                 <Icon name="sliders" size={17} className="sportpill__gear" />
@@ -908,6 +899,7 @@ export default function App() {
                   library.clear()
                   // L'apparence aussi revient à celle du premier jour.
                   startAppearance()
+                  startLang()
                   // Et les réglages que tient l'écran : laissés tels quels, le
                   // prochain `save` les aurait réécrits dans le magasin vidé.
                   setParams({ ...DEFAULTS })
@@ -920,6 +912,7 @@ export default function App() {
                 onRestored={() => {
                   library.reload()
                   startAppearance()
+                  startLang()
                   const restored = load().params
                   if (restored) setParams({ ...DEFAULTS, ...restored })
                 }}

@@ -19,6 +19,7 @@ import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { isNative } from './platform'
 
+import { t } from './i18n'
 const BRANDS = {
   garmin: { color: '#007CC3', letter: 'G' },
   strava: { color: '#FC4C02', letter: 'S' },
@@ -87,20 +88,20 @@ export default function SendSheet({ onSend, busy = false, onClose }) {
   if (guide) {
     const { title, brand, guide: g } = guide
     return (
-      <section className="sendsheet" aria-label={`Envoyer sur ${title}`}>
+      <section className="sendsheet" aria-label={t('Envoyer sur {title}', { title })}>
         <header className="sendsheet__head">
           <span>
             <em>{title}</em>
-            <b>Pousser cette boucle sur {title}</b>
+            <b>{t('Pousser cette boucle sur {title}', { title })}</b>
           </span>
-          <button className="sendsheet__close" onClick={() => setGuide(null)} aria-label="Revenir">
+          <button className="sendsheet__close" onClick={() => setGuide(null)} aria-label={t('Revenir')}>
             <Icon name="close" size={16} />
           </button>
         </header>
         {g.warning && (
           <p className="sendsheet__warn">
             <Icon name="warning" size={15} />
-            {g.warning}
+            {t(g.warning)}
           </p>
         )}
         <ol className="sendsheet__steps">
@@ -108,34 +109,30 @@ export default function SendSheet({ onSend, busy = false, onClose }) {
             <li key={head}>
               <i style={{ background: BRANDS[brand].color }}>{i + 1}</i>
               <span>
-                <b>{head}</b>
-                <em>{text}</em>
+                <b>{t(head)}</b>
+                <em>{t(text)}</em>
               </span>
             </li>
           ))}
         </ol>
         <div className="sendsheet__actions">
           <button className="btn" onClick={onSend} disabled={busy}>
-            <Icon name="download" size={16} />
-            Enregistrer le GPX
-          </button>
-          <button className="btn btn--primary sendsheet__go" style={{ background: BRANDS[brand].color }} onClick={() => openSite(g.url)}>
-            Ouvrir {title}
-          </button>
+            <Icon name="download" size={16} />{t('Enregistrer le GPX')}</button>
+          <button className="btn btn--primary sendsheet__go" style={{ background: BRANDS[brand].color }} onClick={() => openSite(g.url)}>{t('Ouvrir {title}', { title })}</button>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="sendsheet" aria-label="Envoyer cette boucle">
+    <section className="sendsheet" aria-label={t('Envoyer cette boucle')}>
       <header className="sendsheet__head">
         <span>
-          <em>Partage</em>
-          <b>Envoyer cette boucle</b>
+          <em>{t('Partage')}</em>
+          <b>{t('Envoyer cette boucle')}</b>
         </span>
         {onClose && (
-          <button className="sendsheet__close" onClick={onClose} aria-label="Fermer">
+          <button className="sendsheet__close" onClick={onClose} aria-label={t('Fermer')}>
             <Icon name="close" size={16} />
           </button>
         )}
@@ -156,8 +153,8 @@ export default function SendSheet({ onSend, busy = false, onClose }) {
               </span>
             )}
             <span className="sendsheet__text">
-              <b>{d.title}</b>
-              <em>{d.sub}</em>
+              <b>{t(d.title)}</b>
+              <em>{t(d.sub)}</em>
             </span>
             <Icon name="chevronRight" size={16} />
           </button>

@@ -19,6 +19,8 @@ import Challenges from './Challenges.jsx'
 import { dailyMetres, monthKey, monthLabel } from './monthSummary'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
+import { t, locale, dec } from './i18n'
+import { routeName } from './stepText'
 export default function Library({ saved, history, initialView, onOpen, onOpenRun, onImport, importProgress, onExplore, onRename, onForget, profile, mapStyle }) {
   // S'ouvrir sur ce qui existe : un premier favori gardé avant toute sortie
   // tombait sinon sur « Aucune sortie enregistrée », et semblait perdu. Un avis
@@ -72,18 +74,14 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
     <div className="panel">
       <div className="seg">
         <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
-          {/* « (0) » sur un compte vide n'apprend rien : le compte vient avec la première. */}
-          Sorties{history.length > 0 && ` (${history.length})`}
-        </button>
-        <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
-          Favoris{saved.length > 0 && ` (${saved.length})`}
-        </button>
+          {/* « (0) » sur un compte vide n'apprend rien : le compte vient avec la première. */}{t('Sorties{v1}', { v1: history.length > 0 && ` (${history.length})` })}</button>
+        <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>{t('Favoris{v1}', { v1: saved.length > 0 && ` (${saved.length})` })}</button>
       </div>
 
       {/* Le bilan, la semaine et les défis côte à côte, au pouce : empilés, ils
           poussaient la liste des sorties — ce qu'on vient chercher — sous le pli. */}
       {view === 'history' && shown.length > 0 && (
-        <div className="statstrip" aria-label="Bilan">
+        <div className="statstrip" aria-label={t('Bilan')}>
           <div className="statstrip__card">
             <Totals history={shown} profile={profile} />
           </div>
@@ -101,20 +99,20 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
 
       {view === 'history' && history.length > 0 && (
         <div className="histfilter">
-          <div className="chips" role="radiogroup" aria-label="Activité">
+          <div className="chips" role="radiogroup" aria-label={t('Activité')}>
             {/* Sans icône : à 390 px, elles prenaient la place du nom du mois, à côté. */}
             {[
-              ['all', 'Tout'],
-              ['run', 'Course'],
-              ['bike', 'Vélo'],
+              ['all', t('Tout')],
+              ['run', t('Course')],
+              ['bike', t('Vélo')],
             ].map(([key, label]) => (
               <button key={key} role="radio" aria-checked={sport === key} className={`chip ${sport === key ? 'chip--on' : ''}`} onClick={() => setSport(key)}>
                 {label}
               </button>
             ))}
           </div>
-          <select className="histfilter__month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mois">
-            <option value="all">Tous les mois</option>
+          <select className="histfilter__month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label={t('Mois')}>
+            <option value="all">{t('Tous les mois')}</option>
             {months.map((m) => (
               <option key={m} value={m}>
                 {monthLabel(m)}
@@ -131,16 +129,16 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
           </span>
           {/* Un titre court, puis une ligne : le bouton dessous dit déjà où aller. */}
           {view === 'history' && history.length ? (
-            <p>Aucune sortie pour ce filtre.</p>
+            <p>{t('Aucune sortie pour ce filtre.')}</p>
           ) : view === 'history' ? (
             <>
-              <b>Pas encore de sortie</b>
-              <p>Chaque sortie s'enregistre ici, avec son temps et sa trace.</p>
+              <b>{t('Pas encore de sortie')}</b>
+              <p>{t('Chaque sortie s\'enregistre ici, avec son temps et sa trace.')}</p>
             </>
           ) : (
             <>
-              <b>Aucun favori</b>
-              <p>Le cœur, sous une proposition, la garde ici.</p>
+              <b>{t('Aucun favori')}</b>
+              <p>{t('Le cœur, sous une proposition, la garde ici.')}</p>
             </>
           )}
           {/* Un écran vide qui dit « va ailleurs » sans y mener laisse chercher
@@ -148,18 +146,14 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
               rend rien — il y a déjà des sorties, et l'on veut changer de filtre. */}
           {onExplore && !(view === 'history' && history.length) && (
             <button className="btn btn--primary" onClick={onExplore}>
-              <Icon name="search" size={17} />
-              Trouver une boucle
-            </button>
+              <Icon name="search" size={17} />{t('Trouver une boucle')}</button>
           )}
         </div>
       ) : (
         <>
           {/* Deux lignes, pas six : l'explication complète repoussait la liste
               sous le pli à chaque ouverture de l'onglet. */}
-          <p className="muted small">
-            Ouverts sans réseau ; l'icône à droite garde aussi <b>le fond de carte</b> (1 à 15 Mo).
-          </p>
+          <p className="muted small">{t('Ouverts sans réseau ; l\'icône à droite garde aussi')}{' '}<b>{t('le fond de carte')}</b>{' '}{t('(1 à 15 Mo).')}</p>
           <div className="list">
             {rows.map((r, i) => (
               // Une clé qui suit la ligne, pas sa place : retirer une ligne
@@ -190,9 +184,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
             ))}
           </div>
           {all.length > rows.length && (
-            <button className="btn" onClick={() => setLimit(limit + PAGE)}>
-              Afficher les suivantes ({all.length - rows.length})
-            </button>
+            <button className="btn" onClick={() => setLimit(limit + PAGE)}>{t('Afficher les suivantes ({v1})', { v1: all.length - rows.length })}</button>
           )}
         </>
       )}
@@ -250,14 +242,14 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
       <span>
         {naming ? (
           <RenameField
-            name={route.name}
-            label={run ? 'Nom de la sortie' : 'Nom du favori'}
+            name={routeName(route.name)}
+            label={run ? t('Nom de la sortie') : t('Nom du favori')}
             autoFocus
             onRename={(nom) => onRename(route, nom)}
             onDone={() => setNaming(false)}
           />
         ) : (
-          route.name
+          routeName(route.name)
         )}
         <em>
           {run
@@ -268,7 +260,7 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
       {route.grade ? (
         <span className={`grade grade--${route.grade}`}>{route.grade}</span>
       ) : (
-        <span className="grade grade--free">libre</span>
+        <span className="grade grade--free">{t('libre')}</span>
       )}
     </>
   )
@@ -297,9 +289,7 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
               refermer()
               setNaming(true)
             }}
-          >
-            Renommer
-          </button>
+          >{t('Renommer')}</button>
           <button
             className="list__act list__act--warn"
             onClick={() => {
@@ -307,7 +297,7 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
               setAsking(true)
             }}
           >
-            {run ? 'Supprimer' : 'Retirer'}
+            {run ? t('Supprimer') : t('Retirer')}
           </button>
         </div>
       )}
@@ -326,28 +316,22 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
 function Forget({ route, run, shared, onCancel, onConfirm }) {
   const stored = offline.isStored(route)
   return (
-    <div className="list__confirm" role="group" aria-label={run ? 'Supprimer la sortie' : 'Retirer le favori'}>
+    <div className="list__confirm" role="group" aria-label={run ? t('Supprimer la sortie') : t('Retirer le favori')}>
       <p>
         {run ? (
-          <>
-            Supprimer <b>{route.name}</b>, la sortie du {dayLabel(route.ranAt)} ? Ses kilomètres quittent les totaux.
-          </>
+          <>{t('Supprimer')}{' '}<b>{routeName(route.name)}</b>{t(', la sortie du {v1} ? Ses kilomètres quittent les totaux.', { v1: dayLabel(route.ranAt) })}</>
         ) : (
-          <>
-            Retirer <b>{route.name}</b> des favoris ?
-          </>
+          <>{t('Retirer')}{' '}<b>{routeName(route.name)}</b>{' '}{t('des favoris ?')}</>
         )}
         {stored &&
           (shared
-            ? ' Sa carte hors ligne reste : une autre ligne de Mes parcours la montre.'
-            : ` Sa carte hors ligne (${offline.formatBytes(offline.storedBytes(route))}) part avec.`)}
+            ? t(' Sa carte hors ligne reste : une autre ligne de Mes parcours la montre.')
+            : t(' Sa carte hors ligne ({v1}) part avec.', { v1: offline.formatBytes(offline.storedBytes(route)) }))}
       </p>
       <div className="row">
-        <button className="btn" onClick={onCancel}>
-          Annuler
-        </button>
+        <button className="btn" onClick={onCancel}>{t('Annuler')}</button>
         <button className="btn btn--primary" onClick={onConfirm}>
-          {run ? 'Supprimer' : 'Retirer'}
+          {run ? t('Supprimer') : t('Retirer')}
         </button>
       </div>
     </div>
@@ -381,7 +365,7 @@ function ImportRow({ onImport, progress = null }) {
     try {
       await onImport(fichier, (line, name) => setEnCours({ name, line }))
     } catch (err) {
-      setErreur(err.message)
+      setErreur(t(err.message))
     } finally {
       setEnCours(null)
     }
@@ -399,15 +383,11 @@ function ImportRow({ onImport, progress = null }) {
         hidden
       />
       <button className="btn" onClick={() => champ.current?.click()}>
-        <Icon name="fileImport" size={17} />
-        Importer un GPX
-      </button>
+        <Icon name="fileImport" size={17} />{t('Importer un GPX')}</button>
       {erreur ? (
         <p className="muted small import__error">{erreur}</p>
       ) : (
-        <p className="muted small">
-          Le tracé d'un ami ou d'une course : Lacet le note et le guide comme les siens.
-        </p>
+        <p className="muted small">{t('Le tracé d\'un ami ou d\'une course : Lacet le note et le guide comme les siens.')}</p>
       )}
     </div>
   )
@@ -433,9 +413,9 @@ function ImportProgress({ name, line, progress }) {
   const drawn = useMemo(() => sketch(line, 64, 44, 5), [line])
   const stage = progress?.stage
   const fraction = stage === 'download' ? (progress?.fraction ?? 0) : 0
-  const label = !line ? 'Lecture du fichier' : (IMPORT_STAGES[stage] ?? 'Reconnaissance des rues')
+  const label = !line ? t('Lecture du fichier') : t(IMPORT_STAGES[stage] ?? 'Reconnaissance des rues')
   return (
-    <div className="import import--busy" role="status" aria-label={`Import de ${name} : ${label}`}>
+    <div className="import import--busy" role="status" aria-label={t('Import de {name} : {label}', { name, label })}>
       <span className="import__trace" aria-hidden="true">
         {drawn ? (
           <svg viewBox="0 0 64 44" width="64" height="44">
@@ -508,7 +488,7 @@ function OfflineControl({ route, mapStyle }) {
       await offline.download(route, style, setProgress)
       refresh()
     } catch (e) {
-      setFailed(e.message || 'Le téléchargement a échoué.')
+      setFailed(e.message || t('Le téléchargement a échoué.'))
     } finally {
       setProgress(null)
     }
@@ -520,7 +500,7 @@ function OfflineControl({ route, mapStyle }) {
         className="offline offline--busy"
         role="progressbar"
         aria-valuenow={Math.round(progress * 100)}
-        aria-label={`Téléchargement de la carte de ${route.name}`}
+        aria-label={t('Téléchargement de la carte de {name}', { name: route.name })}
       >
         <b>{Math.round(progress * 100)}%</b>
         <i style={{ transform: `scaleX(${progress})` }} />
@@ -541,19 +521,17 @@ function OfflineControl({ route, mapStyle }) {
           refresh()
         }}
         onBlur={() => setConfirm(false)}
-        title="Confirmer le retrait"
+        title={t('Confirmer le retrait')}
       >
-        <Icon name="close" size={14} />
-        Retirer ?
-      </button>
+        <Icon name="close" size={14} />{t('Retirer ?')}</button>
     ) : (
       <button
         className={`offline offline--on ${autreFond ? 'offline--other' : ''}`}
         onClick={() => setConfirm(true)}
         title={
           autreFond
-            ? `Carte gardée pour le fond « ${entry.label} » — ${offline.formatBytes(entry.bytes)}`
-            : `Carte disponible hors ligne — ${offline.formatBytes(entry.bytes)}, zoom ${entry.zoom}`
+            ? t('Carte gardée pour le fond « {label} » — {v2}', { label: entry.label, v2: offline.formatBytes(entry.bytes) })
+            : t('Carte disponible hors ligne — {v1}, zoom {zoom}', { v1: offline.formatBytes(entry.bytes), zoom: entry.zoom })
         }
       >
         <Icon name={autreFond ? 'layers' : 'check'} size={14} />
@@ -566,8 +544,8 @@ function OfflineControl({ route, mapStyle }) {
     <button
       className={`offline ${failed ? 'offline--warn' : ''}`}
       onClick={start}
-      title={failed || `Garder le fond « ${style.label} » hors ligne pour ce parcours`}
-      aria-label={`Rendre ${route.name} disponible hors ligne`}
+      title={failed || t('Garder le fond « {label} » hors ligne pour ce parcours', { label: style.label })}
+      aria-label={t('Rendre {name} disponible hors ligne', { name: route.name })}
     >
       <Icon name={failed ? 'warning' : 'download'} size={14} />
     </button>
@@ -608,10 +586,8 @@ function WeeklyVolume({ history, goalKm = 0 }) {
         {/* Court des deux côtés : à 390 px, « Douze dernières semaines » et
             « par semaine en moyenne » se repliaient chacun sur deux lignes. La
             période est déjà dite par l'axe, juste en dessous. */}
-        <span className="label">Volume par semaine</span>
-        <em>
-          {km(moyenne, 0)} {unitLabel()} en moyenne{goal > 0 && ` · objectif ${goalKm}`}
-        </em>
+        <span className="label">{t('Volume par semaine')}</span>
+        <em>{t('{v1} {v2} en moyenne{v3}', { v1: km(moyenne, 0), v2: unitLabel(), v3: goal > 0 && t(' · objectif {goalKm}', { goalKm }) })}</em>
       </figcaption>
 
       {/* Douze dates sous douze barres ne tiennent pas dans la largeur d'un
@@ -631,15 +607,13 @@ function WeeklyVolume({ history, goalKm = 0 }) {
       </div>
       <div className="weeks__axis" aria-hidden="true">
         <span>{semaines[0].short}</span>
-        <span>cette semaine</span>
+        <span>{t('cette semaine')}</span>
       </div>
 
       {/* Ce que le dessin montre, écrit : c'est la seule version lisible par
           une synthèse vocale, et la seule consultable sans souris. */}
       <table className="visually-hidden">
-        <caption>
-          Distance par semaine, les douze dernières{goal > 0 && `, pour un objectif de ${goalKm} km`}
-        </caption>
+        <caption>{t('Distance par semaine, les douze dernières{v1}', { v1: goal > 0 && t(', pour un objectif de {goalKm} km', { goalKm }) })}</caption>
         <tbody>
           {semaines.map((s) => (
             <tr key={s.key}>
@@ -673,8 +647,8 @@ function lastWeeks(history, n, now = new Date()) {
       key: lundi.toISOString().slice(0, 10),
       from: lundi.getTime(),
       to: lundi.getTime() + 7 * 864e5,
-      label: `Semaine du ${lundi.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`,
-      short: lundi.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', ''),
+      label: t('Semaine du {v1}', { v1: lundi.toLocaleDateString(locale(), { day: 'numeric', month: 'long' }) }),
+      short: lundi.toLocaleDateString(locale(), { day: 'numeric', month: 'short' }).replace('.', ''),
       metres: 0,
     })
   }
@@ -720,8 +694,8 @@ function Totals({ history, profile }) {
       .reduce((acc, r) => ({ m: acc.m + (r.actual_distance_m || 0), s: acc.s + (r.actual_duration_s || 0) }), { m: 0, s: 0 })
   const [foot, wheel] = [of(false), of(true)]
   const average = [
-    foot.m > 0 ? `Allure moyenne ${pace(foot.s / (foot.m / 1000))}${paceLabel()}` : null,
-    wheel.m > 0 && wheel.s > 0 ? `${foot.m > 0 ? 'à vélo' : 'Vitesse moyenne'} ${speedIn(wheel.m / wheel.s * 3.6).toFixed(1).replace('.', ',')} ${speedLabel()}` : null,
+    foot.m > 0 ? t('Allure moyenne {v1}{v2}', { v1: pace(foot.s / (foot.m / 1000)), v2: paceLabel() }) : null,
+    wheel.m > 0 && wheel.s > 0 ? `${foot.m > 0 ? t('à vélo') : t('Vitesse moyenne')} ${speedIn(wheel.m / wheel.s * 3.6).toFixed(1).replace('.', dec())} ${speedLabel()}` : null,
   ]
     .filter(Boolean)
     .join(', ')
@@ -731,11 +705,11 @@ function Totals({ history, profile }) {
       <div className="stats stats--four">
         <div>
           <b>{km(sums.distance, 0)}</b>
-          <span>km au total</span>
+          <span>{t('km au total')}</span>
         </div>
         <div>
           <b>{sums.count}</b>
-          <span>{sums.count > 1 ? 'sorties' : 'sortie'}</span>
+          <span>{sums.count > 1 ? t('sorties') : t('sortie')}</span>
         </div>
         <div>
           <b>{timeTotal(sums.time)[0]}</b>
@@ -743,13 +717,13 @@ function Totals({ history, profile }) {
         </div>
         <div>
           <b>{km(week, 0)}</b>
-          <span>km en 7 jours</span>
+          <span>{t('km en 7 jours')}</span>
         </div>
       </div>
       <p className="muted small">
         {[
           average,
-          `≈ ${Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString('fr-FR')} kcal (estimées)`,
+          t('≈ {v1} kcal (estimées)', { v1: Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString(locale()) }),
         ]
           .filter(Boolean)
           .join(' · ')}
@@ -801,7 +775,7 @@ function Thumb({ line, sport }) {
 function dayLabel(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return d.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 /**
@@ -826,13 +800,9 @@ function MonthHeader({ label, month, runs, onReport }) {
   return (
     <div className="monthhead">
       <b>{label}</b>
-      <span>
-        {runs.length} sortie{runs.length > 1 ? 's' : ''} · {km(distance, 1)} {unitLabel()} · {duration(time)}
-      </span>
+      <span>{t('{length} sortie{v2} · {v3} {v4} · {v5}', { length: runs.length, v2: runs.length > 1 ? 's' : '', v3: km(distance, 1), v4: unitLabel(), v5: duration(time) })}</span>
       {onReport && (
-        <button className="monthhead__report" onClick={onReport}>
-          Bilan
-        </button>
+        <button className="monthhead__report" onClick={onReport}>{t('Bilan')}</button>
       )}
       {jours.length > 0 && (
         <div className="monthdays weeks__plot" aria-hidden="true">

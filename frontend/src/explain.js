@@ -13,6 +13,7 @@ import { isNight } from './engine/environment'
 import { km } from './format'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 const TERRAIN_RUN = {
   title: 'Types de terrain',
   items: [
@@ -118,7 +119,7 @@ export function reliefBadge(key, reachable, climbPerKm = null) {
     // Peu de D+ en montagne, c'est du plat : il en prend la limite.
     if (climbPerKm < 10) level = Math.min(level, flat)
   }
-  return ['Peu probable', 'Possible', 'Probable'][level]
+  return [t('Peu probable'), t('Possible'), t('Probable')][level]
 }
 
 /**
@@ -132,11 +133,11 @@ export function weatherAdvice(weather) {
   const temp = `${Math.round(weather.temp_c)} °C`
   // `short` tient dans une pastille ; `advice` dit que la phrase change la tenue.
   if (weather.rain_mm >= 0.2) {
-    return { icon: 'rain', short: `${temp} · pluie`, advice: true, text: `${temp}, pluie annoncée dans l'heure : une veste imperméable, et prudence sur les pavés et les feuilles.` }
+    return { icon: 'rain', short: t('{temp} · pluie', { temp }), advice: true, text: t('{temp}, pluie annoncée dans l\'heure : une veste imperméable, et prudence sur les pavés et les feuilles.', { temp }) }
   }
-  if (weather.temp_c < 4) return { icon: 'moon', short: temp, advice: true, text: `${temp} au départ : gants, bonnet et une couche de plus — tu l'enlèveras après l'échauffement.` }
-  if (weather.temp_c > 26) return { icon: 'sun', short: temp, advice: true, text: `${temp} au départ : emporte de l'eau, et ralentis l'allure plutôt que de la tenir.` }
-  return { icon: 'sun', short: `${temp} · sec`, advice: false, text: `${temp} et sec au départ.` }
+  if (weather.temp_c < 4) return { icon: 'moon', short: temp, advice: true, text: t('{temp} au départ : gants, bonnet et une couche de plus — tu l\'enlèveras après l\'échauffement.', { temp }) }
+  if (weather.temp_c > 26) return { icon: 'sun', short: temp, advice: true, text: t('{temp} au départ : emporte de l\'eau, et ralentis l\'allure plutôt que de la tenir.', { temp }) }
+  return { icon: 'sun', short: t('{temp} · sec', { temp }), advice: false, text: t('{temp} et sec au départ.', { temp }) }
 }
 
 /**
@@ -149,7 +150,7 @@ export function weatherAdvice(weather) {
 export function reliefOf(route) {
   if (route?.ascent_m == null || !(route.distance_m > 0)) return null
   const perKm = route.ascent_m / (route.distance_m / 1000)
-  return perKm < 6 ? 'Plat' : perKm < RELIEF_BAND_PER_KM.hilly[0] ? 'Vallonné' : 'Côtes'
+  return perKm < 6 ? t('Plat') : perKm < RELIEF_BAND_PER_KM.hilly[0] ? t('Vallonné') : t('Côtes')
 }
 
 /**
@@ -227,19 +228,19 @@ const SAFETY_LIMITS = {
 const safety = (sport) => {
   const { safe, standard } = SAFETY_LIMITS[sport] ?? SAFETY_LIMITS.run
   return {
-    title: 'Sécurité',
+    title: t('Sécurité'),
     intro:
-      "Chaque boucle est notée A, B ou C. A : quasiment tout sur trottoir ou voie propre, et aucune traversée sans passage protégé. B : quelques mètres au contact du trafic. C : davantage. Tout vient d'OpenStreetMap — un chantier d'hier n'y est pas encore.",
+      t('Chaque boucle est notée A, B ou C. A : quasiment tout sur trottoir ou voie propre, et aucune traversée sans passage protégé. B : quelques mètres au contact du trafic. C : davantage. Tout vient d\'OpenStreetMap — un chantier d\'hier n\'y est pas encore.'),
     items: [
       {
         icon: 'shield',
-        label: 'Sûr',
-        text: `Contourne, tronçon par tronçon, les routes rapides sans trottoir ni accotement, puis écarte toute boucle qui en garde trop ou qui les traverse sans passage protégé : au plus ${safe[0]} % du parcours au contact du trafic, jamais plus de ${safe[1]} m d'affilée. C'est ce que faisait la case « Grands axes », qui n'existe plus.`,
+        label: t('Sûr'),
+        text: t('Contourne, tronçon par tronçon, les routes rapides sans trottoir ni accotement, puis écarte toute boucle qui en garde trop ou qui les traverse sans passage protégé : au plus {v1} % du parcours au contact du trafic, jamais plus de {v2} m d\'affilée. C\'est ce que faisait la case « Grands axes », qui n\'existe plus.', { v1: safe[0], v2: safe[1] }),
       },
       {
         icon: 'warning',
-        label: 'Standard',
-        text: `Montre aussi les boucles plus exposées — jusqu'à ${standard} % au contact du trafic — avec le détail des portions concernées. Pour un coin que tu connais, ou quand « Sûr » ne trouve rien.`,
+        label: t('Standard'),
+        text: t('Montre aussi les boucles plus exposées — jusqu\'à {standard} % au contact du trafic — avec le détail des portions concernées. Pour un coin que tu connais, ou quand « Sûr » ne trouve rien.', { standard }),
       },
     ],
   }
@@ -329,7 +330,7 @@ export function nightfall(lat, lon, durationS, now = Date.now()) {
  *
  * Rend `{ rows: [{ label, a, b, best: 'a'|'b'|null }], verdict }`.
  */
-export function compareRoutes(a, b, { nameA = 'la 1', nameB = 'la 2' } = {}) {
+export function compareRoutes(a, b, { nameA = t('la 1'), nameB = t('la 2') } = {}) {
   const sa = a?.safety
   const sb = b?.safety
   const gains = { a: [], b: [] }
@@ -345,36 +346,36 @@ export function compareRoutes(a, b, { nameA = 'la 1', nameB = 'la 2' } = {}) {
     rows.push({ label, a: va == null ? '—' : show(va), b: vb == null ? '—' : show(vb), best })
   }
   const rank = (g) => (g ? 'ABC'.indexOf(g) : null)
-  row('Note', rank(sa?.grade), rank(sb?.grade), (r) => 'ABC'[r], {
+  row(t('Note'), rank(sa?.grade), rank(sb?.grade), (r) => 'ABC'[r], {
     better: 'low',
-    say: (_, w, l) => `est plus sûre (${'ABC'[w]} contre ${'ABC'[l]})`,
+    say: (_, w, l) => t('est plus sûre ({v1} contre {v2})', { v1: 'ABC'[w], v2: 'ABC'[l] }),
   })
-  row('Distance', a?.distance_m, b?.distance_m, (m) => `${km(m, 1)} ${unitLabel()}`)
-  row('Durée', a?.duration_s, b?.duration_s, (s) => `${Math.round(s / 60)} min`, {
+  row(t('Distance'), a?.distance_m, b?.distance_m, (m) => `${km(m, 1)} ${unitLabel()}`)
+  row(t('Durée'), a?.duration_s, b?.duration_s, (s) => `${Math.round(s / 60)} min`, {
     better: 'low',
     min: 90,
-    say: (d) => `gagne ${Math.round(d / 60)} min`,
+    say: (d) => t('gagne {v1} min', { v1: Math.round(d / 60) }),
   })
-  row('Dénivelé +', a?.ascent_m, b?.ascent_m, (m) => `${Math.round(m)} m`, {
+  row(t('Dénivelé +'), a?.ascent_m, b?.ascent_m, (m) => `${Math.round(m)} m`, {
     better: 'low',
     min: 15,
-    say: (d) => `monte ${Math.round(d)} m de moins`,
+    say: (d) => t('monte {v1} m de moins', { v1: Math.round(d) }),
   })
-  row('Hors trafic', sa?.protected_share, sb?.protected_share, (s) => `${Math.round(s * 100)} %`, {
+  row(t('Hors trafic'), sa?.protected_share, sb?.protected_share, (s) => `${Math.round(s * 100)} %`, {
     better: 'high',
     min: 0.05,
-    say: (d) => `a ${Math.round(d * 100)} points de plus à l'abri du trafic`,
+    say: (d) => t('a {v1} points de plus à l\'abri du trafic', { v1: Math.round(d * 100) }),
   })
-  row('Traversées non protégées', sa?.unprotected_crossings, sb?.unprotected_crossings, String, {
+  row(t('Traversées non protégées'), sa?.unprotected_crossings, sb?.unprotected_crossings, String, {
     better: 'low',
     min: 0,
-    say: (d) => `traverse ${d} fois de moins sans protection`,
+    say: (d) => t('traverse {d} fois de moins sans protection', { d }),
   })
-  const phrase = (name, list) => `${name} ${list.length > 1 ? `${list.slice(0, -1).join(', ')} et ${list.at(-1)}` : list[0]}`
+  const phrase = (name, list) => `${name} ${list.length > 1 ? t('{v1} et {v2}', { v1: list.slice(0, -1).join(', '), v2: list.at(-1) }) : list[0]}`
   const parts = []
   if (gains.a.length) parts.push(phrase(nameA, gains.a))
   if (gains.b.length) parts.push(phrase(nameB, gains.b))
   const said = parts.join(' ; ')
-  const verdict = parts.length ? `${said[0].toUpperCase()}${said.slice(1)}.` : 'Elles se valent : choisis au paysage.'
+  const verdict = parts.length ? `${said[0].toUpperCase()}${said.slice(1)}.` : t('Elles se valent : choisis au paysage.')
   return { rows, verdict }
 }

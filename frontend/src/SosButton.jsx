@@ -6,6 +6,7 @@ import { mapLink, shareText, textTo } from './contact'
 import useModal from './useModal'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 // Appui long, en millisecondes, avant que le SOS ne s'arme. Un bouton d'alerte
 // posé à côté de « Terminer », sur un écran qu'on touche en courant, part tout
 // seul au premier frôlement. L'appui maintenu est la seule protection qui ne
@@ -68,16 +69,16 @@ export default function SosButton({ position, distance, elapsed, className = '' 
   function message() {
     const point = position?.current
     return (
-      `J'ai besoin d'aide pendant ma sortie. ` +
-      `Je suis ici : ${point ? mapLink(point) : 'position inconnue'}. ` +
-      `Parcouru ${km(distance, 1)} ${unitLabel()} en ${duration(elapsed)}.`
+      t('J\'ai besoin d\'aide pendant ma sortie. ') +
+      t('Je suis ici : {v1}. ', { v1: point ? mapLink(point) : 'position inconnue' }) +
+      t('Parcouru {v1} {v2} en {v3}.', { v1: km(distance, 1), v2: unitLabel(), v3: duration(elapsed) })
     )
   }
 
-  const sendTo = (contact) => textTo(contact, message(), 'Lacet — besoin d’aide')
+  const sendTo = (contact) => textTo(contact, message(), t('Lacet — besoin d’aide'))
 
   async function shareInstead() {
-    await shareText(message(), 'Lacet — besoin d’aide')
+    await shareText(message(), t('Lacet — besoin d’aide'))
     setAsking(false)
   }
 
@@ -91,8 +92,8 @@ export default function SosButton({ position, distance, elapsed, className = '' 
         onPointerLeave={cancel}
         onPointerCancel={cancel}
         onContextMenu={(e) => e.preventDefault()}
-        title="Alerter un proche — maintiens appuyé"
-        aria-label="Alerter un proche (maintiens appuyé)"
+        title={t('Alerter un proche — maintiens appuyé')}
+        aria-label={t('Alerter un proche (maintiens appuyé)')}
       >
         {/* En toutes lettres : un « ! » cerclé se lit comme un avertissement de
             plus, pas comme le bouton qui prévient quelqu'un. */}
@@ -128,13 +129,10 @@ function ContactSheet({ onClose, onSave, onShare }) {
   const panel = useModal(onClose)
 
   return createPortal(
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="Contact d’urgence">
+    <div className="sheet" role="dialog" aria-modal="true" aria-label={t('Contact d’urgence')}>
       <div className="sheet__panel" ref={panel} tabIndex={-1}>
-        <h3>Prévenir qui ?</h3>
-        <p className="muted">
-          Aucun contact enregistré. Donne un numéro : il reste sur cet appareil et sert
-          à préremplir un SMS — que tu envoies toi-même.
-        </p>
+        <h3>{t('Prévenir qui ?')}</h3>
+        <p className="muted">{t('Aucun contact enregistré. Donne un numéro : il reste sur cet appareil et sert à préremplir un SMS — que tu envoies toi-même.')}</p>
         <input
           className="field"
           type="tel"
@@ -145,19 +143,13 @@ function ContactSheet({ onClose, onSave, onShare }) {
           onChange={(e) => setNumber(e.target.value)}
         />
         <div className="row">
-          <button className="btn" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn" onClick={onShare}>
-            Partager sans enregistrer
-          </button>
+          <button className="btn" onClick={onClose}>{t('Annuler')}</button>
+          <button className="btn" onClick={onShare}>{t('Partager sans enregistrer')}</button>
           <button
             className="btn btn--primary"
             disabled={number.replace(/\D/g, '').length < 6}
             onClick={() => onSave(number)}
-          >
-            Enregistrer et alerter
-          </button>
+          >{t('Enregistrer et alerter')}</button>
         </div>
       </div>
     </div>,

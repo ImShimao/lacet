@@ -5,6 +5,7 @@ import useModal from './useModal'
 import { lastCamera } from './camera'
 import { MAP_STYLES, loadOptions, styleByKey } from './mapStyles'
 
+import { t } from './i18n'
 // Les vignettes déjà rendues, pour la session : rouvrir la feuille au même
 // endroit ne refait pas le tour des fonds.
 const thumbs = new Map()
@@ -128,24 +129,24 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Style de carte"
+        aria-label={t('Style de carte')}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mapsheet__head">
-          <h2>Style de carte</h2>
-          <button className="mapsheet__close" onClick={onClose} aria-label="Fermer">
+          <h2>{t('Style de carte')}</h2>
+          <button className="mapsheet__close" onClick={onClose} aria-label={t('Fermer')}>
             <Icon name="close" size={18} />
           </button>
         </div>
 
         <div className="mapsheet__preview" ref={preview} aria-hidden="true">
-          <span className="mapsheet__badge">{current.label}</span>
+          <span className="mapsheet__badge">{t(current.label)}</span>
         </div>
         <p className="mapsheet__desc" aria-live="polite">
-          {current.description}
+          {t(current.description)}
         </p>
 
-        <div className="mapsheet__grid" role="radiogroup" aria-label="Fonds disponibles">
+        <div className="mapsheet__grid" role="radiogroup" aria-label={t('Fonds disponibles')}>
           {MAP_STYLES.map((s) => (
             <button
               key={s.key}
@@ -159,14 +160,12 @@ export default function MapStyleSheet({ value, onSave, onClose }) {
                 {images[s.key] && <img src={images[s.key]} alt="" />}
                 <Icon name="check" size={14} className="mapsheet__check" />
               </span>
-              <span className="mapsheet__name">{s.label}</span>
+              <span className="mapsheet__name">{t(s.label)}</span>
             </button>
           ))}
         </div>
 
-        <button className="btn btn--primary mapsheet__save" onClick={() => onSave(choice)}>
-          Enregistrer
-        </button>
+        <button className="btn btn--primary mapsheet__save" onClick={() => onSave(choice)}>{t('Enregistrer')}</button>
 
         {/* La petite carte qui rend les vignettes, hors de vue. */}
         <div className="mapsheet__offscreen" ref={host} aria-hidden="true" />

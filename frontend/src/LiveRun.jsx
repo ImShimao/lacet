@@ -26,6 +26,8 @@ import { MILE_M, units } from './units'
 import { blocksOf, createCoach, workoutSettings } from './workout'
 import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed, targetSpeech } from './runFormat'
 
+import { t, dec } from './i18n'
+import { stepText } from './stepText'
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
 const haptic = (kind) => {
   if (isNative()) import('./native').then((n) => n[kind]())
@@ -423,7 +425,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       if (!gpsLost.current && lastGoodAt.current && Date.now() - lastGoodAt.current > GPS_LOST_MS) {
         gpsLost.current = true
         setLostSignal(true)
-        talk('Signal GPS perdu. Je reprends dès qu’il revient.', { priority: false, keep: true })
+        talk(t('Signal GPS perdu. Je reprends dès qu’il revient.'), { priority: false, keep: true })
       }
     }, 1000)
 
@@ -455,7 +457,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (gpsLost.current) {
           gpsLost.current = false
           setLostSignal(false)
-          talk('Signal GPS retrouvé.', { priority: false, keep: true })
+          talk(t('Signal GPS retrouvé.'), { priority: false, keep: true })
         }
         if (door.current === undefined) {
           const first = route?.geometry?.[0]
@@ -530,7 +532,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         heading.current = runHeading(point) ?? heading.current
         onPosition(point, heading.current)
       },
-      (err) => setError(err.message),
+      (err) => setError(t(err.message)),
       { background: true },
     )
 
@@ -645,7 +647,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setPaused(kind)
     setState((s) => ({ ...s, elapsed: movingSeconds(), distance: covered.current }))
     if (kind === 'auto') {
-      talk('Pause automatique.', { priority: false, keep: true })
+      talk(t('Pause automatique.'), { priority: false, keep: true })
       haptic('pulseHaptic')
     }
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
@@ -659,7 +661,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     resumedAt.current = Date.now()
     setPaused(null)
     setHomeNote(null)
-    if (spoken) talk('Reprise.', { priority: false, keep: true })
+    if (spoken) talk(t('Reprise.'), { priority: false, keep: true })
     refreshLockScreen(upcomingStep.current, fix.current?.along ?? 0)
   }
 
@@ -759,7 +761,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       splitTimer.current = setTimeout(() => setSplitShown(null), SPLIT_SHOWN_MS)
     }
 
-    if (units() !== 'mi') sayMilestone({ done, previous, gap, each, elapsed, travelled, word: 'kilomètre' })
+    if (units() !== 'mi') sayMilestone({ done, previous, gap, each, elapsed, travelled, word: t('kilomètre') })
   }
 
   /** Les bornes de la voix en miles : même phrases, au mile, l'allure au mile. */
@@ -794,10 +796,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     // tus : c'est un réglage à part, et la course libre n'a pas d'allure visée.
     const hint = target && sport !== 'bike' && gap === 1 ? targetSpeech(each, plannedPerKm(request, false)) : ''
     if (!crossed && !hint) return
-    const ran = crossed && total ? ` ${capitalize(spokenDuration(elapsed))} de course.` : ''
+    const ran = crossed && total ? t(' {v1} de course.', { v1: capitalize(spokenDuration(elapsed)) }) : ''
     if (sport === 'bike') {
       const kmh = travelled / 1000 / (elapsed / 3600)
-      talk(`${done} ${word}s.${average ? ` Moyenne ${spokenSpeed(kmh)}.` : ''}${ran}`, { priority: false, keep: true })
+      talk(`${done} ${word}s.${average ? t(' Moyenne {v1}.', { v1: spokenSpeed(kmh) }) : ''}${ran}`, { priority: false, keep: true })
       return
     }
     // « Troisième kilomètre », et non « ce kilomètre » : en courant, on ne
@@ -809,8 +811,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // Deux bornes franchies d'un coup n'ont pas de temps propre à dire ; et
       // au premier, la moyenne répéterait le temps qu'on vient d'entendre.
       const own = lap && gap === 1 && each > 0
-      said = own ? `${which} à ${spoken(each)}.` : `${which}.`
-      if (average && !(own && done === 1)) said += ` Allure moyenne ${spoken(elapsed / (travelled / 1000))}.`
+      said = own ? t('{which} à {v2}.', { which, v2: spoken(each) }) : `${which}.`
+      if (average && !(own && done === 1)) said += t(' Allure moyenne {v1}.', { v1: spoken(elapsed / (travelled / 1000)) })
     }
     talk([said, hint].filter(Boolean).join(' ') + ran, { priority: false, keep: true })
   }
@@ -886,20 +888,20 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         if (canDetour && !autoReroute.current) {
           talk(
             backwards
-              ? 'Tu pars à contresens du parcours. Fais demi-tour.'
-              : "Tu t'es écarté du parcours. Reviens sur le tracé, ou touche « Recalculer ».",
+              ? t('Tu pars à contresens du parcours. Fais demi-tour.')
+              : t('Tu t\'es écarté du parcours. Reviens sur le tracé, ou touche « Recalculer ».'),
           )
         } else if (canDetour) {
           dueAt.current = Date.now() + REROUTE_AFTER_MS
           setRerouteDue(dueAt.current)
           talk(
             backwards
-              ? 'Tu pars à contresens du parcours. Fais demi-tour.'
-              : "Tu t'es écarté du parcours. Si tu ne le retrouves pas, je t'en propose un nouveau.",
+              ? t('Tu pars à contresens du parcours. Fais demi-tour.')
+              : t('Tu t\'es écarté du parcours. Si tu ne le retrouves pas, je t\'en propose un nouveau.'),
           )
         } else {
           talk(
-            backwards ? 'Tu pars à contresens du parcours. Fais demi-tour.' : "Tu t'es écarté du parcours. Reviens sur le tracé.",
+            backwards ? t('Tu pars à contresens du parcours. Fais demi-tour.') : t('Tu t\'es écarté du parcours. Reviens sur le tracé.'),
           )
         }
       }
@@ -909,7 +911,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     } else {
       lastOnAlong.current = found.along
       lastOnPoint.current = point
-      if (strayCount.current >= OFF_ROUTE_FIXES) talk('Te revoilà sur le parcours.')
+      if (strayCount.current >= OFF_ROUTE_FIXES) talk(t('Te revoilà sur le parcours.'))
       strayCount.current = 0
       dueAt.current = null
       setOffRoute(false)
@@ -1029,7 +1031,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (last != null && next.along - last < STOP_EVERY_M) return
     lastStopSaid.current[next.kind] = next.along
     const metres = Math.max(20, Math.round((next.along - along) / 10) * 10)
-    talk(`Point d'eau dans ${metres} mètres.`, { priority: false })
+    talk(t('Point d\'eau dans {metres} mètres.', { metres }), { priority: false })
   }
 
   /**
@@ -1047,9 +1049,9 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     }
     const half = (covered.current + left) / 2
     if (!guideRef.current.route?.home && covered.current + left >= HALF_MIN_M && covered.current >= half && covered.current - half <= MILESTONE_SLACK_M) {
-      say('half', 'Mi-parcours.')
+      say('half', t('Mi-parcours.'))
     }
-    if (covered.current + left >= LAST_KM_MIN_M && left <= LAST_KM_M && LAST_KM_M - left <= MILESTONE_SLACK_M) say('last', 'Il reste mille mètres.')
+    if (covered.current + left >= LAST_KM_MIN_M && left <= LAST_KM_M && LAST_KM_M - left <= MILESTONE_SLACK_M) say('last', t('Il reste mille mètres.'))
   }
 
   /**
@@ -1087,8 +1089,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     setTurnBack(turnedBack.current)
     talk(
       canDetour
-        ? 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » : je t’en trouve un autre.'
-        : 'Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » pour qu’il soit évité la prochaine fois.',
+        ? t('Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » : je t’en trouve un autre.')
+        : t('Tu reviens sur tes pas. Si le passage est fermé, touche « Passage fermé » pour qu’il soit évité la prochaine fois.'),
     )
   }
 
@@ -1144,7 +1146,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       homeShown.current = true
       setBackHome(true)
       haptic('warnHaptic')
-      talk(`${arrivalSpeech(at.covered, at.elapsed, sport === 'bike')} Touche « Terminer » pour finir.`)
+      talk(t('{v1} Touche « Terminer » pour finir.', { v1: arrivalSpeech(at.covered, at.elapsed, sport === 'bike') }))
       return
     }
     finishing.current = true
@@ -1177,7 +1179,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     homeShown.current = true
     setBackHome(true)
     haptic('pulseHaptic')
-    talk('Retour au point de départ. Touche « Terminer » pour finir la sortie.', { priority: false, keep: true })
+    talk(t('Retour au point de départ. Touche « Terminer » pour finir la sortie.'), { priority: false, keep: true })
   }
 
   /**
@@ -1194,8 +1196,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     addReport({ lon: point[0], lat: point[1], kind })
     if (at && turnedBack.current) setTurnBack({ ...turnedBack.current, reported: true })
     haptic('pulseHaptic')
-    const said = REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.'
-    talk(canDetour ? `${said} Je cherche un autre chemin.` : `${said} J'en tiendrai compte.`)
+    const said = t(REPORT_KINDS.find((k) => k.key === kind)?.spoken ?? 'Signalement enregistré.')
+    talk(canDetour ? t('{said} Je cherche un autre chemin.', { said }) : t('{said} J\'en tiendrai compte.', { said }))
     if (canDetour) detour(here.current ?? point, { forced: true })
   }
 
@@ -1240,7 +1242,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // Le départ du parcours choisi : la porte, même après un recalcul.
         home: homeward ? route.geometry[0] : null,
       })
-      if (!found) throw new Error('Aucun chemin')
+      if (!found) throw new Error(t('Aucun chemin'))
       // Revenu sur le tracé pendant le calcul : rien à changer. Sauf quand
       // c'est nous qui avons demandé le détour — là, le tracé n'est pas en
       // cause, c'est la rue devant qui est barrée.
@@ -1260,7 +1262,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       // répète pas au relevé suivant.
       acted.current.add(0)
       previewed.current.add(0)
-      talk(`${homeward ? 'Retour au départ.' : 'Nouvel itinéraire.'} ${next.instructions[0]?.text ?? ''}`)
+      talk(`${homeward ? t('Retour au départ.') : t('Nouvel itinéraire.')} ${stepText(next.instructions[0]?.text) ?? ''}`)
       haptic('pulseHaptic')
       onReroute?.(next)
       // Rentrer, c'est repartir : en pause, le chrono resterait figé et la voix
@@ -1268,10 +1270,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       if (home && pausedKind.current) togglePause()
     } catch {
       if (home) {
-        setHomeNote("Pas de chemin sûr d'ici : la boucle reste ton parcours.")
-        talk("Je n'ai pas trouvé de chemin sûr pour rentrer d'ici. Je garde la boucle.")
+        setHomeNote(t('Pas de chemin sûr d\'ici : la boucle reste ton parcours.'))
+        talk(t('Je n\'ai pas trouvé de chemin sûr pour rentrer d\'ici. Je garde la boucle.'))
       } else if (forced) {
-        talk("Je n'ai pas trouvé d'autre chemin d'ici. Le signalement est gardé pour les prochaines sorties.")
+        talk(t('Je n\'ai pas trouvé d\'autre chemin d\'ici. Le signalement est gardé pour les prochaines sorties.'))
       } else if (strayCount.current >= OFF_ROUTE_FIXES) {
         dueAt.current = Date.now() + REROUTE_RETRY_MS
         setRerouteDue(dueAt.current)
@@ -1281,7 +1283,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         // hors du tracé — et une voix qui radote, on la coupe.
         if (!saidNoPath.current) {
           saidNoPath.current = true
-          talk("Pas de chemin de retour trouvé d'ici. Je réessaie dans un instant.", { priority: false })
+          talk(t('Pas de chemin de retour trouvé d\'ici. Je réessaie dans un instant.'), { priority: false })
         }
       }
     } finally {
@@ -1300,8 +1302,8 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const point = here.current
     if (!point) return
     if (haversine(point, route.geometry[0]) <= HOME_NEAR_M) {
-      setHomeNote('Tu es déjà au départ : termine quand tu veux.')
-      talk('Tu es déjà au départ.')
+      setHomeNote(t('Tu es déjà au départ : termine quand tu veux.'))
+      talk(t('Tu es déjà au départ.'))
       return
     }
     setHomeNote(null)
@@ -1462,7 +1464,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
       {block && (
         <div className={`live__split live__block live__block--${block.kind}`} role="status">
-          <b>{block.title}</b>
+          <b>{t(block.title)}</b>
           {block.unit === 'm' ? `${Math.ceil(block.left)} m` : duration(Math.ceil(block.left))}
         </div>
       )}
@@ -1471,7 +1473,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         <div className="live__split" role="status">
           <b>Km {splitShown.km}</b>
           {sport === 'bike'
-            ? `${(3600 / splitShown.seconds).toFixed(1).replace('.', ',')} km/h`
+            ? `${(3600 / splitShown.seconds).toFixed(1).replace('.', dec())} km/h`
             : `${pace(splitShown.seconds)}`}
         </div>
       )}
@@ -1480,12 +1482,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         <div className="live__paused" role="status">
           <Icon name="flag" size={17} />
           <div>
-            <b>{route?.destination && !route.roundtrip ? 'Arrivé à destination' : 'De retour au départ'}</b>
-            <span>Termine ici, ou continue : la sortie suit.</span>
+            <b>{route?.destination && !route.roundtrip ? t('Arrivé à destination') : t('De retour au départ')}</b>
+            <span>{t('Termine ici, ou continue : la sortie suit.')}</span>
           </div>
-          <button className="live__home" onClick={() => finish(arrivedShown.current ? { arrived: true } : null)}>
-            Terminer
-          </button>
+          <button className="live__home" onClick={() => finish(arrivedShown.current ? { arrived: true } : null)}>{t('Terminer')}</button>
         </div>
       )}
 
@@ -1494,21 +1494,16 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       {alert && (
         <div className="live__alert" role="alert">
           <Icon name="warning" size={17} />
-          <span>
-            Traversée dans {Math.round(alert.d)} m
-            {alert.protected ? ' — passage protégé' : ' — pas de passage protégé'}
-          </span>
+          <span>{t('Traversée dans {v1} m{v2}', { v1: Math.round(alert.d), v2: alert.protected ? t(' — passage protégé') : t(' — pas de passage protégé') })}</span>
         </div>
       )}
 
       {error && <div className="live__error">{error}</div>}
       {!error && state.points === 0 && (
-        <div className="live__wait">Acquisition du signal GPS…</div>
+        <div className="live__wait">{t('Acquisition du signal GPS…')}</div>
       )}
       {!error && lostSignal && (
-        <div className="live__wait" role="status">
-          Signal GPS perdu : le guidage reprend dès qu'il revient.
-        </div>
+        <div className="live__wait" role="status">{t('Signal GPS perdu : le guidage reprend dès qu\'il revient.')}</div>
       )}
 
       <ReportButton disabled={!here.current} onReport={(kind) => report(kind)} />

@@ -13,6 +13,7 @@
 // vraie ; seul ce qui se passe entre deux bornes est lissé.
 
 import { haversineM } from './engine/geo'
+import { t } from './i18n'
 import { pyFixed } from './engine/py'
 
 const ATTRIBUTION =
@@ -74,7 +75,7 @@ export function runTimes(track, entry) {
 export function buildRunGpx(entry) {
   const track = entry.track?.length > 1 ? entry.track : entry.geometry || []
   const times = runTimes(track, entry)
-  const name = escape(entry.name || 'Sortie')
+  const name = escape(entry.name || t('Sortie'))
   const alts = entry.track_alt?.length === track.length ? entry.track_alt : []
   const points = track.map(
     ([lon, lat], i) =>

@@ -60,3 +60,17 @@ test("les fonds de carte tiennent sur l'écran, sans défilement latéral", asyn
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+test("la langue se change dans Apparence, et tout l'écran suit sans recharger", async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
+  await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
+  await page.getByRole('button', { name: /^Apparence/ }).click()
+  await page.getByRole('button', { name: /^Langue/ }).click()
+  await page.getByRole('option', { name: 'English' }).click()
+
+  await expect(page.getByRole('button', { name: /^Language/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'My routes', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Explore', exact: true }).first()).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe('en')
+})

@@ -7,6 +7,8 @@ import react from '@vitejs/plugin-react'
 // n'existent que dans l'app.
 export default defineConfig({
   plugins: [react()],
+  // Les tests partent du français : voir `src/test-setup.js`.
+  test: { setupFiles: ['./src/test-setup.js'] },
   server: {
     port: 5173,
     host: '127.0.0.1',

@@ -12,6 +12,7 @@
 
 import { load } from './storage'
 
+import { t as tr } from './i18n'
 /** Les séances proposées : les classiques du fractionné, de la piste au court-long. */
 export const WORKOUT_PRESETS = [
   { key: '400', label: '8 × 400 m', reps: 8, work: { m: 400 }, rest_s: 90 },
@@ -43,7 +44,7 @@ export function durationWords(seconds) {
   return s ? `${whole} ${s}` : whole
 }
 
-const amountWords = (b) => (b.m ? (b.m % 1000 ? `${b.m} mètres` : b.m === 1000 ? '1 kilomètre' : `${b.m / 1000} kilomètres`) : durationWords(b.s))
+const amountWords = (b) => (b.m ? (b.m % 1000 ? tr('{m} mètres', { m: b.m }) : b.m === 1000 ? tr('1 kilomètre') : tr('{v1} kilomètres', { v1: b.m / 1000 })) : durationWords(b.s))
 
 /** Les blocs de la séance, dans l'ordre. */
 export function blocksOf(settings = workoutSettings()) {
@@ -55,15 +56,15 @@ export function blocksOf(settings = workoutSettings()) {
     if (rep < preset.reps) out.push({ kind: 'rest', rep, reps: preset.reps, s: preset.rest_s })
   }
   if (settings.cooldown_min > 0) out.push({ kind: 'cooldown', s: settings.cooldown_min * 60 })
-  const spoken = `${preset.reps} fois ${amountWords(preset.work)}, récupération ${durationWords(preset.rest_s)}`
+  const spoken = tr('{reps} fois {v2}, récupération {v3}', { reps: preset.reps, v2: amountWords(preset.work), v3: durationWords(preset.rest_s) })
   return { label: preset.label, spoken, blocks: out }
 }
 
 function startPhrase(b) {
-  if (b.kind === 'warmup') return `D'abord ${amountWords(b)} d'échauffement, tranquille.`
-  if (b.kind === 'rest') return `Récupère : ${amountWords(b)}, en trottinant.`
-  if (b.kind === 'cooldown') return `Fini les répétitions. Retour au calme : ${amountWords(b)}.`
-  const which = b.rep === b.reps ? 'Dernière répétition' : `Répétition ${b.rep} sur ${b.reps}`
+  if (b.kind === 'warmup') return tr('D\'abord {v1} d\'échauffement, tranquille.', { v1: amountWords(b) })
+  if (b.kind === 'rest') return tr('Récupère : {v1}, en trottinant.', { v1: amountWords(b) })
+  if (b.kind === 'cooldown') return tr('Fini les répétitions. Retour au calme : {v1}.', { v1: amountWords(b) })
+  const which = b.rep === b.reps ? tr('Dernière répétition') : tr('Répétition {rep} sur {reps}', { rep: b.rep, reps: b.reps })
   return `${which} : ${amountWords(b)}. Vas-y !`
 }
 
@@ -94,7 +95,7 @@ export function createCoach({ spoken, blocks }, saved = null) {
       if (index === -1) {
         index = 0
         from = { t, m }
-        said.push(`Séance fractionnée : ${spoken}. ${startPhrase(blocks[0])}`)
+        said.push(tr('Séance fractionnée : {spoken}. {v2}', { spoken, v2: startPhrase(blocks[0]) }))
       }
       for (;;) {
         const b = blocks[index]
@@ -103,15 +104,15 @@ export function createCoach({ spoken, blocks }, saved = null) {
           const warn = b.m ? b.m >= WARN_MIN_M && left <= WARN_M : b.s >= WARN_MIN_S && left <= WARN_S
           if (warn && !warned) {
             warned = true
-            said.push(b.m ? `Plus que ${WARN_M} mètres.` : 'Dix secondes.')
+            said.push(b.m ? tr('Plus que {WARN_M} mètres.', { WARN_M }) : tr('Dix secondes.'))
           }
           return {
             said,
-            status: { kind: b.kind, title: TITLES[b.kind] ?? `Répétition ${b.rep}/${b.reps}`, left, unit: b.m ? 'm' : 's', rep: b.rep, reps: b.reps },
+            status: { kind: b.kind, title: TITLES[b.kind] ?? tr('Répétition {rep}/{reps}', { rep: b.rep, reps: b.reps }), left, unit: b.m ? 'm' : 's', rep: b.rep, reps: b.reps },
           }
         }
         // Le bloc est fini : le temps d'une répétition courue à la distance, puis la suite.
-        const took = b.kind === 'work' && b.m ? `Terminé en ${durationWords(t - from.t)}.` : ''
+        const took = b.kind === 'work' && b.m ? tr('Terminé en {v1}.', { v1: durationWords(t - from.t) }) : ''
         index += 1
         from = { t, m }
         warned = false

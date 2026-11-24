@@ -4,6 +4,7 @@ import { haversineM } from './engine/geo'
 import { askedOf, placeOf } from './request'
 import { recentPlaces } from './storage'
 
+import { t } from './i18n'
 /** Le départ de la toute première ouverture, quand il n'y a rien d'autre. */
 export const PARIS = { lat: 48.8566, lon: 2.3522 }
 
@@ -91,7 +92,7 @@ export default function useStart(geo, { onMoved }) {
       // ouverture, quand il n'y a encore rien à se rappeler.
       const dernier = recentPlaces()[0]
       if (dernier) applyStart(placeOf(dernier), dernier.label, true)
-      else applyStart(PARIS, 'Paris', true)
+      else applyStart(PARIS, t('Paris'), true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.status, geo.position])

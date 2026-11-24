@@ -38,6 +38,7 @@ const GROUPS = ['Paramètres', 'Données', 'Infos']
 
 import { SECTIONS } from './accountSections.js'
 
+import { t, locale, dec, lang, useLang, setLang, LANGUAGES } from './i18n'
 export { SECTIONS, sectionTitle } from './accountSections.js'
 
 export default function Account({ page = null, onPage = () => {}, ...props }) {
@@ -96,15 +97,15 @@ function Summary({ onPage, params, poiPrefs }) {
           <Icon name={sport?.icon ?? 'user'} size={24} />
         </span>
         <span className="menu__text">
-          <b>Profil local</b>
+          <b>{t('Profil local')}</b>
           <em>{summaryOf('profile', { params, poiPrefs })}</em>
         </span>
         <Icon name="chevronRight" size={17} className="menu__chev" />
       </button>
 
       {GROUPS.map((group) => (
-        <section className="acct__group" key={group} aria-label={group}>
-          <h3 className="acct__label">{group}</h3>
+        <section className="acct__group" key={group} aria-label={t(group)}>
+          <h3 className="acct__label">{t(group)}</h3>
           <div className="menu">
             {SECTIONS.filter((s) => s.group === group).map((s) => (
               <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
@@ -112,7 +113,7 @@ function Summary({ onPage, params, poiPrefs }) {
                   <Icon name={s.icon} size={18} />
                 </span>
                 <span className="menu__text">
-                  <b>{s.title}</b>
+                  <b>{t(s.title)}</b>
                   <em>{summaryOf(s.key, { params, poiPrefs })}</em>
                 </span>
                 <Icon name="chevronRight" size={17} className="menu__chev" />
@@ -122,9 +123,7 @@ function Summary({ onPage, params, poiPrefs }) {
         </section>
       ))}
 
-      <p className="muted small acct__foot">
-        Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.
-      </p>
+      <p className="muted small acct__foot">{t('Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.')}</p>
     </>
   )
 }
@@ -137,23 +136,23 @@ function summaryOf(key, { params, poiPrefs }) {
   const saved = load()
   switch (key) {
     case 'profile':
-      return `Poids ${params.weight_kg || 70} kg${params.weekly_km ? ` · ${params.weekly_km} km par semaine` : ''}`
+      return t('Poids {v1} kg{v2}', { v1: params.weight_kg || 70, v2: params.weekly_km ? t(' · {weekly_km} km par semaine', { weekly_km: params.weekly_km }) : '' })
     case 'search':
       return [
-        `Sécurité ${SAFETY.find((o) => o.key === params.safety)?.label.toLowerCase() ?? 'sûre'}`,
-        directionOf(params.direction) ? `Vers le ${directionOf(params.direction).title.toLowerCase()}` : null,
+        t('Sécurité {v1}', { v1: t(SAFETY.find((o) => o.key === params.safety)?.label ?? 'Sûr').toLowerCase() ?? t('sûre') }),
+        directionOf(params.direction) ? t('Vers le {v1}', { v1: t(directionOf(params.direction).title).toLowerCase() }) : null,
         `${params.count ?? 5} boucles`,
-        params.avoid?.length ? `${params.avoid.length} évitement${params.avoid.length > 1 ? 's' : ''}` : null,
+        params.avoid?.length ? t('{length} évitement{v2}', { length: params.avoid.length, v2: params.avoid.length > 1 ? 's' : '' }) : null,
       ]
         .filter(Boolean)
         .join(' · ')
     case 'run': {
       const { km } = voiceSettings()
       return [
-        `Recalcul ${saved.autoReroute !== false ? 'auto' : 'manuel'}`,
-        `Arrêt ${saved.autoFinish !== false ? 'auto' : 'manuel'} à l'arrivée`,
-        km ? null : 'Kilomètres tus',
-        workoutSettings().on ? `Fractionné ${WORKOUT_PRESETS.find((p) => p.key === workoutSettings().preset)?.label ?? ''}` : null,
+        t('Recalcul {v1}', { v1: t(saved.autoReroute !== false ? 'auto' : 'manuel') }),
+        t('Arrêt {v1} à l\'arrivée', { v1: t(saved.autoFinish !== false ? 'auto' : 'manuel') }),
+        km ? null : t('Kilomètres tus'),
+        workoutSettings().on ? t('Fractionné {v1}', { v1: t(WORKOUT_PRESETS.find((p) => p.key === workoutSettings().preset)?.label ?? '') }) : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -161,31 +160,31 @@ function summaryOf(key, { params, poiPrefs }) {
     case 'safety': {
       const reports = activeReports().length
       const contact = saved.emergencyContact
-        ? `SOS vers ${saved.emergencyContact}${saved.notifyContact ? ' · départ et retour annoncés' : ''}`
-        : "Pas de contact d'urgence"
+        ? t('SOS vers {emergencyContact}{v2}', { emergencyContact: saved.emergencyContact, v2: saved.notifyContact ? t(' · départ et retour annoncés') : '' })
+        : t('Pas de contact d\'urgence')
       const zones = listZones().filter((z) => z.on !== false).length
       return [
         contact,
         reports && `${reports} signalement${reports > 1 ? 's' : ''}`,
-        zones && `${zones} zone${zones > 1 ? 's' : ''} évitée${zones > 1 ? 's' : ''}`,
+        zones && t('{zones} zone{v2} évitée{v3}', { zones, v2: zones > 1 ? 's' : '', v3: zones > 1 ? 's' : '' }),
       ]
         .filter(Boolean)
         .join(' · ')
     }
     case 'appearance': {
       const { accent, theme, text } = appearanceLabels()
-      return `${accent} · Thème ${theme.toLowerCase()} · Texte ${text === 'large' ? 'agrandi' : 'normal'}`
+      return t('{accent} · Thème {v2} · Texte {v3}', { accent, v2: theme.toLowerCase(), v3: t(text === 'large' ? 'agrandi' : 'normal') })
     }
     case 'storage': {
       const info = usage()
-      if (!info) return 'Sorties, cartes et rues gardées'
+      if (!info) return t('Sorties, cartes et rues gardées')
       const { history, favorites } = info.counts
-      return `${mo(info.bytes)} · ${history} sortie${history > 1 ? 's' : ''}, ${favorites} favori${favorites > 1 ? 's' : ''}`
+      return t('{v1} · {history} sortie{v3}, {favorites} favori{v5}', { v1: mo(info.bytes), history, v3: history > 1 ? 's' : '', favorites, v5: favorites > 1 ? 's' : '' })
     }
     case 'backup':
-      return 'Exporter, restaurer ou tout effacer'
+      return t('Exporter, restaurer ou tout effacer')
     case 'about':
-      return 'Version, conditions, confidentialité, sources'
+      return t('Version, conditions, confidentialité, sources')
     default:
       return ''
   }
@@ -197,20 +196,18 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'profile':
       return (
         <>
-          <p className="muted small">
-            Le poids sert à estimer les calories d'une sortie, et rien d'autre. Rien n'est envoyé.
-          </p>
+          <p className="muted small">{t('Le poids sert à estimer les calories d\'une sortie, et rien d\'autre. Rien n\'est envoyé.')}</p>
           <div className="rows">
             <NumberRow
-              label="Poids"
-              unit="kg"
+              label={t('Poids')}
+              unit={t('kg')}
               value={params.weight_kg || 70}
               min={30}
               max={200}
               onChange={(weight_kg) => onProfile({ weight_kg })}
             />
             <NumberRow
-              label="Objectif par semaine"
+              label={t('Objectif par semaine')}
               unit="km"
               value={params.weekly_km || 0}
               min={0}
@@ -218,9 +215,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
               onChange={(weekly_km) => onProfile({ weekly_km })}
             />
           </div>
-          <p className="muted small">
-            L'objectif trace un repère sur « Volume par semaine », dans tes sorties. À 0, pas de repère.
-          </p>
+          <p className="muted small">{t('L\'objectif trace un repère sur « Volume par semaine », dans tes sorties. À 0, pas de repère.')}</p>
         </>
       )
     case 'search':
@@ -237,11 +232,11 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'safety':
       return (
         <>
-          <h3 className="section">Contact d'urgence</h3>
+          <h3 className="section">{t('Contact d\'urgence')}</h3>
           <EmergencyContact />
-          <h3 className="section">Mes zones à éviter</h3>
+          <h3 className="section">{t('Mes zones à éviter')}</h3>
           <MyZones zones={zones} onZones={onZones} />
-          <h3 className="section">Mes signalements</h3>
+          <h3 className="section">{t('Mes signalements')}</h3>
           <MyReports />
         </>
       )
@@ -250,11 +245,11 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'storage':
       return (
         <>
-          <h3 className="section">Sorties et favoris</h3>
+          <h3 className="section">{t('Sorties et favoris')}</h3>
           <StoredData />
-          <h3 className="section">Cartes hors ligne</h3>
+          <h3 className="section">{t('Cartes hors ligne')}</h3>
           <OfflineStorage />
-          <h3 className="section">Rues gardées</h3>
+          <h3 className="section">{t('Rues gardées')}</h3>
           <KeptStreets />
         </>
       )
@@ -262,49 +257,27 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       return (
         <>
           <BackupRows onRestored={onRestored} />
-          <h3 className="section">Tout effacer</h3>
+          <h3 className="section">{t('Tout effacer')}</h3>
           <ClearData onClearData={onClearData} />
         </>
       )
     case 'about':
       return (
         <>
-          <h3 className="section">Version</h3>
+          <h3 className="section">{t('Version')}</h3>
           <BuildStamp />
           <LastSearch />
           {/* Les pages légales qu'Apple et le RGPD demandent, dans l'app même : sans
               compte ni serveur, il n'y a rien d'autre à consulter ailleurs. */}
-          <h3 className="section">Conditions d'utilisation</h3>
+          <h3 className="section">{t('Conditions d\'utilisation')}</h3>
           <p className="muted small">
-            <b>La note A, B ou C est une estimation, pas une garantie.</b> Elle est calculée à partir
-            d'OpenStreetMap, qui peut être incomplet ou dépassé : un trottoir manquant, un chantier,
-            une rue mal éclairée n'y figurent pas toujours. Regarde la route, respecte le Code de la
-            route et reste seul juge de ton parcours.
-          </p>
-          <p className="muted small">
-            Lacet est fourni tel quel, sans garantie que les boucles, les distances, le dénivelé ou
-            le guidage soient exacts. Le bouton SOS prépare un SMS : il n'appelle pas les secours et
-            ne remplace pas le 112.
-          </p>
-          <h3 className="section">Confidentialité</h3>
-          <p className="muted small">
-            Aucun compte, aucune mesure d'usage, aucune publicité. Favoris, sorties, réglages et
-            contact d'urgence ne quittent pas cet appareil. Seuls partent sur le réseau, sans rien
-            qui t'identifie : la zone autour du départ (rues, altitudes, vent, fond de carte) et le
-            lieu qu'on cherche par son nom. Une sortie ne quitte le téléphone que si tu l'exportes ou
-            la partages.
-          </p>
-          <p className="muted small">
-            « Tout effacer », dans Sauvegarde, supprime tout ce que l'app a gardé. Pour toute
-            question : la page du projet sur GitHub.
-          </p>
-          <h3 className="section">Sources</h3>
-          <p className="disclaimer">
-            Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © OpenFreeMap, © OpenMapTiles,
-            © OpenTopoMap (CC-BY-SA), © Mapbox · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors
-            ligne) et Valhalla (FOSSGIS) hors de France · Recherche de
-            lieux Photon (Komoot) et Nominatim · Vent MET Norway (CC BY 4.0).
-          </p>
+            <b>{t('La note A, B ou C est une estimation, pas une garantie.')}</b>{' '}{t('Elle est calculée à partir d\'OpenStreetMap, qui peut être incomplet ou dépassé : un trottoir manquant, un chantier, une rue mal éclairée n\'y figurent pas toujours. Regarde la route, respecte le Code de la route et reste seul juge de ton parcours.')}</p>
+          <p className="muted small">{t('Lacet est fourni tel quel, sans garantie que les boucles, les distances, le dénivelé ou le guidage soient exacts. Le bouton SOS prépare un SMS : il n\'appelle pas les secours et ne remplace pas le 112.')}</p>
+          <h3 className="section">{t('Confidentialité')}</h3>
+          <p className="muted small">{t('Aucun compte, aucune mesure d\'usage, aucune publicité. Favoris, sorties, réglages et contact d\'urgence ne quittent pas cet appareil. Seuls partent sur le réseau, sans rien qui t\'identifie : la zone autour du départ (rues, altitudes, vent, fond de carte) et le lieu qu\'on cherche par son nom. Une sortie ne quitte le téléphone que si tu l\'exportes ou la partages.')}</p>
+          <p className="muted small">{t('« Tout effacer », dans Sauvegarde, supprime tout ce que l\'app a gardé. Pour toute question : la page du projet sur GitHub.')}</p>
+          <h3 className="section">{t('Sources')}</h3>
+          <p className="disclaimer">{t('Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © OpenFreeMap, © OpenMapTiles, © OpenTopoMap (CC-BY-SA), © Mapbox · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors ligne) et Valhalla (FOSSGIS) hors de France · Recherche de lieux Photon (Komoot) et Nominatim · Vent MET Norway (CC BY 4.0).')}</p>
         </>
       )
     default:
@@ -321,16 +294,13 @@ function EmergencyContact() {
   const [announce, setAnnounce] = useState(() => Boolean(load().notifyContact))
   return (
     <>
-      <p className="muted small">
-        Le bouton SOS prépare un SMS vers ce numéro avec ta position.{' '}
-        <b>L'app ne l'envoie pas</b> : c'est toi qui appuies sur envoyer.
-      </p>
+      <p className="muted small">{t('Le bouton SOS prépare un SMS vers ce numéro avec ta position.')}{' '}<b>{t('L\'app ne l\'envoie pas')}</b>{' '}{t(': c\'est toi qui appuies sur envoyer.')}</p>
       <input
         className="field"
         type="tel"
         inputMode="tel"
         autoComplete="tel"
-        aria-label="Numéro du contact d'urgence"
+        aria-label={t('Numéro du contact d\'urgence')}
         placeholder="06 12 34 56 78"
         value={contact}
         onChange={(e) => {
@@ -341,7 +311,7 @@ function EmergencyContact() {
       <PrefsCard>
         <ToggleRow
           icon="sos"
-          label="Prévenir au départ et au retour"
+          label={t('Prévenir au départ et au retour')}
           on={announce}
           onChange={(value) => {
             setAnnounce(value)
@@ -351,10 +321,10 @@ function EmergencyContact() {
       </PrefsCard>
       <p className="muted small">
         {!announce
-          ? 'Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.'
+          ? t('Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.')
           : contact.trim()
-            ? 'Au départ, Messages s’ouvre avec la distance, le point de départ et l’heure prévue du retour : envoie, puis reviens dans Lacet pour le compte à rebours. À l’arrivée, un bouton prépare « De retour de ma sortie ».'
-            : 'Donne un numéro ci-dessus : sans lui, rien ne part.'}
+            ? t('Au départ, Messages s’ouvre avec la distance, le point de départ et l’heure prévue du retour : envoie, puis reviens dans Lacet pour le compte à rebours. À l’arrivée, un bouton prépare « De retour de ma sortie ».')
+            : t('Donne un numéro ci-dessus : sans lui, rien ne part.')}
       </p>
     </>
   )
@@ -370,15 +340,10 @@ function ClearData({ onClearData }) {
   const [done, setDone] = useState(false)
   return (
     <>
-      <p className="muted small">
-        Favoris, sorties, départs nommés, signalements, contact d'urgence, réglages, cartes
-        et rues gardées. Fais une sauvegarde avant si tu veux pouvoir revenir en arrière.
-      </p>
+      <p className="muted small">{t('Favoris, sorties, départs nommés, signalements, contact d\'urgence, réglages, cartes et rues gardées. Fais une sauvegarde avant si tu veux pouvoir revenir en arrière.')}</p>
       {confirm ? (
         <div className="row">
-          <button className="btn" onClick={() => setConfirm(false)}>
-            Annuler
-          </button>
+          <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
           <button
             className="btn btn--primary"
             onClick={async () => {
@@ -386,16 +351,12 @@ function ClearData({ onClearData }) {
               setConfirm(false)
               setDone(true)
             }}
-          >
-            Confirmer l'effacement
-          </button>
+          >{t('Confirmer l\'effacement')}</button>
         </div>
       ) : (
-        <button className="btn" onClick={() => setConfirm(true)}>
-          Effacer mes données
-        </button>
+        <button className="btn" onClick={() => setConfirm(true)}>{t('Effacer mes données')}</button>
       )}
-      {done && <p className="muted small">Tout est effacé : l'app repart comme au premier jour.</p>}
+      {done && <p className="muted small">{t('Tout est effacé : l\'app repart comme au premier jour.')}</p>}
     </>
   )
 }
@@ -404,7 +365,7 @@ function ClearData({ onClearData }) {
 function appearanceLabels() {
   const look = getAppearance()
   const label = (list, key) => list.find((o) => o.key === key)?.label ?? ''
-  return { accent: label(ACCENTS, look.accent), theme: label(THEMES, look.theme), text: look.text }
+  return { accent: t(label(ACCENTS, look.accent)), theme: t(label(THEMES, look.theme)), text: look.text }
 }
 
 /**
@@ -414,23 +375,25 @@ function appearanceLabels() {
  */
 function AppearanceSettings({ mapStyle, onStyles }) {
   const look = useAppearance()
+  const language = useLang()
   // Lue au rendu partout ailleurs : changer d'onglet suffit à tout réafficher.
   const [unit, setUnit] = useState(units)
   return (
     <PrefsCard
-      title="Affichage"
-      foot="Le vert, le jaune et le rouge de la sécurité ne suivent pas l'accent : ce sont des avis, pas une décoration."
+      title={t('Affichage')}
+      foot={t('Le vert, le jaune et le rouge de la sécurité ne suivent pas l\'accent : ce sont des avis, pas une décoration.')}
     >
+      <PickRow icon="language" label={t('Langue')} value={language} options={LANGUAGES} onChange={setLang} />
       <PickRow
         icon="appearance"
-        label="Thème"
+        label={t('Thème')}
         value={look.theme}
         options={THEMES}
         onChange={(theme) => setAppearance({ theme })}
       />
       <PickRow
         icon="sun"
-        label="Couleur d'accent"
+        label={t('Couleur d\'accent')}
         value={look.accent}
         shown={ACCENTS.find((o) => o.key === look.accent)?.label}
         options={ACCENTS.map((a) => ({
@@ -439,7 +402,7 @@ function AppearanceSettings({ mapStyle, onStyles }) {
           label: (
             <span className="swatch-opt">
               <i data-accent={a.key} />
-              {a.label}
+              {t(a.label)}
             </span>
           ),
         }))}
@@ -447,14 +410,14 @@ function AppearanceSettings({ mapStyle, onStyles }) {
       />
       <PickRow
         icon="sliders"
-        label="Taille du texte"
+        label={t('Taille du texte')}
         value={look.text}
         options={TEXT_SIZES}
         onChange={(text) => setAppearance({ text })}
       />
       <PickRow
         icon="routes"
-        label="Unités"
+        label={t('Unités')}
         value={unit}
         options={UNIT_OPTIONS}
         onChange={(value) => {
@@ -462,7 +425,7 @@ function AppearanceSettings({ mapStyle, onStyles }) {
           setUnit(value)
         }}
       />
-      {onStyles && <LinkRow icon="layers" label="Style de carte" value={styleByKey(mapStyle).label} onClick={onStyles} />}
+      {onStyles && <LinkRow icon="layers" label={t('Style de carte')} value={styleByKey(mapStyle).label} onClick={onStyles} />}
     </PrefsCard>
   )
 }
@@ -509,27 +472,27 @@ function SearchSettings({ params, onProfile }) {
   return (
     <>
       <PrefsCard
-        title="Itinéraire"
-        foot="Sûr écarte les routes rapides sans trottoir. À gauche, on court face aux voitures (R412-36)."
+        title={t('Itinéraire')}
+        foot={t('Sûr écarte les routes rapides sans trottoir. À gauche, on court face aux voitures (R412-36).')}
       >
         <PickRow
           icon="shield"
-          label="Sécurité"
+          label={t('Sécurité')}
           value={params.safety ?? 'safe'}
           options={SAFETY_OPTIONS}
           onChange={(safety) => onProfile({ safety })}
         />
         <PickRow
           icon="compass"
-          label="Direction"
+          label={t('Direction')}
           value={directionOf(params.direction)?.key ?? 'auto'}
-          shown={directionOf(params.direction)?.title ?? 'Auto'}
-          options={DIRECTIONS.map((d) => ({ key: d.key, label: d.title ?? 'Auto' }))}
+          shown={directionOf(params.direction)?.title ?? t('Auto')}
+          options={DIRECTIONS.map((d) => ({ key: d.key, label: d.title ?? t('Auto') }))}
           onChange={(direction) => onProfile({ direction })}
         />
         <PickRow
           icon="repeat"
-          label="Forme"
+          label={t('Forme')}
           value={params.form ?? 'auto'}
           options={FORM_OPTIONS}
           onChange={(form) => onProfile({ form })}
@@ -537,7 +500,7 @@ function SearchSettings({ params, onProfile }) {
         {params.form === 'laps' && (
           <PickRow
             icon="refresh"
-            label="Nombre de tours"
+            label={t('Nombre de tours')}
             value={params.laps ?? 2}
             options={LAP_OPTIONS}
             onChange={(laps) => onProfile({ laps })}
@@ -545,14 +508,14 @@ function SearchSettings({ params, onProfile }) {
         )}
         <PickRow
           icon="navigation"
-          label="Côté de la route"
+          label={t('Côté de la route')}
           value={params.side ?? 'left'}
           options={SIDES}
           onChange={(side) => onProfile({ side })}
         />
       </PrefsCard>
 
-      <PrefsCard title="Éviter">
+      <PrefsCard title={t('Éviter')}>
         {AVOIDABLE.filter((a) => !a.sport || a.sport === sport).map((a) => (
           <ToggleRow
             key={a.key}
@@ -565,32 +528,32 @@ function SearchSettings({ params, onProfile }) {
       </PrefsCard>
 
       <PrefsCard
-        title="Recherche"
-        foot="La nuit, les rues éclairées passent devant. « Auto » suit le coucher du soleil."
+        title={t('Recherche')}
+        foot={t('La nuit, les rues éclairées passent devant. « Auto » suit le coucher du soleil.')}
       >
         <PickRow
           icon="clock"
-          label="Moment"
+          label={t('Moment')}
           value={params.time_of_day ?? 'auto'}
           options={MOMENTS}
           onChange={(time_of_day) => onProfile({ time_of_day })}
         />
         <PickRow
           icon="routes"
-          label="Propositions"
+          label={t('Propositions')}
           value={params.count ?? 5}
-          shown={`${params.count ?? 5} boucles`}
-          options={COUNTS.map((c) => ({ key: c.key, label: `${c.label} boucles` }))}
+          shown={t('{v1} boucles', { v1: params.count ?? 5 })}
+          options={COUNTS.map((c) => ({ key: c.key, label: t('{label} boucles', { label: c.label }) }))}
           onChange={(count) => onProfile({ count })}
         />
       </PrefsCard>
 
       <PrefsCard
-        title="Raccourcis de l'accueil"
-        foot="Les touches sous la règle de distance, six au plus."
+        title={t('Raccourcis de l\'accueil')}
+        foot={t('Les touches sous la règle de distance, six au plus.')}
       >
-        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label="Distances" icon="routes" unit={unitLabel()} />
-        <PresetRow kind="duration" label="Durées" icon="clock" unit="min" />
+        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label={t('Distances')} icon="routes" unit={unitLabel()} />
+        <PresetRow kind="duration" label={t('Durées')} icon="clock" unit="min" />
       </PrefsCard>
 
       <ShownFilters params={params} onProfile={onProfile} />
@@ -624,9 +587,9 @@ function PresetRow({ kind, label, icon, unit }) {
       <div className="presetrow__chips" role="group" aria-label={label}>
         {list.map((v) => (
           <span className="presetrow__chip" key={v}>
-            {String(v).replace('.', ',')} <small>{unit}</small>
+            {String(v).replace('.', dec())} <small>{unit}</small>
             {list.length > 1 && (
-              <button onClick={() => keep(list.filter((x) => x !== v))} aria-label={`Retirer ${v} ${unit}`}>
+              <button onClick={() => keep(list.filter((x) => x !== v))} aria-label={t('Retirer {v} {unit}', { v, unit })}>
                 <Icon name="close" size={12} />
               </button>
             )}
@@ -636,14 +599,14 @@ function PresetRow({ kind, label, icon, unit }) {
           <input
             autoFocus
             inputMode="decimal"
-            aria-label={`Nouvelle valeur, en ${unit}`}
+            aria-label={t('Nouvelle valeur, en {unit}', { unit })}
             placeholder={unit}
             onBlur={(e) => add(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           />
         ) : (
           list.length < 6 && (
-            <button className="presetrow__add" onClick={() => setAdding(true)} aria-label={`Ajouter une valeur, en ${unit}`}>
+            <button className="presetrow__add" onClick={() => setAdding(true)} aria-label={t('Ajouter une valeur, en {unit}', { unit })}>
               <Icon name="plus" size={14} />
             </button>
           )
@@ -670,7 +633,7 @@ function ShownFilters({ params, onProfile }) {
         : { hiddenFilters: [...hidden, f.key], ...f.reset },
     )
   return (
-    <PrefsCard title="Panneau Filtres" foot="La longueur et l'allure y restent toujours.">
+    <PrefsCard title={t('Panneau Filtres')} foot={t('La longueur et l\'allure y restent toujours.')}>
       {OPTIONAL_FILTERS.map((f) => {
         const on = !hidden.includes(f.key)
         return (
@@ -678,7 +641,7 @@ function ShownFilters({ params, onProfile }) {
             key={f.key}
             icon={FILTER_ICONS[f.key]}
             label={f.label}
-            sub={on ? null : `Masqué. ${f.fixed}`}
+            sub={on ? null : t('Masqué. {fixed}', { fixed: f.fixed })}
             on={on}
             onChange={() => toggle(f)}
           />
@@ -715,13 +678,10 @@ function KeptStreets() {
   return (
     <>
       <div className="rows">
-        <Row label="Espace occupé" value={usage ? offline.formatBytes(usage.bytes) : '—'} />
-        <Row label="Plafond" value={usage ? offline.formatBytes(usage.budget) : '—'} />
+        <Row label={t('Espace occupé')} value={usage ? offline.formatBytes(usage.bytes) : '—'} />
+        <Row label={t('Plafond')} value={usage ? offline.formatBytes(usage.budget) : '—'} />
       </div>
-      <p className="muted small">
-        Gardées toutes seules dès qu'on cherche une boucle, pour trois mois : rien à
-        préparer avant un voyage.
-      </p>
+      <p className="muted small">{t('Gardées toutes seules dès qu\'on cherche une boucle, pour trois mois : rien à préparer avant un voyage.')}</p>
     </>
   )
 }
@@ -742,7 +702,7 @@ function KeptStreets() {
 function StoredData() {
   const [info, setInfo] = useState(() => usage())
   const [freed, setFreed] = useState(null)
-  if (!info) return <p className="muted small">Le stockage de l'app ne répond pas.</p>
+  if (!info) return <p className="muted small">{t('Le stockage de l\'app ne répond pas.')}</p>
 
   const part = Math.min(1, info.bytes / info.quota)
   const serre = part > 0.75
@@ -750,34 +710,25 @@ function StoredData() {
     <>
       {info.refusedAt && (
         <div className="notice notice--warn">
-          <b>Le stockage est plein.</b> La dernière modification n'a pas pu être enregistrée — ni
-          favori, ni réglage, ni sortie terminée. Retire des traces ci-dessous, ou fais une
-          sauvegarde puis efface, avant de repartir courir.
-        </div>
+          <b>{t('Le stockage est plein.')}</b>{' '}{t('La dernière modification n\'a pas pu être enregistrée — ni favori, ni réglage, ni sortie terminée. Retire des traces ci-dessous, ou fais une sauvegarde puis efface, avant de repartir courir.')}</div>
       )}
       {info.trimmed && (
         <div className="notice notice--warn">
-          <b>De la place a dû être faite le {dayOf(info.trimmed.at)}.</b> Le stockage était plein :{' '}
-          {/* Alléger d'abord, supprimer ensuite (`save`) : l'un, l'autre ou
-              les deux, et chacun se dit autrement. */}
-          {[
+          <b>{t('De la place a dû être faite le {v1}.', { v1: dayOf(info.trimmed.at) })}</b>{' '}{t('Le stockage était plein :')}{' '}{/* Alléger d'abord, supprimer ensuite (`save`) : l'un, l'autre ou
+              les deux, et chacun se dit autrement. */}{t('{v1} pour que la suite puisse s\'enregistrer. Les plus récentes, elles, sont intactes.', { v1: [
             info.trimmed.briefed > 0 &&
               `${info.trimmed.briefed} sorties ont perdu leur trace et leur parcours prévu, pas leurs chiffres`,
             info.trimmed.from > info.trimmed.to &&
               `${info.trimmed.from - info.trimmed.to} sorties parmi les plus anciennes ont été supprimées`,
           ]
             .filter(Boolean)
-            .join(', et ')}{' '}
-          pour que la suite puisse s'enregistrer. Les plus récentes, elles, sont intactes.
-          <button
+            .join(', et ') })}<button
             className="linkish"
             onClick={() => {
               forgetTrim()
               setInfo(usage())
             }}
-          >
-            J'ai lu
-          </button>
+          >{t('J\'ai lu')}</button>
         </div>
       )}
 
@@ -785,10 +736,7 @@ function StoredData() {
         <i style={{ transform: `scaleX(${part})` }} />
       </div>
       <p className="muted small">
-        <b>{mo(info.bytes)}</b> sur environ {mo(info.quota)} — {info.counts.history} sortie
-        {info.counts.history > 1 ? 's' : ''} ({mo(info.parts.history)}), {info.counts.favorites} favori
-        {info.counts.favorites > 1 ? 's' : ''} ({mo(info.parts.favorites)}).
-      </p>
+        <b>{mo(info.bytes)}</b>{' '}{t('sur environ {v1} — {history} sortie{v3} ({v4}), {favorites} favori{v6} ({v7}).', { v1: mo(info.quota), history: info.counts.history, v3: info.counts.history > 1 ? 's' : '', v4: mo(info.parts.history), favorites: info.counts.favorites, v6: info.counts.favorites > 1 ? 's' : '', v7: mo(info.parts.favorites) })}</p>
 
       {info.counts.traces > 0 && (
         <div className="row">
@@ -799,15 +747,13 @@ function StoredData() {
               setFreed(libere)
               setInfo(usage())
             }}
-          >
-            Retirer les {info.counts.traces} traces gardées ({mo(info.parts.traces)})
-          </button>
+          >{t('Retirer les {traces} traces gardées ({v2})', { traces: info.counts.traces, v2: mo(info.parts.traces) })}</button>
         </div>
       )}
       <p className="muted small">
         {freed !== null
-          ? `${mo(freed)} libérés. Les chiffres des sorties n'ont pas bougé.`
-          : "Une trace est le dessin de ce qu'on a réellement couru. La retirer garde la distance, le temps, l'allure et les tours de kilomètre : seuls le tracé sur la carte et son export s'en vont."}
+          ? t('{v1} libérés. Les chiffres des sorties n\'ont pas bougé.', { v1: mo(freed) })
+          : t('Une trace est le dessin de ce qu\'on a réellement couru. La retirer garde la distance, le temps, l\'allure et les tours de kilomètre : seuls le tracé sur la carte et son export s\'en vont.')}
       </p>
     </>
   )
@@ -815,12 +761,12 @@ function StoredData() {
 
 /** « 1,4 Mo », « 320 ko ». */
 function mo(octets) {
-  if (octets >= 1048576) return `${(octets / 1048576).toFixed(1).replace('.', ',')} Mo`
+  if (octets >= 1048576) return `${(octets / 1048576).toFixed(1).replace('.', dec())} Mo`
   return `${Math.round(octets / 1024)} ko`
 }
 
 /** « 28 septembre » */
-const dayOf = (at) => new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+const dayOf = (at) => new Date(at).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })
 
 /**
  * Ce qu'on a signalé en courant, et qu'on peut retirer.
@@ -834,19 +780,12 @@ function MyReports() {
   const [items, setItems] = useState(() => activeReports())
   if (!items.length) {
     return (
-      <p className="muted small">
-        Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou
-        dangereux pour six mois.
-      </p>
+      <p className="muted small">{t('Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou dangereux pour six mois.')}</p>
     )
   }
   return (
     <>
-      <p className="muted small">
-        {items.length} point{items.length > 1 ? 's' : ''} écarté{items.length > 1 ? 's' : ''} du
-        routage, dans un rayon de vingt-cinq mètres chacun. Ils s'effacent d'eux-mêmes au bout de
-        six mois.
-      </p>
+      <p className="muted small">{t('{length} point{v2} écarté{v3} du routage, dans un rayon de vingt-cinq mètres chacun. Ils s\'effacent d\'eux-mêmes au bout de six mois.', { length: items.length, v2: items.length > 1 ? 's' : '', v3: items.length > 1 ? 's' : '' })}</p>
       <div className="rows">
         {items.map((r) => (
           <div className="rows__row" key={r.id}>
@@ -854,13 +793,11 @@ function MyReports() {
               {kindLabel(r.kind)}
               <em className="muted small">
                 {' '}
-                · {new Date(r.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} ·{' '}
+                · {new Date(r.at).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })} ·{' '}
                 {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
               </em>
             </span>
-            <button className="linkish" onClick={() => setItems(removeReport(r.id))}>
-              Retirer
-            </button>
+            <button className="linkish" onClick={() => setItems(removeReport(r.id))}>{t('Retirer')}</button>
           </div>
         ))}
       </div>
@@ -879,10 +816,7 @@ function MyReports() {
 function MyZones({ zones, onZones }) {
   if (!zones.length) {
     return (
-      <p className="muted small">
-        Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs
-        passent autour.
-      </p>
+      <p className="muted small">{t('Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs passent autour.')}</p>
     )
   }
   return (
@@ -893,7 +827,7 @@ function MyZones({ zones, onZones }) {
             className="zonerow__name"
             defaultValue={z.name}
             maxLength={60}
-            aria-label="Nom de la zone"
+            aria-label={t('Nom de la zone')}
             onBlur={(e) => e.target.value !== z.name && onZones(updateZone(z.id, { name: e.target.value }))}
           />
           <label className="zonerow__on">
@@ -902,11 +836,9 @@ function MyZones({ zones, onZones }) {
               checked={z.on !== false}
               onChange={(e) => onZones(updateZone(z.id, { on: e.target.checked }))}
             />
-            {z.on !== false ? 'Évitée' : 'Ignorée'}
+            {z.on !== false ? t('Évitée') : t('Ignorée')}
           </label>
-          <button className="linkish" onClick={() => onZones(removeZone(z.id))}>
-            Supprimer
-          </button>
+          <button className="linkish" onClick={() => onZones(removeZone(z.id))}>{t('Supprimer')}</button>
         </div>
       ))}
     </div>
@@ -927,29 +859,21 @@ function OfflineStorage() {
 
   if (!offline.isAvailable()) {
     return (
-      <p className="muted small">
-        Le stockage de l'appareil ne répond pas : les cartes ne peuvent pas être
-        gardées. Les parcours, eux, restent accessibles.
-      </p>
+      <p className="muted small">{t('Le stockage de l\'appareil ne répond pas : les cartes ne peuvent pas être gardées. Les parcours, eux, restent accessibles.')}</p>
     )
   }
 
   return (
     <>
       <div className="rows">
-        <Row label="Parcours avec carte" value={count} />
-        <Row label="Espace occupé" value={offline.formatBytes(total)} />
+        <Row label={t('Parcours avec carte')} value={count} />
+        <Row label={t('Espace occupé')} value={offline.formatBytes(total)} />
       </div>
-      <p className="muted small">
-        Les cinq dernières sorties gardent leur carte, au cas où le réseau tombe. Hors
-        ligne, c'est le fond Nuit qui sert.
-      </p>
+      <p className="muted small">{t('Les cinq dernières sorties gardent leur carte, au cas où le réseau tombe. Hors ligne, c\'est le fond Nuit qui sert.')}</p>
       {count > 0 &&
         (confirm ? (
           <div className="row">
-            <button className="btn" onClick={() => setConfirm(false)}>
-              Annuler
-            </button>
+            <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
             <button
               className="btn btn--primary"
               onClick={async () => {
@@ -958,14 +882,10 @@ function OfflineStorage() {
                 setCount(0)
                 setConfirm(false)
               }}
-            >
-              Vider les cartes
-            </button>
+            >{t('Vider les cartes')}</button>
           </div>
         ) : (
-          <button className="btn" onClick={() => setConfirm(true)}>
-            Vider les cartes hors ligne
-          </button>
+          <button className="btn" onClick={() => setConfirm(true)}>{t('Vider les cartes hors ligne')}</button>
         ))}
     </>
   )
@@ -995,30 +915,30 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
   const [screen, setScreen] = useStored('keepScreenOn')
   return (
     <PrefsCard
-      title="Pendant la sortie"
-      foot="Éteints, « Recalculer » et « Terminer » restent à portée de main."
+      title={t('Pendant la sortie')}
+      foot={t('Éteints, « Recalculer » et « Terminer » restent à portée de main.')}
     >
       <ToggleRow
         icon="refresh"
-        label="Recalcul automatique"
+        label={t('Recalcul automatique')}
         on={reroute}
         onChange={setReroute}
       />
       <ToggleRow
         icon="flag"
-        label="Arrêt automatique à l'arrivée"
+        label={t('Arrêt automatique à l\'arrivée')}
         on={finish}
         onChange={setFinish}
       />
       <ToggleRow
         icon="pause"
-        label="Pause automatique"
+        label={t('Pause automatique')}
         on={pause}
         onChange={setPause}
       />
       <ToggleRow
         icon="sun"
-        label="Écran toujours allumé"
+        label={t('Écran toujours allumé')}
         on={screen}
         onChange={setScreen}
       />
@@ -1026,7 +946,7 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
         <ToggleRow
           key={kind}
           icon={k.icon}
-          label={`${k.label} sur le parcours`}
+          label={t('{label} sur le parcours', { label: t(k.label) })}
           on={Boolean(poiPrefs?.[kind])}
           onChange={(on) => onPoiPrefs({ [kind]: on })}
         />
@@ -1037,14 +957,14 @@ function RunSettings({ poiPrefs, onPoiPrefs }) {
 
 // Au mile quand l'app est en miles : la voix compte alors ses bornes au mile.
 const kmEvery = () => [
-  { key: 1, label: `Chaque ${unitLabel()}` },
-  { key: 2, label: `Tous les 2 ${unitLabel()}` },
-  { key: 0, label: 'Jamais' },
+  { key: 1, label: t('Chaque {v1}', { v1: unitLabel() }) },
+  { key: 2, label: t('Tous les 2 {v1}', { v1: unitLabel() }) },
+  { key: 0, label: t('Jamais') },
 ]
 const kmSays = () => [
-  ['lap', `Temps du ${unitLabel()}`, 'clock'],
-  ['pace', 'Allure', 'gauge'],
-  ['total', 'Temps couru', 'history'],
+  ['lap', t('Temps du {v1}', { v1: unitLabel() }), 'clock'],
+  ['pace', t('Allure'), 'gauge'],
+  ['total', t('Temps couru'), 'history'],
 ]
 // « Anticipation des instructions » : quand la voix annonce un virage.
 const LEADS = [
@@ -1070,6 +990,7 @@ const RATES = [
 function VoiceSetting() {
   const [prefs, setPrefs] = useState(voiceSettings)
   const [voices, setVoices] = useState([])
+  const language = useLang()
   const change = (patch) => {
     const next = { ...prefs, ...patch }
     setPrefs(next)
@@ -1078,48 +999,48 @@ function VoiceSetting() {
 
   useEffect(() => {
     if (!isNative()) return
-    import('./native').then((n) => n.voicesNative()).then(setVoices)
-  }, [])
+    import('./native').then((n) => n.voicesNative(lang())).then(setVoices)
+  }, [language])
 
   const voiceOptions = [
-    { key: null, label: 'Voix du système' },
-    ...voices.map((v) => ({ key: v.id, label: v.enhanced ? `${v.name} (améliorée)` : v.name })),
+    { key: null, label: t('Voix du système') },
+    ...voices.map((v) => ({ key: v.id, label: v.enhanced ? t('{name} (améliorée)', { name: v.name }) : v.name })),
   ]
 
   return (
     <>
-      <PrefsCard title="Voix">
+      <PrefsCard title={t('Voix')}>
         <PickRow
           icon="volume"
-          label="Voix utilisée"
+          label={t('Voix utilisée')}
           value={prefs.voiceId ?? null}
-          shown={voices.find((v) => v.id === prefs.voiceId)?.name ?? 'Voix du système'}
+          shown={voices.find((v) => v.id === prefs.voiceId)?.name ?? t('Voix du système')}
           options={voiceOptions}
           onChange={(voiceId) => change({ voiceId })}
         />
-        <PickRow icon="gauge" label="Débit" value={prefs.rate ?? 'normal'} options={RATES} onChange={(rate) => change({ rate })} />
+        <PickRow icon="gauge" label={t('Débit')} value={prefs.rate ?? 'normal'} options={RATES} onChange={(rate) => change({ rate })} />
         <PickRow
           icon="turnRight"
-          label="Anticipation des instructions"
+          label={t('Anticipation des instructions')}
           value={prefs.lead}
           options={LEADS}
           onChange={(lead) => change({ lead })}
         />
-        <LinkRow icon="play" label="Écouter la voix" onClick={() => preview()} />
+        <LinkRow icon="play" label={t('Écouter la voix')} onClick={() => preview()} />
       </PrefsCard>
 
       <PrefsCard
-        title="Annonces"
-        foot="La distance est toujours dite. À vélo, tous les 5 ou 10 km."
+        title={t('Annonces')}
+        foot={t('La distance est toujours dite. À vélo, tous les 5 ou 10 km.')}
       >
-        <PickRow icon="flag" label={units() === 'mi' ? 'Miles' : 'Kilomètres'} value={prefs.km} options={kmEvery()} onChange={(km) => change({ km })} />
+        <PickRow icon="flag" label={units() === 'mi' ? t('Miles') : t('Kilomètres')} value={prefs.km} options={kmEvery()} onChange={(km) => change({ km })} />
         {prefs.km !== 0 &&
           kmSays().map(([key, label, icon]) => (
             <ToggleRow key={key} icon={icon} label={label} on={prefs[key]} onChange={(on) => change({ [key]: on })} />
           ))}
         <ToggleRow
           icon="trendUp"
-          label="Écart à l'allure visée"
+          label={t('Écart à l\'allure visée')}
           on={prefs.target}
           onChange={(target) => change({ target })}
         />
@@ -1128,8 +1049,8 @@ function VoiceSetting() {
   )
 }
 
-const WARMUPS = [0, 5, 10, 15, 20].map((n) => ({ key: n, label: n ? `${n} min` : 'Aucun' }))
-const COOLDOWNS = [0, 5, 10].map((n) => ({ key: n, label: n ? `${n} min` : 'Aucun' }))
+const WARMUPS = [0, 5, 10, 15, 20].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
+const COOLDOWNS = [0, 5, 10].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
 
 /**
  * La séance fractionnée de la prochaine sortie : la voix dit chaque bloc, le
@@ -1145,21 +1066,21 @@ function WorkoutSetting() {
   }
   return (
     <PrefsCard
-      title="Séance fractionnée"
-      foot="Chaque bloc annoncé, prévenu avant sa fin, et chaque répétition chronométrée."
+      title={t('Séance fractionnée')}
+      foot={t('Chaque bloc annoncé, prévenu avant sa fin, et chaque répétition chronométrée.')}
     >
-      <ToggleRow icon="repeat" label="Guider une séance" on={prefs.on} onChange={(on) => change({ on })} />
+      <ToggleRow icon="repeat" label={t('Guider une séance')} on={prefs.on} onChange={(on) => change({ on })} />
       {prefs.on && (
         <>
           <PickRow
             icon="flame"
-            label="Séance"
+            label={t('Séance')}
             value={prefs.preset}
-            options={WORKOUT_PRESETS.map((p) => ({ key: p.key, label: p.label }))}
+            options={WORKOUT_PRESETS.map((p) => ({ key: p.key, label: t(p.label) }))}
             onChange={(preset) => change({ preset })}
           />
-          <PickRow icon="clock" label="Échauffement" value={prefs.warmup_min} options={WARMUPS} onChange={(warmup_min) => change({ warmup_min })} />
-          <PickRow icon="clock" label="Retour au calme" value={prefs.cooldown_min} options={COOLDOWNS} onChange={(cooldown_min) => change({ cooldown_min })} />
+          <PickRow icon="clock" label={t('Échauffement')} value={prefs.warmup_min} options={WARMUPS} onChange={(warmup_min) => change({ warmup_min })} />
+          <PickRow icon="clock" label={t('Retour au calme')} value={prefs.cooldown_min} options={COOLDOWNS} onChange={(cooldown_min) => change({ cooldown_min })} />
         </>
       )}
     </PrefsCard>
@@ -1187,24 +1108,21 @@ function LockScreenSetting() {
   if (!isNative() || status === undefined) return null
 
   let problem = null
-  if (!status) problem = "Cette version de l'app n'a pas le module d'écran verrouillé."
-  else if (!status.supported) problem = "L'activité en direct demande iOS 16.2 ou plus récent."
-  else if (!status.enabled) problem = 'Activités en direct coupées : Réglages › Lacet › Activités en direct.'
-  else if (!status.extension) problem = "L'extension qui dessine l'activité a été retirée à l'installation."
+  if (!status) problem = t('Cette version de l\'app n\'a pas le module d\'écran verrouillé.')
+  else if (!status.supported) problem = t('L\'activité en direct demande iOS 16.2 ou plus récent.')
+  else if (!status.enabled) problem = t('Activités en direct coupées : Réglages › Lacet › Activités en direct.')
+  else if (!status.extension) problem = t('L\'extension qui dessine l\'activité a été retirée à l\'installation.')
   else if (status.nested === false) {
-    problem = `L'app a été installée sous un autre nom (${status.bundle}) : l'extension ${status.extensionBundle} ne lui est plus rattachée, et iOS refuse de la lancer.`
+    problem = t('L\'app a été installée sous un autre nom ({bundle}) : l\'extension {extensionBundle} ne lui est plus rattachée, et iOS refuse de la lancer.', { bundle: status.bundle, extensionBundle: status.extensionBundle })
   } else if (status.signedExtension === false) {
     problem =
-      "L'extension n'a pas reçu de signature : l'outil d'installation a signé l'app et pas son extension. Réinstalle avec AltStore, qui la signe."
+      t('L\'extension n\'a pas reçu de signature : l\'outil d\'installation a signé l\'app et pas son extension. Réinstalle avec AltStore, qui la signe.')
   }
 
   return (
     <>
       <p className="muted small">
-        <b>Écran verrouillé.</b> Pendant une sortie guidée, le prochain virage, sa
-        distance, ce qui reste et l'heure d'arrivée s'affichent sur l'écran
-        verrouillé et dans la Dynamic Island. La musique continue.
-      </p>
+        <b>{t('Écran verrouillé.')}</b>{' '}{t('Pendant une sortie guidée, le prochain virage, sa distance, ce qui reste et l\'heure d\'arrivée s\'affichent sur l\'écran verrouillé et dans la Dynamic Island. La musique continue.')}</p>
       {problem && <div className="notice notice--warn">{problem}</div>}
     </>
   )
@@ -1230,8 +1148,8 @@ function BuildStamp() {
   }, [])
 
   const parts = [
-    app ? `app ${app.version} (build ${app.build})` : null,
-    web ? `interface build ${web}` : 'interface de développement',
+    app ? t('app {version} (build {build})', { version: app.version, build: app.build }) : null,
+    web ? `interface build ${web}` : t('interface de développement'),
     commit || null,
   ].filter(Boolean)
 
@@ -1240,10 +1158,7 @@ function BuildStamp() {
       {parts.join(' · ')}
       {app && web && app.build !== String(web) && (
         <>
-          {' '}— <b>les deux numéros diffèrent</b> : l'app affiche une interface
-          plus ancienne que celle qu'elle contient. Ferme-la complètement et
-          rouvre-la ; si ça persiste, réinstalle-la.
-        </>
+          {' '}— <b>{t('les deux numéros diffèrent')}</b>{' '}{t(': l\'app affiche une interface plus ancienne que celle qu\'elle contient. Ferme-la complètement et rouvre-la ; si ça persiste, réinstalle-la.')}</>
       )}
     </p>
   )
@@ -1263,14 +1178,14 @@ function LastSearch() {
   if (!last) return null
   // Deux décimales sous la seconde : c'est là que se jouent les étapes qu'on
   // cherche à raccourcir, et « 0,0 s » n'apprend rien.
-  const s = (v) => `${(v ?? 0).toFixed(v >= 1 ? 1 : 2).replace('.', ',')} s`
+  const s = (v) => `${(v ?? 0).toFixed(v >= 1 ? 1 : 2).replace('.', dec())} s`
   // Les rues préparées en fond ne coûtent rien à la recherche : le dire ainsi
   // évite de lire deux zéros comme une mesure ratée.
   const ready = !last.fetch && !last.graph
   const parts = [
-    ready ? 'rues déjà prêtes' : `rues ${s(last.fetch)}`,
+    ready ? t('rues déjà prêtes') : `rues ${s(last.fetch)}`,
     ready ? null : `graphe ${s(last.graph)}`,
-    `itinéraires ${s(last.routing)}`,
+    t('itinéraires {v1}', { v1: s(last.routing) }),
     last.elevation ? `altitude ${s(last.elevation)}` : null,
   ].filter(Boolean)
   // D'où venaient les rues : la carte livrée, les archives en ligne, Overpass,
@@ -1282,11 +1197,7 @@ function LastSearch() {
     : null
 
   return (
-    <p className="muted small">
-      Dernier calcul : {last.km} km en {s(last.total)} — {parts.join(' · ')}
-      {last.nodes ? ` (${last.nodes.toLocaleString('fr-FR')} nœuds)` : ''}
-      {venues ? ` · rues : ${venues}` : ''}
-    </p>
+    <p className="muted small">{t('Dernier calcul : {km} km en {v2} — {v3}{v4}{v5}', { km: last.km, v2: s(last.total), v3: parts.join(' · '), v4: last.nodes ? t(' ({v1} nœuds)', { v1: last.nodes.toLocaleString(locale()) }) : '', v5: venues ? t(' · rues : {venues}', { venues }) : '' })}</p>
   )
 }
 
@@ -1304,7 +1215,7 @@ function BackupRows({ onRestored }) {
   const backup = async () => {
     const stamp = new Date().toISOString().slice(0, 10)
     await saveTextFile(`lacet-sauvegarde-${stamp}.json`, exportAll(), 'application/json')
-    setMessage('Sauvegarde écrite. Garde-la hors du téléphone si tu comptes réinstaller l’app.')
+    setMessage(t('Sauvegarde écrite. Garde-la hors du téléphone si tu comptes réinstaller l’app.'))
   }
 
   const restore = async (file) => {
@@ -1316,34 +1227,27 @@ function BackupRows({ onRestored }) {
       onRestored?.()
       // Ce que les plafonds ont laissé dehors se dit, au lieu de disparaître.
       const dehors = [
-        left.favorites > 0 && `${left.favorites} favori${left.favorites > 1 ? 's' : ''} (plafond de ${MAX_FAVORITES})`,
-        left.history > 0 && `${left.history} sortie${left.history > 1 ? 's' : ''} (plafond de ${MAX_HISTORY})`,
-        left.places > 0 && `${left.places} départ${left.places > 1 ? 's' : ''} nommé${left.places > 1 ? 's' : ''} (plafond de ${MAX_PLACES})`,
+        left.favorites > 0 && t('{favorites} favori{v2} (plafond de {MAX_FAVORITES})', { favorites: left.favorites, v2: left.favorites > 1 ? 's' : '', MAX_FAVORITES }),
+        left.history > 0 && t('{history} sortie{v2} (plafond de {MAX_HISTORY})', { history: left.history, v2: left.history > 1 ? 's' : '', MAX_HISTORY }),
+        left.places > 0 && t('{places} départ{v2} nommé{v3} (plafond de {MAX_PLACES})', { places: left.places, v2: left.places > 1 ? 's' : '', v3: left.places > 1 ? 's' : '', MAX_PLACES }),
       ].filter(Boolean)
       setMessage(
-        `Restauré : ${favorites} parcours en favori, ${history} sorties.` +
-          (dehors.length ? ` Pas de place pour ${dehors.join(', ')}.` : ''),
+        t('Restauré : {favorites} parcours en favori, {history} sorties.', { favorites, history }) +
+          (dehors.length ? t(' Pas de place pour {v1}.', { v1: dehors.join(', ') }) : ''),
       )
     } catch (error) {
-      setMessage(error.message)
+      setMessage(t(error.message))
     }
   }
 
   return (
     <>
-      <p className="muted small">
-        Un fichier qui emporte favoris, sorties et réglages — à garder ailleurs
-        avant de supprimer l'app, qui les effacerait.
-      </p>
+      <p className="muted small">{t('Un fichier qui emporte favoris, sorties et réglages — à garder ailleurs avant de supprimer l\'app, qui les effacerait.')}</p>
       <div className="row">
         <button className="btn" onClick={backup}>
-          <Icon name="fileExport" size={15} />
-          Sauvegarder
-        </button>
+          <Icon name="fileExport" size={15} />{t('Sauvegarder')}</button>
         <label className="btn">
-          <Icon name="fileImport" size={15} />
-          Restaurer
-          <input
+          <Icon name="fileImport" size={15} />{t('Restaurer')}<input
             type="file"
             accept="application/json,.json"
             className="visually-hidden"
@@ -1428,7 +1332,7 @@ function NumberRow({ label, unit, value, min, max, onChange }) {
     <div className="rows__row">
       <span>{label}</span>
       <span className="rows__num">
-        <button {...moins} aria-label={`Diminuer ${label.toLowerCase()}`}>
+        <button {...moins} aria-label={t('Diminuer {v1}', { v1: label.toLowerCase() })}>
           <Icon name="minus" size={15} />
         </button>
         <label className="rows__field">
@@ -1436,7 +1340,7 @@ function NumberRow({ label, unit, value, min, max, onChange }) {
             type="text"
             inputMode="numeric"
             enterKeyHint="done"
-            aria-label={`${label} en ${{ kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? 'centimètres'}`}
+            aria-label={t('{label} en {v2}', { label, v2: { kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? t('centimètres') })}
             value={draft ?? value}
             onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
             onFocus={(e) => e.target.select()}
@@ -1445,7 +1349,7 @@ function NumberRow({ label, unit, value, min, max, onChange }) {
           />
           <b>{unit}</b>
         </label>
-        <button {...plus} aria-label={`Augmenter ${label.toLowerCase()}`}>
+        <button {...plus} aria-label={t('Augmenter {v1}', { v1: label.toLowerCase() })}>
           <Icon name="plus" size={15} />
         </button>
       </span>

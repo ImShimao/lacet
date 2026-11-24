@@ -11,6 +11,8 @@ import { pace } from './format'
 import { clock } from './runFormat'
 import { paceLabel } from './units'
 
+import { t, dec } from './i18n'
+import { stepText } from './stepText'
 // En dessous de cette distance parcourue, l'allure réelle ne dit encore rien :
 // le premier kilomètre part d'un feu rouge ou d'un lacet à renouer. On se fie à
 // l'allure prévue par le parcours jusque-là.
@@ -26,14 +28,14 @@ export function shortDistance(meters) {
   const m = Math.max(0, meters)
   if (m < 10) return 'maintenant'
   if (m < 1000) return `${Math.round(m / 10) * 10} m`
-  return `${(m / 1000).toFixed(1).replace('.', ',')} km`
+  return `${(m / 1000).toFixed(1).replace('.', dec())} km`
 }
 
 /** « 3,2 km » : ce qui reste jusqu'à l'arrivée. */
 export function remainingDistance(meters) {
   const m = Math.max(0, meters)
   if (m < 1000) return `${Math.round(m / 10) * 10} m`
-  return `${(m / 1000).toFixed(1).replace('.', ',')} km`
+  return `${(m / 1000).toFixed(1).replace('.', dec())} km`
 }
 
 /**
@@ -61,15 +63,15 @@ export function lockScreenState({ route, step, along, offRoute, paused = false, 
   const total = route?.distance_m || 0
   const left = Math.max(0, total - (along ?? travelled))
   const pace = paceEstimate({ route, travelled, elapsedS })
-  const text = step?.step?.text
+  const text = stepText(step?.step?.text)
   // Deux virages rapprochés se lisent ensemble : le second serait sinon affiché
   // une fois le premier pris, quand il n'est déjà plus temps de se placer.
-  const instruction = text ? (step.then ? `${text} — ${step.then}` : text) : left < 30 ? 'Arrivée' : 'Continue sur le parcours'
+  const instruction = text ? (step.then ? `${text} — ${step.then}` : text) : left < 30 ? t('Arrivée') : t('Continue sur le parcours')
   // « Maintenant » en même temps que la voix, quand l'écran de course le sait.
   const imminent = step ? step.imminent ?? step.remaining < 20 : false
 
   return {
-    name: route?.name || 'Sortie',
+    name: route?.name || t('Sortie'),
     instruction,
     distance: imminent ? 'maintenant' : shortDistance(step ? step.remaining : left),
     turn: step?.step?.turn || (left < 30 ? 'finish' : 'straight'),
@@ -93,14 +95,14 @@ export function lockScreenState({ route, step, along, offRoute, paused = false, 
 export function finishedState({ name, distanceM, elapsedS, bike = false, now = Date.now() }) {
   const perKm = distanceM > 100 ? elapsedS / (distanceM / 1000) : 0
   const average = bike
-    ? `${((distanceM / Math.max(1, elapsedS)) * 3.6).toFixed(1).replace('.', ',')} km/h`
+    ? `${((distanceM / Math.max(1, elapsedS)) * 3.6).toFixed(1).replace('.', dec())} km/h`
     : perKm
       ? `${pace(perKm)}${paceLabel()}`
       : null
   return {
-    name: name || 'Sortie',
-    instruction: ['Sortie terminée', [clock(elapsedS), average].filter(Boolean).join(' · ')].join(' — '),
-    distance: `${(distanceM / 1000).toFixed(1).replace('.', ',')} km`,
+    name: name || t('Sortie'),
+    instruction: [t('Sortie terminée'), [clock(elapsedS), average].filter(Boolean).join(' · ')].join(' — '),
+    distance: `${(distanceM / 1000).toFixed(1).replace('.', dec())} km`,
     turn: 'finish',
     remaining: '0 m',
     arrival: now,

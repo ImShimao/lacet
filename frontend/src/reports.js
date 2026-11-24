@@ -15,6 +15,7 @@
 
 import { load, save } from './storage'
 
+import { t } from './i18n'
 /**
  * Ce qu'on peut signaler.
  *
@@ -71,4 +72,4 @@ export function removeReport(id) {
 }
 
 /** Le libellé d'un genre de signalement. */
-export const kindLabel = (kind) => REPORT_KINDS.find((k) => k.key === kind)?.label ?? 'Signalement'
+export const kindLabel = (kind) => t(REPORT_KINDS.find((k) => k.key === kind)?.label ?? 'Signalement')

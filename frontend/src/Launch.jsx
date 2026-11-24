@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import Logo from './Logo.jsx'
 
+import { t } from './i18n'
 const SHOWN_MS = 1500
 const FADE_MS = 350
 
@@ -33,7 +34,7 @@ export default function Launch() {
     <div className={`launch launch--${stage}`} onPointerDown={() => setStage('out')} aria-hidden="true">
       <Logo size={132} className="launch__mark" />
       <b className="launch__name">Lacet</b>
-      <span className="launch__tag">Des boucles sûres, depuis ta porte</span>
+      <span className="launch__tag">{t('Des boucles sûres, depuis ta porte')}</span>
     </div>
   )
 }

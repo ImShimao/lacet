@@ -7,6 +7,7 @@ import { pace } from './format'
 import { slim } from './storage'
 import { paceLabel, unitLabel } from './units'
 
+import { t } from './i18n'
 // « Distance exacte » : l'écart toléré entre la boucle et la distance visée.
 const PRECISE_TOLERANCE = 0.025
 // Les allures que le moteur accepte (`normalizeRequest`), en secondes par km.
@@ -90,9 +91,9 @@ export function summarise(p) {
     p.sport === 'bike' || p.speedUnit === 'speed'
       ? `${p.speed_kmh} km/h`
       : `${pace(p.pace_sec_per_km)}${paceLabel()}`
-  const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
+  const form = p.form === 'laps' ? t('{n} tours', { n: p.laps ?? 2 }) : t(FORM_WORDS[p.form] ?? '')
   // « Éviter › Boucles déjà courues » : ce qu'on cherche, ce sont des inédites.
-  const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null
+  const fresh = (p.avoid ?? []).includes('known') ? t('inédites') : null
   return [dist, form, fresh, speed].filter(Boolean).join(' · ')
 }
 
@@ -102,10 +103,10 @@ export function summarise(p) {
  * tracé : ce sont le terrain et le relief qu'on vient y changer.
  */
 export function filtersLine(p) {
-  const terrain = (TERRAINS[p.sport] ?? TERRAINS.run).find((t) => t.key === p.surface)?.label
-  const relief = p.climb_m != null ? `D+ ${p.climb_m} m` : RELIEFS.find((r) => r.key === p.elevation)?.label
-  const form = p.form === 'laps' ? `${p.laps ?? 2} tours` : FORM_WORDS[p.form]
-  const fresh = (p.avoid ?? []).includes('known') ? 'inédites' : null
+  const terrain = t((TERRAINS[p.sport] ?? TERRAINS.run).find((x) => x.key === p.surface)?.label ?? '')
+  const relief = p.climb_m != null ? `D+ ${p.climb_m} m` : t(RELIEFS.find((r) => r.key === p.elevation)?.label ?? '')
+  const form = p.form === 'laps' ? t('{n} tours', { n: p.laps ?? 2 }) : t(FORM_WORDS[p.form] ?? '')
+  const fresh = (p.avoid ?? []).includes('known') ? t('inédites') : null
   return [terrain, relief, form, fresh].filter(Boolean).join(' · ')
 }
 
@@ -133,8 +134,8 @@ export function freeRunEntry(params, startedAt = Date.now()) {
  */
 export function freeRunName(sport, startedAt) {
   const h = new Date(startedAt).getHours()
-  const moment = h < 5 ? 'de nuit' : h < 11 ? 'du matin' : h < 14 ? 'de midi' : h < 18 ? "de l'après-midi" : h < 22 ? 'du soir' : 'de nuit'
-  return `${sport === 'bike' ? 'Vélo' : 'Course'} ${moment}`
+  const moment = h < 5 ? t('de nuit') : h < 11 ? t('du matin') : h < 14 ? t('de midi') : h < 18 ? t('de l\'après-midi') : h < 22 ? t('du soir') : t('de nuit')
+  return `${sport === 'bike' ? t('Vélo') : t('Course')} ${moment}`
 }
 
 /** L'entrée d'historique d'une sortie terminée. */

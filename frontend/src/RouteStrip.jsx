@@ -4,6 +4,7 @@ import { unitLabel } from './units'
 import { reliefOf } from './explain'
 import { energy } from './Library.jsx'
 
+import { t, locale } from './i18n'
 /**
  * La bande de parcours : le profil altimétrique et le niveau de sécurité sur un
  * même axe, celui de la distance.
@@ -74,18 +75,18 @@ export default function RouteStrip({ route, onScrub, weightKg = 70, sport = 'run
     // `09-sheet.css`).
     <div className={`strip ${cursor === null ? '' : 'strip--live'}`}>
       <div className="strip__head">
-        <span className="strip__title">Parcours</span>
+        <span className="strip__title">{t('Parcours')}</span>
         <span className="mono strip__read">
           {readout
             ? `${km(readout.dist, 2)} ${unitLabel()} · ${Math.round(readout.ele)} m · ${
-                LEVEL_LABELS[readout.level]
+                t(LEVEL_LABELS[readout.level])
               }`
             : // Une boucle revient à son départ : son D− égale son D+, et la place
               // sert mieux au caractère du relief et au coût de la sortie.
               [
                 model.hasElevation ? reliefOf(route) : null,
                 model.hasElevation ? `D+ ${Math.round(route.ascent_m || 0)} m` : 'altitude indisponible',
-                `≈ ${Math.round(energy(route.distance_m || model.total, weightKg, sport)).toLocaleString('fr-FR')} kcal`,
+                t('≈ {v1} kcal', { v1: Math.round(energy(route.distance_m || model.total, weightKg, sport)).toLocaleString(locale()) }),
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -103,7 +104,7 @@ export default function RouteStrip({ route, onScrub, weightKg = 70, sport = 'run
         // pas par `touchend` : sans ça, la feuille resterait effacée.
         onTouchCancel={clear}
         role="img"
-        aria-label={`Profil du parcours sur ${km(model.total, 1)} kilomètres`}
+        aria-label={t('Profil du parcours sur {v1} kilomètres', { v1: km(model.total, 1) })}
       >
         {model.hasElevation && (
           <>
@@ -189,7 +190,7 @@ export default function RouteStrip({ route, onScrub, weightKg = 70, sport = 'run
         {model.levels.map((level) => (
           <span key={level} className="strip__key">
             <i style={{ background: LEVEL_COLORS[level] }} />
-            {LEVEL_LABELS[level]}
+            {t(LEVEL_LABELS[level])}
           </span>
         ))}
         {model.surfaces.map((s) => (

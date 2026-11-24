@@ -26,6 +26,8 @@ import { clockTime, turnIcon } from './runFormat'
 import { fromKm, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 import { presets } from './presets'
 
+import { t, locale, dec } from './i18n'
+import { stepText, routeName, compass, engineText } from './stepText'
 // Ce que règle la règle de l'accueil, selon le sport et le mode : bornes, pas,
 // et une grande graduation tous les `major` pas.
 const QUICK = {
@@ -74,8 +76,8 @@ function QuickLength({ params, onQuickParams }) {
     <div className="dist">
       <Segmented
         options={[
-          { key: 'distance', label: 'Distance' },
-          { key: 'duration', label: 'Durée' },
+          { key: 'distance', label: t('Distance') },
+          { key: 'duration', label: t('Durée') },
         ]}
         value={params.mode}
         onChange={(mode) => onQuickParams({ mode })}
@@ -91,7 +93,7 @@ function QuickLength({ params, onQuickParams }) {
           className="ruler__track"
           role="slider"
           tabIndex={0}
-          aria-label={duration ? 'Durée de la sortie' : 'Distance de la boucle'}
+          aria-label={duration ? t('Durée de la sortie') : t('Distance de la boucle')}
           aria-valuemin={cfg.min}
           aria-valuemax={cfg.max}
           aria-valuenow={value}
@@ -148,7 +150,7 @@ function QuickLength({ params, onQuickParams }) {
                 onQuickParams({ [key]: Math.round(target * 1000) / 1000, mode: duration ? 'duration' : 'distance' })
               }}
             >
-              {String(p).replace('.', ',')} {unit}
+              {String(p).replace('.', dec())} {unit}
             </button>
           )
         })}
@@ -168,25 +170,23 @@ function Destination({ destination, placing, onPlace, onClear }) {
         <Icon name="flag" size={18} />
       </span>
       <div>
-        <b>{destination ? destination.label || "Point d'arrivée" : 'Où vas-tu ?'}</b>
+        <b>{destination ? destination.label || t('Point d\'arrivée') : t('Où vas-tu ?')}</b>
         <em>
           {destination
-            ? 'arrivée — glisse-la sur la carte'
+            ? t('arrivée — glisse-la sur la carte')
             : placing
-              ? "touche la carte là où tu veux arriver"
-              : "cherche une adresse en haut, ou pose-la sur la carte"}
+              ? t('touche la carte là où tu veux arriver')
+              : t('cherche une adresse en haut, ou pose-la sur la carte')}
         </em>
       </div>
       {destination ? (
-        <button className="origin__act" onClick={onClear} aria-label="Effacer l'arrivée">
+        <button className="origin__act" onClick={onClear} aria-label={t('Effacer l\'arrivée')}>
           <Icon name="close" size={15} />
         </button>
       ) : (
         onPlace && (
           <button className={`origin__act ${placing ? 'origin__act--on' : ''}`} onClick={onPlace} aria-pressed={placing}>
-            <Icon name="pin" size={15} />
-            Carte
-          </button>
+            <Icon name="pin" size={15} />{t('Carte')}</button>
         )
       )}
     </div>
@@ -204,7 +204,7 @@ function Notice({ warn = false, action = null, onAct = null, children }) {
       {children}
       {action && onAct && (
         <button className="notice__act" onClick={onAct}>
-          {action}
+          {t(action)}
         </button>
       )}
     </div>
@@ -287,9 +287,7 @@ export default function Explore({
         {/* Hors des archives, l'écran annonce lui-même jusqu'à une minute
             d'attente : il faut pouvoir en sortir sans fermer l'app. */}
         {onCancel && (
-          <button className="btn btn--ghost" onClick={onCancel}>
-            Annuler
-          </button>
+          <button className="btn btn--ghost" onClick={onCancel}>{t('Annuler')}</button>
         )}
       </div>
     )
@@ -298,16 +296,12 @@ export default function Explore({
   if (error) {
     return (
       <div className="panel">
-        <div className="notice notice--error">{error.message}</div>
+        <div className="notice notice--error">{t(error.message)}</div>
         {error.offline ? (
           <button className="btn btn--primary" onClick={onOpenSaved}>
-            <Icon name="routes" size={17} />
-            Voir mes parcours enregistrés
-          </button>
+            <Icon name="routes" size={17} />{t('Voir mes parcours enregistrés')}</button>
         ) : (
-          <button className="btn btn--primary" onClick={onSearch}>
-            Réessayer
-          </button>
+          <button className="btn btn--primary" onClick={onSearch}>{t('Réessayer')}</button>
         )}
       </div>
     )
@@ -321,8 +315,8 @@ export default function Explore({
         {onGoal && (
           <Segmented
             options={[
-              { key: 'loop', label: 'Boucle' },
-              { key: 'journey', label: 'Aller à…' },
+              { key: 'loop', label: t('Boucle') },
+              { key: 'journey', label: t('Aller à…') },
             ]}
             value={journey ? 'journey' : 'loop'}
             onChange={onGoal}
@@ -336,13 +330,13 @@ export default function Explore({
               <Icon name="pin" size={18} />
             </span>
             <div>
-              <b>{startLabel || (start ? 'Point choisi' : 'Localisation…')}</b>
+              <b>{startLabel || (start ? t('Point choisi') : t('Localisation…'))}</b>
               <em>
                 {geo.accuracy && geo.status === 'ready'
-                  ? `précision ± ${Math.round(geo.accuracy)} m`
+                  ? t('précision ± {v1} m', { v1: Math.round(geo.accuracy) })
                   : journey
-                    ? 'départ du trajet'
-                    : 'départ de la boucle'}
+                    ? t('départ du trajet')
+                    : t('départ de la boucle')}
               </em>
             </div>
           </div>
@@ -350,7 +344,7 @@ export default function Explore({
             <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
           )}
           {journey && destination && start && onSwapEnds && (
-            <button className="itinerary__swap" onClick={onSwapEnds} aria-label="Inverser départ et arrivée" title="Inverser départ et arrivée">
+            <button className="itinerary__swap" onClick={onSwapEnds} aria-label={t('Inverser départ et arrivée')} title={t('Inverser départ et arrivée')}>
               <Icon name="updown" size={16} />
             </button>
           )}
@@ -360,11 +354,11 @@ export default function Explore({
             {/* Une précision du trajet, pas une seconde grande question : des
                 pastilles, pas un deuxième sélecteur pleine largeur. */}
             {onTripKind && (
-              <div className="chips chips--trip" role="radiogroup" aria-label="Type de trajet">
+              <div className="chips chips--trip" role="radiogroup" aria-label={t('Type de trajet')}>
                 {[
-                  ['oneway', 'Au plus court'],
-                  ['stretch', 'Plus long'],
-                  ['round', 'Aller-retour'],
+                  ['oneway', t('Au plus court')],
+                  ['stretch', t('Plus long')],
+                  ['round', t('Aller-retour')],
                 ].map(([key, label]) => (
                   <button
                     key={key}
@@ -385,7 +379,7 @@ export default function Explore({
         )}
         <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
           <Icon name="search" size={18} />
-          {journey ? (destination ? 'Trouver mon trajet' : "Choisir l'arrivée") : 'Trouver ma boucle'}
+          {journey ? (destination ? t('Trouver mon trajet') : t('Choisir l\'arrivée')) : t('Trouver ma boucle')}
         </button>
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
@@ -394,30 +388,22 @@ export default function Explore({
               distance, déjà écrite en grand juste au-dessus. */}
           <button className="btn btn--stack" onClick={onOpenFilters}>
             <Icon name="sliders" size={17} />
-            <span>
-              Filtres
-              <em>{filtersLine(params)}</em>
+            <span>{t('Filtres')}<em>{filtersLine(params)}</em>
             </span>
           </button>
           <button className="btn btn--ghost" onClick={onFreeRun}>
-            <Icon name="play" size={17} />
-            Courir libre
-          </button>
+            <Icon name="play" size={17} />{t('Courir libre')}</button>
         </div>
         {/* Les rues se préparent en fond dès que le départ est connu : le dire
             explique pourquoi la recherche est soudain instantanée — et qu'elle
             le restera, même sans réseau. */}
         {streetsReady ? (
           <p className="ready small">
-            <Icon name="check" size={14} />
-            Rues du coin prêtes, même sans réseau.
-          </p>
+            <Icon name="check" size={14} />{t('Rues du coin prêtes, même sans réseau.')}</p>
         ) : (
           streetsLoading && (
             <p className="ready ready--busy small">
-              <Icon name="spinner" size={14} />
-              Préparation des rues de ce coin…
-            </p>
+              <Icon name="spinner" size={14} />{t('Préparation des rues de ce coin…')}</p>
           )
         )}
       </div>
@@ -429,15 +415,11 @@ export default function Explore({
   if (!routes.length) {
     return (
       <div className="panel">
-        <div className="notice notice--warn">{meta.message}</div>
+        <div className="notice notice--warn">{t(meta.message)}</div>
         {rejected?.length > 0 && <RejectedList rejected={rejected} />}
-        <button className="btn btn--primary" onClick={onOpenFilters}>
-          Modifier les filtres
-        </button>
+        <button className="btn btn--primary" onClick={onOpenFilters}>{t('Modifier les filtres')}</button>
         <button className="btn btn--ghost" onClick={onFreeRun}>
-          <Icon name="play" size={17} />
-          Courir sans itinéraire
-        </button>
+          <Icon name="play" size={17} />{t('Courir sans itinéraire')}</button>
       </div>
     )
   }
@@ -481,8 +463,8 @@ export default function Explore({
             <Icon name="check" size={16} />
           </span>
           {selected.matched
-            ? 'Boucle importée et analysée : note, voies, traversées et dénivelé.'
-            : 'Boucle importée. Ses points ne suivent aucune rue connue : elle reste sans note.'}
+            ? t('Boucle importée et analysée : note, voies, traversées et dénivelé.')
+            : t('Boucle importée. Ses points ne suivent aucune rue connue : elle reste sans note.')}
         </div>
       )}
       <RouteCards
@@ -497,9 +479,7 @@ export default function Explore({
           ne se trouvait qu'une fois le choix déjà fait. */}
       {routes.length > 1 && !comparing && (
         <button className="comparelink" onClick={() => setComparing(true)} aria-expanded={false}>
-          <Icon name="chart" size={15} />
-          Comparer les {routes.length} propositions
-        </button>
+          <Icon name="chart" size={15} />{t('Comparer les {length} propositions', { length: routes.length })}</button>
       )}
       {comparing && routes.length > 1 && (
         <Compare routes={routes} selected={selected} onSelect={onSelect} onClose={() => setComparing(false)} />
@@ -510,30 +490,26 @@ export default function Explore({
       {/* Et quand la direction demandée n'a rien donné : les boucles
           montrées partent d'ailleurs, et il faut le savoir avant d'y aller. */}
       {(meta.relaxed || meta.heading_missed) && (
-        <div className="notice notice--warn">{meta.message}</div>
+        <div className="notice notice--warn">{t(meta.message)}</div>
       )}
       {/* Une bordure de la zone n'est pas arrivée à temps — la carte livrée
           s'arrête à la limite de la région, et Overpass tardait. Plutôt que de
           faire attendre devant une barre figée, on a cherché avec le reste ; le
           dire évite de croire que le coin n'a rien de mieux à offrir. */}
       {meta.partial && (
-        <Notice action="Relancer" onAct={onSearch}>
-          Le bord de la zone n'est pas encore arrivé : ces boucles n'utilisent que les rues déjà là.
-        </Notice>
+        <Notice action="Relancer" onAct={onSearch}>{t('Le bord de la zone n\'est pas encore arrivé : ces boucles n\'utilisent que les rues déjà là.')}</Notice>
       )}
       {/* Sans altitude, le dénivelé n'est pas seulement absent de l'affichage :
           il n'a pas pu servir au classement. Demander « des côtes » et recevoir
           cinq boucles plates sans un mot serait incompréhensible. */}
       {meta.elevation_skipped && (
-        <Notice action="Relancer" onAct={onSearch}>
-          Le relief n'a pas répondu à temps : dénivelé inconnu, classement sans lui.
-        </Notice>
+        <Notice action="Relancer" onAct={onSearch}>{t('Le relief n\'a pas répondu à temps : dénivelé inconnu, classement sans lui.')}</Notice>
       )}
       {/* Le relief, lui, a répondu — mais le coin n'a pas celui qu'on demande.
           Le dire, plutôt que de laisser croire que ces boucles sont des côtes. */}
       {relief && (
         <Notice
-          action={relief.kind === 'climb' ? `Viser ${relief.ascent} m` : 'Chercher en Vallonné'}
+          action={relief.kind === 'climb' ? t('Viser {ascent} m', { ascent: relief.ascent }) : t('Chercher en Vallonné')}
           onAct={
             onSearchWith &&
             (() =>
@@ -543,10 +519,10 @@ export default function Explore({
           }
         >
           {relief.kind === 'climb'
-            ? `Rien autour de ${params.climb_m} m d'ici : la boucle la plus proche monte de ${relief.ascent} m.`
+            ? t('Rien autour de {climb_m} m d\'ici : la boucle la plus proche monte de {ascent} m.', { climb_m: params.climb_m, ascent: relief.ascent })
             : relief.kind === 'hilly'
-              ? `Pas de côtes à portée d'ici : la plus vallonnée ne monte que de ${relief.ascent} m. Pars plus près du relief pour en trouver.`
-              : `Pas de boucle plate d'ici : la plus douce monte déjà de ${relief.ascent} m.`}
+              ? t('Pas de côtes à portée d\'ici : la plus vallonnée ne monte que de {ascent} m. Pars plus près du relief pour en trouver.', { ascent: relief.ascent })
+              : t('Pas de boucle plate d\'ici : la plus douce monte déjà de {ascent} m.', { ascent: relief.ascent })}
         </Notice>
       )}
       {/* Le même aveu pour le terrain : ces boucles passent devant parce
@@ -554,24 +530,19 @@ export default function Explore({
       {ground && (
         <Notice action="Passer en Mixte" onAct={onSearchWith && (() => onSearchWith({ surface: 'mixed' }))}>
           {ground.kind === 'trail'
-            ? `Peu de chemins à portée d'ici : la boucle la plus nature n'en compte que ${ground.share} %.`
-            : `Pas de boucle toute goudronnée d'ici : la plus roulante a encore ${ground.share} % de chemins.`}
+            ? t('Peu de chemins à portée d\'ici : la boucle la plus nature n\'en compte que {share} %.', { share: ground.share })
+            : t('Pas de boucle toute goudronnée d\'ici : la plus roulante a encore {share} % de chemins.', { share: ground.share })}
         </Notice>
       )}
       {dusk && (
-        <div className="notice notice--warn">
-          La nuit tombe vers {clockTime(dusk)}, avant ta fin estimée ({clockTime(Date.now() + selected.duration_s * 1000)}) :
-          frontale et gilet réfléchissant.
-        </div>
+        <div className="notice notice--warn">{t('La nuit tombe vers {v1}, avant ta fin estimée ({v2}) : frontale et gilet réfléchissant.', { v1: clockTime(dusk), v2: clockTime(Date.now() + selected.duration_s * 1000) })}</div>
       )}
       {/* Le repère a rejoint la rue, et de loin : le dire évite de chercher
           pourquoi il a bougé. Sous cinquante mètres, rien — ça ne se voit pas.
           Dans le détail seulement : sur la carte repliée, ces trois lignes
           prenaient la place du tracé, à chaque recherche depuis une adresse. */}
       {snapped && (
-        <div className="notice notice--detail">
-          Le départ s'est posé sur la rue, à {snapped} m du point demandé : la boucle part et revient là.
-        </div>
+        <div className="notice notice--detail">{t('Le départ s\'est posé sur la rue, à {snapped} m du point demandé : la boucle part et revient là.', { snapped })}</div>
       )}
       {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
       {/* Retour, météo, vent : trois cadres pleine largeur poussaient le tracé
@@ -588,14 +559,9 @@ export default function Explore({
           <Icon name="repeat" size={15} />
           <span>
             {selected.figure_eight ? (
-              <>
-                Deux boucles différentes, de <b>{km(selected.lap_distances_m[0], 2)}</b> puis{' '}
-                <b>{km(selected.lap_distances_m[1], 2)} {unitLabel()}</b>, enchaînées au départ
-              </>
+              <>{t('Deux boucles différentes, de')}{' '}<b>{km(selected.lap_distances_m[0], 2)}</b>{' '}{t('puis')}{' '}<b>{km(selected.lap_distances_m[1], 2)} {unitLabel()}</b>{t(', enchaînées au départ')}</>
             ) : (
-              <>
-                Un tour de <b>{km(selected.lap_distance_m, 2)} {unitLabel()}</b>, à parcourir{' '}
-                <b>{selected.laps} fois</b>
+              <>{t('Un tour de')}{' '}<b>{km(selected.lap_distance_m, 2)} {unitLabel()}</b>{t(', à parcourir')}{' '}<b>{t('{laps} fois', { laps: selected.laps })}</b>
               </>
             )}
             {/* Ne l'affirmer que quand c'est vrai : la liste peut mêler des
@@ -605,7 +571,7 @@ export default function Explore({
             {/* Ni quand on a demandé des tours : c'est la forme choisie. */}
             {routes.some((r) => r.laps === 1) || (params.form ?? 'auto') !== 'auto'
               ? '.'
-              : " — aucune boucle entière de cette longueur ne tient le contrôle par ici."}
+              : t(' — aucune boucle entière de cette longueur ne tient le contrôle par ici.')}
           </span>
         </div>
       )}
@@ -632,29 +598,27 @@ export default function Explore({
           // plus tard, ou accepter que ce tracé-là ne sera jamais noté.
           <div className="notice">
             {selected.imported
-              ? "Ce parcours ne suit aucune rue connue d'ici : pas de note ni de virages dictés. Lacet le suit, le mesure et prévient si tu t'en écartes."
-              : "Tracé par un calculateur public, faute des rues de ce coin : pas de note. Relance plus tard pour en avoir une."}
+              ? t('Ce parcours ne suit aucune rue connue d\'ici : pas de note ni de virages dictés. Lacet le suit, le mesure et prévient si tu t\'en écartes.')
+              : t('Tracé par un calculateur public, faute des rues de ce coin : pas de note. Relance plus tard pour en avoir une.')}
           </div>
         )
       )}
 
       <button className="disclose" onClick={onToggleDetail} aria-expanded={detail}>
-        {detail ? 'Moins de détails' : 'Pourquoi cette note ?'}
+        {detail ? t('Moins de détails') : t('Pourquoi cette note ?')}
         <Icon name={detail ? 'chevronUp' : 'chevronDown'} size={16} />
       </button>
 
       {detail && (
         <>
           {rejected?.length > 0 && <RejectedList rejected={rejected} />}
-          <p className="disclaimer">
-            Note tirée d'OpenStreetMap, parfois incomplet ou dépassé : reste attentif sur le terrain.
-          </p>
+          <p className="disclaimer">{t('Note tirée d\'OpenStreetMap, parfois incomplet ou dépassé : reste attentif sur le terrain.')}</p>
         </>
       )}
 
       {/* Ce qu'on fait de la boucle, avec leur nom, dans le détail : sous les
           cartes, trois ronds sans libellé se devinaient mal. */}
-      <div className="loopacts" role="group" aria-label="Cette boucle">
+      <div className="loopacts" role="group" aria-label={t('Cette boucle')}>
         {/* Le sens n'est pas décoratif : il décide des côtes qu'on prend
             en montant, du vent qu'on a dans le dos à la fin, et de chaque
             consigne de virage. La même boucle à l'envers est une autre sortie. */}
@@ -664,11 +628,11 @@ export default function Explore({
             onClick={onReverse}
             disabled={reversing}
             aria-pressed={Boolean(selected.reversed)}
-            title={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
-            aria-label={selected.reversed ? "Revenir au sens d'origine" : "Parcourir dans l'autre sens"}
+            title={selected.reversed ? t('Revenir au sens d\'origine') : t('Parcourir dans l\'autre sens')}
+            aria-label={selected.reversed ? t('Revenir au sens d\'origine') : t('Parcourir dans l\'autre sens')}
           >
             <Icon name="uturn" size={18} />
-            <span>Autre sens</span>
+            <span>{t('Autre sens')}</span>
           </button>
         )}
         {/* Un GPX, par la feuille de partage : un ami qui a Lacet l'ouvre avec
@@ -678,31 +642,31 @@ export default function Explore({
           className={`loopact ${sharing ? 'loopact--on' : ''}`}
           onClick={() => setSharing((s) => !s)}
           aria-expanded={sharing}
-          title="Envoyer cette boucle"
-          aria-label="Envoyer cette boucle"
+          title={t('Envoyer cette boucle')}
+          aria-label={t('Envoyer cette boucle')}
         >
           <Icon name="share" size={18} />
-          <span>Partager</span>
+          <span>{t('Partager')}</span>
         </button>
         {/* Un trajet ne se régénère pas — ses trois chemins sont déjà là —,
             mais il a un retour : de B vers A, avec ses propres sens uniques,
             ses propres traversées, et parfois une autre note. */}
         {isJourney ? (
           onReturnTrip && (
-            <button className="loopact" onClick={onReturnTrip} title="Calculer le trajet retour" aria-label="Calculer le trajet retour">
+            <button className="loopact" onClick={onReturnTrip} title={t('Calculer le trajet retour')} aria-label={t('Calculer le trajet retour')}>
               <Icon name="uturn" size={18} />
-              <span>Trajet retour</span>
+              <span>{t('Trajet retour')}</span>
             </button>
           )
         ) : (
           <button
             className="loopact"
             onClick={onRegenerate ?? onSearch}
-            title="Régénérer d'autres boucles"
-            aria-label="Régénérer d'autres boucles"
+            title={t('Régénérer d\'autres boucles')}
+            aria-label={t('Régénérer d\'autres boucles')}
           >
             <Icon name="shuffle" size={18} />
-            <span>Autres boucles</span>
+            <span>{t('Autres boucles')}</span>
           </button>
         )}
       </div>
@@ -711,9 +675,7 @@ export default function Explore({
 
       {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}
 
-      <button className="linkish" onClick={onFreeRun}>
-        ou courir librement, sans suivre de tracé
-      </button>
+      <button className="linkish" onClick={onFreeRun}>{t('ou courir librement, sans suivre de tracé')}</button>
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
           que soit l'endroit où l'on a fait défiler le détail. À côté, le seul
@@ -723,23 +685,21 @@ export default function Explore({
             ou un favori rouvert n'avaient pas d'autre sortie qu'une nouvelle
             recherche lancée depuis la barre du haut. */}
         {onBack && (
-          <button className="btn btn--icon" onClick={onBack} title="Revenir au générateur" aria-label="Revenir au générateur">
+          <button className="btn btn--icon" onClick={onBack} title={t('Revenir au générateur')} aria-label={t('Revenir au générateur')}>
             <Icon name="close" size={19} />
           </button>
         )}
         <button
           className={`btn btn--icon ${isFavorite ? 'btn--on' : ''}`}
           onClick={onFavorite}
-          title={isFavorite ? 'Retirer des favoris' : 'Enregistrer en favori'}
-          aria-label={isFavorite ? 'Retirer des favoris' : 'Enregistrer en favori'}
+          title={isFavorite ? t('Retirer des favoris') : t('Enregistrer en favori')}
+          aria-label={isFavorite ? t('Retirer des favoris') : t('Enregistrer en favori')}
           aria-pressed={isFavorite}
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
         </button>
         <button className="btn btn--primary" onClick={onStart}>
-          <Icon name="play" size={17} />
-          Démarrer
-        </button>
+          <Icon name="play" size={17} />{t('Démarrer')}</button>
       </div>
     </div>
   )
@@ -788,7 +748,7 @@ function SearchProgress({ progress }) {
   return (
     <div className="progress" role="status">
       <div className="progress__label">
-        <span>{STAGES[stage] ?? 'Calcul en cours'}…</span>
+        <span>{t(STAGES[stage] ?? 'Calcul en cours')}…</span>
         {fraction !== null && fraction > 0 && <b>{Math.round(fraction * 100)} %</b>}
       </div>
       {/* Tant qu'aucune tuile n'est arrivée, la barre défile au lieu de rester à
@@ -802,14 +762,14 @@ function SearchProgress({ progress }) {
         {long && stage === 'download'
           ? // Les archives couvrent la France et ses voisins ; ailleurs, il faut
             // interroger OpenStreetMap en direct, et c'est là que ça traîne.
-            "Hors des archives : OpenStreetMap répond lentement, moins d'une minute en général."
+            t('Hors des archives : OpenStreetMap répond lentement, moins d\'une minute en général.')
           : stage === 'download'
-            ? "Gardées sur l'appareil : la prochaine fois, ce sera immédiat."
+            ? t('Gardées sur l\'appareil : la prochaine fois, ce sera immédiat.')
             : stage === 'elevation'
               ? // La seule étape qui attend encore quelqu'un d'autre : autant le
                 // dire, plutôt que de promettre un calcul sans serveur.
-                "Altitudes de l'IGN, gardées pour les prochaines boucles."
-              : 'Calculé sur ton téléphone, sans serveur.'}
+                t('Altitudes de l\'IGN, gardées pour les prochaines boucles.')
+              : t('Calculé sur ton téléphone, sans serveur.')}
       </p>
     </div>
   )
@@ -825,13 +785,10 @@ function SearchProgress({ progress }) {
  */
 function AlreadyRun({ found }) {
   const { run, share } = found
-  const quand = new Date(run.ranAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+  const quand = new Date(run.ranAt).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })
   const temps = run.actual_duration_s ? minutes(run.actual_duration_s) : null
   return (
-    <div className="notice">
-      Déjà couru le {quand}
-      {temps ? ` en ${temps}` : ''}
-      {share < 0.95 ? ` — à ${Math.round(share * 100)} % le même chemin.` : '.'}
+    <div className="notice">{t('Déjà couru le {quand}{v2}', { quand, v2: temps ? t(' en {temps}', { temps }) : '' })}{share < 0.95 ? t(' — à {v1} % le même chemin.', { v1: Math.round(share * 100) }) : '.'}
     </div>
   )
 }
@@ -940,14 +897,14 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     : r.laps > 1
                       ? `${km(r.lap_distance_m, 1)} ${unitLabel()} × ${r.laps}`
                       : // « Boucle sud-est » le dit déjà dessous : pas deux fois.
-                        r.name?.toLowerCase().includes(r.direction?.toLowerCase()) ? '' : r.direction}
+                        r.name?.toLowerCase().includes(r.direction?.toLowerCase()) ? '' : compass(r.direction)}
                 </span>
                 {/* Sans analyse — un tracé de secours —, pas de note : un tiret
                     dit « on ne sait pas », là où un « A » mentirait. */}
                 {r.safety ? (
                   <span className={`grade grade--${r.safety.grade}`}>{r.safety.grade}</span>
                 ) : (
-                  <span className="grade grade--unknown" title="Sécurité non évaluée">
+                  <span className="grade grade--unknown" title={t('Sécurité non évaluée')}>
                     —
                   </span>
                 )}
@@ -955,21 +912,19 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     cherche — se comparer — et parfois ce qu'on fuit. Dans les
                     deux cas, il vaut mieux le savoir avant de partir. */}
                 {known?.has(r.id) && !on && (
-                  <span className="rcard__seen" title="Déjà couru">
+                  <span className="rcard__seen" title={t('Déjà couru')}>
                     <Icon name="history" size={14} />
                   </span>
                 )}
                 {on && (
-                  <span className="rcard__more">
-                    Détails
-                    <Icon name="chevronUp" size={14} />
+                  <span className="rcard__more">{t('Détails')}<Icon name="chevronUp" size={14} />
                   </span>
                 )}
               </span>
               <span className="rcard__km">
                 <b>{km(r.distance_m, 1)}</b> {unitLabel()}
               </span>
-              <span className="rcard__name">{r.name}</span>
+              <span className="rcard__name">{routeName(r.name)}</span>
               <span className="rcard__stats">
                 <span>
                   <b>{minutes(r.duration_s)}</b>
@@ -983,12 +938,11 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                       {/* « protégé » se lisait comme un verdict sur le reste : une
                           rue calme dont le trottoir n'est pas noté sur la carte
                           n'y compte pas, et paraissait livrée aux voitures. */}
-                      <b>{Math.round(r.safety.protected_share * 100)} %</b> {sport === 'bike' ? 'aménagé' : 'hors chaussée'}
+                      <b>{Math.round(r.safety.protected_share * 100)} %</b> {sport === 'bike' ? t('aménagé') : t('hors chaussée')}
                     </>
                   ) : (
                     <>
-                      <b>—</b> non évalué
-                    </>
+                      <b>—</b>{' '}{t('non évalué')}</>
                   )}
                 </span>
               </span>
@@ -1028,12 +982,10 @@ function Facts({ back, weather, wind }) {
   const from = wind && CARDINALS[Math.round(((wind.bearing + 180) % 360) / 45) % 8]
   return (
     <>
-      <ul className="facts" aria-label="Avant de partir">
+      <ul className="facts" aria-label={t('Avant de partir')}>
         {back && (
           <li>
-            <Icon name="clock" size={14} />
-            Retour vers {back}
-          </li>
+            <Icon name="clock" size={14} />{t('Retour vers {back}', { back })}</li>
         )}
         {weather && (
           <li className={weather.advice ? 'facts--warn' : undefined}>
@@ -1043,10 +995,8 @@ function Facts({ back, weather, wind }) {
         )}
         {wind && (
           // Le classement en tient compte : à qualité égale, l'arrivée vent dans le dos passe devant.
-          <li title="À qualité égale, les boucles qui finissent vent dans le dos passent devant.">
-            <Icon name="compass" size={14} />
-            Vent {/^[aeiou]/.test(from) ? `d’${from}` : `de ${from}`} · {Math.round(speedIn(wind.speed_kmh))} {speedLabel()}
-          </li>
+          <li title={t('À qualité égale, les boucles qui finissent vent dans le dos passent devant.')}>
+            <Icon name="compass" size={14} />{t('Vent {v1} · {v2} {v3}', { v1: /^[aeiou]/.test(from) ? `d’${from}` : t('de {from}', { from }), v2: Math.round(speedIn(wind.speed_kmh)), v3: speedLabel() })}</li>
         )}
       </ul>
       {weather?.advice && <p className="facts__advice small">{weather.text}</p>}
@@ -1063,20 +1013,18 @@ function Facts({ back, weather, wind }) {
 function RouteSteps({ steps, onShow }) {
   return (
     <details className="steps">
-      <summary>
-        Feuille de route · {steps.length} consignes
-        <Icon name="chevronDown" size={16} />
+      <summary>{t('Feuille de route · {length} consignes', { length: steps.length })}<Icon name="chevronDown" size={16} />
       </summary>
       <ol>
         {steps.map((s, i) => (
           <li key={i}>
             <button
               onClick={() => s.lon != null && onShow?.([s.lon, s.lat])}
-              aria-label={`${s.text}, à ${km(s.dist_m, 1)} ${unitLabel()} — montrer sur la carte`}
+              aria-label={t('{text}, à {v2} {v3} — montrer sur la carte', { text: stepText(s.text), v2: km(s.dist_m, 1), v3: unitLabel() })}
             >
               <Icon name={turnIcon(s.turn)} size={17} />
               <em>{km(s.dist_m, 1)}</em>
-              <span>{s.text}</span>
+              <span>{stepText(s.text)}</span>
             </button>
           </li>
         ))}
@@ -1088,13 +1036,11 @@ function RouteSteps({ steps, onShow }) {
 function RejectedList({ rejected }) {
   return (
     <div className="rejected">
-      <span className="rejected__title">
-        {rejected.length} écarté{rejected.length > 1 ? 's' : ''} par le contrôle
-      </span>
+      <span className="rejected__title">{t('{length} écarté{v2} par le contrôle', { length: rejected.length, v2: rejected.length > 1 ? 's' : '' })}</span>
       {rejected.map((r, i) => (
         <div key={i} className="rejected__row">
           <span className="mono">{km(r.distance_m, 1)} {unitLabel()}</span>
-          <span>{r.label}</span>
+          <span>{engineText(r.label)}</span>
         </div>
       ))}
     </div>

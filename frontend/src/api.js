@@ -12,6 +12,7 @@ import { buildGpx, gpxFilename } from './engine/gpx'
 import { buildRunGpx } from './runGpx'
 import { isNative, saveTextFile } from './platform'
 
+import { t } from './i18n'
 /**
  * Un échec de recherche, prêt à être montré.
  *
@@ -41,12 +42,12 @@ export function explainFailure(error) {
   if (error?.name === 'PlanningError') return new NetworkError(error.message)
   if (isOffline()) {
     return new NetworkError(
-      "Pas de connexion, et cette zone n'est pas encore sur l'appareil. Les zones déjà explorées se calculent hors ligne, et tes parcours enregistrés restent accessibles dans « Mes parcours ».",
+      t('Pas de connexion, et cette zone n\'est pas encore sur l\'appareil. Les zones déjà explorées se calculent hors ligne, et tes parcours enregistrés restent accessibles dans « Mes parcours ».'),
       { offline: true },
     )
   }
   if (error?.name === 'OverpassError' || error?.name === 'EngineCrash') return new NetworkError(error.message)
-  return new NetworkError(`La recherche a échoué : ${error?.message || 'erreur inconnue'}.`)
+  return new NetworkError(t('La recherche a échoué : {v1}.', { v1: error?.message || 'erreur inconnue' }))
 }
 
 export async function generateLoops(params, onProgress) {
@@ -75,7 +76,7 @@ export async function describePlace(lat, lon) {
  * activité, et pas seulement un dessin. Voir `runGpx.js`.
  */
 export async function downloadRun(entry) {
-  await saveTextFile(gpxFilename(`${entry.name} — trace`), buildRunGpx(entry), 'application/gpx+xml')
+  await saveTextFile(gpxFilename(t('{name} — trace', { name: entry.name })), buildRunGpx(entry), 'application/gpx+xml')
 }
 
 /** Le rapport de la sortie, en JSON, par la feuille de partage — voir `runReport.js`. */

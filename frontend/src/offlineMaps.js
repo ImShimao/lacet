@@ -34,6 +34,7 @@ import { TERRAIN_ZOOM, terrainTileUrl } from './engine/environment'
 import { store } from './engine/store'
 import { load, save } from './storage'
 
+import { t } from './i18n'
 // Les tuiles de CARTO s'arrêtent là ; au-delà, le rendu agrandit. En deçà, on
 // descend jusqu'au zoom 10 pour que dézoomer ne fasse pas un trou : cela ne
 // coûte qu'une poignée de tuiles supplémentaires.
@@ -345,10 +346,10 @@ async function describeStyle(source) {
  * la main.
  */
 export async function download(route, mapStyle, onProgress, { auto = false } = {}) {
-  if (!isAvailable()) throw new Error("Le stockage de l'appareil ne répond pas : impossible de garder la carte.")
+  if (!isAvailable()) throw new Error(t('Le stockage de l\'appareil ne répond pas : impossible de garder la carte.'))
 
   const { templates, shared } = await describeStyle(mapStyle.style)
-  if (!templates.length) throw new Error("Ce fond de carte ne peut pas être gardé hors ligne.")
+  if (!templates.length) throw new Error(t('Ce fond de carte ne peut pas être gardé hors ligne.'))
 
   const { levels } = tilePlan(route.geometry, templates.length)
   const relief = reliefTiles(route.geometry)
@@ -405,7 +406,7 @@ export async function download(route, mapStyle, onProgress, { auto = false } = {
   // dire, et ne rien laisser derrière soi.
   if (maxZoom === null) {
     await dropUnused(urls, load().offlineMaps || {})
-    throw new Error("Aucune tuile n'est arrivée : la carte n'a pas pu être gardée.")
+    throw new Error(t('Aucune tuile n\'est arrivée : la carte n\'a pas pu être gardée.'))
   }
 
   // Le relief, pour que le D+ d'une boucle cherchée ici sans réseau reste connu :
@@ -620,7 +621,7 @@ async function fromNetwork(url, signal, waitMs) {
   const timer = waitMs ? setTimeout(abort, waitMs) : null
   try {
     const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`${response.status} pour ${url}`)
+    if (!response.ok) throw new Error(t('{status} pour {url}', { status: response.status, url }))
     return { type: response.headers.get('content-type') || '', bytes: await response.arrayBuffer() }
   } finally {
     clearTimeout(timer)

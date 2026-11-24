@@ -1,3 +1,4 @@
+import { locale } from './i18n'
 // Séries et défis : ce qui donne envie de ressortir demain.
 //
 // **Les semaines d'affilée d'abord.** Courir tous les jours n'est ni le but ni
@@ -93,7 +94,7 @@ export function monthChallenge(history, sport = 'run', now = new Date()) {
   const daysLeft = Math.round((next.getTime() - startOfDay(now).getTime()) / DAY_MS)
   const perDayKm = target ? (target - km) / Math.max(1, daysLeft) : 0
   return {
-    month: now.toLocaleDateString('fr-FR', { month: 'long' }),
+    month: now.toLocaleDateString(locale(), { month: 'long' }),
     km,
     runs,
     reached,

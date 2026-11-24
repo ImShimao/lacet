@@ -4,6 +4,7 @@
 // dit et où, chaque recalcul et sa durée, le baromètre — ne se retrouve pas dans
 // l'aperçu. Un fichier JSON part par la feuille de partage d'iOS (Fichiers,
 // OneDrive, AirDrop), et se relit au calme.
+import { t } from './i18n'
 
 // La clé de l'historique et des favoris : déjà dans `run`, et trop lourde.
 const SKIPPED_KEYS = new Set(['lacet.v1'])

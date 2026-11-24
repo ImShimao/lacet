@@ -1,3 +1,4 @@
+import { t, locale } from './i18n'
 /**
  * Le bilan d'un mois : kilomètres, dénivelé, plus longue sortie, régularité.
  *
@@ -15,9 +16,9 @@ export function monthKey(iso) {
 
 /** « Septembre 2026 ». */
 export function monthLabel(key) {
-  if (!key) return 'Sans date'
+  if (!key) return t('Sans date')
   const [y, m] = key.split('-').map(Number)
-  const text = new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  const text = new Date(y, m - 1, 1).toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 

@@ -1,3 +1,4 @@
+import { dec, t } from './i18n'
 // La virgule française, partout : chaque écran la remettait — ou l'oubliait —
 // à sa façon, et la même sortie s'affichait « 5,23 » dans l'historique et
 // « 5.23 » sur l'écran de fin.
@@ -6,7 +7,7 @@
 // des miles qu'il écrit. L'unité qui suit le chiffre vient de `unitLabel()`.
 import { perUnit, unitM } from './units'
 
-export const km = (metres, digits = 2) => (metres / unitM()).toFixed(digits).replace('.', ',')
+export const km = (metres, digits = 2) => (metres / unitM()).toFixed(digits).replace('.', dec())
 
 export function duration(seconds) {
   const h = Math.floor(seconds / 3600)
@@ -65,7 +66,7 @@ const SURFACE_LABELS = {
   road: 'Route',
   mixed: 'Mixte',
 }
-export const surfaceLabel = (key) => SURFACE_LABELS[key] || key
+export const surfaceLabel = (key) => t(SURFACE_LABELS[key] || key)
 
 /** Distance orthodromique en mètres — sert au suivi GPS. */
 export function haversine(a, b) {

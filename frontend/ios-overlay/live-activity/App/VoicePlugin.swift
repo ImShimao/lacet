@@ -72,8 +72,13 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             self.lowerOthers()
             let utterance = AVSpeechUtterance(string: text)
             // La voix choisie dans les réglages (`voices`), sinon celle du système.
-            let chosen = call.getString("voice").flatMap { AVSpeechSynthesisVoice(identifier: $0) }
-            utterance.voice = chosen ?? AVSpeechSynthesisVoice(language: "fr-FR")
+            // La langue de l'app (`lang`, « fr-FR » ou « en-GB ») : une voix française
+            // gardée dans les réglages ne lit pas des phrases anglaises.
+            let lang = call.getString("lang") ?? "fr-FR"
+            let chosen = call.getString("voice")
+                .flatMap { AVSpeechSynthesisVoice(identifier: $0) }
+                .flatMap { $0.language.hasPrefix(String(lang.prefix(2))) ? $0 : nil }
+            utterance.voice = chosen ?? AVSpeechSynthesisVoice(language: lang)
             // Le débit d'avant, un peu au-dessus du défaut, multiplié par celui
             // des réglages (0,85 lent, 1 normal, 1,15 rapide).
             let rate = Float(call.getDouble("rate") ?? 1)
@@ -95,10 +100,12 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         }
     }
 
-    /// Les voix françaises installées sur l'iPhone, les meilleures d'abord.
+    /// Les voix installées sur l'iPhone dans la langue de l'app (`lang`, « fr » par
+    /// défaut), les meilleures d'abord.
     @objc func voices(_ call: CAPPluginCall) {
+        let prefix = String((call.getString("lang") ?? "fr").prefix(2))
         let list = AVSpeechSynthesisVoice.speechVoices()
-            .filter { $0.language.hasPrefix("fr") }
+            .filter { $0.language.hasPrefix(prefix) }
             .sorted { $0.quality.rawValue > $1.quality.rawValue }
             .map { voice -> [String: Any] in
                 [

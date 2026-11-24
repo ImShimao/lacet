@@ -8,6 +8,8 @@ import { climbProfile, paceBySlope } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
+import { t, locale, dec, lang } from './i18n'
+import { stepText } from './stepText'
 /**
  * Une sortie déjà faite, rouverte.
  *
@@ -43,14 +45,14 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
   return (
     <div className="panel rundet">
       <div className="rundet__head">
-        <button className="rundet__back" onClick={onClose} aria-label="Retour aux sorties">
+        <button className="rundet__back" onClick={onClose} aria-label={t('Retour aux sorties')}>
           <Icon name="chevronDown" size={18} />
         </button>
         <div className="rundet__name">
           {/* Un champ, pas un bouton « renommer » : le nom se corrige là où on
               le lit. Il reprend sa forme de titre dès qu'on le quitte. */}
           {onRename ? (
-            <RenameField name={entry.name} label="Nom de la sortie" onRename={(nom) => onRename(entry, nom)} />
+            <RenameField name={entry.name} label={t('Nom de la sortie')} onRename={(nom) => onRename(entry, nom)} />
           ) : (
             <b>{entry.name}</b>
           )}
@@ -63,37 +65,33 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
 
       <div className="rundet__big">
         <b>{km(distance)}</b>
-        <span>KILOMÈTRES PARCOURUS</span>
+        <span>{t('KILOMÈTRES PARCOURUS')}</span>
       </div>
 
       <div className="stats stats--four rundet__stats">
         <div>
           <b>{duration(seconds)}</b>
           <span>
-            <Icon name="clock" size={12} />
-            Temps
+            <Icon name="clock" size={12} />{t('Temps')}</span>
+        </div>
+        <div>
+          <b>{bike ? speed.toFixed(1).replace('.', dec()) : pace(perKm)}</b>
+          <span>
+            <Icon name="gauge" size={12} />
+            {bike ? t('Vitesse ({v1})', { v1: speedLabel() }) : t('Allure ({v1})', { v1: paceLabel() })}
           </span>
         </div>
         <div>
-          <b>{bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}</b>
+          <b>{bike ? pace(perKm) : speed.toFixed(1).replace('.', dec())}</b>
           <span>
             <Icon name="gauge" size={12} />
-            {bike ? `Vitesse (${speedLabel()})` : `Allure (${paceLabel()})`}
-          </span>
-        </div>
-        <div>
-          <b>{bike ? pace(perKm) : speed.toFixed(1).replace('.', ',')}</b>
-          <span>
-            <Icon name="gauge" size={12} />
-            {bike ? `Allure (${paceLabel()})` : `Vitesse (${speedLabel()})`}
+            {bike ? t('Allure ({v1})', { v1: paceLabel() }) : t('Vitesse ({v1})', { v1: speedLabel() })}
           </span>
         </div>
         <div>
           <b>{entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—'}</b>
           <span>
-            <Icon name="trendUp" size={12} />
-            Dénivelé +
-          </span>
+            <Icon name="trendUp" size={12} />{t('Dénivelé +')}</span>
         </div>
       </div>
 
@@ -101,10 +99,7 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
           mouvement. Une sortie avec vingt minutes d'arrêts n'a pas duré une
           heure, et l'allure affichée ne s'explique pas sans le dire. */}
       {entry.paused_s > 0 && (
-        <p className="muted small">
-          Chrono arrêté {duration(entry.paused_s)} — feux, pauses, attentes. Le temps ci-dessus
-          est le temps en mouvement, et c'est lui qui donne l'allure.
-        </p>
+        <p className="muted small">{t('Chrono arrêté {v1} — feux, pauses, attentes. Le temps ci-dessus est le temps en mouvement, et c\'est lui qui donne l\'allure.', { v1: duration(entry.paused_s) })}</p>
       )}
 
       {rang && <Standing rang={rang} bike={bike} />}
@@ -122,47 +117,30 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
       {gap !== null && <PlanGap entry={entry} planned={planned} gap={gap} />}
 
       {entry.rerouted && (
-        <p className="muted small">
-          Un nouveau chemin a été calculé pendant cette sortie : l'écart avec le prévu vient
-          en partie de là.
-        </p>
+        <p className="muted small">{t('Un nouveau chemin a été calculé pendant cette sortie : l\'écart avec le prévu vient en partie de là.')}</p>
       )}
       {entry.actual_ascent_m == null ? (
-        <p className="muted small">
-          Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n'ont donné
-          l'altitude pendant cette sortie.
-        </p>
+        <p className="muted small">{t('Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n\'ont donné l\'altitude pendant cette sortie.')}</p>
       ) : (
         <AscentNote entry={entry} />
       )}
       {!entry.track?.length && (
-        <p className="muted small">
-          La trace de cette sortie n'est plus gardée — seules les vingt-cinq dernières le sont,
-          avec leur parcours prévu, pour laisser de la place. Les chiffres, eux, restent.
-        </p>
+        <p className="muted small">{t('La trace de cette sortie n\'est plus gardée — seules les vingt-cinq dernières le sont, avec leur parcours prévu, pour laisser de la place. Les chiffres, eux, restent.')}</p>
       )}
 
       {sharing && <ShareSheet entry={entry} onClose={() => setSharing(false)} />}
       <div className="row">
-        <button className="btn btn--fit" onClick={() => setSharing(true)} aria-label="Partager la sortie en image">
-          <Icon name="share" size={16} />
-          Partager
-        </button>
+        <button className="btn btn--fit" onClick={() => setSharing(true)} aria-label={t('Partager la sortie en image')}>
+          <Icon name="share" size={16} />{t('Partager')}</button>
         {entry.track?.length > 1 && (
-          <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
-            <Icon name="fileExport" size={16} />
-            Exporter
-          </button>
+          <button className="btn btn--fit" onClick={() => downloadRun(entry)} aria-label={t('Exporter la trace en GPX')}>
+            <Icon name="fileExport" size={16} />{t('Exporter')}</button>
         )}
-        <button className="btn btn--fit" onClick={() => shareRunReport(entry)} aria-label="Envoyer le rapport de la sortie">
-          <Icon name="chart" size={16} />
-          Rapport
-        </button>
+        <button className="btn btn--fit" onClick={() => shareRunReport(entry)} aria-label={t('Envoyer le rapport de la sortie')}>
+          <Icon name="chart" size={16} />{t('Rapport')}</button>
         {!entry.free && entry.geometry?.length > 1 && (
           <button className="btn btn--primary" onClick={() => onReplay(entry)}>
-            <Icon name="refresh" size={16} />
-            Refaire ce parcours
-          </button>
+            <Icon name="refresh" size={16} />{t('Refaire ce parcours')}</button>
         )}
       </div>
 
@@ -171,17 +149,11 @@ export default function RunDetail({ entry, history = [], onReplay, onRename, onA
       <div className="rundet__remove">
         {confirm ? (
           <div className="row">
-            <button className="btn" onClick={() => setConfirm(false)}>
-              Annuler
-            </button>
-            <button className="btn btn--primary" onClick={() => onDelete(entry)}>
-              Supprimer définitivement
-            </button>
+            <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
+            <button className="btn btn--primary" onClick={() => onDelete(entry)}>{t('Supprimer définitivement')}</button>
           </div>
         ) : (
-          <button className="linkish" onClick={() => setConfirm(true)}>
-            Supprimer cette sortie
-          </button>
+          <button className="linkish" onClick={() => setConfirm(true)}>{t('Supprimer cette sortie')}</button>
         )}
       </div>
     </div>
@@ -230,11 +202,11 @@ export function PlanGap({ entry, planned, gap }) {
   return (
     <div className="rundet__plan">
       <div>
-        <span>Prévu</span>
+        <span>{t('Prévu')}</span>
         <b>{km(planned, 1)} {unitLabel()}</b>
       </div>
       <div>
-        <span>Écart</span>
+        <span>{t('Écart')}</span>
         <b className={Math.abs(gap) > 300 ? 'rundet__off' : ''}>
           {gap >= 0 ? '+' : '−'}
           {Math.abs(Math.round(gap))} m
@@ -242,13 +214,13 @@ export function PlanGap({ entry, planned, gap }) {
       </div>
       {entry.ascent_m != null && (
         <div>
-          <span>D+ prévu</span>
+          <span>{t('D+ prévu')}</span>
           <b>{Math.round(entry.ascent_m)} m</b>
         </div>
       )}
       {entry.grade && (
         <div>
-          <span>Sécurité</span>
+          <span>{t('Sécurité')}</span>
           <b className={`grade grade--${entry.grade}`}>{entry.grade}</b>
         </div>
       )}
@@ -273,22 +245,22 @@ export function Standing({ rang, bike }) {
     <div className={`standing ${rang.record ? 'standing--record' : ''}`}>
       <div className="standing__head">
         <b>
-          {rang.record ? 'Ton meilleur passage' : `${rang.count}ᵉ fois sur ce chemin`}
+          {rang.record ? t('Ton meilleur passage') : t('{count}ᵉ fois sur ce chemin', { count: rang.count })}
         </b>
         <em>
           {rang.record
-            ? `Le plus rapide de tes ${rang.count} passages ici.`
-            : `au mieux ${pace(paceOf(rang.best))}${bike ? '' : '/km'}, le ${jour(rang.best.ranAt)}`}
+            ? t('Le plus rapide de tes {count} passages ici.', { count: rang.count })
+            : t('au mieux {v1}{v2}, le {v3}', { v1: pace(paceOf(rang.best)), v2: bike ? '' : t('/km'), v3: jour(rang.best.ranAt) })}
         </em>
       </div>
       {!rang.record && (
         <div className="standing__gaps">
           <div>
-            <span>contre la dernière</span>
+            <span>{t('contre la dernière')}</span>
             <b className={rang.vsPrevious <= 0 ? 'standing__up' : ''}>{ecart(rang.vsPrevious)}</b>
           </div>
           <div>
-            <span>contre la meilleure</span>
+            <span>{t('contre la meilleure')}</span>
             <b className={rang.vsBest <= 0 ? 'standing__up' : ''}>{ecart(rang.vsBest)}</b>
           </div>
         </div>
@@ -298,7 +270,7 @@ export function Standing({ rang, bike }) {
 }
 
 const paceOf = (r) => (r.actual_duration_s || 0) / ((r.actual_distance_m || 1) / 1000)
-const jour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+const jour = (iso) => new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })
 
 /**
  * Les tours de kilomètre, en barres.
@@ -329,10 +301,8 @@ export function Splits({ splits, bike, entry = null }) {
   return (
     <div className="splits">
       <div className="splits__head">
-        <span className="label">{bike ? 'Par kilomètre' : 'Allure au kilomètre'}</span>
-        <em>
-          au plus vite {pace(best)} · au plus lent {pace(worst)}
-        </em>
+        <span className="label">{bike ? t('Par kilomètre') : t('Allure au kilomètre')}</span>
+        <em>{t('au plus vite {v1} · au plus lent {v2}', { v1: pace(best), v2: pace(worst) })}</em>
       </div>
       {splits.map((s) => (
         <div key={s.km} className="splits__row">
@@ -349,15 +319,13 @@ export function Splits({ splits, bike, entry = null }) {
           la barre se compare aux autres. */}
       {end && (
         <div className="splits__row splits__row--end">
-          <span>fin</span>
+          <span>{t('fin')}</span>
           <i style={{ width: `${width(end.perKm)}%` }} />
           <b title={`${Math.round(end.metres)} m`}>{pace(end.perKm)}</b>
         </div>
       )}
       {target && (
-        <p className="muted small">
-          Allure visée {pace(target)}{paceLabel()} : {under} kilomètre{under > 1 ? 's' : ''} sur {splits.length} dans les temps.
-        </p>
+        <p className="muted small">{t('Allure visée {v1}{v2} : {under} kilomètre{v4} sur {length} dans les temps.', { v1: pace(target), v2: paceLabel(), under, v4: under > 1 ? 's' : '', length: splits.length })}</p>
       )}
     </div>
   )
@@ -387,11 +355,8 @@ export function Climb({ entry }) {
   return (
     <div className="climb">
       <div className="splits__head">
-        <span className="label">Profil monté</span>
-        <em>
-          sommet au km {km(drawn.topM, 1)} · {drawn.gain >= 0 ? '+' : '−'}
-          {Math.abs(Math.round(drawn.gain))} m sur le départ
-        </em>
+        <span className="label">{t('Profil monté')}</span>
+        <em>{t('sommet au km {v1} · {v2}{v3} m sur le départ', { v1: km(drawn.topM, 1), v2: drawn.gain >= 0 ? '+' : '−', v3: Math.abs(Math.round(drawn.gain)) })}</em>
       </div>
       <svg viewBox="0 0 320 64" preserveAspectRatio="none" aria-hidden="true">
         <path className="climb__area" d={drawn.area} />
@@ -414,8 +379,8 @@ export function Feeling({ entry, onChange }) {
   const [note, setNote] = useState(entry.note ?? '')
   return (
     <div className="feeling">
-      <span className="label">Ressenti</span>
-      <div className="chips" role="radiogroup" aria-label="Ressenti">
+      <span className="label">{t('Ressenti')}</span>
+      <div className="chips" role="radiogroup" aria-label={t('Ressenti')}>
         {FEELINGS.map((label, i) => (
           <button
             key={label}
@@ -429,14 +394,14 @@ export function Feeling({ entry, onChange }) {
               onChange({ feeling: next })
             }}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
       <input
         value={note}
-        aria-label="Note sur la sortie"
-        placeholder="Une note : la météo, les jambes, les chaussures…"
+        aria-label={t('Note sur la sortie')}
+        placeholder={t('Une note : la météo, les jambes, les chaussures…')}
         maxLength={140}
         onChange={(e) => setNote(e.target.value)}
         onBlur={() => note.trim() !== (entry.note ?? '') && onChange({ note: note.trim() })}
@@ -459,15 +424,13 @@ export function Feeling({ entry, onChange }) {
 export function Spoken({ spoken }) {
   return (
     <details className="spoken">
-      <summary>
-        Ce que la voix a dit · {spoken.length} phrase{spoken.length > 1 ? 's' : ''}
-      </summary>
+      <summary>{t('Ce que la voix a dit · {length} phrase{v2}', { length: spoken.length, v2: spoken.length > 1 ? 's' : '' })}</summary>
       <ol>
         {spoken.map((s, i) => (
           <li key={i}>
             <time>{heure(s.t)}</time>
             <em>{km(s.m, 2)} {unitLabel()}</em>
-            <span>{s.text}</span>
+            <span>{stepText(s.text)}</span>
           </li>
         ))}
       </ol>
@@ -475,14 +438,14 @@ export function Spoken({ spoken }) {
   )
 }
 
-const heure = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+const heure = (t) => new Date(t).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 /** « Mardi 16 septembre, 18 h 42 » */
 export function whenLabel(iso) {
   const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return 'Date inconnue'
-  const jour = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-  const heure = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ')
+  if (Number.isNaN(d.getTime())) return t('Date inconnue')
+  const jour = d.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
+  const heure = d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }).replace(':', lang() === 'en' ? ':' : ' h ')
   return `${jour.charAt(0).toUpperCase()}${jour.slice(1)}, ${heure}`
 }
 
@@ -496,17 +459,17 @@ export function SlopePace({ entry, bike = false }) {
   if (!allure) return null
   const value = (seconds) => {
     if (!Number.isFinite(seconds)) return '—'
-    return bike ? `${speedIn(3600 / seconds).toFixed(1).replace('.', ',')} ${speedLabel()}` : `${pace(seconds)} ${paceLabel()}`
+    return bike ? `${speedIn(3600 / seconds).toFixed(1).replace('.', dec())} ${speedLabel()}` : `${pace(seconds)} ${paceLabel()}`
   }
   const rows = [
-    ['Montée', allure.up],
-    ['Plat', allure.flat],
-    ['Descente', allure.down],
+    [t('Montée'), allure.up],
+    [t('Plat'), allure.flat],
+    [t('Descente'), allure.down],
   ]
   return (
     <div className="slope">
       <div className="slope__head">
-        <span className="label">{bike ? 'Vitesse selon la pente' : 'Allure selon la pente'}</span>
+        <span className="label">{bike ? t('Vitesse selon la pente') : t('Allure selon la pente')}</span>
       </div>
       <div className="slope__rows">
         {rows.map(([label, seconds]) => (

@@ -5,6 +5,7 @@ import { km, profileRange } from './format'
 import { unitLabel } from './units'
 import useModal from './useModal'
 
+import { t } from './i18n'
 /**
  * Le dénivelé prévu, ouvert en pleine sortie.
  *
@@ -38,18 +39,18 @@ export default function ElevationSheet({ route, along, onClose }) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Dénivelé prévu"
+        aria-label={t('Dénivelé prévu')}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal__head">
-          <button className="mapsheet__close" onClick={onClose} aria-label="Fermer">
+          <button className="mapsheet__close" onClick={onClose} aria-label={t('Fermer')}>
             <Icon name="close" size={18} />
           </button>
-          <h2>Dénivelé prévu</h2>
+          <h2>{t('Dénivelé prévu')}</h2>
           <span />
         </div>
         <div className="modal__body">
-          <svg className="elevsheet__chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Profil altimétrique">
+          <svg className="elevsheet__chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('Profil altimétrique')}>
             <defs>
               <linearGradient id="elev-fill" x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0%" style={{ stopColor: 'var(--accent)' }} stopOpacity="0.55" />
@@ -76,15 +77,15 @@ export default function ElevationSheet({ route, along, onClose }) {
 
           <div className="elevsheet__stats">
             <div>
-              <span>Positif</span>
+              <span>{t('Positif')}</span>
               <b>{route.ascent_m != null ? `${Math.round(route.ascent_m)} m` : '—'}</b>
             </div>
             <div>
-              <span>Négatif</span>
+              <span>{t('Négatif')}</span>
               <b>{route.descent_m != null ? `${Math.round(route.descent_m)} m` : '—'}</b>
             </div>
             <div>
-              <span>Reste à monter</span>
+              <span>{t('Reste à monter')}</span>
               <b>{Math.round(left)} m</b>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { recentPlaces, rememberPlace } from './storage'
 import { km } from './format'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 /**
  * Recherche d'un point de départ, n'importe où dans le monde : une adresse,
  * une ville, ou un lieu par son nom — « macdo guebwiller », « one fitness ».
@@ -22,7 +23,7 @@ import { unitLabel } from './units'
  * résultat le faisait disparaître, puisque quitter le champ fermait la liste
  * avant qu'on ait pu l'atteindre.
  */
-export default function SearchBar({ onPick, near = null, label = 'Chercher un lieu de départ' }) {
+export default function SearchBar({ onPick, near = null, label = t('Chercher un lieu de départ') }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -183,8 +184,8 @@ export default function SearchBar({ onPick, near = null, label = 'Chercher un li
             // liste se referme sous le doigt.
             onMouseDown={(e) => e.preventDefault()}
             onClick={clear}
-            aria-label="Effacer la recherche"
-            title="Effacer"
+            aria-label={t('Effacer la recherche')}
+            title={t('Effacer')}
           >
             <Icon name="close" size={13} />
           </button>
@@ -192,17 +193,15 @@ export default function SearchBar({ onPick, near = null, label = 'Chercher un li
       )}
       {visible && (
         <div className="search__results" id="search-results" role="listbox">
-          {memories && shown.length > 0 && <p className="search__title">Départs récents</p>}
+          {memories && shown.length > 0 && <p className="search__title">{t('Départs récents')}</p>}
           {empty && (
             <p className="search__empty">
               {failed
                 ? // Tout se calcule sur l'appareil, sauf ceci : trouver un lieu
                   // par son nom demande un annuaire, et il est en ligne. Les
                   // départs déjà choisis, eux, sont là — d'où le rappel.
-                  `La recherche de lieux n’a pas répondu.${
-                    recents.length ? ' Vide le champ pour retrouver tes derniers départs, ou place' : ' Sans réseau, place'
-                  } le départ à la main sur la carte.`
-                : `Aucun lieu trouvé pour « ${answered} ». Essaie le nom de la commune, ou place le départ à la main sur la carte.`}
+                  t('La recherche de lieux n’a pas répondu.{v1} le départ à la main sur la carte.', { v1: recents.length ? t(' Vide le champ pour retrouver tes derniers départs, ou place') : t(' Sans réseau, place') })
+                : t('Aucun lieu trouvé pour « {answered} ». Essaie le nom de la commune, ou place le départ à la main sur la carte.', { answered })}
             </p>
           )}
           {shown.map((place, i) => (

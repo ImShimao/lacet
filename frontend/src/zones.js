@@ -20,6 +20,7 @@
 
 import { load, save } from './storage'
 
+import { t } from './i18n'
 /** Les bornes du curseur de rayon, en mètres. */
 export const ZONE_RADIUS = { min: 100, max: 2000, step: 50, initial: 300 }
 
@@ -48,7 +49,7 @@ export const avoidedZones = () =>
     .filter((z) => z.on !== false)
     .map(({ lon, lat, radius_m, polygon }) => (polygon ? { polygon } : { lon, lat, radius_m }))
 
-const defaultName = (reason) => (reason && reason !== 'other' ? `Zone ${ZONE_REASONS.find((r) => r.key === reason)?.label.toLowerCase()}` : 'Zone à éviter')
+const defaultName = (reason) => (reason && reason !== 'other' ? t('Zone {v1}', { v1: ZONE_REASONS.find((r) => r.key === reason)?.label.toLowerCase() }) : t('Zone à éviter'))
 
 const keep = (zones) => {
   save({ zones })

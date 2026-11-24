@@ -2,6 +2,7 @@
  * Les pages de « Mon compte », à part : l'en-tête de l'app s'en sert avant que
  * l'écran lui-même soit chargé (`App.jsx`, import à la demande).
  */
+import { t } from './i18n'
 
 export const SECTIONS = [
   { key: 'profile', group: null, icon: 'user', title: 'Profil' },
@@ -15,5 +16,5 @@ export const SECTIONS = [
 ]
 
 /** Le titre d'une page, pour l'en-tête de l'app. */
-export const sectionTitle = (key) => SECTIONS.find((s) => s.key === key)?.title ?? 'Mon compte'
+export const sectionTitle = (key) => t(SECTIONS.find((s) => s.key === key)?.title ?? 'Mon compte')
 

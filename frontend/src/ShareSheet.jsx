@@ -5,6 +5,7 @@ import useModal from './useModal'
 import { shareText } from './contact'
 import { shareDataUrl, figuresOf, templatesFor } from './shareCard'
 
+import { t } from './i18n'
 /**
  * Partager une sortie : choisir l'image, la voir en grand, puis l'envoyer.
  *
@@ -52,12 +53,12 @@ export default function ShareSheet({ entry, verdict = null, onClose }) {
   const share = async () => {
     try {
       if (!image) throw new Error('image absente')
-      await shareDataUrl(image, entry.name || 'Ma sortie')
+      await shareDataUrl(image, entry.name || t('Ma sortie'))
     } catch (error) {
       // Refermer la feuille d'iOS n'est pas une panne. Une image qui ne se
       // fait pas, si : le texte part à sa place, plutôt que rien.
       if (/cancel/i.test(error?.message || '')) return
-      shareText(`${entry.name} — ${figuresOf(entry).map(([v]) => v).join(' · ')} — avec Lacet`, 'Ma sortie')
+      shareText(t('{name} — {v2} — avec Lacet', { name: entry.name, v2: figuresOf(entry).map(([v]) => v).join(' · ') }), t('Ma sortie'))
     }
   }
 
@@ -67,9 +68,9 @@ export default function ShareSheet({ entry, verdict = null, onClose }) {
       // n'accepte d'écrire que pendant le geste, et une attente l'aurait fini.
       const blob = fetch(image).then((r) => r.blob())
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-      setNote(current.clear ? 'Copiée. Dans ta story, appuie longuement puis « Coller ».' : 'Image copiée.')
+      setNote(current.clear ? t('Copiée. Dans ta story, appuie longuement puis « Coller ».') : t('Image copiée.'))
     } catch {
-      setNote('La copie n’a pas marché : passe par « Partager », puis « Copier ».')
+      setNote(t('La copie n’a pas marché : passe par « Partager », puis « Copier ».'))
     }
   }
 
@@ -81,42 +82,42 @@ export default function ShareSheet({ entry, verdict = null, onClose }) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Partager la sortie"
+        aria-label={t('Partager la sortie')}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal__head">
-          <button className="mapsheet__close" onClick={onClose} aria-label="Fermer">
+          <button className="mapsheet__close" onClick={onClose} aria-label={t('Fermer')}>
             <Icon name="close" size={18} />
           </button>
-          <h2>Partager</h2>
+          <h2>{t('Partager')}</h2>
           <span />
         </div>
 
         <div className="modal__body">
           <div className="sharesheet__stage" data-clear={current.clear || undefined}>
-            {image ? <img src={image} alt={`Aperçu : ${current.label}`} /> : <span className="sharesheet__wait">Préparation…</span>}
+            {image ? <img src={image} alt={t('Aperçu : {label}', { label: current.label })} /> : <span className="sharesheet__wait">{t('Préparation…')}</span>}
           </div>
           <p className="sharesheet__hint" aria-live="polite">
             {note ?? current.hint}
           </p>
 
-          <div className="sharesheet__strip" role="radiogroup" aria-label="Modèles d'image">
-            {templates.map((t) => (
+          <div className="sharesheet__strip" role="radiogroup" aria-label={t('Modèles d\'image')}>
+            {templates.map((tpl) => (
               <button
-                key={t.key}
+                key={tpl.key}
                 role="radio"
-                aria-checked={choice === t.key}
+                aria-checked={choice === tpl.key}
                 className="sharesheet__opt"
                 onClick={() => {
-                  setChoice(t.key)
+                  setChoice(tpl.key)
                   setNote(null)
                 }}
-                data-autofocus={choice === t.key || undefined}
+                data-autofocus={choice === tpl.key || undefined}
               >
-                <span className="sharesheet__thumb" data-clear={t.clear || undefined}>
-                  {images[t.key] && <img src={images[t.key]} alt="" />}
+                <span className="sharesheet__thumb" data-clear={tpl.clear || undefined}>
+                  {images[tpl.key] && <img src={images[tpl.key]} alt="" />}
                 </span>
-                {t.label}
+                {t(tpl.label)}
               </button>
             ))}
           </div>
@@ -124,13 +125,9 @@ export default function ShareSheet({ entry, verdict = null, onClose }) {
 
         <div className="modal__foot">
           <button className="btn" onClick={copy} disabled={!image}>
-            <Icon name="copy" size={17} />
-            Copier
-          </button>
+            <Icon name="copy" size={17} />{t('Copier')}</button>
           <button className="btn btn--primary" onClick={share}>
-            <Icon name="share" size={17} />
-            Partager
-          </button>
+            <Icon name="share" size={17} />{t('Partager')}</button>
         </div>
       </div>
     </div>,

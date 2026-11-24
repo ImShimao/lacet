@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { keyOf } from './offlineMaps'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, MAX_TRACKS, brief, load, save, slim, wipe } from './storage'
 
+import { t, locale } from './i18n'
 /**
  * Ce que l'app garde de toi : les favoris, les sorties, les départs nommés.
  *
@@ -53,7 +54,7 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
   const favoritesFull = (route) => {
     setNotice({
       list: 'favorites',
-      text: `${MAX_FAVORITES} favoris, c'est le plafond : « ${route.name} » n'est pas gardé. Retire d'abord un favori — glisse sa ligne vers la gauche.`,
+      text: t('{MAX_FAVORITES} favoris, c\'est le plafond : « {name} » n\'est pas gardé. Retire d\'abord un favori — glisse sa ligne vers la gauche.', { MAX_FAVORITES, name: route.name }),
     })
     return saved
   }
@@ -100,10 +101,10 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       put('history', suite, setHistory)
       const partie = toutes[MAX_HISTORY]
       if (partie) {
-        const jour = new Date(partie.ranAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+        const jour = new Date(partie.ranAt).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
         setNotice({
           list: 'history',
-          text: `Lacet garde les ${MAX_HISTORY.toLocaleString('fr-FR')} dernières sorties : celle du ${jour}, la plus ancienne, a laissé sa place à celle-ci.`,
+          text: t('Lacet garde les {v1} dernières sorties : celle du {jour}, la plus ancienne, a laissé sa place à celle-ci.', { v1: MAX_HISTORY.toLocaleString(locale()), jour }),
         })
       }
       return entry
@@ -148,7 +149,7 @@ const meme = (a, b) => a === b || (Boolean(a?.ranAt) && a.ranAt === b?.ranAt)
       if (places.length >= MAX_PLACES) {
         setNotice({
           list: 'places',
-          text: `${MAX_PLACES} départs nommés, c'est le plafond : « ${place.name} » n'est pas gardé. Oublie d'abord un départ, avec la croix à côté de son nom dans le menu du départ.`,
+          text: t('{MAX_PLACES} départs nommés, c\'est le plafond : « {name} » n\'est pas gardé. Oublie d\'abord un départ, avec la croix à côté de son nom dans le menu du départ.', { MAX_PLACES, name: place.name }),
         })
         return places
       }

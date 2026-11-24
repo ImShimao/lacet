@@ -12,6 +12,7 @@ import { paceBands } from './runTrace'
 import ShareSheet from './ShareSheet.jsx'
 import { paceLabel, speedIn, speedLabel, unitLabel, units } from './units'
 
+import { t, locale, dec } from './i18n'
 /**
  * Ce qu'on vient de faire, dit une fois la sortie terminée.
  *
@@ -88,11 +89,9 @@ export default function RunSummary({
           </span>
         )}
         {drawn?.parts.length > 0 && (
-          <span className="sketch__legend" aria-hidden="true">
-            plus vite <i /> plus lent
-          </span>
+          <span className="sketch__legend" aria-hidden="true">{t('plus vite')}{' '}<i />{' '}{t('plus lent')}</span>
         )}
-        <b>{entry.arrived ? 'Boucle bouclée' : 'Sortie enregistrée'}</b>
+        <b>{entry.arrived ? t('Boucle bouclée') : t('Sortie enregistrée')}</b>
         <em>
           {entry.name} · {whenLabel(entry.ranAt)}
         </em>
@@ -103,7 +102,7 @@ export default function RunSummary({
 
       <div className="summary__big">
         <b>{km(shown)}</b>
-        <span>{units() === 'mi' ? 'miles' : 'kilomètres'}</span>
+        <span>{units() === 'mi' ? t('miles') : t('kilomètres')}</span>
       </div>
 
       {/* Des étiquettes d'un mot, l'unité à côté du chiffre : « Allure (/km) »
@@ -111,14 +110,14 @@ export default function RunSummary({
       <div className="stats stats--four summary__stats">
         <div>
           <b>{duration(seconds)}</b>
-          <span>Temps</span>
+          <span>{t('Temps')}</span>
         </div>
         <div>
           <b>
-            {bike ? speed.toFixed(1).replace('.', ',') : pace(perKm)}
+            {bike ? speed.toFixed(1).replace('.', dec()) : pace(perKm)}
             <small>{bike ? speedLabel() : paceLabel()}</small>
           </b>
-          <span>{bike ? 'Vitesse' : 'Allure'}</span>
+          <span>{bike ? t('Vitesse') : t('Allure')}</span>
         </div>
         <div>
           <b>
@@ -128,8 +127,8 @@ export default function RunSummary({
           <span>D+</span>
         </div>
         <div>
-          <b>{kcal > 0 ? kcal.toLocaleString('fr-FR') : '—'}</b>
-          <span title="Estimées d'après ton poids">kcal</span>
+          <b>{kcal > 0 ? kcal.toLocaleString(locale()) : '—'}</b>
+          <span title={t('Estimées d\'après ton poids')}>kcal</span>
         </div>
       </div>
 
@@ -138,15 +137,11 @@ export default function RunSummary({
         <div className="summary__records">
           {best.list.includes('longest') && (
             <span>
-              <Icon name="routes" size={15} />
-              Ta plus longue sortie {bike ? 'à vélo' : 'à pied'}
-            </span>
+              <Icon name="routes" size={15} />{t('Ta plus longue sortie {v1}', { v1: bike ? t('à vélo') : t('à pied') })}</span>
           )}
           {best.list.includes('fastest') && (
             <span>
-              <Icon name="flag" size={15} />
-              {bike ? 'Ta vitesse la plus haute' : 'Ton allure la plus rapide'}, sur 3 km ou plus
-            </span>
+              <Icon name="flag" size={15} />{t('{v1}, sur 3 km ou plus', { v1: bike ? t('Ta vitesse la plus haute') : t('Ton allure la plus rapide') })}</span>
           )}
           {bests.map((b) => (
             <span key={b.km}>
@@ -171,40 +166,40 @@ export default function RunSummary({
 
       <p className="muted small">
         {best.monthCount > 1
-          ? `${best.monthCount}ᵉ sortie du mois · ${km(best.monthM, 1)} ${unitLabel()} depuis le 1er.`
-          : 'Première sortie du mois.'}
+          ? t('{monthCount}ᵉ sortie du mois · {v2} {v3} depuis le 1er.', { monthCount: best.monthCount, v2: km(best.monthM, 1), v3: unitLabel() })
+          : t('Première sortie du mois.')}
       </p>
 
       {/* Les gestes secondaires, avec leur nom : cinq ronds sans libellé à
           côté de « Terminer » se devinaient mal, et le partage s'y perdait. */}
-      <div className="loopacts summary__more" role="group" aria-label="Cette sortie">
+      <div className="loopacts summary__more" role="group" aria-label={t('Cette sortie')}>
         {entry.track?.length > 1 && (
-          <button className="loopact" onClick={() => downloadRun(entry)} aria-label="Exporter la trace en GPX">
+          <button className="loopact" onClick={() => downloadRun(entry)} aria-label={t('Exporter la trace en GPX')}>
             <Icon name="fileExport" size={18} />
             <span>GPX</span>
           </button>
         )}
-        <button className="loopact" onClick={() => shareRunReport(entry)} aria-label="Envoyer le rapport de la sortie">
+        <button className="loopact" onClick={() => shareRunReport(entry)} aria-label={t('Envoyer le rapport de la sortie')}>
           <Icon name="chart" size={18} />
-          <span>Rapport</span>
+          <span>{t('Rapport')}</span>
         </button>
         {onKeep && (
           <button
             className={`loopact ${kept ? 'loopact--on' : ''}`}
             onClick={onKeep}
             aria-pressed={kept}
-            aria-label={kept ? 'Retirer le parcours des favoris' : 'Garder ce parcours en favori'}
+            aria-label={kept ? t('Retirer le parcours des favoris') : t('Garder ce parcours en favori')}
           >
             {kept ? <SolidIcon name="heart" size={18} /> : <Icon name="heart" size={18} />}
-            <span>Favori</span>
+            <span>{t('Favori')}</span>
           </button>
         )}
         {/* La même boucle à l'envers est une autre sortie — les côtes en
             descente, le vent dans le dos : c'est en arrivant qu'on se le dit. */}
         {onReverse && (
-          <button className="loopact" onClick={onReverse} aria-label="Préparer ce parcours dans l'autre sens">
+          <button className="loopact" onClick={onReverse} aria-label={t('Préparer ce parcours dans l\'autre sens')}>
             <Icon name="uturn" size={18} />
-            <span>Autre sens</span>
+            <span>{t('Autre sens')}</span>
           </button>
         )}
       </div>
@@ -212,60 +207,44 @@ export default function RunSummary({
       {/* Comment les chiffres sont mesurés, pour qui se le demande : dit en
           clair mais replié, pour que les gestes de la fin restent à l'écran. */}
       <details className="spoken">
-        <summary>Comment c'est mesuré</summary>
+        <summary>{t('Comment c\'est mesuré')}</summary>
         {entry.paused_s > 0 && (
-          <p className="muted small">
-            Chrono arrêté {duration(entry.paused_s)} — feux, pauses : le temps ci-dessus est celui en mouvement.
-          </p>
+          <p className="muted small">{t('Chrono arrêté {v1} — feux, pauses : le temps ci-dessus est celui en mouvement.', { v1: duration(entry.paused_s) })}</p>
         )}
-        {entry.rerouted && <p className="muted small">Un nouveau chemin a été calculé en route.</p>}
+        {entry.rerouted && <p className="muted small">{t('Un nouveau chemin a été calculé en route.')}</p>}
         {entry.actual_ascent_m == null ? (
-          <p className="muted small">
-            Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n'ont donné
-            l'altitude pendant cette sortie.
-          </p>
+          <p className="muted small">{t('Pas de dénivelé mesuré : ni le baromètre ni le GPS du téléphone n\'ont donné l\'altitude pendant cette sortie.')}</p>
         ) : (
           <AscentNote entry={entry} />
         )}
-        <p className="muted small">
-          Tout est dans « Mes parcours ». La trace reste sur l'appareil : la
-          sauvegarde de « Mon compte » l'emporte avec le reste.
-        </p>
+        <p className="muted small">{t('Tout est dans « Mes parcours ». La trace reste sur l\'appareil : la sauvegarde de « Mon compte » l\'emporte avec le reste.')}</p>
       </details>
 
       {/* Le départ a été annoncé : le retour se dit d'un geste, ici, où l'on
           arrive. Pas tout seul — « Terminer » peut venir d'ailleurs que de
           la porte, et un « tout va bien » parti trop tôt rassurerait à tort. */}
       {announcing() && (
-        <button className="btn" onClick={() => textTo(contactOf(), arrivalText(entry), 'Lacet — de retour')}>
-          <Icon name="check" size={16} />
-          Prévenir que je suis de retour
-        </button>
+        <button className="btn" onClick={() => textTo(contactOf(), arrivalText(entry), t('Lacet — de retour'))}>
+          <Icon name="check" size={16} />{t('Prévenir que je suis de retour')}</button>
       )}
 
       <div className="summary__actions">
-        <button className="btn summary__share" onClick={() => setSharing(true)} aria-label="Partager la sortie en image">
-          <Icon name="share" size={17} />
-          Partager
-        </button>
-        <button className="btn btn--primary" onClick={onClose}>
-          Terminer
-        </button>
+        <button className="btn summary__share" onClick={() => setSharing(true)} aria-label={t('Partager la sortie en image')}>
+          <Icon name="share" size={17} />{t('Partager')}</button>
+        <button className="btn btn--primary" onClick={onClose}>{t('Terminer')}</button>
       </div>
 
       {/* L'arrivée s'est déclenchée d'elle-même : si c'était trop tôt, on repart
           sans rien perdre. */}
       {entry.arrived && onContinue && (
-        <button className="linkish" onClick={onContinue}>
-          Pas fini ? Reprendre la sortie
-        </button>
+        <button className="linkish" onClick={onContinue}>{t('Pas fini ? Reprendre la sortie')}</button>
       )}
     </div>
   )
 }
 
 const bestLabel = ({ km: n, seconds }) =>
-  n === 1 ? `Ton kilomètre le plus rapide : ${pace(seconds)}` : `Ton meilleur ${n} km : ${duration(seconds)}`
+  n === 1 ? t('Ton kilomètre le plus rapide : {v1}', { v1: pace(seconds) }) : t('Ton meilleur {n} km : {v2}', { n, v2: duration(seconds) })
 
 // L'écart au plan qui se dit comme une réussite : au-delà, c'est un détour ou
 // un raccourci, et `PlanGap` le montre sans le fêter.
@@ -277,15 +256,15 @@ const ON_PLAN_M = 150
  * record, la plus longue, puis la distance tenue.
  */
 export function verdictOf({ rang, bests, best, gap }) {
-  if (rang?.record) return `Ton meilleur passage ici, sur ${rang.count}`
+  if (rang?.record) return t('Ton meilleur passage ici, sur {count}', { count: rang.count })
   if (rang) {
     const s = Math.abs(rang.vsPrevious)
-    if (s < 2) return 'La même allure que la dernière fois ici'
-    return `${s} s/km ${rang.vsPrevious < 0 ? 'plus vite' : 'plus lent'} que la dernière fois ici`
+    if (s < 2) return t('La même allure que la dernière fois ici')
+    return t('{s} s/km {v2} que la dernière fois ici', { s, v2: rang.vsPrevious < 0 ? t('plus vite') : t('plus lent') })
   }
   if (bests.length) return bestLabel(bests[bests.length - 1])
-  if (best.list.includes('longest')) return 'Ta plus longue sortie'
-  if (gap !== null && Math.abs(gap) <= ON_PLAN_M) return `À ${Math.abs(Math.round(gap))} m de la distance prévue`
+  if (best.list.includes('longest')) return t('Ta plus longue sortie')
+  if (gap !== null && Math.abs(gap) <= ON_PLAN_M) return t('À {v1} m de la distance prévue', { v1: Math.abs(Math.round(gap)) })
   return null
 }
 

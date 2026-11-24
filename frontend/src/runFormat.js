@@ -3,6 +3,7 @@
 
 import { MILE_M, perUnit, speedIn, unitM, units } from './units'
 
+import { t, locale, dec, lang } from './i18n'
 /** L'allure demandée au moteur, en secondes par kilomètre. */
 export function plannedPerKm(request, bike) {
   if (!request) return 0
@@ -20,16 +21,16 @@ export function minutes(total) {
 
 /** L'heure qu'il sera, dans l'écriture du téléphone. */
 export const clockTime = (at) =>
-  new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  new Date(at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
 
 /** « 120 m », « 1,4 km » : la distance du prochain virage, arrondie pour l'œil. */
 export function roundedDistance(metres) {
   // En miles, les courtes distances se disent en pieds, comme sur une route anglaise.
   if (units() === 'mi') {
-    if (metres >= MILE_M / 10) return `${(metres / MILE_M).toFixed(1).replace('.', ',')} mi`
+    if (metres >= MILE_M / 10) return `${(metres / MILE_M).toFixed(1).replace('.', dec())} mi`
     return `${Math.round(metres / 0.3048 / 50) * 50} ft`
   }
-  if (metres >= 1000) return `${(metres / 1000).toFixed(1).replace('.', ',')} km`
+  if (metres >= 1000) return `${(metres / 1000).toFixed(1).replace('.', dec())} km`
   return `${Math.round(metres / 10) * 10} m`
 }
 
@@ -56,7 +57,7 @@ export function clock(seconds) {
 /** « 11,4 » km/h. */
 export function speed(metres, seconds) {
   if (metres < 50 || seconds <= 0) return '—'
-  return speedIn((metres / seconds) * 3.6).toFixed(1).replace('.', ',')
+  return speedIn((metres / seconds) * 3.6).toFixed(1).replace('.', dec())
 }
 
 /** « 5 minutes 30 » — la synthèse vocale lit « 5:30 » comme une heure. */
@@ -67,8 +68,8 @@ export function spoken(secondsPerKm) {
   const total = Math.round(secondsPerKm)
   const m = Math.floor(total / 60)
   const s = total % 60
-  if (!m) return `${s} secondes`
-  const whole = m > 1 ? `${m} minutes` : '1 minute'
+  if (!m) return t('{s} secondes', { s })
+  const whole = m > 1 ? t('{m} minutes', { m }) : t('1 minute')
   return s ? `${whole} ${s}` : whole
 }
 
@@ -94,6 +95,9 @@ function cardinal(n) {
   return `${word}-${cardinal(unit)}`
 }
 
+/** « 1st », « 22nd », « 13th » : la synthèse anglaise lit très bien les chiffres. */
+const englishOrdinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]}`
+
 /**
  * « premier », « troisième », « vingt et unième » — un rang dit en toutes
  * lettres.
@@ -102,6 +106,7 @@ function cardinal(n) {
  * mots, eux, se prononcent toujours.
  */
 export function ordinal(n) {
+  if (lang() === 'en') return englishOrdinal(n)
   if (!Number.isInteger(n) || n < 1 || n > 999) return `${n}e`
   if (n === 1) return 'premier'
   // « quatre-vingts » et « deux cents » perdent leur s : « quatre-vingtième ».
@@ -117,8 +122,8 @@ export function spokenDuration(seconds) {
   const total = Math.round((seconds || 0) / 60)
   const h = Math.floor(total / 60)
   const m = total % 60
-  if (!h) return total > 1 ? `${total} minutes` : '1 minute'
-  const hours = h > 1 ? `${h} heures` : '1 heure'
+  if (!h) return total > 1 ? t('{total} minutes', { total }) : t('1 minute')
+  const hours = h > 1 ? t('{h} heures', { h }) : t('1 heure')
   return m ? `${hours} ${m}` : hours
 }
 
@@ -127,13 +132,13 @@ export function spokenDuration(seconds) {
  * kilomètres en 58 minutes, allure moyenne 5 minutes 41. »
  */
 export function arrivalSpeech(metres, seconds, bike = false) {
-  const head = 'Arrivée. Sortie terminée'
+  const head = t('Arrivée. Sortie terminée')
   if (!(metres > 100) || !(seconds > 0)) return `${head}.`
-  const distance = `${(metres / unitM()).toFixed(1).replace('.', ',')} ${units() === 'mi' ? 'miles' : 'kilomètres'}`
+  const distance = `${(metres / unitM()).toFixed(1).replace('.', dec())} ${units() === 'mi' ? 'miles' : t('kilomètres')}`
   const average = bike
     ? `moyenne ${spokenSpeed(metres / 1000 / (seconds / 3600))}`
     : `allure moyenne ${spoken(seconds / (metres / 1000))}`
-  return `${head} : ${distance} en ${spokenDuration(seconds)}, ${average}.`
+  return t('{head} : {distance} en {v3}, {average}.', { head, distance, v3: spokenDuration(seconds), average })
 }
 
 /**
@@ -146,13 +151,13 @@ export function targetSpeech(secondsPerKm, planned) {
   if (!(planned > 0) || !(secondsPerKm > 0)) return ''
   const diff = Math.round(secondsPerKm - planned)
   if (Math.abs(diff) < 10) return ''
-  return diff > 0 ? `Trop lent de ${diff} secondes.` : `En avance de ${-diff} secondes.`
+  return diff > 0 ? t('Trop lent de {diff} secondes.', { diff }) : t('En avance de {v1} secondes.', { v1: -diff })
 }
 
 /** « 24,5 kilomètres-heure ». */
 export function spokenSpeed(kmh) {
   if (!Number.isFinite(kmh) || kmh <= 0) return 'inconnue'
-  return `${String(Math.round(speedIn(kmh) * 10) / 10).replace('.', ',')} ${units() === 'mi' ? 'miles à l’heure' : 'kilomètres-heure'}`
+  return `${String(Math.round(speedIn(kmh) * 10) / 10).replace('.', dec())} ${units() === 'mi' ? t('miles à l’heure') : t('kilomètres-heure')}`
 }
 
 export const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1)

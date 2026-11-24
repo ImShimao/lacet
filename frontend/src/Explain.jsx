@@ -4,6 +4,7 @@ import Icon from './Icon.jsx'
 import useModal from './useModal'
 import { explain } from './explain'
 
+import { t } from './i18n'
 /**
  * Le petit « i » à côté d'un réglage, et la fiche qu'il ouvre.
  *
@@ -22,7 +23,7 @@ export function InfoButton({ topic, sport }) {
         type="button"
         className="info-btn"
         onClick={() => setOpen(true)}
-        aria-label={`Explications : ${content.title}`}
+        aria-label={t('Explications : {title}', { title: t(content.title) })}
         aria-haspopup="dialog"
       >
         <Icon name="info" size={17} />
@@ -64,22 +65,20 @@ function InfoSheet({ content, onClose }) {
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id={titleId}>{content.title}</h3>
-        {content.intro && <p className="infosheet__intro">{content.intro}</p>}
+        <h3 id={titleId}>{t(content.title)}</h3>
+        {content.intro && <p className="infosheet__intro">{t(content.intro)}</p>}
         <ul className="infosheet__list">
           {content.items.map((item) => (
             <li key={item.label}>
               <span className="infosheet__key">
                 <Icon name={item.icon} size={26} />
-                <b>{item.label}</b>
+                <b>{t(item.label)}</b>
               </span>
-              <p>{item.text}</p>
+              <p>{t(item.text)}</p>
             </li>
           ))}
         </ul>
-        <button className="btn btn--primary" onClick={onClose}>
-          J'ai compris
-        </button>
+        <button className="btn btn--primary" onClick={onClose}>{t('J\'ai compris')}</button>
       </div>
     </div>,
     document.getElementById('root') ?? document.body,

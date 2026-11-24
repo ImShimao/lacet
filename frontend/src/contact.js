@@ -15,6 +15,7 @@ import { clockTime, minutes } from './runFormat'
 import { load } from './storage'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 export const contactOf = () => load().emergencyContact || null
 
 /** Le départ et le retour s'annoncent : réglé dans « Mon compte → Sécurité », et un numéro gardé. */
@@ -51,7 +52,7 @@ export async function shareText(text, title) {
   } catch (error) {
     // Refermer la feuille de partage n'est pas une panne : iOS le signale comme
     // une erreur, et le message à copier surgissait alors pour rien.
-    if (!/cancel/i.test(error?.message || '')) window.prompt('Copie ce message et envoie-le :', text)
+    if (!/cancel/i.test(error?.message || '')) window.prompt(t('Copie ce message et envoie-le :'), text)
   }
 }
 
@@ -62,10 +63,10 @@ export async function shareText(text, title) {
 export function departureText({ route = null, sport = 'run', from = null, now = Date.now() }) {
   const verb = sport === 'bike' ? 'rouler' : 'courir'
   const point = route?.geometry?.[0] ?? from
-  const where = point ? ` depuis ici : ${mapLink(point)}` : ''
-  if (!route) return `Je pars ${verb}${where}. Je te dis quand je suis de retour.`
-  const back = route.duration_s ? ` Retour prévu vers ${clockTime(now + route.duration_s * 1000)}.` : ''
-  return `Je pars ${verb} ${km(route.distance_m, 1)} ${unitLabel()}${where}.${back}`
+  const where = point ? t(' depuis ici : {v1}', { v1: mapLink(point) }) : ''
+  if (!route) return t('Je pars {verb}{where}. Je te dis quand je suis de retour.', { verb, where })
+  const back = route.duration_s ? t(' Retour prévu vers {v1}.', { v1: clockTime(now + route.duration_s * 1000) }) : ''
+  return t('Je pars {verb} {v2} {v3}{where}.{back}', { verb, v2: km(route.distance_m, 1), v3: unitLabel(), where, back })
 }
 
 /**
@@ -75,7 +76,7 @@ export function departureText({ route = null, sport = 'run', from = null, now = 
  * regarder si Lacet est encore devant.
  */
 export async function announceDeparture(details, settleMs = 700) {
-  await textTo(contactOf(), departureText(details), 'Lacet — je pars')
+  await textTo(contactOf(), departureText(details), t('Lacet — je pars'))
   await new Promise((resolve) => setTimeout(resolve, settleMs))
   if (document.visibilityState === 'visible') return
   await new Promise((resolve) => {
@@ -90,6 +91,6 @@ export async function announceDeparture(details, settleMs = 700) {
 
 /** « De retour de ma sortie : 10,2 km en 58 min. » */
 export function arrivalText(entry) {
-  const done = entry.actual_distance_m > 0 ? ` : ${km(entry.actual_distance_m, 1)} ${unitLabel()} en ${minutes(Math.round((entry.actual_duration_s || 0) / 60))}` : ''
-  return `De retour de ma sortie${done}. Tout va bien.`
+  const done = entry.actual_distance_m > 0 ? t(' : {v1} {v2} en {v3}', { v1: km(entry.actual_distance_m, 1), v2: unitLabel(), v3: minutes(Math.round((entry.actual_duration_s || 0) / 60)) }) : ''
+  return t('De retour de ma sortie{done}. Tout va bien.', { done })
 }

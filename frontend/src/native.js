@@ -24,6 +24,7 @@ import { KeepAwake } from '@capacitor-community/keep-awake'
 import { Share } from '@capacitor/share'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { StatusBar, Style } from '@capacitor/status-bar'
+import { t } from './i18n'
 
 // Ce module-là ne s'importe pas : il se déclare, sous le nom qu'il porte côté natif.
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation')
@@ -80,7 +81,7 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
       stale: false,
       distanceFilter: 0,
       ...(background
-        ? { backgroundTitle: 'Lacet', backgroundMessage: 'Suivi de ta sortie en cours.' }
+        ? { backgroundTitle: 'Lacet', backgroundMessage: t('Suivi de ta sortie en cours.') }
         : {}),
     },
     (location, error) => {
@@ -90,8 +91,8 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
           denied: error.code === 'NOT_AUTHORIZED',
           message:
             error.code === 'NOT_AUTHORIZED'
-              ? "L'accès à ta position est refusé. Autorise-le dans Réglages → Lacet → Position."
-              : 'Position indisponible pour le moment.',
+              ? t("L'accès à ta position est refusé. Autorise-le dans Réglages → Lacet → Position.")
+              : t('Position indisponible pour le moment.'),
         })
         return
       }
@@ -117,7 +118,7 @@ export function watchPosition(onFix, onError, { background = false } = {}) {
     // démarrera jamais. Sans ce retour, l'écran de course restait sur
     // « Acquisition du signal GPS… » pour toujours, sans une explication.
     () => {
-      if (!stopped) onError?.({ denied: false, message: 'Le suivi de position ne démarre pas. Ferme et rouvre l’app.' })
+      if (!stopped) onError?.({ denied: false, message: t('Le suivi de position ne démarre pas. Ferme et rouvre l’app.') })
     },
   )
 
@@ -166,12 +167,12 @@ export function watchCompass(onHeading) {
  * de la phrase et remonte dès que la voix s'est tue : c'est le module natif qui
  * s'en charge (`VoicePlugin.swift`), sur ce que la voix fait vraiment.
  */
-export const speakNative = (text, { priority = true, voice = null, rate = 1 } = {}) =>
-  Voice.speak({ text, flush: priority, ...(voice ? { voice } : {}), rate }).catch(() => {})
+export const speakNative = (text, { priority = true, voice = null, rate = 1, lang = 'fr-FR' } = {}) =>
+  Voice.speak({ text, flush: priority, ...(voice ? { voice } : {}), rate, lang }).catch(() => {})
 
-/** Les voix françaises de l'iPhone : `[{ id, name, enhanced }]`, vide si le module manque. */
-export const voicesNative = () =>
-  Voice.voices()
+/** Les voix de l'iPhone dans la langue (`fr` ou `en`) : `[{ id, name, enhanced }]`, vide si le module manque. */
+export const voicesNative = (lang = 'fr') =>
+  Voice.voices({ lang })
     .then((r) => r?.voices ?? [])
     .catch(() => [])
 

@@ -16,10 +16,12 @@ import ErrorBoundary from './ErrorBoundary.jsx'
 import { isNative } from './platform'
 import { mirrorTo, restoreFrom } from './storage'
 import { getAppearance, onAppearance, startAppearance } from './appearance'
+import { startLang } from './i18n'
 
 // Le thème, l'accent et la taille du texte, posés avant tout rendu : l'app
 // s'ouvre dans ses couleurs, sans passer d'abord par celles d'origine.
 startAppearance()
+startLang()
 
 async function start() {
   const native = isNative() ? await import('./native').catch(() => null) : null
@@ -28,7 +30,10 @@ async function start() {
     // trouver ce que la copie a gardé si iOS a vidé le stockage — voir
     // `storage.js`. Le fichier n'est lu que dans ce cas-là — et l'apparence se
     // relit quand il l'a été.
-    if (await restoreFrom(native.readStoreCopy)) startAppearance()
+    if (await restoreFrom(native.readStoreCopy)) {
+      startAppearance()
+      startLang()
+    }
     mirrorTo(native.writeStoreCopy)
     // La barre d'état d'iOS suit le thème : texte clair sur le sombre, et l'inverse.
     native.setStatusBarTheme(getAppearance().resolved)

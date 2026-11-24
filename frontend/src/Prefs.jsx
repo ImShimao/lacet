@@ -11,14 +11,15 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
+import { tx } from './i18n'
 
 /** Une carte de réglages, sous son titre de famille. */
 export function PrefsCard({ title, children, foot = null }) {
   return (
-    <section className="prefs" aria-label={title}>
-      {title && <h3 className="acct__label">{title}</h3>}
+    <section className="prefs" aria-label={tx(title)}>
+      {title && <h3 className="acct__label">{tx(title)}</h3>}
       <div className="prefs__card">{children}</div>
-      {foot && <p className="prefs__foot">{foot}</p>}
+      {foot && <p className="prefs__foot">{tx(foot)}</p>}
     </section>
   )
 }
@@ -29,8 +30,8 @@ function Head({ icon, label, sub }) {
     <>
       {icon && <Icon name={icon} size={19} className="prow__icon" />}
       <span className="prow__text">
-        <b>{label}</b>
-        {sub && <em>{sub}</em>}
+        <b>{tx(label)}</b>
+        {sub && <em>{tx(sub)}</em>}
       </span>
     </>
   )
@@ -58,13 +59,13 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
     <div className={`prow prow--pick ${open ? 'prow--open' : ''}`} ref={row}>
       <button className="prow__btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <Head icon={icon} label={label} sub={sub} />
-        <span className="prow__value">{shown ?? current?.label ?? ''}</span>
+        <span className="prow__value">{tx(shown ?? current?.label ?? '')}</span>
         <Icon name="updown" size={15} className="prow__updown" />
       </button>
       {open && (
         <>
           <div className="pop__scrim" onClick={() => setOpen(false)} />
-          <div className={`pop ${up ? 'pop--up' : ''}`} role="listbox" aria-label={label}>
+          <div className={`pop ${up ? 'pop--up' : ''}`} role="listbox" aria-label={tx(label)}>
             {options.map((o) => (
               <button
                 key={String(o.key)}
@@ -77,7 +78,7 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
                 }}
               >
                 <Icon name="check" size={16} className="pop__check" />
-                <span>{o.label}</span>
+                <span>{tx(o.label)}</span>
               </button>
             ))}
           </div>
@@ -113,7 +114,7 @@ export function LinkRow({ icon, label, sub, value, onClick }) {
     <div className="prow">
       <button className="prow__btn" onClick={onClick}>
         <Head icon={icon} label={label} sub={sub} />
-        {value && <span className="prow__value">{value}</span>}
+        {value && <span className="prow__value">{tx(value)}</span>}
         <Icon name="chevronRight" size={16} className="prow__updown" />
       </button>
     </div>

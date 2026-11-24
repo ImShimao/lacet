@@ -10,6 +10,7 @@ import { REPORT_KINDS } from './reports'
 import { clock, clockTime, minutes, speed } from './runFormat'
 import { paceLabel, speedLabel, unitLabel } from './units'
 
+import { t } from './i18n'
 /**
  * Temps restant, pause, chrono, distance, allure, tour.
  *
@@ -26,9 +27,7 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
           « je rentre à quelle heure ». Les deux se déduisent de l'allure du
           moment — celle qu'on tient vraiment, pas celle qu'on avait prévue. */}
       {left !== null && (
-        <p className="live__eta">
-          Reste environ <b>{minutes(Math.round(left / 60))}</b> · fin vers{' '}
-          <b>{clockTime(Date.now() + left * 1000)}</b>
+        <p className="live__eta">{t('Reste environ')}{' '}<b>{minutes(Math.round(left / 60))}</b>{' '}{t('· fin vers')}{' '}<b>{clockTime(Date.now() + left * 1000)}</b>
         </p>
       )}
 
@@ -36,23 +35,23 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
         <div className="live__paused" role="status">
           <Icon name="pause" size={17} />
           <div>
-            <b>{paused === 'auto' ? 'Pause automatique' : 'En pause'}</b>
+            <b>{paused === 'auto' ? t('Pause automatique') : t('En pause')}</b>
             <span>
               {homeNote ??
                 (paused === 'auto'
-                  ? 'Le chrono reprend tout seul dès que tu repars.'
-                  : 'Reprends quand tu veux, ou termine la sortie.')}
+                  ? t('Le chrono reprend tout seul dès que tu repars.')
+                  : t('Reprends quand tu veux, ou termine la sortie.'))}
             </span>
           </div>
           {onHome && (
             <button className="live__home" onClick={onHome} disabled={homeBusy}>
-              {homeBusy ? 'Calcul…' : 'Rentrer au départ'}
+              {homeBusy ? t('Calcul…') : t('Rentrer au départ')}
             </button>
           )}
         </div>
       )}
 
-      <div className={`live__clock ${paused ? 'live__clock--paused' : ''}`} role="timer" aria-label="Temps de course">
+      <div className={`live__clock ${paused ? 'live__clock--paused' : ''}`} role="timer" aria-label={t('Temps de course')}>
         {clock(state.elapsed)}
       </div>
 
@@ -65,21 +64,21 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
             {km(state.distance)}
             <small>{unitLabel()}</small>
           </b>
-          <span>Distance</span>
+          <span>{t('Distance')}</span>
         </div>
         <div>
           <b>
             {bike ? speed(state.distance, state.elapsed) : pace(moving)}
             <small>{bike ? speedLabel() : paceLabel()}</small>
           </b>
-          <span>{bike ? 'Vitesse' : 'Allure'}</span>
+          <span>{bike ? t('Vitesse') : t('Allure')}</span>
         </div>
         <div>
           <b>
             {remaining === null ? (bike ? pace(moving) : speed(state.distance, state.elapsed)) : km(remaining, 1)}
             <small>{remaining === null ? (bike ? paceLabel() : speedLabel()) : unitLabel()}</small>
           </b>
-          <span>{remaining === null ? (bike ? 'Allure' : 'Vitesse') : 'Restant'}</span>
+          <span>{remaining === null ? (bike ? t('Allure') : t('Vitesse')) : t('Restant')}</span>
         </div>
       </div>
 
@@ -87,8 +86,7 @@ export function RunStats({ bike, state, moving, left, remaining, paused, laps, l
           « combien de kilomètres » mais « quel tour ». Les trois tours sont
           identiques : sans compteur, rien ne les distingue. */}
       {laps > 1 && (
-        <div className="lapcount" role="status">
-          Tour <b>{lap}</b> sur <b>{laps}</b>
+        <div className="lapcount" role="status">{t('Tour')}{' '}<b>{lap}</b>{' '}{t('sur')}{' '}<b>{laps}</b>
         </div>
       )}
     </>
@@ -107,13 +105,11 @@ export function ReportButton({ disabled, onReport }) {
   if (!open) {
     return (
       <button className="signal" onClick={() => setOpen(true)} disabled={disabled}>
-        <Icon name="cone" size={17} />
-        Signaler un problème ici
-      </button>
+        <Icon name="cone" size={17} />{t('Signaler un problème ici')}</button>
     )
   }
   return (
-    <div className="signal signal--open" role="group" aria-label="Signaler un problème">
+    <div className="signal signal--open" role="group" aria-label={t('Signaler un problème')}>
       {REPORT_KINDS.map((k) => (
         <button
           key={k.key}
@@ -124,10 +120,10 @@ export function ReportButton({ disabled, onReport }) {
           }}
         >
           <Icon name={k.icon} size={19} />
-          {k.label}
+          {t(k.label)}
         </button>
       ))}
-      <button className="signal__cancel" onClick={() => setOpen(false)} aria-label="Annuler">
+      <button className="signal__cancel" onClick={() => setOpen(false)} aria-label={t('Annuler')}>
         <Icon name="close" size={16} />
       </button>
     </div>
@@ -145,18 +141,18 @@ export function RunControls({ paused, onFinish, onProfile, onTogglePause, here, 
       {paused ? (
         <button className="runctl__side runctl__stop" onClick={onFinish}>
           <Icon name="stop" size={18} />
-          <span>Terminer</span>
+          <span>{t('Terminer')}</span>
         </button>
       ) : (
-        <button className="runctl__side" onClick={onProfile} disabled={!onProfile} aria-label="Voir le dénivelé prévu">
+        <button className="runctl__side" onClick={onProfile} disabled={!onProfile} aria-label={t('Voir le dénivelé prévu')}>
           <Icon name="mountain" size={19} />
-          <span>Dénivelé</span>
+          <span>{t('Dénivelé')}</span>
         </button>
       )}
       <button
         className={`runctl__main ${paused ? 'runctl__main--paused' : ''}`}
         onClick={onTogglePause}
-        aria-label={paused ? 'Reprendre' : 'Mettre en pause'}
+        aria-label={paused ? t('Reprendre') : t('Mettre en pause')}
         aria-pressed={Boolean(paused)}
       >
         <Icon name={paused ? 'play' : 'pause'} size={30} strokeWidth={2.4} />

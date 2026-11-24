@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { isNative } from './platform'
 
+import { t } from './i18n'
 /**
  * Trois, deux, un — le temps de ranger le téléphone.
  *
@@ -62,7 +63,7 @@ export default function Countdown({ onDone, onCancel, note = null }) {
           <circle className="countdown__track" cx="60" cy="60" r="54" />
           <circle className="countdown__arc" cx="60" cy="60" r="54" pathLength="1" />
         </svg>
-        <span className={`countdown__n ${go ? 'countdown__n--go' : ''}`}>{go ? 'Partez !' : n}</span>
+        <span className={`countdown__n ${go ? 'countdown__n--go' : ''}`}>{go ? t('Partez !') : n}</span>
       </div>
       {/* Trois points : où l'on en est, sans avoir à lire. */}
       <div className="countdown__steps" aria-hidden="true">
@@ -71,9 +72,7 @@ export default function Countdown({ onDone, onCancel, note = null }) {
         ))}
       </div>
       {note && <p className="countdown__note">{note}</p>}
-      <button className="btn countdown__cancel" onClick={onCancel}>
-        Annuler
-      </button>
+      <button className="btn countdown__cancel" onClick={onCancel}>{t('Annuler')}</button>
     </div>
   )
 }

@@ -25,8 +25,9 @@
 // L'annonce dit maintenant « arrivée dans 100 mètres », et le constat vient
 // au bon moment — pour l'arrivée, c'est `arrival.js` qui le dit.
 
-import { on } from './engine/navigation'
 
+import { t, dec, lang } from './i18n'
+import { stepText, onRoad } from './stepText'
 // Allure par défaut, en mètres par seconde, tant qu'aucune vitesse n'est
 // mesurée : six minutes au kilomètre à pied, vingt kilomètres-heure à vélo.
 export const DEFAULT_SPEED = { run: 2.8, bike: 5.5 }
@@ -102,7 +103,7 @@ export const rightAfter = (following, speed) => chains(following, speed) && foll
  * @param speed      la vitesse du moment, en m/s
  */
 export function announcement(step, remaining, { stage = 'act', following = null, speed = DEFAULT_SPEED.run } = {}) {
-  const warning = step.caution ? ' Attention, traversée sans passage protégé.' : ''
+  const warning = step.caution ? t(' Attention, traversée sans passage protégé.') : ''
   // À l'annonce, on ne dit la suivante que si elle est collée à celle-ci : le
   // reste le sera au carrefour. Au carrefour — et au départ, dit d'emblée —,
   // tout ce qui viendra avant la prochaine annonce. L'arrivée qui suit, elle, se
@@ -115,40 +116,40 @@ export function announcement(step, remaining, { stage = 'act', following = null,
   const calm = now && !joined ? quietStretch(following) : null
   // La ligne droite qui suit se dit dans la phrase de la manœuvre ; l'arrivée,
   // elle, garde sa phrase à elle.
-  const after = joined ? thenClause(following) : calm && !calm.finish ? `, puis continue pendant ${calm.distance}` : ''
-  const tail = calm?.finish ? ` Arrivée dans ${calm.distance}.` : ''
+  const after = joined ? thenClause(following) : calm && !calm.finish ? t(', puis continue pendant {distance}', { distance: calm.distance }) : ''
+  const tail = calm?.finish ? t(' Arrivée dans {distance}.', { distance: calm.distance }) : ''
 
-  if (step.turn === 'start') return `${trimDot(step.text)}${after}.${tail}`
+  if (step.turn === 'start') return `${trimDot(stepText(step.text))}${after}.${tail}`
   if (step.turn === 'finish') {
     // Le constat — « arrivée, sortie terminée » — est dit par la détection
     // d'arrivée, au point le plus proche : le dire ici le doublerait, et trop tôt.
-    return stage === 'preview' ? `Arrivée dans ${distanceWords(remaining)}.` : null
+    return stage === 'preview' ? t('Arrivée dans {v1}.', { v1: distanceWords(remaining) }) : null
   }
   if (step.turn === 'lap') {
     if (stage !== 'act') return null
     // La manœuvre qui suit de près se dit ici, comme après un virage : on la
     // donnait pour annoncée, sans la dire, et le premier virage du second tour
     // n'avait que son « maintenant ».
-    return calm && !calm.finish ? `${step.text} Continue pendant ${calm.distance}.` : `${trimDot(step.text)}${after}.${tail}`
+    return calm && !calm.finish ? t('{text} Continue pendant {distance}.', { text: stepText(step.text), distance: calm.distance }) : `${trimDot(stepText(step.text))}${after}.${tail}`
   }
 
   if (stage === 'preview') {
-    return `Dans ${distanceWords(remaining)}, ${lower(step.text)}${after}.${warning}`
+    return t('Dans {v1}, {v2}{after}.{warning}', { v1: distanceWords(remaining), v2: lower(stepText(step.text)), after, warning })
   }
   // **« Maintenant », en tête.** Sans ce mot, l'annonce de loin et celle du
   // carrefour étaient la même phrase, et l'on ne savait pas laquelle on venait
   // d'entendre. Placé en fin de phrase, il fallait encore écouter toute la
   // consigne avant de l'apprendre ; en tête, on tourne pendant qu'elle se dit.
-  return `Maintenant, ${lower(step.text)}${after}.${warning}${tail}`
+  return t('Maintenant, {v1}{after}.{warning}{tail}', { v1: lower(stepText(step.text)), after, warning, tail })
 }
 
 /** « , puis tout de suite à gauche dans la rue Pasteur » */
 function thenClause({ step, gap }) {
   if (step.turn === 'finish') {
-    return gap <= RIGHT_AFTER_M ? ', puis tu arrives' : `, puis arrivée dans ${distanceWords(gap)}`
+    return gap <= RIGHT_AFTER_M ? t(', puis tu arrives') : t(', puis arrivée dans {v1}', { v1: distanceWords(gap) })
   }
-  const move = `${SHORT[step.turn] ?? 'continue'}${on(step.road)}`
-  return gap <= RIGHT_AFTER_M ? `, puis tout de suite ${move}` : `, puis dans ${distanceWords(gap)}, ${move}`
+  const move = `${t(SHORT[step.turn] ?? 'continue')}${onRoad(step.road)}`
+  return gap <= RIGHT_AFTER_M ? t(', puis tout de suite {move}', { move }) : t(', puis dans {v1}, {move}', { v1: distanceWords(gap), move })
 }
 
 /** Après un virage, la longueur sans consigne qui suit, si elle vaut d'être dite. */
@@ -164,9 +165,9 @@ function quietStretch(following) {
 export function thenLabel(following, speed) {
   if (!chains(following, speed)) return null
   const { step, gap } = following
-  if (step.turn === 'finish') return gap <= RIGHT_AFTER_M ? 'puis arrivée' : `puis arrivée à ${metres(gap)}`
-  const move = SHORT[step.turn] ?? 'tout droit'
-  const where = gap <= RIGHT_AFTER_M ? 'tout de suite' : `à ${metres(gap)}`
+  if (step.turn === 'finish') return gap <= RIGHT_AFTER_M ? t('puis arrivée') : t('puis arrivée à {v1}', { v1: metres(gap) })
+  const move = t(SHORT[step.turn] ?? 'tout droit')
+  const where = gap <= RIGHT_AFTER_M ? t('tout de suite') : t('à {v1}', { v1: metres(gap) })
   return `puis ${move} ${where}${step.road ? ` · ${step.road}` : ''}`
 }
 
@@ -191,14 +192,14 @@ const SHORT = {
  */
 export function distanceWords(m) {
   const d = Math.max(0, m)
-  if (d < 120) return `${Math.max(10, Math.round(d / 10) * 10)} mètres`
+  if (d < 120) return t('{v1} mètres', { v1: Math.max(10, Math.round(d / 10) * 10) })
   if (d < 1000) {
     const r = Math.round(d / 50) * 50
-    return r >= 1000 ? '1 kilomètre' : `${r} mètres`
+    return r >= 1000 ? t('1 kilomètre') : t('{r} mètres', { r })
   }
   const km = d >= 10_000 ? Math.round(d / 1000) : Math.round(d / 100) / 10
-  const text = String(km).replace('.', ',')
-  return `${text} kilomètre${km >= 2 ? 's' : ''}`
+  const text = String(km).replace('.', dec())
+  return t('{text} kilomètre{v2}', { text, v2: (lang() === 'en' ? km !== 1 : km >= 2) ? 's' : '' })
 }
 
 /** « 60 m », pour l'écran. */

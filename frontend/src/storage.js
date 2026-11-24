@@ -6,6 +6,7 @@
 import { haversineM } from './engine/geo'
 import { traceOf } from './knownRoutes'
 
+import { t } from './i18n'
 const KEY = 'lacet.v1'
 
 const DEFAULTS = { favorites: [], history: [], params: null, recentPlaces: [], reports: [] }
@@ -178,7 +179,7 @@ export function save(patch) {
   // garde en mémoire, le temps de la session, pour que « Mon compte » puisse le
   // dire au lieu de laisser croire que tout va bien.
   refusedAt = Date.now()
-  console.warn('Lacet — stockage local saturé, la dernière modification n’a pas été gardée.')
+  console.warn(t('Lacet — stockage local saturé, la dernière modification n’a pas été gardée.'))
   return load()
 }
 
@@ -417,10 +418,10 @@ export function importAll(text) {
   try {
     parsed = JSON.parse(text)
   } catch {
-    throw new Error("Ce fichier n'est pas une sauvegarde Lacet.")
+    throw new Error(t('Ce fichier n\'est pas une sauvegarde Lacet.'))
   }
   const lu = parsed?.app === 'lacet' ? parsed.data : null
-  if (!lu || typeof lu !== 'object') throw new Error("Ce fichier n'est pas une sauvegarde Lacet.")
+  if (!lu || typeof lu !== 'object') throw new Error(t('Ce fichier n\'est pas une sauvegarde Lacet.'))
   // Ce qui décrit l'appareil d'où vient la sauvegarde, et pas ses données : la
   // liste des cartes hors ligne — dont les fichiers sont restés là-bas, et que
   // l'app aurait annoncées « disponibles » sur un téléphone réinstallé —, une

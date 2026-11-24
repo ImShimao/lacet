@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react'
 
+import { t } from './i18n'
 /**
  * La poignée de la feuille.
  *
@@ -17,7 +18,7 @@ export function SheetGrabber({ open, onSet }) {
     <button
       type="button"
       className="grabber"
-      aria-label={open ? 'Replier le détail' : 'Déplier le détail'}
+      aria-label={open ? t('Replier le détail') : t('Déplier le détail')}
       aria-expanded={open}
       // Le doigt passe par l'en-tête ; ici, seul le clavier — VoiceOver, un
       // clavier Bluetooth (`detail` vaut 0) — sinon le geste compterait deux fois.

@@ -6,6 +6,7 @@ import { formatDistance, formatKm } from './FiltersSheet.jsx'
 import { save } from './storage'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 /**
  * Chercher des boucles, et ce qu'il faut tenir pendant ce temps-là.
  *
@@ -155,7 +156,7 @@ export default function useSearch() {
               meta: {
                 ...relache.meta,
                 relaxed: true,
-                message: `Aucune boucle à ±2,5 % de ${formatDistance(request.distance_km)} ${unitLabel()} depuis ce départ : voici les plus proches, à ±10 %.`,
+                message: t('Aucune boucle à ±2,5 % de {v1} {v2} depuis ce départ : voici les plus proches, à ±10 %.', { v1: formatDistance(request.distance_km), v2: unitLabel() }),
               },
             }
           }

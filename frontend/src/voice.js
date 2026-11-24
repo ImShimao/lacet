@@ -16,6 +16,7 @@
 
 import { load } from './storage'
 
+import { t, locale } from './i18n'
 const nativeModule = () => import('./native')
 
 /**
@@ -70,7 +71,7 @@ export function setEnabled(value) {
 export function speak(text, { priority = true } = {}) {
   if (!enabled || !text) return false
   const { voiceId, rate } = voiceSettings()
-  nativeModule().then((n) => n.speakNative(text, { priority, voice: voiceId, rate: RATE[rate] ?? 1 }))
+  nativeModule().then((n) => n.speakNative(text, { priority, voice: voiceId, rate: RATE[rate] ?? 1, lang: locale() }))
   return true
 }
 
@@ -78,9 +79,9 @@ export function speak(text, { priority = true } = {}) {
  * Fait entendre la voix réglée, hors sortie : le bouton « Écouter » des
  * réglages. Passe outre `enabled`, qui ne vaut que pendant une sortie.
  */
-export function preview(text = 'Dans deux cents mètres, tourne à gauche.') {
+export function preview(text = t('Dans deux cents mètres, tourne à gauche.')) {
   const { voiceId, rate } = voiceSettings()
-  nativeModule().then((n) => n.speakNative(text, { voice: voiceId, rate: RATE[rate] ?? 1 }))
+  nativeModule().then((n) => n.speakNative(text, { voice: voiceId, rate: RATE[rate] ?? 1, lang: locale() }))
 }
 
 export function stop() {

@@ -15,6 +15,7 @@ vi.mock('./native', () => ({ speakNative, stopSpeechNative }))
 
 const { LEAD, RATE, VOICE_DEFAULTS, preview, setEnabled, speak, voiceSettings } = await import('./voice')
 const { save } = await import('./storage')
+const { setLang } = await import('./i18n')
 
 // Le module natif est importé à la demande : laisser passer la promesse.
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -41,7 +42,7 @@ describe('la voix', () => {
     setEnabled(true)
     expect(speak('Dans cent mètres, tourne à droite')).toBe(true)
     await flush()
-    expect(speakNative).toHaveBeenCalledWith('Dans cent mètres, tourne à droite', { priority: true, voice: 'fr-FR.Thomas', rate: RATE.fast })
+    expect(speakNative).toHaveBeenCalledWith('Dans cent mètres, tourne à droite', { priority: true, voice: 'fr-FR.Thomas', rate: RATE.fast, lang: 'fr-FR' })
   })
 
   it('laisse finir une consigne quand l’annonce n’est que du confort', async () => {
@@ -62,7 +63,7 @@ describe('la voix', () => {
     save({ voice: { rate: 'slow' } })
     preview()
     await flush()
-    expect(speakNative).toHaveBeenCalledWith(expect.stringMatching(/tourne à gauche/), { voice: null, rate: RATE.slow })
+    expect(speakNative).toHaveBeenCalledWith(expect.stringMatching(/tourne à gauche/), { voice: null, rate: RATE.slow, lang: 'fr-FR' })
   })
 
   it('retombe sur les réglages d’origine, et sur un débit normal s’il est inconnu', async () => {
@@ -73,5 +74,21 @@ describe('la voix', () => {
     speak('Allure 5:30')
     await flush()
     expect(speakNative.mock.calls[0][1].rate).toBe(1)
+  })
+
+  it('parle la langue de l’app : l’anglais demande une voix anglaise, et dit sa phrase d’essai', async () => {
+    setLang('en')
+    try {
+      setEnabled(true)
+      speak('In 100 meters, turn left.')
+      await flush()
+      preview()
+      await flush()
+      expect(speakNative.mock.calls[0][1].lang).toBe('en-GB')
+      expect(speakNative.mock.calls[1][0]).toBe('In two hundred meters, turn left.')
+      expect(speakNative.mock.calls[1][1].lang).toBe('en-GB')
+    } finally {
+      setLang('fr')
+    }
   })
 })

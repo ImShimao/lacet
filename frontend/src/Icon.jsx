@@ -121,6 +121,12 @@ const PATHS = {
       <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none" />
     </>
   ),
+  language: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5S9.4 5.9 12 3.5z" />
+    </>
+  ),
   sliders: (
     <>
       <path d="M3.5 7.5h9M18.5 7.5h2M3.5 16.5h3M12.5 16.5h8" />

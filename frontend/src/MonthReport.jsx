@@ -6,6 +6,7 @@ import { monthLabel, monthSummary } from './monthSummary'
 import { shareMonthCard } from './shareCard'
 import { unitLabel } from './units'
 
+import { t } from './i18n'
 /**
  * Le bilan d'un mois, ouvert depuis Mes parcours. Il lit `monthSummary`, comme la
  * carte partagée : un seul calcul pour l'écran et l'image.
@@ -25,13 +26,13 @@ export default function MonthReport({ history, month, onClose }) {
       if (/cancel/i.test(error?.message || '')) return
       shareText(
         [
-          `${label} — ${km(summary.distance_m, 1)} ${unitLabel()} en ${summary.count} sortie${summary.count > 1 ? 's' : ''}`,
+          t('{label} — {v2} {v3} en {count} sortie{v5}', { label, v2: km(summary.distance_m, 1), v3: unitLabel(), count: summary.count, v5: summary.count > 1 ? 's' : '' }),
           summary.ascent_m != null ? `D+ ${summary.ascent_m} m` : null,
-          `${active} semaine${active > 1 ? 's' : ''} sur ${total} avec une sortie`,
+          t('{active} semaine{v2} sur {total} avec une sortie', { active, v2: active > 1 ? 's' : '', total }),
         ]
           .filter(Boolean)
-          .join(' · ') + ' — avec Lacet',
-        'Mon bilan du mois',
+          .join(' · ') + t(' — avec Lacet'),
+        t('Mon bilan du mois'),
       )
     }
   }
@@ -40,50 +41,44 @@ export default function MonthReport({ history, month, onClose }) {
     <div className="panel summary">
       <div className="summary__hero">
         <b>{label}</b>
-        <em>Bilan du mois</em>
+        <em>{t('Bilan du mois')}</em>
       </div>
 
       {summary.count === 0 ? (
-        <p className="muted">Aucune sortie ce mois-ci.</p>
+        <p className="muted">{t('Aucune sortie ce mois-ci.')}</p>
       ) : (
         <>
           <div className="summary__big">
             <b>{km(summary.distance_m)}</b>
-            <span>KILOMÈTRES</span>
+            <span>{t('KILOMÈTRES')}</span>
           </div>
           <div className="stats stats--four">
             <div>
               <b>{summary.count}</b>
-              <span>{summary.count > 1 ? 'sorties' : 'sortie'}</span>
+              <span>{summary.count > 1 ? t('sorties') : t('sortie')}</span>
             </div>
             <div>
               <b>{duration(summary.time_s)}</b>
-              <span>de course</span>
+              <span>{t('de course')}</span>
             </div>
             <div>
               <b>{summary.ascent_m != null ? `${summary.ascent_m} m` : '—'}</b>
-              <span>Dénivelé +</span>
+              <span>{t('Dénivelé +')}</span>
             </div>
             <div>
               <b>{summary.longest ? km(summary.longest.actual_distance_m, 1) : '—'}</b>
-              <span>km, plus longue</span>
+              <span>{t('km, plus longue')}</span>
             </div>
           </div>
-          <p className="muted small">
-            Régularité : {active} semaine{active > 1 ? 's' : ''} sur {total} avec une sortie.
-          </p>
+          <p className="muted small">{t('Régularité : {active} semaine{v2} sur {total} avec une sortie.', { active, v2: active > 1 ? 's' : '', total })}</p>
         </>
       )}
 
       <div className="row">
-        <button className="btn" onClick={onClose}>
-          Retour
-        </button>
+        <button className="btn" onClick={onClose}>{t('Retour')}</button>
         {summary.count > 0 && (
           <button className="btn btn--primary" onClick={share}>
-            <Icon name="share" size={17} />
-            Partager
-          </button>
+            <Icon name="share" size={17} />{t('Partager')}</button>
         )}
       </div>
     </div>

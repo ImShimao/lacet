@@ -2,7 +2,8 @@ import Icon from './Icon.jsx'
 import { KINDS } from './pois'
 import { unitLabel, unitM } from './units'
 
-const kmText = (m) => (m / unitM()).toFixed(1).replace('.', ',')
+import { t, dec } from './i18n'
+const kmText = (m) => (m / unitM()).toFixed(1).replace('.', dec())
 
 /** Au-delà, la liste des kilomètres ne se lit plus : on dit l'écart. */
 const LIST_MAX = 6
@@ -24,13 +25,13 @@ export function longestGap(stops, distance) {
 export function StopsList({ stops, loading, complete, offline = false, prefs, distance = 0 }) {
   const kinds = Object.keys(KINDS).filter((k) => prefs?.[k])
   if (!kinds.length) return null
-  if (loading) return <p className="muted small stops">Recherche des points d'eau…</p>
+  if (loading) return <p className="muted small stops">{t('Recherche des points d\'eau…')}</p>
 
   return (
     <div className="stops">
       {kinds.map((kind) => {
         const here = stops.filter((s) => s.kind === kind)
-        const name = here.length > 1 ? KINDS[kind].plural : KINDS[kind].label.toLowerCase()
+        const name = here.length > 1 ? t(KINDS[kind].plural) : t(KINDS[kind].label).toLowerCase()
         const gap = longestGap(here, distance)
         return (
           <div key={kind} className="stops__row">
@@ -38,24 +39,22 @@ export function StopsList({ stops, loading, complete, offline = false, prefs, di
             {here.length === 0 ? (
               <span className="muted">
                 {complete
-                  ? "Aucun point d'eau connu le long du tracé."
+                  ? t('Aucun point d\'eau connu le long du tracé.')
                   : offline
-                    ? 'Pas de réseau : rien à montrer pour l’instant.'
-                    : 'Le service d’OpenStreetMap ne répond pas pour l’instant.'}
+                    ? t('Pas de réseau : rien à montrer pour l’instant.')
+                    : t('Le service d’OpenStreetMap ne répond pas pour l’instant.')}
               </span>
             ) : here.length <= LIST_MAX ? (
               <span>
                 <b>
                   {here.length} {name}
-                </b>{' '}
-                — km {here.map((s) => kmText(s.along)).join(' · ')}
+                </b>{' '}{t('— km')}{' '}{here.map((s) => kmText(s.along)).join(' · ')}
               </span>
             ) : (
               <span>
                 <b>
                   {here.length} {name}
-                </b>
-                , le plus long tronçon sans : <b>{kmText(gap.to - gap.from)} {unitLabel()}</b> ({unitLabel()} {kmText(gap.from)} → {kmText(gap.to)})
+                </b>{t(', le plus long tronçon sans :')}{' '}<b>{kmText(gap.to - gap.from)} {unitLabel()}</b> ({unitLabel()} {kmText(gap.from)} → {kmText(gap.to)})
               </span>
             )}
           </div>
@@ -78,9 +77,7 @@ export function NextStops({ stops, along }) {
     <div className="nextstops" role="status">
       {next.map((s) => (
         <span key={s.kind}>
-          <Icon name={KINDS[s.kind].icon} size={15} />
-          {KINDS[s.kind].label} dans{' '}
-          <b>{s.along - along >= 1000 ? `${kmText(s.along - along)} ${unitLabel()}` : `${Math.max(10, Math.round((s.along - along) / 10) * 10)} m`}</b>
+          <Icon name={KINDS[s.kind].icon} size={15} />{t('{label} dans', { label: KINDS[s.kind].label })}{' '}<b>{s.along - along >= 1000 ? `${kmText(s.along - along)} ${unitLabel()}` : `${Math.max(10, Math.round((s.along - along) / 10) * 10)} m`}</b>
         </span>
       ))}
     </div>

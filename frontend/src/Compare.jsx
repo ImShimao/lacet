@@ -9,29 +9,28 @@ import { useState } from 'react'
 import Icon from './Icon'
 import { compareRoutes } from './explain'
 
+import { t } from './i18n'
 export default function Compare({ routes, selected, onSelect, onClose }) {
   const others = routes.filter((r) => r.id !== selected.id)
   const [otherId, setOtherId] = useState(others[0]?.id)
   const other = others.find((r) => r.id === otherId) ?? others[0]
   if (!other) return null
   const n = (r) => routes.indexOf(r) + 1
-  const { rows, verdict } = compareRoutes(selected, other, { nameA: `la ${n(selected)}`, nameB: `la ${n(other)}` })
+  const { rows, verdict } = compareRoutes(selected, other, { nameA: t('la {v1}', { v1: n(selected) }), nameB: t('la {v1}', { v1: n(other) }) })
 
   return (
-    <section className="sendsheet compare" aria-label="Comparer deux propositions">
+    <section className="sendsheet compare" aria-label={t('Comparer deux propositions')}>
       <header className="sendsheet__head">
         <span>
-          <em>Comparer</em>
-          <b>
-            La {n(selected)} contre la {n(other)}
-          </b>
+          <em>{t('Comparer')}</em>
+          <b>{t('La {v1} contre la {v2}', { v1: n(selected), v2: n(other) })}</b>
         </span>
-        <button className="sendsheet__close" onClick={onClose} aria-label="Fermer la comparaison">
+        <button className="sendsheet__close" onClick={onClose} aria-label={t('Fermer la comparaison')}>
           <Icon name="close" size={16} />
         </button>
       </header>
       {others.length > 1 && (
-        <div className="compare__pick" role="group" aria-label="Comparer avec">
+        <div className="compare__pick" role="group" aria-label={t('Comparer avec')}>
           {others.map((r) => (
             <button key={r.id} aria-pressed={r.id === other.id} onClick={() => setOtherId(r.id)}>
               {n(r)}
@@ -43,8 +42,8 @@ export default function Compare({ routes, selected, onSelect, onClose }) {
         <thead>
           <tr>
             <td />
-            <th scope="col">La {n(selected)}</th>
-            <th scope="col">La {n(other)}</th>
+            <th scope="col">{t('La {v1}', { v1: n(selected) })}</th>
+            <th scope="col">{t('La {v1}', { v1: n(other) })}</th>
           </tr>
         </thead>
         <tbody>
@@ -58,9 +57,7 @@ export default function Compare({ routes, selected, onSelect, onClose }) {
         </tbody>
       </table>
       <p className="compare__verdict">{verdict}</p>
-      <button className="btn btn--ghost" onClick={() => onSelect(other)}>
-        Voir la {n(other)}
-      </button>
+      <button className="btn btn--ghost" onClick={() => onSelect(other)}>{t('Voir la {v1}', { v1: n(other) })}</button>
     </section>
   )
 }
