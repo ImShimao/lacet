@@ -70,14 +70,6 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
 
   return (
     <div className="panel">
-      {view === 'history' && shown.length > 0 && (
-        <>
-          <Totals history={shown} profile={profile} />
-          <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} goalKm={profile?.weekly_km} />
-          {/* Les séries suivent le filtre d'activité ; le défi du mois, son sport — la course, si « Tout ». */}
-          <Challenges history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} sport={sport === 'bike' ? 'bike' : 'run'} />
-        </>
-      )}
       <div className="seg">
         <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
           Sorties ({history.length})
@@ -86,6 +78,23 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
           Favoris ({saved.length})
         </button>
       </div>
+
+      {/* Le bilan, la semaine et les défis côte à côte, au pouce : empilés, ils
+          poussaient la liste des sorties — ce qu'on vient chercher — sous le pli. */}
+      {view === 'history' && shown.length > 0 && (
+        <div className="statstrip" aria-label="Bilan">
+          <div className="statstrip__card">
+            <Totals history={shown} profile={profile} />
+          </div>
+          <div className="statstrip__card">
+            <WeeklyVolume history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} goalKm={profile?.weekly_km} />
+          </div>
+          {/* Les séries suivent le filtre d'activité ; le défi du mois, son sport — la course, si « Tout ». */}
+          <div className="statstrip__card">
+            <Challenges history={history.filter((r) => sport === 'all' || (r.sport || 'run') === sport)} sport={sport === 'bike' ? 'bike' : 'run'} />
+          </div>
+        </div>
+      )}
 
       {view === 'saved' && onImport && <ImportRow onImport={onImport} />}
 
@@ -141,8 +150,7 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
           {/* Deux lignes, pas six : l'explication complète repoussait la liste
               sous le pli à chaque ouverture de l'onglet. */}
           <p className="muted small">
-            Ces parcours s'ouvrent sans réseau. L'icône à droite ajoute <b>le fond de carte</b> :
-            1 à 2 Mo à la campagne, une quinzaine en ville.
+            Ouverts sans réseau ; l'icône à droite garde aussi <b>le fond de carte</b> (1 à 15 Mo).
           </p>
           <div className="list">
             {rows.map((r, i) => (
@@ -681,9 +689,12 @@ function Totals({ history, profile }) {
         </div>
       </div>
       <p className="muted small">
-        {average} · environ{' '}
-        {Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString('fr-FR')}{' '}
-        kcal, estimées à partir de ton poids — pas mesurées.
+        {[
+          average,
+          `≈ ${Math.round(history.reduce((sum, r) => sum + energy(r.actual_distance_m || 0, profile?.weight_kg, r.sport), 0)).toLocaleString('fr-FR')} kcal (estimées)`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
       </p>
     </>
   )

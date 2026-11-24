@@ -113,6 +113,9 @@ place d'une icône : dix « Boucle sud-ouest » se reconnaissent à leur dessin.
 course libre prend le nom de son moment — « Course du soir », « Vélo du
 matin ». Chaque mois de l'historique a un bouton **Bilan** : kilomètres, D+,
 temps, plus longue sortie et régularité, partageables en image comme une sortie.
+Sous les onglets Sorties / Favoris, le total, le volume par semaine et les
+séries et défis tiennent sur une bande qu'on fait glisser au pouce
+(`.statstrip`) : empilés, ils poussaient la liste sous le pli.
 
 **Le point de passage** : un appui long sur la carte (ou « Passer par un
 point » dans le menu du départ) pose un fanion, et la recherche repart avec

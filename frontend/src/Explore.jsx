@@ -518,8 +518,7 @@ export default function Explore({
           dire évite de croire que le coin n'a rien de mieux à offrir. */}
       {meta.partial && (
         <Notice action="Relancer" onAct={onSearch}>
-          Le bord de la zone n'est pas encore arrivé : ces boucles sont tracées sur les rues
-          déjà là. Relance la recherche dans un instant pour en profiter.
+          Le bord de la zone n'est pas encore arrivé : ces boucles n'utilisent que les rues déjà là.
         </Notice>
       )}
       {/* Sans altitude, le dénivelé n'est pas seulement absent de l'affichage :
@@ -527,9 +526,7 @@ export default function Explore({
           cinq boucles plates sans un mot serait incompréhensible. */}
       {meta.elevation_skipped && (
         <Notice action="Relancer" onAct={onSearch}>
-          Le relief n'a pas répondu à temps : ces boucles sont classées sans lui, et leur
-          dénivelé reste inconnu. Relance la recherche — les altitudes arrivées entre-temps
-          sont gardées.
+          Le relief n'a pas répondu à temps : dénivelé inconnu, classement sans lui.
         </Notice>
       )}
       {/* Le relief, lui, a répondu — mais le coin n'a pas celui qu'on demande.
@@ -573,8 +570,7 @@ export default function Explore({
           prenaient la place du tracé, à chaque recherche depuis une adresse. */}
       {snapped && (
         <div className="notice notice--detail">
-          Le départ s'est posé sur la rue, à {snapped} m du point demandé :
-          c'est de là que la boucle part, et c'est là qu'elle revient.
+          Le départ s'est posé sur la rue, à {snapped} m du point demandé : la boucle part et revient là.
         </div>
       )}
       {known.has(selected.id) && <AlreadyRun found={known.get(selected.id)} />}
@@ -636,8 +632,8 @@ export default function Explore({
           // plus tard, ou accepter que ce tracé-là ne sera jamais noté.
           <div className="notice">
             {selected.imported
-              ? "Ce parcours vient d'un fichier, et ses points ne suivent aucune rue connue d'ici — un chemin absent de la carte, ou des rues pas encore téléchargées. Lacet ne peut donc juger ni trottoirs, ni vitesses, ni traversées, et ne dicte pas les virages. Il le suit, le mesure et prévient si tu t'en écartes."
-              : "Ce tracé vient d'un calculateur d'itinéraires public, faute d'avoir les rues de ce coin : Lacet n'a pas pu juger ce qu'il longe — ni trottoirs, ni vitesses, ni traversées. Reste attentif, et relance la recherche plus tard pour une vraie note."}
+              ? "Ce parcours ne suit aucune rue connue d'ici : pas de note ni de virages dictés. Lacet le suit, le mesure et prévient si tu t'en écartes."
+              : "Tracé par un calculateur public, faute des rues de ce coin : pas de note. Relance plus tard pour en avoir une."}
           </div>
         )
       )}

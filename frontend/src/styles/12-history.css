@@ -471,3 +471,60 @@
 .challenges__month p {
   margin: 8px 0 0;
 }
+
+/* Le bilan de « Mes parcours » : trois cartes côte à côte, qu'on fait glisser
+   au pouce. La suivante dépasse un peu, pour dire qu'il y en a d'autres. */
+.statstrip {
+  display: flex;
+  gap: 10px;
+  margin: 12px -18px 4px;
+  padding: 0 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 18px;
+  scrollbar-width: none;
+}
+.statstrip::-webkit-scrollbar {
+  display: none;
+}
+.statstrip__card {
+  flex: 0 0 88%;
+  min-width: 0;
+  scroll-snap-align: start;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+/* La carte porte déjà le cadre : les défis ne s'en mettent pas un second. */
+.statstrip__card .challenges {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.statstrip .statstrip__card .stats {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 10px;
+  border: 0;
+  background: none;
+}
+/* Dans la carte, des chiffres à plat, deux par ligne : quatre tuiles serrées
+   coupaient « km · 7 j » en deux. */
+.statstrip .statstrip__card .stats > div {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.statstrip .statstrip__card .stats b {
+  font-size: calc(22px * var(--text-scale));
+}
+.statstrip__card:empty {
+  display: none;
+}
+.statstrip__card > * {
+  margin: 0;
+}
