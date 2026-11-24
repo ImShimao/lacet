@@ -41,6 +41,26 @@ describe('le trajet de A à B', () => {
     expect(new Set(routes.map((r) => r.geometry.join(';'))).size).toBe(routes.length)
   })
 
+  it("l'aller-retour passe par B et revient à A, par d'autres rues que l'aller", async () => {
+    const { routes, meta } = await planJourney({ ...A, to: B, sport: 'run', roundtrip: true }, deps)
+    expect(meta.roundtrip).toBe(true)
+    expect(routes.length).toBeGreaterThan(0)
+    const oneWay = (await planJourney({ ...A, to: B, sport: 'run' }, deps)).routes
+    for (const r of routes) {
+      expect(r.roundtrip).toBe(true)
+      expect(haversineM(r.geometry[0], [A.lon, A.lat])).toBeLessThan(200)
+      expect(haversineM(r.geometry.at(-1), [A.lon, A.lat])).toBeLessThan(200)
+      expect(Math.min(...r.geometry.map((c) => haversineM(c, [B.lon, B.lat])))).toBeLessThan(200)
+      // Plus long qu'un aller simple, mais pas l'aller refait deux fois à l'identique.
+      const single = oneWay.find((o) => o.journey === r.journey)
+      if (single) expect(r.distance_m).toBeGreaterThan(single.distance_m * 1.9)
+      const half = Math.floor(r.geometry.length / 2)
+      const out = new Set(r.geometry.slice(0, half).map((c) => c.join()))
+      const shared = r.geometry.slice(half).filter((c) => out.has(c.join())).length
+      expect(shared / (r.geometry.length - half)).toBeLessThan(0.6)
+    }
+  })
+
   it('refuse une arrivée au départ, ou trop loin', () => {
     expect(() => journeyRequest({ ...A, to: A })).toThrow(/arrivée est au départ/)
     expect(() => journeyRequest({ ...A, to: { lat: 47.5, lon: 4.84 } })).toThrow(/trop loin/)

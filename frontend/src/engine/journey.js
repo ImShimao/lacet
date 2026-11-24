@@ -13,6 +13,12 @@
 // mètres. Chacun reçoit sa note : on voit d'un coup d'œil ce que coûte, en
 // sécurité, le kilomètre gagné. Deux chemins identiques n'en font qu'un.
 //
+// **L'aller-retour (`roundtrip`) revient par d'autres rues.** On court jusqu'à B
+// puis on rentre : refaire le même chemin en sens inverse, c'est une demi-sortie
+// vue deux fois. Le retour est cherché avec les rues de l'aller rendues
+// `REUSE_FACTOR` fois plus chères : il les reprend seulement quand il n'y a pas
+// d'autre passage (un pont, une impasse), et la note juge le tout.
+//
 // **La zone chargée est un disque autour de A qui contient B**, et non le
 // rectangle des deux : c'est celle que le recalcul en course (`planDetour`)
 // redemande à partir de la même demande, et il retrouve ainsi le même graphe.
@@ -30,6 +36,10 @@ export const MAX_JOURNEY_M = { run: 20_000, bike: 30_000 }
 const MIN_JOURNEY_M = 300
 // Un point posé à plus de ça d'une rue n'est pas un départ, c'est un champ.
 const SNAP_M = 400
+// Le prix d'une rue déjà courue à l'aller, pour le retour : assez pour qu'un
+// détour de deux ou trois fois sa longueur passe avant, pas assez pour faire
+// d'un pont unique un mur.
+const REUSE_FACTOR = 4
 
 export const JOURNEY_VARIANTS = [
   { key: 'safe', label: 'Le plus sûr' },
@@ -56,7 +66,7 @@ export function journeyRequest(input) {
   const reach = (2 * (crow + 1000)) / 1.1 / 1000
   const req = normalizeRequest({ ...input, distance_km: Math.ceil(reach * 10) / 10, duration_min: null, tolerance: 0.1 })
   const label = typeof to.label === 'string' && to.label.trim() ? to.label.trim().slice(0, 60) : null
-  return { req, to: { lat: to.lat, lon: to.lon }, label, crow }
+  return { req, to: { lat: to.lat, lon: to.lon }, label, crow, roundtrip: Boolean(input.roundtrip) }
 }
 
 /** Les poids de chaque variante. Les zones et les signalements pèsent dans toutes. */
@@ -118,6 +128,16 @@ function endpoints(graph, req, to, weights) {
   return { source, target }
 }
 
+/** Le retour de B vers A, les rues de l'aller rendues plus chères. */
+function returnEdges(graph, from, to, weights, outbound) {
+  const w = Float64Array.from(weights)
+  for (const e of outbound) w[e] *= REUSE_FACTOR
+  const tree = dijkstra(graph, from, w, { target: to, slack: 1 })
+  if (tree.dist[to] === INF) return null
+  const edges = reconstruct(tree, to)
+  return edges?.length ? edges : null
+}
+
 /** La géométrie d'un chemin, de nœud en nœud. */
 function geometryOf(graph, start, edges) {
   const out = []
@@ -140,7 +160,7 @@ function geometryOf(graph, start, edges) {
  */
 export async function planJourney(input, { loadGraph, fetchElevations = fetchMany, now = () => new Date(), onProgress = () => {} }) {
   const started = performance.now()
-  const { req, to, label, crow } = journeyRequest(input)
+  const { req, to, label, crow, roundtrip } = journeyRequest(input)
   const graph = await loadGraph(graphRequest({ ...input, distance_km: req.distance_km, duration_min: null }))
   onProgress('routing', 0)
 
@@ -150,10 +170,16 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
 
   const found = []
   for (const variant of JOURNEY_VARIANTS) {
-    const tree = dijkstra(graph, source, variantWeights(graph, variant.key, req, night, blocked), { target, slack: 1 })
+    const weights = variantWeights(graph, variant.key, req, night, blocked)
+    const tree = dijkstra(graph, source, weights, { target, slack: 1 })
     if (tree.dist[target] === INF) continue
-    const edges = reconstruct(tree, target)
+    let edges = reconstruct(tree, target)
     if (!edges?.length) continue
+    if (roundtrip) {
+      const back = returnEdges(graph, target, source, weights, edges)
+      if (!back) continue
+      edges = [...edges, ...back]
+    }
     const path = edges.join(',')
     if (found.some((f) => f.path === path)) continue
     found.push({ ...variant, path, edges, nodes: nodeSequence(graph, source, edges) })
@@ -180,12 +206,14 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
       elev = [values, null, threshold, ELEVATION_STEP_M]
     }
     // Le nom dit la variante et où elle mène : c'est lui qu'on relit en favori.
-    const name = label ? `${f.label} vers ${label}` : f.label
+    const where = label ? ` vers ${label}` : ''
+    const name = roundtrip ? `${f.label}${where} et retour` : `${f.label}${where}`
     const route = matchedRoute(graph, source, f, { req, name, elev, night })
     // L'identifiant d'une boucle : la variante et la longueur, pour qu'un trajet
     // gardé en favori ne prenne pas la place d'un autre.
     const { imported, matched, ...plain } = route
-    return { ...plain, id: `ab-${f.key}-${Math.trunc(route.distance_m)}`, journey: f.key, destination: to }
+    const id = `${roundtrip ? 'aba' : 'ab'}-${f.key}-${Math.trunc(route.distance_m)}`
+    return { ...plain, id, journey: f.key, destination: to, ...(roundtrip ? { roundtrip: true } : {}) }
   })
 
   return {
@@ -193,6 +221,7 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
     rejected: [],
     meta: {
       journey: true,
+      roundtrip,
       night,
       crow_m: Math.round(crow),
       graph_nodes: graph.nodeCount,

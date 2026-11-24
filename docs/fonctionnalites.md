@@ -15,7 +15,9 @@ contrôle : l'app dit aussi ce qu'elle a écarté, et pourquoi.
 l'arrivée sur la carte, et Lacet propose jusqu'à trois chemins — le plus sûr,
 l'équilibré, le plus direct —, chacun noté A, B ou C, pour voir ce que coûte en
 sécurité le kilomètre gagné. Même guidage à la voix, même relief, même recalcul
-si l'on s'écarte, et « Trajet retour » refait le chemin de B vers A.
+si l'on s'écarte, et « Trajet retour » refait le chemin de B vers A. En
+**aller-retour**, Lacet va jusqu'à B puis revient à la porte par d'autres rues
+que l'aller — la sortie jusqu'au lac et retour, sans courir deux fois la même.
 
 **Il refuse les routes dangereuses.** Chaque tronçon est évalué : vitesse de la
 voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées ou non.

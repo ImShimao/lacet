@@ -142,6 +142,8 @@ export default function App() {
   const [goal, setGoal] = useState(stored.goal === 'journey' ? 'journey' : 'loop')
   const [destination, setDestination] = useState(null)
   const [placingDest, setPlacingDest] = useState(false)
+  // Aller jusqu'à B et revenir, par d'autres rues : un choix d'habitude, gardé.
+  const [roundTrip, setRoundTrip] = useState(Boolean(stored.roundTrip))
   const journey = goal === 'journey'
   // Il s'arrête de lui-même dès qu'on change d'écran ou de boucle : laissé
   // allumé, il serait reparti au retour sur la carte.
@@ -185,7 +187,11 @@ export default function App() {
       // rouverts et validés sans rien changer — en est une aussi : refaite à
       // l'identique, elle rendait exactement les mêmes boucles.
       const request = journey
-        ? { ...toRequest(active, from), to: { lat: to.lat, lon: to.lon, ...(to.label ? { label: to.label } : {}) } }
+        ? {
+            ...toRequest(active, from),
+            to: { lat: to.lat, lon: to.lon, ...(to.label ? { label: to.label } : {}) },
+            ...(roundTrip ? { roundtrip: true } : {}),
+          }
         : { ...toRequest(active, from), ...(through ? { via: through } : {}) }
       const key = JSON.stringify(request)
       const again = regenerate || (Boolean(result?.request && result.routes.length) && key === lastAsked.current)
@@ -230,7 +236,7 @@ export default function App() {
       if (shown?.routes.length) rememberShown(asked, shown.routes)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params, start, result, via, history, journey, destination],
+    [params, start, result, via, history, journey, destination, roundTrip],
   )
 
   // L'arrivée posée ou cherchée. Un point touché sur la carte n'a pas de nom :
@@ -249,6 +255,13 @@ export default function App() {
     setGoal(next)
     save({ goal: next })
     setPlacingDest(false)
+    found.forget()
+  }
+  const toggleRoundTrip = () => {
+    setRoundTrip((on) => {
+      save({ roundTrip: !on })
+      return !on
+    })
     found.forget()
   }
   // Le retour : B devient le départ, A l'arrivée, et la recherche repart.
@@ -721,7 +734,7 @@ export default function App() {
                 <b>{sport?.label}</b>
                 {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
                 <span className="sportpill__spec">
-                  {result.meta?.journey ? `Trajet · ${summarise(params).split(' · ').slice(1).join(' · ')}` : summarise(params)}
+                  {result.meta?.journey ? `${result.meta.roundtrip ? 'Aller-retour' : 'Trajet'} · ${summarise(params).split(' · ').slice(1).join(' · ')}` : summarise(params)}
                 </span>
                 <Icon name="sliders" size={17} className="sportpill__gear" />
               </button>
@@ -955,7 +968,9 @@ export default function App() {
                 setDestination(null)
                 found.forget()
               }}
-              onReturnTrip={journey && destination ? returnTrip : null}
+              onReturnTrip={journey && destination && !result?.meta?.roundtrip ? returnTrip : null}
+              roundTrip={roundTrip}
+              onRoundTrip={toggleRoundTrip}
               onBack={() => {
                 setDetail(false)
                 found.forget()

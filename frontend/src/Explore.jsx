@@ -257,6 +257,8 @@ export default function Explore({
   onPlaceDestination = null,
   onClearDestination = null,
   onReturnTrip = null,
+  roundTrip = false,
+  onRoundTrip = null,
 }) {
   const [exporting, setExporting] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -339,7 +341,19 @@ export default function Explore({
           />
         )}
         {journey ? (
-          <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+          <>
+            <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+            {onRoundTrip && (
+              <Segmented
+                options={[
+                  { key: 'oneway', label: 'Aller simple' },
+                  { key: 'round', label: 'Aller-retour' },
+                ]}
+                value={roundTrip ? 'round' : 'oneway'}
+                onChange={(key) => (key === 'round') !== roundTrip && onRoundTrip()}
+              />
+            )}
+          </>
         ) : (
           onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />
         )}

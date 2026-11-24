@@ -17,7 +17,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 | Point de passage | non | oui | **Fait** |
 | Zones à éviter (cercle, contour) | non | oui | **Fait** (+ raison et icône) |
 | **De A à B** | non | non | **Fait** : trois chemins notés, trajet retour |
-| Aller-retour vers un point (A → B → A) | non | non | *À faire* : un trajet aller, puis le retour par d'autres rues |
+| Aller-retour vers un point (A → B → A) | non | non | **Fait** : le retour évite les rues de l'aller |
 | Tours d'un circuit, boucle en 8 | non | non | **Fait** |
 | Note de sécurité A, B, C de chaque proposition | non | non | **Fait** |
 | Éviter ce qu'on a déjà couru | « jamais la même » | non | **Fait** |
@@ -58,7 +58,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 ## Ordre retenu
 
 1. **De A à B** — fait le 24 novembre 2026.
-2. Aller-retour vers un point.
+2. **Aller-retour vers un point** — fait le 24 novembre 2026.
 3. Comparer deux propositions.
 4. Séance fractionnée guidée à la voix.
 5. Défis et séries.
