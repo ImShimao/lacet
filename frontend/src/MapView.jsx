@@ -86,6 +86,7 @@ export default function MapView({
   destination = null,
   placingDest = false,
   onDestination,
+  covered = false,
 }) {
   const container = useRef(null)
   const map = useRef(null)
@@ -589,7 +590,10 @@ export default function MapView({
   const hasRoute = route?.geometry?.length > 1
   useEffect(() => {
     const m = map.current
-    if (!m || navigate || flyover || !hasRoute) return undefined
+    // Sous une page (Mes parcours, Mon compte, le bilan), la carte ne se voit
+    // pas : la redessiner vingt-cinq fois par seconde ne servirait qu'à vider
+    // la batterie.
+    if (!m || navigate || flyover || covered || !hasRoute) return undefined
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
     let frame = 0
     let last = -1
@@ -616,7 +620,7 @@ export default function MapView({
         m.setLayoutProperty('route-arrows', 'visibility', 'visible')
       }
     }
-  }, [hasRoute, navigate, flyover, styleKey])
+  }, [hasRoute, navigate, flyover, covered, styleKey])
 
   // --- survol 3D ------------------------------------------------------------------
   // La boucle vue d'en haut, carte inclinée sur le relief, de la porte à la
@@ -886,6 +890,9 @@ export default function MapView({
     // traversées s'y posent. Pas en course : un détour remplace le tracé sous
     // les pieds, et doit y être tout de suite.
     const data = routeToGeoJson(route)
+    // La flèche du départ se pose tout de suite : c'est elle qu'on lit en
+    // premier, avant même que la boucle ait fini de se dessiner.
+    m.getSource('route-start')?.setData(nav.current.navigate ? empty() : startArrowGeoJson(route))
     const finish = () => {
       m.getSource('route')?.setData(data)
       m.getSource('crossings')?.setData(crossingsToGeoJson(route))
@@ -1216,7 +1223,9 @@ function addLayers(m) {
     id: 'route-flow',
     type: 'line',
     source: 'route',
-    layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' },
+    // Des bouts arrondis : de petites gélules qui glissent, plutôt que des
+    // tirets coupés net qui papillotent en avançant.
+    layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
     paint: {
       'line-color': '#ffffff',
       'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.6, 15, 2, 17, 2.6],
@@ -1252,6 +1261,27 @@ function addLayers(m) {
       'icon-keep-upright': false,
       'icon-padding': 6,
       'icon-allow-overlap': false,
+    },
+  })
+
+  // La flèche du départ, comme chez RunnrZ : une pointe pleine, juste après la
+  // porte, qui dit par où partir avant qu'on ait cherché les traits qui coulent.
+  if (!m.hasImage('route-start-arrow')) {
+    m.addImage('route-start-arrow', startArrowIcon(), { pixelRatio: 2 })
+  }
+  m.addSource('route-start', { type: 'geojson', data: empty() })
+  m.addLayer({
+    id: 'route-start-arrow',
+    type: 'symbol',
+    source: 'route-start',
+    layout: {
+      'icon-image': 'route-start-arrow',
+      'icon-rotate': ['-', ['get', 'bearing'], 90],
+      'icon-rotation-alignment': 'map',
+      'icon-pitch-alignment': 'map',
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.9, 16, 1.25],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
     },
   })
 
@@ -1434,6 +1464,51 @@ function circlePolygon([lon, lat], radiusM, steps = 48) {
     ring.push([lon + dLon * Math.cos(angle), lat + dLat * Math.sin(angle)])
   }
   return { type: 'Polygon', coordinates: [ring] }
+}
+
+/**
+ * Où poser la flèche du départ, et vers où la tourner : à quatre-vingts mètres
+ * de la porte — plus près, le point de la position la recouvrait —, le cap pris
+ * sur cinquante mètres pour qu'un premier coude de trottoir ne la fasse pas
+ * pointer de travers.
+ */
+export function startArrowGeoJson(route) {
+  const line = route?.geometry
+  if (!(line?.length > 1)) return empty()
+  const { total, at } = alongLine(line)
+  if (total < 150) return empty()
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { bearing: bearingOf(at(55), at(105)) },
+        geometry: { type: 'Point', coordinates: at(80) },
+      },
+    ],
+  }
+}
+
+/** La pointe du départ : pleine, blanche cernée de sombre, tournée vers la droite. */
+function startArrowIcon() {
+  const size = 44
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(34, 22)
+  ctx.lineTo(12, 11)
+  ctx.lineTo(16.5, 22)
+  ctx.lineTo(12, 33)
+  ctx.closePath()
+  ctx.strokeStyle = mapToken('--map-arrow-casing')
+  ctx.lineWidth = 5
+  ctx.stroke()
+  ctx.fillStyle = mapToken('--map-ink')
+  ctx.fill()
+  return ctx.getImageData(0, 0, size, size)
 }
 
 function routeToGeoJson(route) {

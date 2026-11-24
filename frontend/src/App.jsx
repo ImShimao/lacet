@@ -571,6 +571,7 @@ export default function App() {
           destination={running || !journey ? null : destination}
           placingDest={placingDest}
           onDestination={(p) => pickDestination(p)}
+          covered={sheetMode === 'page'}
           // En contour, chaque toucher ajoute un sommet ; en cercle, il pose le centre.
           onZoneCenter={(p) =>
             setZoneDraft(

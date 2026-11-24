@@ -147,8 +147,11 @@ précis**. La parcourir à l'envers donne les côtes au mauvais moment, le vent 
 face à la fin, et un guidage qui annonce des virages à gauche là où il faut
 tourner à droite.
 
-**De petits traits blancs coulent sans fin dans le tracé**, dans son sens : le
-sens se voit d'un coup d'œil, sans suivre la ligne. MapLibre ne sait pas décaler
+**De petits traits blancs coulent sans fin dans le tracé**, dans son sens : des
+gélules courtes et espacées, comme chez RunnrZ, qui se voient d'un coup d'œil
+sans suivre la ligne. **Une flèche pleine se pose à quatre-vingts mètres du
+départ** et dit par où partir (`startArrowGeoJson`). Sous une page (Mes
+parcours, Mon compte, le bilan), la carte est cachée : l'animation s'arrête. MapLibre ne sait pas décaler
 des pointillés ; le motif tourne donc d'un pixel à la fois, vingt-cinq fois par
 seconde, en réécrivant `line-dasharray` (`flowDashes`, `MapView.jsx`). En course,
 pendant le survol et quand l'iPhone demande de réduire les animations, rien ne
