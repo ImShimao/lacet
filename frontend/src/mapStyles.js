@@ -94,6 +94,9 @@ export function traceColors(contrast) {
     risk: on('risk'),
     ghost: on('ghost'),
     halo: on('halo'),
+    // Le liseré clair ne sert que sur un fond sombre : sur un fond clair, il
+    // faisait du tracé trois traits parallèles. Il y prend la couleur du halo.
+    edge: contrast === 'dark' ? '#ffffff' : on('halo'),
     unknown: mapToken(contrast === 'dark' ? '--accent-light' : '--accent-deep'),
   }
 }

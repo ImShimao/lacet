@@ -152,8 +152,13 @@ gélules courtes et espacées, comme chez RunnrZ, qui se voient d'un coup d'œil
 sans suivre la ligne. **Une flèche pleine se pose à quatre-vingts mètres du
 départ** et dit par où partir (`startArrowGeoJson`). Sous une page (Mes
 parcours, Mon compte, le bilan), la carte est cachée : l'animation s'arrête. MapLibre ne sait pas décaler
-des pointillés ; le motif tourne donc d'un pixel à la fois, vingt-cinq fois par
-seconde, en réécrivant `line-dasharray` (`flowDashes`, `MapView.jsx`). En course,
+des pointillés ; le motif tourne donc en réécrivant `line-dasharray`
+(`flowDashes`, `MapView.jsx`), vingt crans par seconde. Chaque cran redessine la
+carte : **au bout de vingt secondes sans geste, les traits s'arrêtent** et des
+chevrons fixes prennent le relais ; glisser, pincer ou toucher la carte, ou
+choisir une autre boucle, les relance. Sur un fond sombre, un liseré blanc
+détache le tracé des rues, comme chez RunnrZ ; sur un fond clair, il se fond
+dans le halo. En course,
 pendant le survol et quand l'iPhone demande de réduire les animations, rien ne
 bouge : de petits chevrons fixes, blancs cernés de sombre, prennent le relais
 (`arrowIcon`). Ils suivent la géométrie dans le sens où elle est écrite — celui

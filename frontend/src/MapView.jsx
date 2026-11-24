@@ -581,30 +581,46 @@ export default function MapView({
   }, [overview])
 
   // --- le sens, en mouvement ---------------------------------------------------
-  // De petits traits blancs coulent sans fin dans le tracé, dans son sens, comme
-  // chez RunnrZ : le sens se voit sans chercher, et la boucle paraît vivante.
-  // MapLibre ne sait pas décaler des pointillés : on fait tourner le motif, un
-  // pixel à la fois, en réécrivant `line-dasharray` (voir `flowDashes`). Les
-  // chevrons fixes reviennent là où rien ne doit bouger : en course, pendant le
-  // survol, et quand iOS demande moins de mouvement.
+  // De petits traits blancs coulent dans le tracé, dans son sens, comme chez
+  // RunnrZ : le sens se voit sans chercher, et la boucle paraît vivante.
+  // MapLibre ne sait pas décaler des pointillés : on fait tourner le motif en
+  // réécrivant `line-dasharray` (voir `flowDashes`).
+  //
+  // Chaque cran redessine toute la carte : c'est le prix de l'effet. D'où trois
+  // économies. Vingt crans par seconde, pas soixante : à vingt-cinq pixels par
+  // seconde, l'œil ne voit pas la différence. Rien sous une page qui cache la
+  // carte. Et **une pause au repos** : quand personne n'a touché la carte depuis
+  // `FLOW_IDLE_MS`, les traits s'arrêtent et les chevrons fixes prennent le
+  // relais ; le moindre geste sur la carte, ou une autre boucle, relance. Les
+  // chevrons restent seuls en course, pendant le survol, et quand iOS demande
+  // moins de mouvement.
   const hasRoute = route?.geometry?.length > 1
+  const routeId = route?.id
   useEffect(() => {
     const m = map.current
-    // Sous une page (Mes parcours, Mon compte, le bilan), la carte ne se voit
-    // pas : la redessiner vingt-cinq fois par seconde ne servirait qu'à vider
-    // la batterie.
     if (!m || navigate || flyover || covered || !hasRoute) return undefined
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
     let frame = 0
     let last = -1
+    let awake = performance.now()
+    const show = (moving) => {
+      if (!m.style || !m.getLayer('route-flow')) return
+      m.setLayoutProperty('route-flow', 'visibility', moving ? 'visible' : 'none')
+      m.setLayoutProperty('route-arrows', 'visibility', moving ? 'none' : 'visible')
+    }
     const tick = (now) => {
+      // Au repos : on rend la main, plus aucune image n'est demandée.
+      if (now - awake > FLOW_IDLE_MS) {
+        frame = 0
+        show(false)
+        return
+      }
       frame = requestAnimationFrame(tick)
       // Une carte détruite n'a plus de style : `getLayer` y lèverait une erreur.
       if (!m.style || !m.getLayer('route-flow')) return
       // Un changement de thème repose les couches, cachées : on les reprend.
       if (m.getLayoutProperty('route-flow', 'visibility') !== 'visible') {
-        m.setLayoutProperty('route-flow', 'visibility', 'visible')
-        m.setLayoutProperty('route-arrows', 'visibility', 'none')
+        show(true)
         last = -1
       }
       const step = Math.floor(now / FLOW_STEP_MS) % FLOW_STEPS
@@ -612,15 +628,23 @@ export default function MapView({
       last = step
       m.setPaintProperty('route-flow', 'line-dasharray', flowDashes(step))
     }
+    const wake = () => {
+      awake = performance.now()
+      if (!frame) frame = requestAnimationFrame(tick)
+    }
     frame = requestAnimationFrame(tick)
+    // Un doigt sur la carte — glisser, pincer, toucher — la réveille.
+    m.on('movestart', wake)
+    m.on('touchstart', wake)
+    m.on('mousedown', wake)
     return () => {
       cancelAnimationFrame(frame)
-      if (m.style && m.getLayer('route-flow')) {
-        m.setLayoutProperty('route-flow', 'visibility', 'none')
-        m.setLayoutProperty('route-arrows', 'visibility', 'visible')
-      }
+      m.off('movestart', wake)
+      m.off('touchstart', wake)
+      m.off('mousedown', wake)
+      show(false)
     }
-  }, [hasRoute, navigate, flyover, covered, styleKey])
+  }, [hasRoute, routeId, navigate, flyover, covered, styleKey])
 
   // --- survol 3D ------------------------------------------------------------------
   // La boucle vue d'en haut, carte inclinée sur le relief, de la porte à la
@@ -688,6 +712,7 @@ export default function MapView({
     const pin = new maplibregl.Marker({ element: el }).setLngLat(line[0]).addTo(m)
     // Le reste de la boucle s'efface un peu : ce qui est parcouru doit se détacher.
     m.setPaintProperty('route-line', 'line-opacity', 0.55)
+    m.setPaintProperty('route-edge', 'line-opacity', 0.3)
     m.setPaintProperty('route-arrows', 'icon-opacity', 0.4)
 
     const show = (d, paused) => {
@@ -800,6 +825,7 @@ export default function MapView({
       m.setPadding(before)
       if (m.getLayer('route-line')) {
         m.setPaintProperty('route-line', 'line-opacity', 1)
+        m.setPaintProperty('route-edge', 'line-opacity', 0.85)
         m.setPaintProperty('route-arrows', 'icon-opacity', 1)
       }
       // Pas de relief en course : il coûte des tuiles et du calcul à chaque image.
@@ -1045,11 +1071,13 @@ function visibleCentre(m) {
 }
 
 // Les traits qui coulent dans le tracé, en largeurs de ligne : un trait de
-// FLOW_DASH, un blanc de FLOW_GAP. Le motif avance d'un pixel par cran, vingt-cinq par seconde.
+// FLOW_DASH, un blanc de FLOW_GAP. Le motif avance d'un pixel et quart par cran, vingt crans par seconde.
 const FLOW_DASH = 3.5
 const FLOW_GAP = 14
-const FLOW_STEPS = 35
-const FLOW_STEP_MS = 40
+const FLOW_STEPS = 28
+const FLOW_STEP_MS = 50
+// Le temps sans geste sur la carte après lequel les traits s'arrêtent.
+const FLOW_IDLE_MS = 20_000
 
 /**
  * Le motif de pointillés décalé de `step` crans dans le sens du tracé.
@@ -1155,6 +1183,7 @@ function paintLayers(m, contrast) {
   set('accuracy-fill', 'fill-color', mapToken('--map-accuracy'))
   set('ghost-line', 'line-color', c.ghost)
   set('route-halo', 'line-color', c.halo)
+  set('route-edge', 'line-color', c.edge)
   set('route-line', 'line-color', colorExpression(c))
   set('flown-glow', 'line-color', accent)
   set('flown-line', 'line-color', mapToken('--map-flown'))
@@ -1208,6 +1237,15 @@ function addLayers(m) {
     source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-width': 9, 'line-opacity': 0.85 },
+  })
+  // Un liseré clair entre le halo sombre et la couleur, comme chez RunnrZ : la
+  // boucle se détache de toutes les rues du fond, claires ou sombres.
+  m.addLayer({
+    id: 'route-edge',
+    type: 'line',
+    source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 7, 'line-opacity': 0.85 },
   })
   m.addLayer({
     id: 'route-line',
