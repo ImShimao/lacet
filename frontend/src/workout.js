@@ -77,13 +77,17 @@ const TITLES = { warmup: 'Échauffement', rest: 'Récupération', cooldown: 'Ret
  *   valant `null` une fois la séance finie, sinon `{ kind, title, left, rep, reps }`
  *   où `left` est en secondes ou en mètres selon le bloc (`unit`).
  */
-export function createCoach({ spoken, blocks }) {
-  let index = -1
-  let from = { t: 0, m: 0 }
-  let warned = false
-  let done = false
+export function createCoach({ spoken, blocks }, saved = null) {
+  // `saved` : l'instantané d'une sortie reprise après un arrêt de l'app — le
+  // bloc en cours et d'où il est parti, en temps couru et en mètres.
+  let index = saved?.index ?? -1
+  let from = saved?.from ?? { t: 0, m: 0 }
+  let warned = saved?.warned ?? false
+  let done = saved?.done ?? false
 
   return {
+    /** Ce qu'il faut garder pour reprendre la séance où elle en était. */
+    snapshot: () => ({ index, from: { ...from }, warned, done }),
     update(t, m) {
       const said = []
       if (done || !blocks.length) return { said, status: null }

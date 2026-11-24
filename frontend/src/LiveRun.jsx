@@ -189,9 +189,11 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   const splitTimer = useRef(null)
   // La séance fractionnée, si elle est réglée : le coach dit chaque bloc, le
   // bandeau dit le bloc en cours (`workout.js`). Une sortie reprise après un
-  // arrêt de l'app la recommence au bloc d'échauffement.
-  // shortcut: la séance ne survit pas à une reprise, à garder dans `runState` si ça gêne.
-  const coach = useRef(workoutSettings().on ? createCoach(blocksOf()) : null)
+  // arrêt de l'app la reprend au bloc où elle en était — et une sortie partie
+  // sans séance n'en commence pas une en route.
+  const coach = useRef(
+    resuming ? (resuming.coach ? createCoach(blocksOf(), resuming.coach) : null) : workoutSettings().on ? createCoach(blocksOf()) : null,
+  )
   const [block, setBlock] = useState(null)
   // Les annonces « à redire » pas encore finies, avec l'heure où elles le
   // seront. Une consigne de guidage vide la file de la voix : celles qu'elle
@@ -568,6 +570,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
       diag: diag.current,
       pausedS: pausedSeconds(now),
       rerouted: wasRerouted(),
+      coach: coach.current?.snapshot() ?? null,
       ...measuredAscent(),
     })
   }

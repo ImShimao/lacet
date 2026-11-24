@@ -39,6 +39,18 @@ describe('la séance fractionnée', () => {
     expect(coach.update(10_100, 30_100).said).toEqual([])
   })
 
+  it("reprend, après un arrêt de l'app, au bloc où elle en était", () => {
+    const plan = blocksOf({ preset: '400', warmup_min: 1, cooldown_min: 0 })
+    const first = createCoach(plan)
+    first.update(0, 0)
+    first.update(60, 180)
+    const saved = JSON.parse(JSON.stringify(first.snapshot()))
+    const again = createCoach(plan, saved)
+    // Pas de nouvelle présentation : la répétition en cours continue.
+    expect(again.update(90, 400)).toMatchObject({ said: [], status: { title: 'Répétition 1/8', left: 180 } })
+    expect(again.update(150, 580).said).toEqual(['Terminé en 1 minute 30. Récupère : 1 minute 30, en trottinant.'])
+  })
+
   it('dit les durées comme on les dit', () => {
     expect(durationWords(45)).toBe('45 secondes')
     expect(durationWords(60)).toBe('1 minute')
