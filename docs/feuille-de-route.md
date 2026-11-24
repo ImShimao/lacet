@@ -33,7 +33,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 | Profil d'altitude, sommet marqué | oui | non | **Fait** |
 | Mix de surfaces | oui | non | **Fait** |
 | Survol 3D piloté | oui | non | **Fait** (3 vues, vitesse, barre de temps) |
-| Comparer deux propositions côte à côte | non | non | *À faire* : tableau « A contre B » des chiffres qui départagent |
+| Comparer deux propositions côte à côte | non | non | **Fait** : tableau « la 1 contre la 2 », meilleure valeur en avant, verdict en une phrase |
 | Points d'eau sur le parcours | non | non | **Fait** |
 
 ## 3. Courir
@@ -60,6 +60,6 @@ Légende : **Fait** · **En cours** · *À faire*.
 
 1. **De A à B** — fait le 24 novembre 2026.
 2. **Aller-retour vers un point** — fait le 24 novembre 2026.
-3. Comparer deux propositions.
+3. **Comparer deux propositions** — fait le 24 novembre 2026.
 4. Séance fractionnée guidée à la voix.
 5. Défis et séries.

@@ -10,6 +10,8 @@
 // changent là-bas, ils doivent changer ici.
 
 import { isNight } from './engine/environment'
+import { km } from './format'
+import { unitLabel } from './units'
 
 const TERRAIN_RUN = {
   title: 'Types de terrain',
@@ -317,4 +319,61 @@ export function nightfall(lat, lon, durationS, now = Date.now()) {
     else lo = mid
   }
   return hi
+}
+
+/**
+ * Deux propositions face à face : les lignes qui les départagent, et une phrase
+ * qui dit ce que chacune gagne. Une ligne n'a de gagnant que si l'écart compte —
+ * deux minutes sur une heure, oui ; dix secondes, non.
+ *
+ * Rend `{ rows: [{ label, a, b, best: 'a'|'b'|null }], verdict }`.
+ */
+export function compareRoutes(a, b, { nameA = 'la 1', nameB = 'la 2' } = {}) {
+  const sa = a?.safety
+  const sb = b?.safety
+  const gains = { a: [], b: [] }
+  const rows = []
+  // `better` : la valeur la plus petite gagne (`low`) ou la plus grande (`high`).
+  const row = (label, va, vb, show, { better = null, min = 0, say = null } = {}) => {
+    if (va == null && vb == null) return
+    let best = null
+    if (better && va != null && vb != null && Math.abs(va - vb) > min) {
+      best = (better === 'low') === va < vb ? 'a' : 'b'
+      if (say) gains[best].push(say(Math.abs(va - vb), best === 'a' ? va : vb, best === 'a' ? vb : va))
+    }
+    rows.push({ label, a: va == null ? '—' : show(va), b: vb == null ? '—' : show(vb), best })
+  }
+  const rank = (g) => (g ? 'ABC'.indexOf(g) : null)
+  row('Note', rank(sa?.grade), rank(sb?.grade), (r) => 'ABC'[r], {
+    better: 'low',
+    say: (_, w, l) => `est plus sûre (${'ABC'[w]} contre ${'ABC'[l]})`,
+  })
+  row('Distance', a?.distance_m, b?.distance_m, (m) => `${km(m, 1)} ${unitLabel()}`)
+  row('Durée', a?.duration_s, b?.duration_s, (s) => `${Math.round(s / 60)} min`, {
+    better: 'low',
+    min: 90,
+    say: (d) => `gagne ${Math.round(d / 60)} min`,
+  })
+  row('Dénivelé +', a?.ascent_m, b?.ascent_m, (m) => `${Math.round(m)} m`, {
+    better: 'low',
+    min: 15,
+    say: (d) => `monte ${Math.round(d)} m de moins`,
+  })
+  row('Hors trafic', sa?.protected_share, sb?.protected_share, (s) => `${Math.round(s * 100)} %`, {
+    better: 'high',
+    min: 0.05,
+    say: (d) => `a ${Math.round(d * 100)} points de plus à l'abri du trafic`,
+  })
+  row('Traversées non protégées', sa?.unprotected_crossings, sb?.unprotected_crossings, String, {
+    better: 'low',
+    min: 0,
+    say: (d) => `traverse ${d} fois de moins sans protection`,
+  })
+  const phrase = (name, list) => `${name} ${list.length > 1 ? `${list.slice(0, -1).join(', ')} et ${list.at(-1)}` : list[0]}`
+  const parts = []
+  if (gains.a.length) parts.push(phrase(nameA, gains.a))
+  if (gains.b.length) parts.push(phrase(nameB, gains.b))
+  const said = parts.join(' ; ')
+  const verdict = parts.length ? `${said[0].toUpperCase()}${said.slice(1)}.` : 'Elles se valent : choisis au paysage.'
+  return { rows, verdict }
 }

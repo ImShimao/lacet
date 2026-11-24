@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climbBand, climbMismatch, nightfall, reliefBadge, reliefMismatch, reliefOf, surfaceMismatch, weatherAdvice } from './explain'
+import { climbBand, climbMismatch, compareRoutes, nightfall, reliefBadge, reliefMismatch, reliefOf, surfaceMismatch, weatherAdvice } from './explain'
 
 /** La tenue conseillée d'après la météo du relais ; rien sans température. */
 describe('weatherAdvice', () => {
@@ -147,5 +147,33 @@ describe('reliefBadge', () => {
     expect(reliefBadge('climb', 98.2, 70)).toBe('Possible')
     expect(reliefBadge('climb', 98.2, 90)).toBe('Peu probable')
     expect(reliefBadge('climb', 98.2, 5)).toBe('Peu probable')
+  })
+})
+
+/** Deux propositions face à face : un gagnant par ligne quand l'écart compte, et la phrase qui le dit. */
+describe('compareRoutes', () => {
+  const safe = { distance_m: 10100, duration_s: 3900, ascent_m: 40, safety: { grade: 'A', protected_share: 0.92, unprotected_crossings: 1 } }
+  const fast = { distance_m: 9800, duration_s: 3780, ascent_m: 95, safety: { grade: 'B', protected_share: 0.71, unprotected_crossings: 4 } }
+
+  it('dit ce que chacune gagne', () => {
+    const { rows, verdict } = compareRoutes(safe, fast)
+    expect(rows.find((r) => r.label === 'Note')).toMatchObject({ a: 'A', b: 'B', best: 'a' })
+    expect(rows.find((r) => r.label === 'Durée').best).toBe('b')
+    expect(rows.find((r) => r.label === 'Distance').best).toBeNull()
+    expect(verdict).toBe(
+      "La 1 est plus sûre (A contre B), monte 55 m de moins, a 21 points de plus à l'abri du trafic et traverse 3 fois de moins sans protection ; la 2 gagne 2 min.",
+    )
+  })
+
+  it('ne désigne pas de gagnant pour un écart qui ne compte pas', () => {
+    const twin = { ...safe, duration_s: 3930, ascent_m: 45 }
+    const { rows, verdict } = compareRoutes(safe, twin)
+    expect(rows.every((r) => r.best === null)).toBe(true)
+    expect(verdict).toMatch(/se valent/)
+  })
+
+  it("reste lisible sans note ni relief", () => {
+    const { rows } = compareRoutes({ distance_m: 5000 }, { distance_m: 5200 })
+    expect(rows.map((r) => r.label)).toEqual(['Distance'])
   })
 })

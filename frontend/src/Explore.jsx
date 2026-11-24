@@ -14,6 +14,7 @@ import RouteStrip from './RouteStrip.jsx'
 import { alreadyRun } from './knownRoutes'
 import SafetyPanel from './SafetyPanel.jsx'
 import SendSheet from './SendSheet.jsx'
+import Compare from './Compare.jsx'
 import { StopsList } from './Stops.jsx'
 import { Segmented, formatKm } from './FiltersSheet.jsx'
 import { downloadGpx } from './api'
@@ -262,6 +263,7 @@ export default function Explore({
 }) {
   const [exporting, setExporting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [comparing, setComparing] = useState(false)
   // Ce qu'on reconnaît de l'historique, calculé une fois par liste de
   // propositions : le tri grossier écarte presque tout sans rien mesurer, mais
   // le refaire à chaque rendu serait gratuit pour personne.
@@ -661,6 +663,18 @@ export default function Explore({
           <Icon name="share" size={18} />
           <span>Partager</span>
         </button>
+        {routes.length > 1 && (
+          <button
+            className={`loopact ${comparing ? 'loopact--on' : ''}`}
+            onClick={() => setComparing((c) => !c)}
+            aria-expanded={comparing}
+            title="Comparer avec une autre proposition"
+            aria-label="Comparer avec une autre proposition"
+          >
+            <Icon name="chart" size={18} />
+            <span>Comparer</span>
+          </button>
+        )}
         {/* Un trajet ne se régénère pas — ses trois chemins sont déjà là —,
             mais il a un retour : de B vers A, avec ses propres sens uniques,
             ses propres traversées, et parfois une autre note. */}
@@ -684,6 +698,9 @@ export default function Explore({
         )}
       </div>
       {sharing && <SendSheet onSend={exportGpx} busy={exporting} onClose={() => setSharing(false)} />}
+      {comparing && routes.length > 1 && (
+        <Compare routes={routes} selected={selected} onSelect={onSelect} onClose={() => setComparing(false)} />
+      )}
 
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 

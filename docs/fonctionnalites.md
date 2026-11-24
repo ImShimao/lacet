@@ -22,6 +22,11 @@ Et **plus long** tient une distance ou une durée : le bureau est à 3 km, mais
 on veut en courir 10, ou 45 minutes — Lacet propose des chemins vers B qui font
 ce compte, chacun par un côté différent (« Par le nord-ouest »).
 
+**Il aide à choisir.** « Comparer », dans le détail, met la proposition
+affichée face à une autre : note, distance, durée, dénivelé, part à l'abri du
+trafic, traversées non protégées — la meilleure valeur en avant —, et une
+phrase qui dit ce que chacune gagne (« la 1 est plus sûre, la 2 gagne 3 min »).
+
 **Il refuse les routes dangereuses.** Chaque tronçon est évalué : vitesse de la
 voie, trottoir ou piste séparée, éclairage la nuit, traversées protégées ou non.
 Une boucle notée **A** est presque entièrement protégée ; une **C** demande de
