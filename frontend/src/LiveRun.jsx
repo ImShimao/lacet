@@ -32,6 +32,9 @@ const haptic = (kind) => {
 }
 
 // Distance à laquelle on prévient d'une traversée à venir.
+// Le débit supposé de la voix pour savoir quand une phrase de la séance est
+// finie : un peu bas, pour la redire plutôt que la perdre si on se trompe.
+const COACH_CHARS_PER_S = 12
 const CROSSING_ALERT_M = 120
 // Ce qu'il faut avoir couru depuis l'alerte pour qu'une même traversée se
 // signale de nouveau. Plus que les 240 m d'un passage — 120 m pour y arriver,
@@ -190,6 +193,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // shortcut: la séance ne survit pas à une reprise, à garder dans `runState` si ça gêne.
   const coach = useRef(workoutSettings().on ? createCoach(blocksOf()) : null)
   const [block, setBlock] = useState(null)
+  // Les phrases de la séance pas encore finies de dire, avec l'heure où elles le
+  // seront. Une consigne de guidage vide la file de la voix : celles qu'elle
+  // coupe sont redites derrière elle (`talk`).
+  const coachPending = useRef([])
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
   const homeShown = useRef(false)
@@ -770,7 +777,14 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   function coachTick() {
     if (!coach.current) return
     const { said, status } = coach.current.update(movingSeconds(), covered.current)
-    for (const text of said) talk(text, { priority: false })
+    for (const text of said) {
+      talk(text, { priority: false })
+      // Ce que dure la phrase, à une douzaine de caractères par seconde — la voix
+      // d'iOS en dit un peu plus : mieux vaut redire une phrase finie que perdre
+      // une phrase coupée.
+      const from = Math.max(Date.now(), coachPending.current.at(-1)?.until ?? 0)
+      coachPending.current.push({ text, until: from + (text.length / COACH_CHARS_PER_S) * 1000 })
+    }
     setBlock(status)
     if (!status) coach.current = null
   }
@@ -973,6 +987,21 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     if (!text || !voice.speak(text, ...options)) return
     const [lon, lat] = (here.current ?? [null, null]).map((x) => (x == null ? null : Math.round(x * 1e5) / 1e5))
     journal.current.push({ t: Date.now(), lon, lat, m: Math.round(covered.current), text })
+    // Une consigne prioritaire coupe la phrase en cours et vide la file. Celles
+    // de la séance qu'elle a coupées reviennent derrière elle : mesuré sur une
+    // sortie simulée, « Répétition 1 sur 8 » se perdait en entier sous la
+    // première consigne de départ (`LiveRun.voice.test.jsx`).
+    if ((options[0]?.priority ?? true) && coachPending.current.length) {
+      const now = Date.now()
+      const cut = coachPending.current.filter((p) => p.until > now)
+      coachPending.current = []
+      for (const p of cut) {
+        voice.speak(p.text, { priority: false })
+        // Redite après la consigne, qui passe devant.
+        const from = coachPending.current.at(-1)?.until ?? now + (text.length / COACH_CHARS_PER_S) * 1000
+        coachPending.current.push({ text: p.text, until: from + (p.text.length / COACH_CHARS_PER_S) * 1000 })
+      }
+    }
   }
 
   /**

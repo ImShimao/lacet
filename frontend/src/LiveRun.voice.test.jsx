@@ -777,5 +777,10 @@ describe('la voix réglée', () => {
     expect(textes[0] ?? '', transcription(run)).toMatch(/Séance fractionnée : 8 fois 400 mètres/)
     expect(textes.some((t) => t.startsWith('Répétition 2 sur 8 : 400 mètres.')), transcription(run)).toBe(true)
     expect(textes.some((t) => /^Terminé en \d+ minutes? \d*/.test(t)), transcription(run)).toBe(true)
+    // Entendue, pas seulement envoyée : chaque phrase de la séance passe au moins
+    // une fois en entier, même quand une consigne de virage l'a coupée.
+    const seance = [...new Set(textes.filter((t) => /^(Séance|Répétition|Dernière|Récupère|Terminé|Plus que|Dix secondes)/.test(t)))]
+    const entendues = new Set(run.dites.filter((d) => d.entendu === d.texte.length).map((d) => d.texte))
+    expect(seance.filter((t) => !entendues.has(t)), transcription(run)).toEqual([])
   }, 60_000)
 })
