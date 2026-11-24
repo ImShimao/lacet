@@ -434,3 +434,13 @@
     animation: none;
   }
 }
+
+/* Le bloc de la séance fractionnée : vif pendant l'effort, calme sinon. */
+.live__block--work {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.live__block--work b {
+  color: var(--on-accent);
+}

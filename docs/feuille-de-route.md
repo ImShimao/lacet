@@ -44,7 +44,7 @@ Légende : **Fait** · **En cours** · *À faire*.
 | Recalcul hors parcours, sans réseau | non | partiel | **Fait** |
 | SOS par SMS avec position | non | oui | **Fait** |
 | Allure visée, écarts annoncés | non | partiel | **Fait** |
-| Séance fractionnée (échauffement, répétitions, retour au calme) | non | non | *À faire* : la voix annonce chaque bloc |
+| Séance fractionnée (échauffement, répétitions, retour au calme) | non | non | **Fait** : cinq séances, chaque bloc dit à la voix, temps de chaque répétition |
 | Arrivée à destination d'un trajet | — | — | **Fait** |
 
 ## 4. Après la sortie
@@ -61,5 +61,5 @@ Légende : **Fait** · **En cours** · *À faire*.
 1. **De A à B** — fait le 24 novembre 2026.
 2. **Aller-retour vers un point** — fait le 24 novembre 2026.
 3. **Comparer deux propositions** — fait le 24 novembre 2026.
-4. Séance fractionnée guidée à la voix.
+4. **Séance fractionnée guidée à la voix** — fait le 24 novembre 2026.
 5. Défis et séries.

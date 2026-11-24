@@ -6,7 +6,7 @@ import RunBanner from './RunBanner.jsx'
 import { ReportButton, RunControls, RunStats } from './RunPanel.jsx'
 import { NextStops } from './Stops.jsx'
 import useLiveActivity from './useLiveActivity'
-import { haversine, pace } from './format'
+import { duration, haversine, pace } from './format'
 import { bearing, buildTrack, headingAt, locate, nextInstruction, pointAt, runsBack, wrongWay } from './routeTracker'
 import { finishedState, lockScreenState } from './lockScreen'
 import { actAt, announcement, chains, followingStep, previewAt, rightAfter, speedOr, thenLabel } from './guidance'
@@ -23,6 +23,7 @@ import { spliceRoute } from './detour'
 import { keptIndices, simplify, trailRecorder } from './trail'
 import { clearRun, saveRun } from './runState'
 import { MILE_M, units } from './units'
+import { blocksOf, createCoach, workoutSettings } from './workout'
 import { arrivalSpeech, capitalize, lapAt, ordinal, plannedPerKm, spoken, spokenDuration, spokenSpeed, targetSpeech } from './runFormat'
 
 /** Une vibration de l'iPhone — rien dans l'aperçu de développement. */
@@ -183,6 +184,12 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // musique forte ou voix coupée, l'écran doit le dire aussi.
   const [splitShown, setSplitShown] = useState(null)
   const splitTimer = useRef(null)
+  // La séance fractionnée, si elle est réglée : le coach dit chaque bloc, le
+  // bandeau dit le bloc en cours (`workout.js`). Une sortie reprise après un
+  // arrêt de l'app la recommence au bloc d'échauffement.
+  // shortcut: la séance ne survit pas à une reprise, à garder dans `runState` si ça gêne.
+  const coach = useRef(workoutSettings().on ? createCoach(blocksOf()) : null)
+  const [block, setBlock] = useState(null)
   const origin = useRef(resuming?.trail?.[0] ?? null)
   const homeAt = useRef(null)
   const homeShown = useRef(false)
@@ -402,6 +409,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   useEffect(() => {
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: movingSeconds() }))
+      coachTick()
       keepRun()
       if (!gpsLost.current && lastGoodAt.current && Date.now() - lastGoodAt.current > GPS_LOST_MS) {
         gpsLost.current = true
@@ -492,6 +500,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
             covered.current += step
             setState((s) => ({ ...s, distance: covered.current, points: s.points + 1 }))
             announceSplit(covered.current)
+            coachTick()
           }
           const now = Date.now()
           trail.current.push({ t: now, covered: covered.current })
@@ -755,6 +764,15 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     mileAt.current = elapsed
     lastMile.current = done
     sayMilestone({ done, previous, gap, each, elapsed, travelled, word: 'mile' })
+  }
+
+  /** La séance : ce qu'il faut dire maintenant, et le bloc en cours pour le bandeau. */
+  function coachTick() {
+    if (!coach.current) return
+    const { said, status } = coach.current.update(movingSeconds(), covered.current)
+    for (const text of said) talk(text, { priority: false })
+    setBlock(status)
+    if (!status) coach.current = null
   }
 
   /** Ce que la voix dit à une borne — kilomètre ou mile —, selon les réglages. */
@@ -1403,6 +1421,13 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
         homeBusy={Boolean(rerouting)}
         homeNote={homeNote}
       />
+
+      {block && (
+        <div className={`live__split live__block live__block--${block.kind}`} role="status">
+          <b>{block.title}</b>
+          {block.unit === 'm' ? `${Math.ceil(block.left)} m` : duration(Math.ceil(block.left))}
+        </div>
+      )}
 
       {splitShown && (
         <div className="live__split" role="status">

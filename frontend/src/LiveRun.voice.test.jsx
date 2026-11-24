@@ -766,4 +766,16 @@ describe('la voix réglée', () => {
     // Les kilomètres restent tus : aucune borne « … kilomètre. » n'est dite.
     expect(run.dites.some((d) => /^(Premier|\S+ième|\S+uième) kilomètre\./.test(d.texte)), transcription(run)).toBe(false)
   }, 60_000)
+
+  it('la séance fractionnée se dit bloc par bloc, sans couper le guidage', async () => {
+    save({ voice: { km: 0 }, workout: { on: true, preset: '400', warmup_min: 0, cooldown_min: 0 } })
+    const { demande, routes } = await boucles(BEAUNE, 5)
+    const route = routes.find((r) => r.laps === 1)
+    const run = await courir(route, demande)
+    const textes = run.dites.map((d) => d.texte)
+    expect(defauts(route, run, { km: 0 }).join('\n'), transcription(run)).toBe('')
+    expect(textes[0] ?? '', transcription(run)).toMatch(/Séance fractionnée : 8 fois 400 mètres/)
+    expect(textes.some((t) => t.startsWith('Répétition 2 sur 8 : 400 mètres.')), transcription(run)).toBe(true)
+    expect(textes.some((t) => /^Terminé en \d+ minutes? \d*/.test(t)), transcription(run)).toBe(true)
+  }, 60_000)
 })

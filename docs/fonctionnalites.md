@@ -38,6 +38,13 @@ puis au moment d'agir — en baissant ta musique le temps de parler. Écran
 verrouillé, la consigne, la distance et l'heure d'arrivée restent lisibles dans
 une activité en direct.
 
+**Il fait aussi coach.** Une séance fractionnée — 8 × 400 m, 5 × 1 km,
+10 × 30 s / 30 s… — réglée dans « Mon compte › Guidage et voix » se court sur
+une boucle comme en course libre : la voix dit chaque bloc à son début
+(« Répétition 3 sur 8 : 400 mètres. Vas-y ! »), prévient dix secondes ou cent
+mètres avant la fin, donne le temps de chaque répétition, et un bandeau montre
+ce qui reste du bloc.
+
 **Il ne te lâche pas si tu t'écartes.** Un virage raté, une rue barrée : au bout
 de vingt secondes hors du tracé, il calcule un nouveau chemin depuis là où tu
 es — sur le téléphone, sans réseau — en essayant de **tenir la distance

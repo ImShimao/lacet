@@ -27,6 +27,7 @@ import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
+import { WORKOUT_PRESETS, workoutSettings } from './workout'
 import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
 import { parsePresets, presets, setPresets } from './presets'
@@ -152,6 +153,7 @@ function summaryOf(key, { params, poiPrefs }) {
         `Recalcul ${saved.autoReroute !== false ? 'auto' : 'manuel'}`,
         `Arrêt ${saved.autoFinish !== false ? 'auto' : 'manuel'} à l'arrivée`,
         km ? null : 'Kilomètres tus',
+        workoutSettings().on ? `Fractionné ${WORKOUT_PRESETS.find((p) => p.key === workoutSettings().preset)?.label ?? ''}` : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -231,6 +233,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       return (
         <>
           <VoiceSetting />
+          <WorkoutSetting />
           <RunSettings poiPrefs={poiPrefs} onPoiPrefs={onPoiPrefs} />
           <LockScreenSetting />
         </>
@@ -1130,6 +1133,44 @@ function VoiceSetting() {
         />
       </PrefsCard>
     </>
+  )
+}
+
+const WARMUPS = [0, 5, 10, 15, 20].map((n) => ({ key: n, label: n ? `${n} min` : 'Aucun' }))
+const COOLDOWNS = [0, 5, 10].map((n) => ({ key: n, label: n ? `${n} min` : 'Aucun' }))
+
+/**
+ * La séance fractionnée de la prochaine sortie : la voix dit chaque bloc, le
+ * bandeau le bloc en cours (`workout.js`). Gardée allumée d'une sortie à
+ * l'autre — c'est la semaine de piste —, à couper une fois la séance faite.
+ */
+function WorkoutSetting() {
+  const [prefs, setPrefs] = useState(workoutSettings)
+  const change = (patch) => {
+    const next = { ...prefs, ...patch }
+    setPrefs(next)
+    save({ workout: next })
+  }
+  return (
+    <PrefsCard
+      title="Séance fractionnée"
+      foot="La voix dit chaque bloc à son début, prévient dix secondes ou cent mètres avant sa fin, et donne le temps de chaque répétition. Sur une boucle comme en course libre."
+    >
+      <ToggleRow icon="repeat" label="Guider une séance" on={prefs.on} onChange={(on) => change({ on })} />
+      {prefs.on && (
+        <>
+          <PickRow
+            icon="flame"
+            label="Séance"
+            value={prefs.preset}
+            options={WORKOUT_PRESETS.map((p) => ({ key: p.key, label: p.label }))}
+            onChange={(preset) => change({ preset })}
+          />
+          <PickRow icon="clock" label="Échauffement" value={prefs.warmup_min} options={WARMUPS} onChange={(warmup_min) => change({ warmup_min })} />
+          <PickRow icon="clock" label="Retour au calme" value={prefs.cooldown_min} options={COOLDOWNS} onChange={(cooldown_min) => change({ cooldown_min })} />
+        </>
+      )}
+    </PrefsCard>
   )
 }
 
