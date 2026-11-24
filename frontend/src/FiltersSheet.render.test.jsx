@@ -140,7 +140,7 @@ describe('le panneau des filtres', () => {
 
   it('n’affiche pas un filtre masqué dans les réglages, mais garde la longueur', () => {
     ouvrir({ ...DEFAULTS, hiddenFilters: ['terrain'] })
-    expect(screen.queryByText('Préférences de parcours')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: 'Terrain' })).not.toBeInTheDocument()
     // Les essentiels et les autres filtres restent.
     expect(screen.getByText('Longueur')).toBeInTheDocument()
     expect(screen.getByText('Allure')).toBeInTheDocument()

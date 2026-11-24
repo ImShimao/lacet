@@ -16,14 +16,14 @@ export const SPORTS = [
 // à vélo. Le moteur, lui, reçoit la même valeur.
 export const TERRAINS = {
   run: [
-    { key: 'road', label: 'Route', icon: 'road', sub: 'Les rues et routes goudronnées.' },
-    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins mêlés, selon ce qui est autour.' },
-    { key: 'trail', label: 'Sentier', icon: 'mountain', sub: 'Chemins, sentiers et pistes, loin des voitures.' },
+    { key: 'road', label: 'Route', icon: 'road', sub: 'Rues et routes goudronnées' },
+    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins mêlés' },
+    { key: 'trail', label: 'Sentier', icon: 'mountain', sub: 'Chemins et sentiers, loin des voitures' },
   ],
   bike: [
-    { key: 'road', label: 'Route', icon: 'road', sub: 'Les routes goudronnées.' },
-    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins roulants mêlés.' },
-    { key: 'trail', label: 'VTT', icon: 'mountain', sub: 'Chemins et sentiers, loin des voitures.' },
+    { key: 'road', label: 'Route', icon: 'road', sub: 'Routes goudronnées' },
+    { key: 'mixed', label: 'Mixte', icon: 'forest', sub: 'Routes et chemins roulants' },
+    { key: 'trail', label: 'VTT', icon: 'mountain', sub: 'Chemins et sentiers, loin des voitures' },
   ],
 }
 
@@ -357,7 +357,7 @@ export default function FiltersSheet({ value, origin = null, onApply, onClose })
           )}
 
           {shown('terrain') && (
-            <Field label="Préférences de parcours" info="terrain" sport={draft.sport}>
+            <Field label="Terrain" info="terrain" sport={draft.sport}>
               <Choices label="Terrain" options={TERRAINS[draft.sport]} value={draft.surface} onChange={(surface) => set({ surface })} />
               <div className="checks checks--after">
                 <button

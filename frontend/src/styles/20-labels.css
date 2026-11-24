@@ -1,12 +1,13 @@
 /* Le ton commun à tous les écrans : les étiquettes, les chiffres, les choix.
 
-   Repris de ce qui se lit bien chez Roovr et RunnrZ, sans leurs couleurs :
-   - chaque section s'annonce par une petite étiquette en chasse fixe, espacée,
-     précédée d'un point de l'accent : on repère les blocs sans les lire ;
-   - un chiffre se lit en grand, son unité en petit à côté, et son étiquette
-     au-dessus : l'œil trouve le nombre d'abord ;
+   Calme d'abord : une étiquette de section est un petit titre en minuscules,
+   pas une ligne de capitales espacées précédée d'un point — répétées dix fois
+   par écran, elles faisaient plus de bruit que le contenu qu'elles annonçaient.
+   - un chiffre se lit en grand, son étiquette en petit au-dessus ;
    - un choix fait se voit d'un trait de l'accent, pas seulement d'un gris un
-     peu plus clair, qui ne se distinguait pas en plein soleil.
+     peu plus clair, qui ne se distinguait pas en plein soleil ;
+   - les cadres se font rares : la surface suffit à grouper, le filet sert
+     quand deux surfaces identiques se touchent.
    Ce fichier vient en dernier : il retouche les fichiers qui le précèdent. */
 
 /* ══ étiquettes de section ═══════════════════════════════════════════════ */
@@ -17,24 +18,12 @@
 .search__title,
 .startmenu b,
 .acct__label {
-  font-family: var(--eyebrow);
-  font-size: calc(10.5px * var(--text-scale));
+  font-family: var(--display);
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-.label::before,
-.acct__label::before,
-.strip__title::before {
-  content: '';
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin: 0 7px 1px 0;
-  border-radius: 50%;
-  background: var(--accent-text);
-  vertical-align: middle;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: var(--text-2);
 }
 
 /* ══ choix segmentés ═════════════════════════════════════════════════════ */
@@ -78,8 +67,7 @@
   min-width: 0;
   padding: 9px 9px 10px;
   text-align: left;
-  border: 1px solid var(--line-soft);
-  border-right: 1px solid var(--line-soft);
+  border: 0;
   border-radius: 12px;
   background: var(--surface-2);
 }
@@ -92,9 +80,31 @@
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  font-family: var(--eyebrow);
-  font-size: calc(9px * var(--text-scale));
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: calc(11px * var(--text-scale));
   line-height: 1.25;
+}
+
+/* ══ moins de cadres ═════════════════════════════════════════════════════ */
+
+/* Une ligne de liste se détache par sa surface : le filet en plus doublait
+   chaque sortie d'un trait, et dix sorties faisaient une grille. */
+.list__row {
+  border-color: transparent;
+}
+/* Le geste « garder la carte » à côté : une icône, pas une seconde carte. Sa
+   couleur dit l'état (vert gardée, jaune incomplète). */
+.offline {
+  min-width: 40px;
+  padding: 0 6px;
+  background: none;
+  border-color: transparent;
+}
+.offline--on,
+.offline--other,
+.offline--warn {
+  border-color: transparent;
+}
+.statstrip__card {
+  background: var(--surface-2);
+  border-color: transparent;
 }

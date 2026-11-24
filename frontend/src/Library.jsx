@@ -685,7 +685,7 @@ function Totals({ history, profile }) {
         </div>
         <div>
           <b>{km(week, 0)}</b>
-          <span>km · 7 j</span>
+          <span>km en 7 jours</span>
         </div>
       </div>
       <p className="muted small">

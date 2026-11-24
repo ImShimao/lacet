@@ -11,6 +11,14 @@ sécurité, points d'eau — et la poignée grise le replie. L'app reste en
 portrait (`customize.py`) : on court téléphone en main ou au bras, et une app
 qui pivote au moindre mouvement est inutilisable en courant.
 
+**Peu de cadres, peu de bruit.** Les étiquettes de section sont de petits
+titres en minuscules, dans la police du texte — plus de capitales espacées en
+chasse fixe précédées d'un point. Les chiffres du bilan n'ont plus de cadre,
+les lignes de « Mes parcours » se détachent par leur surface et non par un
+filet, et le bouton « garder la carte » n'est plus qu'une icône
+(`20-labels.css`). Les noms vont à l'essentiel : « Terrain », « Route · Rues et
+routes goudronnées ».
+
 **Peu de texte à l'écran.** Dans le détail, l'heure de retour, la météo et le
 vent tiennent sur une rangée de pastilles (`Facts` dans `Explore.jsx`) ; seul
 un conseil qui change la tenue (pluie, froid, chaleur) garde sa phrase. Dans
