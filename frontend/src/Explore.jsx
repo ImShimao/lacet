@@ -171,7 +171,7 @@ function Destination({ destination, placing, onPlace, onClear }) {
         <b>{destination ? destination.label || "Point d'arrivée" : 'Où vas-tu ?'}</b>
         <em>
           {destination
-            ? "arrivée du trajet — fais-la glisser sur la carte"
+            ? 'arrivée — glisse-la sur la carte'
             : placing
               ? "touche la carte là où tu veux arriver"
               : "cherche une adresse en haut, ou pose-la sur la carte"}
@@ -260,6 +260,7 @@ export default function Explore({
   onReturnTrip = null,
   tripKind = 'oneway',
   onTripKind = null,
+  onSwapEnds = null,
 }) {
   const [exporting, setExporting] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -315,23 +316,8 @@ export default function Explore({
   if (!result) {
     return (
       <div className="panel">
-        <div className="origin">
-          <span className="origin__pin">
-            <Icon name="pin" size={18} />
-          </span>
-          <div>
-            <b>{startLabel || (start ? 'Point choisi' : 'Localisation…')}</b>
-            <em>
-              {geo.accuracy && geo.status === 'ready'
-                ? `précision ± ${Math.round(geo.accuracy)} m`
-                : journey
-                  ? 'départ du trajet'
-                  : 'départ de la boucle'}
-            </em>
-          </div>
-        </div>
-        {/* Revenir à sa porte, ou aller quelque part : les deux sorties qu'on
-            fait. Le trajet garde tout le reste — note, voix, relief. */}
+        {/* Revenir à sa porte, ou aller quelque part : la première question, en
+            tête. Le trajet garde tout le reste — note, voix, relief. */}
         {onGoal && (
           <Segmented
             options={[
@@ -342,19 +328,55 @@ export default function Explore({
             onChange={onGoal}
           />
         )}
+        {/* Départ et arrivée d'un même bloc, reliés comme sur un plan : séparés
+            par le choix Boucle / Aller à…, ils ne se lisaient pas comme un trajet. */}
+        <div className={journey ? 'itinerary' : undefined}>
+          <div className="origin">
+            <span className="origin__pin">
+              <Icon name="pin" size={18} />
+            </span>
+            <div>
+              <b>{startLabel || (start ? 'Point choisi' : 'Localisation…')}</b>
+              <em>
+                {geo.accuracy && geo.status === 'ready'
+                  ? `précision ± ${Math.round(geo.accuracy)} m`
+                  : journey
+                    ? 'départ du trajet'
+                    : 'départ de la boucle'}
+              </em>
+            </div>
+          </div>
+          {journey && (
+            <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+          )}
+          {journey && destination && start && onSwapEnds && (
+            <button className="itinerary__swap" onClick={onSwapEnds} aria-label="Inverser départ et arrivée" title="Inverser départ et arrivée">
+              <Icon name="updown" size={16} />
+            </button>
+          )}
+        </div>
         {journey ? (
           <>
-            <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+            {/* Une précision du trajet, pas une seconde grande question : des
+                pastilles, pas un deuxième sélecteur pleine largeur. */}
             {onTripKind && (
-              <Segmented
-                options={[
-                  { key: 'oneway', label: 'Au plus court' },
-                  { key: 'stretch', label: 'Plus long' },
-                  { key: 'round', label: 'Aller-retour' },
-                ]}
-                value={tripKind}
-                onChange={onTripKind}
-              />
+              <div className="chips chips--trip" role="radiogroup" aria-label="Type de trajet">
+                {[
+                  ['oneway', 'Au plus court'],
+                  ['stretch', 'Plus long'],
+                  ['round', 'Aller-retour'],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    role="radio"
+                    aria-checked={tripKind === key}
+                    className={`chip ${tripKind === key ? 'chip--on' : ''}`}
+                    onClick={() => onTripKind(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             )}
             {tripKind === 'stretch' && onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />}
           </>
@@ -471,6 +493,17 @@ export default function Explore({
         onOpenDetail={onOpenDetail}
         sport={params.sport}
       />
+      {/* Sous les cartes, là où l'on hésite : au fond du détail, « Comparer »
+          ne se trouvait qu'une fois le choix déjà fait. */}
+      {routes.length > 1 && !comparing && (
+        <button className="comparelink" onClick={() => setComparing(true)} aria-expanded={false}>
+          <Icon name="chart" size={15} />
+          Comparer les {routes.length} propositions
+        </button>
+      )}
+      {comparing && routes.length > 1 && (
+        <Compare routes={routes} selected={selected} onSelect={onSelect} onClose={() => setComparing(false)} />
+      )}
 
       {/* Les avertissements viennent après les cartes : ils nuancent une
           proposition, ils ne doivent pas la pousser sous le pli. */}
@@ -663,18 +696,6 @@ export default function Explore({
           <Icon name="share" size={18} />
           <span>Partager</span>
         </button>
-        {routes.length > 1 && (
-          <button
-            className={`loopact ${comparing ? 'loopact--on' : ''}`}
-            onClick={() => setComparing((c) => !c)}
-            aria-expanded={comparing}
-            title="Comparer avec une autre proposition"
-            aria-label="Comparer avec une autre proposition"
-          >
-            <Icon name="chart" size={18} />
-            <span>Comparer</span>
-          </button>
-        )}
         {/* Un trajet ne se régénère pas — ses trois chemins sont déjà là —,
             mais il a un retour : de B vers A, avec ses propres sens uniques,
             ses propres traversées, et parfois une autre note. */}
@@ -698,10 +719,6 @@ export default function Explore({
         )}
       </div>
       {sharing && <SendSheet onSend={exportGpx} busy={exporting} onClose={() => setSharing(false)} />}
-      {comparing && routes.length > 1 && (
-        <Compare routes={routes} selected={selected} onSelect={onSelect} onClose={() => setComparing(false)} />
-      )}
-
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 
       {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}

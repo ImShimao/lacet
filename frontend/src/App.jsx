@@ -263,16 +263,19 @@ export default function App() {
     save({ tripKind: next })
     found.forget()
   }
-  // Le retour : B devient le départ, A l'arrivée, et la recherche repart.
-  const returnTrip = () => {
+  // Le retour : B devient le départ, A l'arrivée — et, depuis les résultats,
+  // la recherche repart ; depuis l'accueil, on inverse seulement.
+  const swapEnds = ({ run = true } = {}) => {
     if (!start || !destination) return
     const home = askedOf(start)
     const back = { lat: home.lat, lon: home.lon, label: startLabel ?? null }
     const from = { lat: destination.lat, lon: destination.lon }
     applyStart(from, destination.label ?? undefined, true)
     setDestination(back)
-    search(undefined, { from, to: back })
+    if (run) search(undefined, { from, to: back })
+    else found.forget()
   }
+  const returnTrip = () => swapEnds()
 
   // Le point posé, la recherche repart aussitôt : c'est la question qu'on vient
   // de poser. Retiré, elle repart sans lui — si des boucles étaient affichées.
@@ -733,7 +736,9 @@ export default function App() {
                 <b>{sport?.label}</b>
                 {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
                 <span className="sportpill__spec">
-                  {result.meta?.journey ? `${result.meta.roundtrip ? 'Aller-retour' : 'Trajet'} · ${summarise(params).split(' · ').slice(1).join(' · ')}` : summarise(params)}
+                  {result.meta?.journey
+                    ? `${result.meta.roundtrip ? 'Aller-retour' : 'Trajet'} · ${(result.meta.stretched ? summarise(params).split(' · ') : summarise(params).split(' · ').slice(1)).join(' · ')}`
+                    : summarise(params)}
                 </span>
                 <Icon name="sliders" size={17} className="sportpill__gear" />
               </button>
@@ -970,6 +975,7 @@ export default function App() {
               onReturnTrip={journey && destination && !result?.meta?.roundtrip ? returnTrip : null}
               tripKind={tripKind}
               onTripKind={chooseTripKind}
+              onSwapEnds={() => swapEnds({ run: false })}
               onBack={() => {
                 setDetail(false)
                 found.forget()

@@ -763,3 +763,41 @@
   color: var(--text-2);
   font-weight: 600;
 }
+
+/* Départ et arrivée d'un trajet, d'un seul bloc : un trait relie les deux
+   repères, comme sur un plan. Le bouton qui les inverse se range à droite du
+   départ, dans la colonne du ✕ de l'arrivée. */
+.itinerary {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 12px 12px 12px 12px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.itinerary::before {
+  content: '';
+  position: absolute;
+  left: 28px;
+  top: 46px;
+  bottom: 46px;
+  border-left: 2px dotted var(--text-3);
+}
+.itinerary__swap {
+  position: absolute;
+  right: 12px;
+  top: 13px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.chips--trip {
+  justify-content: center;
+  flex-wrap: wrap;
+}

@@ -12,7 +12,7 @@ Chaque boucle est mesurée, notée, et **rejetée** si elle ne passe pas le
 contrôle : l'app dit aussi ce qu'elle a écarté, et pourquoi.
 
 **Il va aussi de A à B.** « Aller à… » : on cherche une adresse ou on pose
-l'arrivée sur la carte, et Lacet propose jusqu'à trois chemins — le plus sûr,
+l'arrivée sur la carte — le bouton ⇅ inverse départ et arrivée —, et Lacet propose jusqu'à trois chemins — le plus sûr,
 l'équilibré, le plus direct —, chacun noté A, B ou C, pour voir ce que coûte en
 sécurité le kilomètre gagné. Même guidage à la voix, même relief, même recalcul
 si l'on s'écarte, et « Trajet retour » refait le chemin de B vers A. En
@@ -22,7 +22,7 @@ Et **plus long** tient une distance ou une durée : le bureau est à 3 km, mais
 on veut en courir 10, ou 45 minutes — Lacet propose des chemins vers B qui font
 ce compte, chacun par un côté différent (« Par le nord-ouest »).
 
-**Il aide à choisir.** « Comparer », dans le détail, met la proposition
+**Il aide à choisir.** « Comparer les propositions », sous les cartes, met la proposition
 affichée face à une autre : note, distance, durée, dénivelé, part à l'abri du
 trafic, traversées non protégées — la meilleure valeur en avant —, et une
 phrase qui dit ce que chacune gagne (« la 1 est plus sûre, la 2 gagne 3 min »).

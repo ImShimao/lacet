@@ -324,7 +324,9 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
     }
     // Le nom dit la variante et où elle mène : c'est lui qu'on relit en favori.
     const where = label ? ` vers ${label}` : ''
-    const name = roundtrip ? `${f.label}${where} et retour` : `${f.label}${where}`
+    // Un chemin allongé a déjà son côté au-dessus du nom, sur sa carte : le nom
+    // dit seulement où il mène.
+    const name = f.key === 'stretch' && label ? `Vers ${label}` : roundtrip ? `${f.label}${where} et retour` : `${f.label}${where}`
     const route = matchedRoute(graph, source, f, { req, name, elev, night })
     // L'identifiant d'une boucle : la variante et la longueur, pour qu'un trajet
     // gardé en favori ne prenne pas la place d'un autre.
@@ -339,6 +341,7 @@ export async function planJourney(input, { loadGraph, fetchElevations = fetchMan
     meta: {
       journey: true,
       roundtrip,
+      stretched: Boolean(wanted),
       night,
       crow_m: Math.round(crow),
       graph_nodes: graph.nodeCount,
