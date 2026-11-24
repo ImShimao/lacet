@@ -510,7 +510,7 @@ function SearchSettings({ params, onProfile }) {
     <>
       <PrefsCard
         title="Itinéraire"
-        foot="Sûr écarte toute route rapide sans trottoir. À gauche, on court face aux voitures, comme le demande le code de la route (R412-36) hors agglomération."
+        foot="Sûr écarte les routes rapides sans trottoir. À gauche, on court face aux voitures (R412-36)."
       >
         <PickRow
           icon="shield"
@@ -566,7 +566,7 @@ function SearchSettings({ params, onProfile }) {
 
       <PrefsCard
         title="Recherche"
-        foot="La nuit, les rues éclairées et passantes passent devant les chemins isolés. « Auto » suit l'heure du coucher du soleil."
+        foot="La nuit, les rues éclairées passent devant. « Auto » suit le coucher du soleil."
       >
         <PickRow
           icon="clock"
@@ -587,7 +587,7 @@ function SearchSettings({ params, onProfile }) {
 
       <PrefsCard
         title="Raccourcis de l'accueil"
-        foot="Les touches sous la règle de distance : la sortie de tous les jours en un toucher. Six au plus."
+        foot="Les touches sous la règle de distance, six au plus."
       >
         <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label="Distances" icon="routes" unit={unitLabel()} />
         <PresetRow kind="duration" label="Durées" icon="clock" unit="min" />
@@ -658,6 +658,9 @@ function PresetRow({ kind, label, icon, unit }) {
  * valeur par défaut, et la ligne le dit : un réglage qu'on ne voit plus ne doit
  * pas continuer d'agir en douce (voir `OPTIONAL_FILTERS`).
  */
+/** Les mêmes icônes que les autres réglages : une ligne sans icône paraissait d'une autre page. */
+const FILTER_ICONS = { sport: 'run', terrain: 'forest', relief: 'hilly' }
+
 function ShownFilters({ params, onProfile }) {
   const hidden = params.hiddenFilters ?? []
   const toggle = (f) =>
@@ -667,12 +670,13 @@ function ShownFilters({ params, onProfile }) {
         : { hiddenFilters: [...hidden, f.key], ...f.reset },
     )
   return (
-    <PrefsCard title="Panneau Filtres" foot="La longueur et l'allure y restent toujours : sans elles, pas de recherche.">
+    <PrefsCard title="Panneau Filtres" foot="La longueur et l'allure y restent toujours.">
       {OPTIONAL_FILTERS.map((f) => {
         const on = !hidden.includes(f.key)
         return (
           <ToggleRow
             key={f.key}
+            icon={FILTER_ICONS[f.key]}
             label={f.label}
             sub={on ? null : `Masqué. ${f.fixed}`}
             on={on}

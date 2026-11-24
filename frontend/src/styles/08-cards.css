@@ -42,7 +42,9 @@
   padding: 12px 14px 12px;
   border-radius: 18px;
   background: var(--surface-2);
-  border: 1.5px solid var(--line);
+  /* Une surface suffit à détacher la carte de la carte : seul le choix en
+     cours garde un contour, pour qu'il se lise sans chercher. */
+  border: 1.5px solid transparent;
   opacity: 0.6;
   transition:
     opacity 0.18s ease,
@@ -79,10 +81,8 @@
 .rcard__dir {
   flex: 1;
   min-width: 0;
-  font-family: var(--mono);
-  font-size: calc(10.5px * var(--text-scale));
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 600;
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -90,6 +90,9 @@
 }
 .rcard--on .rcard__dir {
   color: var(--accent-text);
+}
+.rcard__dir::first-letter {
+  text-transform: uppercase;
 }
 .rcard__km {
   font-size: calc(14px * var(--text-scale));
@@ -117,9 +120,7 @@
 .rcard__stats {
   display: flex;
   gap: 14px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
+  margin-top: 8px;
   font-size: calc(11.5px * var(--text-scale));
   color: var(--text-3);
   white-space: nowrap;

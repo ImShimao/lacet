@@ -72,10 +72,11 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
     <div className="panel">
       <div className="seg">
         <button aria-pressed={view === 'history'} onClick={() => setView('history')}>
-          Sorties ({history.length})
+          {/* « (0) » sur un compte vide n'apprend rien : le compte vient avec la première. */}
+          Sorties{history.length > 0 && ` (${history.length})`}
         </button>
         <button aria-pressed={view === 'saved'} onClick={() => setView('saved')}>
-          Favoris ({saved.length})
+          Favoris{saved.length > 0 && ` (${saved.length})`}
         </button>
       </div>
 
@@ -128,13 +129,20 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
           <span className="empty__icon">
             <Icon name={view === 'history' ? 'routes' : 'heart'} size={22} />
           </span>
-          <p>
-            {view === 'history'
-              ? history.length
-                ? 'Aucune sortie pour ce filtre.'
-                : "Aucune sortie enregistrée. Lance-en une depuis l'onglet Explorer."
-              : 'Aucun parcours en favori. Le cœur, sous une proposition, la garde ici.'}
-          </p>
+          {/* Un titre court, puis une ligne : le bouton dessous dit déjà où aller. */}
+          {view === 'history' && history.length ? (
+            <p>Aucune sortie pour ce filtre.</p>
+          ) : view === 'history' ? (
+            <>
+              <b>Pas encore de sortie</b>
+              <p>Chaque sortie s'enregistre ici, avec son temps et sa trace.</p>
+            </>
+          ) : (
+            <>
+              <b>Aucun favori</b>
+              <p>Le cœur, sous une proposition, la garde ici.</p>
+            </>
+          )}
           {/* Un écran vide qui dit « va ailleurs » sans y mener laisse chercher
               l'onglet du regard : le bouton y emmène. Pas pour un filtre qui ne
               rend rien — il y a déjà des sorties, et l'on veut changer de filtre. */}
@@ -391,11 +399,7 @@ function ImportRow({ onImport }) {
         <p className="muted small import__error">{erreur}</p>
       ) : (
         <p className="muted small">
-          Le tracé d'un ami, une course balisée. Lacet reconnaît les rues qu'il emprunte —
-          il faut télécharger celles du coin, quelques secondes — et le traite ensuite comme
-          une boucle calculée ici : noms de rues, traversées, note de sécurité et consignes
-          de virage. Quand la trace ne suit aucune rue connue, elle est gardée telle quelle,
-          sans note.
+          Le tracé d'un ami ou d'une course : Lacet le note et le guide comme les siens.
         </p>
       )}
     </div>

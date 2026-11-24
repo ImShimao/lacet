@@ -647,8 +647,7 @@ export default function Explore({
         <>
           {rejected?.length > 0 && <RejectedList rejected={rejected} />}
           <p className="disclaimer">
-            Les itinéraires privilégient les voies protégées d'après OpenStreetMap. Les
-            données peuvent être incomplètes ou dépassées : reste attentif sur le terrain.
+            Note tirée d'OpenStreetMap, parfois incomplet ou dépassé : reste attentif sur le terrain.
           </p>
         </>
       )}
@@ -752,7 +751,7 @@ const STAGES = {
   // réseau : chez soi, l'écran annonçait à tort un téléchargement.
   data: 'Lecture des rues',
   download: 'Téléchargement des rues',
-  graph: 'Construction du réseau de voies',
+  graph: 'Assemblage des rues',
   routing: 'Recherche des boucles',
   elevation: 'Calcul du relief',
 }
@@ -803,14 +802,14 @@ function SearchProgress({ progress }) {
         {long && stage === 'download'
           ? // Les archives couvrent la France et ses voisins ; ailleurs, il faut
             // interroger OpenStreetMap en direct, et c'est là que ça traîne.
-            "Ce coin n'est pas dans les archives : Lacet interroge OpenStreetMap en direct, et ses serveurs sont lents en ce moment. Ça aboutit en général en moins d'une minute."
+            "Hors des archives : OpenStreetMap répond lentement, moins d'une minute en général."
           : stage === 'download'
-            ? "Les rues sont gardées sur l'appareil : la prochaine recherche ici sera immédiate, même hors ligne."
+            ? "Gardées sur l'appareil : la prochaine fois, ce sera immédiat."
             : stage === 'elevation'
               ? // La seule étape qui attend encore quelqu'un d'autre : autant le
                 // dire, plutôt que de promettre un calcul sans serveur.
-                "Les altitudes viennent de l'IGN, en un seul envoi — et sont gardées pour les prochaines boucles du coin."
-              : 'Le calcul se fait sur ton appareil, sans serveur.'}
+                "Altitudes de l'IGN, gardées pour les prochaines boucles."
+              : 'Calculé sur ton téléphone, sans serveur.'}
       </p>
     </div>
   )
@@ -940,7 +939,8 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
                     ? `${km(r.lap_distances_m[0], 1)} + ${km(r.lap_distances_m[1], 1)} ${unitLabel()}`
                     : r.laps > 1
                       ? `${km(r.lap_distance_m, 1)} ${unitLabel()} × ${r.laps}`
-                      : r.direction}
+                      : // « Boucle sud-est » le dit déjà dessous : pas deux fois.
+                        r.name?.toLowerCase().includes(r.direction?.toLowerCase()) ? '' : r.direction}
                 </span>
                 {/* Sans analyse — un tracé de secours —, pas de note : un tiret
                     dit « on ne sait pas », là où un « A » mentirait. */}

@@ -517,9 +517,11 @@
   height: 34px;
   padding: 0 6px 0 12px;
   border-radius: 999px;
-  border: 1px solid var(--accent-line);
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  /* Une pastille pleine, sans filet : six raccourcis cerclés d'accent
+     faisaient une rangée de boutons qui crient. */
+  border: none;
+  background: var(--surface-3);
+  color: var(--text);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

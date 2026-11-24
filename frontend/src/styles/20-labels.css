@@ -108,6 +108,17 @@
   background: var(--surface-2);
   border-color: transparent;
 }
+/* Le détail d'une boucle empilait une dizaine de blocs cerclés : profil,
+   sécurité, surfaces, gestes, feuille de route, avis. Sur le fond du panneau,
+   leur surface les sépare déjà ; le filet ne faisait qu'ajouter des traits. */
+.block,
+.strip,
+.steps,
+.loopact,
+.notice,
+.disclose {
+  border-color: transparent;
+}
 
 /* ══ en course ═══════════════════════════════════════════════════════════ */
 

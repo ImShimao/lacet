@@ -95,7 +95,7 @@ describe('glisser une ligne de « Mes parcours »', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }))
     fireEvent.click(within(screen.getByRole('group')).getByRole('button', { name: 'Retirer' }))
     expect(load().favorites).toHaveLength(0)
-    expect(screen.getByText(/Aucun parcours en favori/)).toBeTruthy()
+    expect(screen.getByText(/Aucun favori/)).toBeTruthy()
     await waitFor(() => expect(load().offlineMaps).toEqual({}))
   })
 
