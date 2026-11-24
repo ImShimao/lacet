@@ -9,7 +9,7 @@
 import { duration, km, pace } from './format'
 import { bandPaths, sketch } from './routeDraw'
 import { paceBands } from './runTrace'
-import { paceLabel, unitLabel } from './units'
+import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
 // Le format portrait des réseaux et des messageries : il occupe l'écran d'un
 // téléphone sans être rogné.
@@ -87,7 +87,7 @@ export function drawRunCard(canvas, entry, verdict = null) {
   const figures = [
     [duration(seconds), 'Temps'],
     bike
-      ? [(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ','), 'km/h']
+      ? [speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ','), speedLabel()]
       : [distance > 100 ? pace(seconds / (distance / 1000)) : '—', `Allure ${paceLabel()}`],
     [entry.actual_ascent_m != null ? `${entry.actual_ascent_m} m` : '—', 'Dénivelé +'],
   ]
@@ -143,7 +143,7 @@ export function figuresOf(entry) {
   return [
     [`${km(distance)} ${unitLabel()}`, 'Distance'],
     bike
-      ? [`${(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ',')} km/h`, 'Vitesse']
+      ? [`${speedIn(seconds > 0 ? (distance / seconds) * 3.6 : 0).toFixed(1).replace('.', ',')} ${speedLabel()}`, 'Vitesse']
       : [distance > 100 ? `${pace(seconds / (distance / 1000))} ${paceLabel()}` : '—', 'Allure'],
     [duration(seconds), 'Temps'],
     ...(entry.actual_ascent_m != null ? [[`${entry.actual_ascent_m} m`, 'Dénivelé +']] : []),
