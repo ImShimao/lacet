@@ -57,3 +57,21 @@ describe('la séance fractionnée', () => {
     expect(durationWords(150)).toBe('2 minutes 30')
   })
 })
+
+describe('la séance personnalisée', () => {
+  const perso = (custom) => ({ on: true, preset: 'custom', warmup_min: 0, cooldown_min: 0, custom })
+
+  it('se découpe en blocs comme un classique, à la distance', () => {
+    const { label, blocks } = blocksOf(perso({ reps: 3, unit: 'm', work_m: 1500, rest_s: 75 }))
+    expect(label).toBe('3 × 1,5 km / 1 min 15')
+    expect(blocks.map((b) => b.kind)).toEqual(['work', 'rest', 'work', 'rest', 'work'])
+    expect(blocks[0]).toMatchObject({ m: 1500, rep: 1, reps: 3 })
+    expect(blocks[1]).toMatchObject({ s: 75 })
+  })
+
+  it('se court aussi à la durée, et garde ses valeurs par défaut pour un champ absent', () => {
+    const { label, blocks } = blocksOf(perso({ unit: 's', work_s: 45 }))
+    expect(label).toBe('6 × 45 s / 1 min 30')
+    expect(blocks[0]).toMatchObject({ s: 45, reps: 6 })
+  })
+})

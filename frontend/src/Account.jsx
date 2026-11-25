@@ -27,7 +27,7 @@ import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
-import { WORKOUT_PRESETS, workoutSettings } from './workout'
+import { CUSTOM_DEFAULTS, WORKOUT_PRESETS, shortAmount, workoutPlan, workoutSettings } from './workout'
 import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
 import { parsePresets, presets, setPresets } from './presets'
@@ -152,7 +152,7 @@ function summaryOf(key, { params, poiPrefs }) {
         t('Recalcul {v1}', { v1: t(saved.autoReroute !== false ? 'auto' : 'manuel') }),
         t('Arrêt {v1} à l\'arrivée', { v1: t(saved.autoFinish !== false ? 'auto' : 'manuel') }),
         km ? null : t('Kilomètres tus'),
-        workoutSettings().on ? t('Fractionné {v1}', { v1: t(WORKOUT_PRESETS.find((p) => p.key === workoutSettings().preset)?.label ?? '') }) : null,
+        workoutSettings().on ? t('Fractionné {v1}', { v1: t(workoutPlan().label) }) : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -1052,6 +1052,13 @@ function VoiceSetting() {
 const WARMUPS = [0, 5, 10, 15, 20].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
 const COOLDOWNS = [0, 5, 10].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
 
+// Les réglages de la séance personnalisée : des pas qu'un coach donnerait,
+// de la côte courte au long fractionné.
+const REPS = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map((n) => ({ key: n, label: `${n}` }))
+const WORK_M = [100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 3000].map((m) => ({ key: m, label: shortAmount({ m }) }))
+const WORK_S = [15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 480, 600].map((s) => ({ key: s, label: shortAmount({ s }) }))
+const RESTS = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300].map((s) => ({ key: s, label: shortAmount({ s }) }))
+
 /**
  * La séance fractionnée de la prochaine sortie : la voix dit chaque bloc, le
  * bandeau le bloc en cours (`workout.js`). Gardée allumée d'une sortie à
@@ -1076,14 +1083,42 @@ function WorkoutSetting() {
             icon="flame"
             label={t('Séance')}
             value={prefs.preset}
-            options={WORKOUT_PRESETS.map((p) => ({ key: p.key, label: t(p.label) }))}
+            options={[...WORKOUT_PRESETS.map((p) => ({ key: p.key, label: t(p.label) })), { key: 'custom', label: t('Personnalisée') }]}
             onChange={(preset) => change({ preset })}
           />
+          {prefs.preset === 'custom' && <CustomWorkout custom={{ ...CUSTOM_DEFAULTS, ...prefs.custom }} onChange={(custom) => change({ custom })} />}
           <PickRow icon="clock" label={t('Échauffement')} value={prefs.warmup_min} options={WARMUPS} onChange={(warmup_min) => change({ warmup_min })} />
           <PickRow icon="clock" label={t('Retour au calme')} value={prefs.cooldown_min} options={COOLDOWNS} onChange={(cooldown_min) => change({ cooldown_min })} />
         </>
       )}
     </PrefsCard>
+  )
+}
+
+/** La séance personnalisée, champ par champ : répétitions, effort, récupération. */
+function CustomWorkout({ custom, onChange }) {
+  const set = (patch) => onChange({ ...custom, ...patch })
+  const bySeconds = custom.unit === 's'
+  return (
+    <>
+      <PickRow icon="repeat" label={t('Répétitions')} value={custom.reps} options={REPS} onChange={(reps) => set({ reps })} />
+      <PickRow
+        icon="gauge"
+        label={t('Effort mesuré en')}
+        value={custom.unit}
+        options={[
+          { key: 'm', label: t('Distance') },
+          { key: 's', label: t('Durée') },
+        ]}
+        onChange={(unit) => set({ unit })}
+      />
+      {bySeconds ? (
+        <PickRow icon="flame" label={t('Effort')} value={custom.work_s} options={WORK_S} onChange={(work_s) => set({ work_s })} />
+      ) : (
+        <PickRow icon="flame" label={t('Effort')} value={custom.work_m} options={WORK_M} onChange={(work_m) => set({ work_m })} />
+      )}
+      <PickRow icon="clock" label={t('Récupération')} value={custom.rest_s} options={RESTS} onChange={(rest_s) => set({ rest_s })} />
+    </>
   )
 }
 

@@ -44,15 +44,21 @@ function Head({ icon, label, sub }) {
  */
 export function PickRow({ icon, label, sub, value, options, onChange, shown = null }) {
   const [open, setOpen] = useState(false)
-  const [up, setUp] = useState(false)
+  const [place, setPlace] = useState({ up: false, max: 380 })
   const row = useRef(null)
   const current = options.find((o) => o.key === value)
 
   useLayoutEffect(() => {
     if (!open || !row.current) return
     const box = row.current.getBoundingClientRect()
-    // 50 px par choix, la barre d'onglets en dessous.
-    setUp(box.top + options.length * 50 + 24 > (window.innerHeight || 800) - 90)
+    // 50 px par choix. Le menu va du côté qui a le plus de place, et ne
+    // dépasse jamais cette place : la liste des voix d'iOS, longue, montait
+    // sinon sous l'en-tête de la page (en haut) — ou sous la barre d'onglets.
+    const want = Math.min(options.length * 50 + 16, 380)
+    const below = (window.innerHeight || 800) - 90 - box.top - 6
+    const above = box.bottom - 6 - 120
+    const up = below < want && above > below
+    setPlace({ up, max: Math.max(150, Math.min(want, up ? above : below)) })
   }, [open])
 
   return (
@@ -65,7 +71,7 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
       {open && (
         <>
           <div className="pop__scrim" onClick={() => setOpen(false)} />
-          <div className={`pop ${up ? 'pop--up' : ''}`} role="listbox" aria-label={tx(label)}>
+          <div className={`pop ${place.up ? 'pop--up' : ''}`} style={{ maxHeight: place.max }} role="listbox" aria-label={tx(label)}>
             {options.map((o) => (
               <button
                 key={String(o.key)}

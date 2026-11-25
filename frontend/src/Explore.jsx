@@ -307,6 +307,20 @@ export default function Explore({
     )
   }
 
+  if (!result && journey && placingDest) {
+    // Poser l'arrivée se fait sur la carte : le panneau entier la couvrait, et
+    // l'on touchait la feuille au lieu de la rue. Il ne reste que la consigne.
+    return (
+      <div className="panel panel--placing">
+        <Destination destination={destination} placing={placingDest} onPlace={onPlaceDestination} onClear={onClearDestination} />
+      </div>
+    )
+  }
+
+  // Un trajet sans arrivée n'a qu'une question : où aller. La longueur, les
+  // filtres et la course libre attendent qu'elle soit posée.
+  const bare = journey && !destination
+
   if (!result) {
     return (
       <div className="panel">
@@ -372,7 +386,7 @@ export default function Explore({
                 ))}
               </div>
             )}
-            {tripKind === 'stretch' && onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />}
+            {tripKind === 'stretch' && !bare && onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />}
           </>
         ) : (
           onQuickParams && <QuickLength params={params} onQuickParams={onQuickParams} />
@@ -383,6 +397,7 @@ export default function Explore({
         </button>
         {/* Côte à côte : deux gestes secondaires empilés sous le principal
             prenaient autant de place que lui, et le noyaient. */}
+        {!bare && (
         <div className="row">
           {/* Ce que les filtres règlent, dit avant de les ouvrir — sans la
               distance, déjà écrite en grand juste au-dessus. */}
@@ -394,6 +409,7 @@ export default function Explore({
           <button className="btn btn--ghost" onClick={onFreeRun}>
             <Icon name="play" size={17} />{t('Courir libre')}</button>
         </div>
+        )}
         {/* Les rues se préparent en fond dès que le départ est connu : le dire
             explique pourquoi la recherche est soudain instantanée — et qu'elle
             le restera, même sans réseau. */}

@@ -28,15 +28,43 @@
 
 /* ══ choix segmentés ═════════════════════════════════════════════════════ */
 
+/* Comme ceux d'iOS : le choix actif est une pastille pleine qui se soulève,
+   pas un cadre coloré — deux sélecteurs empilés sur l'accueil faisaient deux
+   rectangles d'accent de plus, et l'écran paraissait chargé. */
 .seg {
   background: var(--surface-2);
-  border: 1px solid var(--line-soft);
+  border: 0;
 }
 .seg button[aria-pressed='true'],
 .seg button[aria-checked='true'] {
-  background: var(--accent-soft);
+  background: var(--surface-3);
   color: var(--accent-text);
-  box-shadow: inset 0 0 0 1px var(--accent-line);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25), 0 0 0 0.5px var(--line);
+}
+/* Boucle / Aller à : la première question, sans prendre la hauteur d'un bouton. */
+.panel > .seg button {
+  padding-block: 10px;
+}
+/* Le départ, sur l'accueil : une ligne d'information, pas une carte. */
+.panel > .origin,
+.panel > div > .origin:only-child {
+  background: none;
+  border: 0;
+  padding: 0 2px;
+}
+.panel > .origin .origin__pin,
+.panel > div > .origin:only-child .origin__pin {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+/* « Courir libre » : un geste secondaire, sobre — les pointillés le faisaient
+   passer pour une zone de dépôt. */
+.panel .row .btn,
+.panel .row .btn--ghost {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--surface-2);
 }
 
 /* ══ le geste principal ══════════════════════════════════════════════════ */

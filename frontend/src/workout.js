@@ -22,7 +22,30 @@ export const WORKOUT_PRESETS = [
   { key: '3min', label: '6 × 3 min', reps: 6, work: { s: 180 }, rest_s: 120 },
 ]
 
-export const WORKOUT_DEFAULTS = { on: false, preset: '400', warmup_min: 10, cooldown_min: 5 }
+// La séance à soi : réglée champ par champ quand aucun classique ne convient.
+// Gardée même quand on revient à un classique, pour la retrouver telle quelle.
+export const CUSTOM_DEFAULTS = { reps: 6, unit: 'm', work_m: 400, work_s: 60, rest_s: 90 }
+
+export const WORKOUT_DEFAULTS = { on: false, preset: '400', warmup_min: 10, cooldown_min: 5, custom: CUSTOM_DEFAULTS }
+
+/** « 400 m », « 1,5 km », « 30 s », « 1 min 30 » : une quantité en peu de signes. */
+export function shortAmount(b) {
+  if (b.m) return b.m % 1000 ? (b.m > 1000 ? `${String(b.m / 1000).replace('.', ',')} km` : `${b.m} m`) : `${b.m / 1000} km`
+  const m = Math.floor(b.s / 60)
+  const s = b.s % 60
+  if (!m) return `${s} s`
+  return s ? `${m} min ${s}` : `${m} min`
+}
+
+/** La séance à courir : un classique, ou la séance personnalisée mise sous la même forme. */
+export function workoutPlan(settings = workoutSettings()) {
+  if (settings.preset === 'custom') {
+    const c = { ...CUSTOM_DEFAULTS, ...settings.custom }
+    const work = c.unit === 's' ? { s: c.work_s } : { m: c.work_m }
+    return { key: 'custom', reps: c.reps, work, rest_s: c.rest_s, label: `${c.reps} × ${shortAmount(work)} / ${shortAmount({ s: c.rest_s })}` }
+  }
+  return WORKOUT_PRESETS.find((p) => p.key === settings.preset) ?? WORKOUT_PRESETS[0]
+}
 
 export const workoutSettings = () => ({ ...WORKOUT_DEFAULTS, ...load().workout })
 
@@ -48,7 +71,7 @@ const amountWords = (b) => (b.m ? (b.m % 1000 ? tr('{m} mètres', { m: b.m }) : 
 
 /** Les blocs de la séance, dans l'ordre. */
 export function blocksOf(settings = workoutSettings()) {
-  const preset = WORKOUT_PRESETS.find((p) => p.key === settings.preset) ?? WORKOUT_PRESETS[0]
+  const preset = workoutPlan(settings)
   const out = []
   if (settings.warmup_min > 0) out.push({ kind: 'warmup', s: settings.warmup_min * 60 })
   for (let rep = 1; rep <= preset.reps; rep += 1) {

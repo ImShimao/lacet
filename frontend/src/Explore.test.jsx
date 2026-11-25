@@ -249,3 +249,54 @@ describe('une boucle importée', () => {
     expect(onBack).toHaveBeenCalledOnce()
   })
 })
+
+/**
+ * « Aller à… » sans arrivée : le panneau ne pose qu'une question, pour laisser
+ * la carte libre — et pendant qu'on pose l'arrivée, il n'en reste qu'une ligne.
+ */
+describe("l'écran Aller à", () => {
+  const formulaire = (props) =>
+    render(
+      <Explore
+        start={{ lat: 47.9, lon: 7.2 }}
+        startLabel="Guebwiller"
+        geo={{ status: 'ready', position: [7.2, 47.9], accuracy: 8, following: false }}
+        busy={false}
+        error={null}
+        result={null}
+        params={{ sport: 'run', surface: 'mixed', elevation: 'rolling', safety: 'safe', distance_km: 10, mode: 'distance' }}
+        journey
+        tripKind="stretch"
+        onGoal={() => {}}
+        onTripKind={() => {}}
+        onQuickParams={() => {}}
+        onPlaceDestination={() => {}}
+        onClearDestination={() => {}}
+        onSearch={() => {}}
+        onFreeRun={() => {}}
+        onOpenFilters={() => {}}
+        {...props}
+      />,
+    )
+
+  it("sans arrivée, cache la longueur, les filtres et la course libre", () => {
+    formulaire()
+    expect(screen.getByText('Où vas-tu ?')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Filtres/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Courir libre/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /10 km/ })).toBeNull()
+  })
+
+  it("pendant la pose, ne garde que la ligne d'arrivée", () => {
+    formulaire({ placingDest: true })
+    expect(screen.getByText('touche la carte là où tu veux arriver')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Choisir l'arrivée/ })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Plus long' })).toBeNull()
+  })
+
+  it("une fois l'arrivée posée, tout revient", () => {
+    formulaire({ destination: { lat: 47.91, lon: 7.21, label: 'Parc' } })
+    expect(screen.getByRole('button', { name: /Filtres/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Courir libre/ })).toBeInTheDocument()
+  })
+})
