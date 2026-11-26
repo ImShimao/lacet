@@ -18,8 +18,8 @@ Après vérification à la lecture du code, beaucoup de diagnostics du scan ne s
 
 | # | Fichier | Catégorie | Sévérité | Statut |
 |---|---|---|---|---|
-| 001 | [offline-style-fetch-status](001-offline-style-fetch-status.md) | Bugs | MEDIUM | TODO |
-| 002 | [app-poi-prefs-save-outside-updater](002-app-poi-prefs-save-outside-updater.md) | Bugs | LOW | TODO |
+| 001 | [offline-style-fetch-status](001-offline-style-fetch-status.md) | Bugs | MEDIUM | DONE (f26e87c, sans test unitaire) |
+| 002 | [app-poi-prefs-save-outside-updater](002-app-poi-prefs-save-outside-updater.md) | Bugs | LOW | DONE (a010197) |
 | 003 | [sos-contact-field-label](003-sos-contact-field-label.md) | Accessibilité | HIGH | DONE (non commité) |
 
 ## Ordre recommandé

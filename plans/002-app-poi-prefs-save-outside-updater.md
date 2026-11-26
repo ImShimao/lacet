@@ -1,6 +1,6 @@
 # 002 — Sortir l'écriture de sauvegarde du setter `setPoiPrefs`
 
-- **Status**: TODO
+- **Status**: DONE (commit a010197). Diagnostic 881 disparu. Les appels de `onPoiPrefs` ne partent qu'un par toucher (`RunSettings`).
 - **Commit**: a4fe34c
 - **Severity**: LOW
 - **Category**: Bugs & correctness

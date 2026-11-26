@@ -1,6 +1,6 @@
 # 001 — Vérifier le statut HTTP avant de lire la réponse du style de carte
 
-- **Status**: TODO
+- **Status**: DONE (commit f26e87c). Écart avec le plan : le test unitaire n'est pas ajouté — `describeStyle` n'est pas exporté et `download` exige le stockage de l'appareil. Diagnostics 277 et 291 disparus.
 - **Commit**: a4fe34c
 - **Severity**: MEDIUM
 - **Category**: Bugs & correctness
