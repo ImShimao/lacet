@@ -87,6 +87,8 @@
   z-index: 6;
   width: auto;
   align-self: flex-start;
+  /* 44 px de haut : la pastille de parcours était à 39 px, sous la cible tactile. */
+  min-height: 44px;
   padding: 8px 13px;
   background: var(--glass);
   backdrop-filter: blur(12px);
