@@ -138,6 +138,7 @@ function ContactSheet({ onClose, onSave, onShare }) {
           type="tel"
           inputMode="tel"
           autoComplete="tel"
+          aria-label={t('Numéro à prévenir')}
           placeholder="06 12 34 56 78"
           value={number}
           onChange={(e) => setNumber(e.target.value)}

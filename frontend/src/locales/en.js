@@ -725,6 +725,7 @@ export default {
   "Alerter un proche (maintiens appuyé)": "Alert someone (press and hold)",
   "Contact d’urgence": "Emergency contact",
   "Prévenir qui ?": "Alert whom?",
+  "Numéro à prévenir": "Number to alert",
   "Aucun contact enregistré. Donne un numéro : il reste sur cet appareil et sert à préremplir un SMS — que tu envoies toi-même.": "No contact saved. Enter a number: it stays on this device and is used to prefill a text message — which you send yourself.",
   "Partager sans enregistrer": "Share without saving",
   "Enregistrer et alerter": "Save and alert",
