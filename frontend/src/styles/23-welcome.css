@@ -26,7 +26,9 @@
   padding: 0 4px;
   background: none;
   border: 0;
-  color: var(--dim);
+  /* `--dim` est un filtre (brightness), pas une couleur : la valeur était
+     invalide et le texte retombait sur la couleur héritée, en blanc plein. */
+  color: var(--text-2);
   font: inherit;
   font-size: calc(15px * var(--text-scale));
 }
@@ -76,14 +78,15 @@
   margin: 0;
   font-size: calc(16px * var(--text-scale));
   line-height: 1.5;
-  color: var(--dim);
+  color: var(--text-2);
 }
+/* `--text-3` plutôt qu'une opacité : sa couleur est mesurée (AA dans les deux
+   thèmes), une opacité sur un gris le ferait passer sous 4,5:1. */
 .welcome__note {
   margin: 14px 0 0;
   font-size: calc(13px * var(--text-scale));
   line-height: 1.45;
-  color: var(--dim);
-  opacity: 0.85;
+  color: var(--text-3);
 }
 .welcome__foot {
   display: flex;
@@ -202,7 +205,9 @@
   padding: 14px 18px;
   border-radius: 16px;
   background: var(--accent);
-  color: var(--accent-text);
+  /* Le texte posé sur l'accent prend `--on-accent` : `--accent-text` est la
+     couleur de l'accent lui-même, et se lisait à peine sur son propre fond. */
+  color: var(--on-accent);
   font-weight: 600;
   font-size: calc(17px * var(--text-scale));
   animation: welcome-pop 0.5s 0.2s cubic-bezier(0.32, 0.72, 0, 1) both;
@@ -214,7 +219,7 @@
   height: 52px;
   border-radius: 26px;
   border: 1px solid var(--line);
-  color: var(--dim);
+  color: var(--text-2);
 }
 
 /* Écrans courts (iPhone SE) : l'illustration cède la place au texte. */
