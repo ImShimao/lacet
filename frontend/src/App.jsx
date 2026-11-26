@@ -875,13 +875,11 @@ export default function App() {
                 geo={geo}
                 history={history}
                 poiPrefs={poiPrefs}
-                onPoiPrefs={(patch) =>
-                  setPoiPrefs((prev) => {
-                    const next = { ...prev, ...patch }
-                    save({ pois: next })
-                    return next
-                  })
-                }
+                onPoiPrefs={(patch) => {
+                  const next = { ...poiPrefs, ...patch }
+                  setPoiPrefs(next)
+                  save({ pois: next })
+                }}
                 onProfile={(patch) => {
                   const next = { ...params, ...patch }
                   setParams(next)
