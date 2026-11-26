@@ -274,7 +274,11 @@ async function describeStyle(source) {
   let style = source
   if (typeof source === 'string') {
     shared.push(source)
-    style = await (await fetch(source)).json()
+    // `fetch` ne rejette pas sur un 404 ou un 503 : sans ce contrôle, le corps
+    // d'erreur passait pour un style, et la carte était dite « non gardable ».
+    const response = await fetch(source)
+    if (!response.ok) throw new Error(`HTTP ${response.status} pour le style ${source}`)
+    style = await response.json()
   }
 
   const templates = []
@@ -288,7 +292,11 @@ async function describeStyle(source) {
       templates.push(src.tiles[0])
     } else if (src.url) {
       shared.push(src.url)
-      const tilejson = await (await fetch(src.url)).json()
+      // Un TileJSON en erreur ne doit pas disparaître en silence : la carte
+      // serait gardée sans une de ses couches.
+      const response = await fetch(src.url)
+      if (!response.ok) throw new Error(`HTTP ${response.status} pour ${src.url}`)
+      const tilejson = await response.json()
       if (tilejson.tiles?.length) templates.push(tilejson.tiles[0])
     }
   }
