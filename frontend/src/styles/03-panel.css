@@ -696,8 +696,10 @@
 .ruler__track::-webkit-scrollbar {
   display: none;
 }
+/* Le contour reste visible au clavier : le supprimer rendait la règle muette au focus. */
 .ruler__track:focus-visible {
-  outline: none;
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
 }
 .ruler__pad {
   flex: 0 0 50%;
