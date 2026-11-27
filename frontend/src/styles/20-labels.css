@@ -100,7 +100,7 @@
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  font-size: calc(11px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.25;
 }
 
@@ -155,7 +155,7 @@
   color: var(--text-3);
 }
 .stats--live span {
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
 }
 /* « Signaler un problème ici » : un geste rare, dit en une ligne discrète et
    non plus en cadre pointillé — mais toujours assez haut pour le pouce. */

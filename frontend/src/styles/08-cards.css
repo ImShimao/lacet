@@ -73,7 +73,7 @@
   display: grid;
   place-items: center;
   font-family: var(--mono);
-  font-size: calc(10.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   flex: none;
 }
@@ -124,7 +124,7 @@
   display: flex;
   gap: 14px;
   margin-top: 8px;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -178,7 +178,7 @@
 .sendsheet__head em {
   font-style: normal;
   font-family: var(--eyebrow);
-  font-size: calc(10px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent-text);
@@ -421,7 +421,7 @@
   align-items: center;
   gap: 2px;
   margin-left: 2px;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 700;
   color: var(--accent-text);
   white-space: nowrap;
@@ -435,7 +435,7 @@
   padding: 7px 0 5px;
 }
 .btn__cap {
-  font-size: calc(10.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0;

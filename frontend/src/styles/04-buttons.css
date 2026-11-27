@@ -181,7 +181,7 @@ html.native textarea {
 }
 .btn--stack em {
   font-style: normal;
-  font-size: calc(11px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   color: var(--text-3);
   white-space: nowrap;

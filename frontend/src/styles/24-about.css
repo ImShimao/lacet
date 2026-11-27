@@ -39,7 +39,7 @@
 }
 .about__diag .muted {
   padding: 0 4px;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
 }
 
 /* La phrase qui compte avant tout le reste : la note n'est pas une garantie. */

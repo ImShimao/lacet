@@ -74,7 +74,7 @@
 .rundet__big span {
   display: block;
   margin-top: 6px;
-  font-size: calc(10.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   letter-spacing: 0.14em;
   color: var(--text-3);
 }
@@ -89,7 +89,7 @@
 }
 .rundet__plan span {
   display: block;
-  font-size: calc(11px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
 .rundet__plan b {
@@ -124,7 +124,7 @@
 }
 .weeks__head em {
   font-style: normal;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
 .weeks__plot {
@@ -210,7 +210,7 @@
 }
 .standing__gaps span {
   display: block;
-  font-size: calc(11px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
 .standing__gaps b {
@@ -238,7 +238,7 @@
 }
 .splits__head em {
   font-style: normal;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
 .splits__row {
@@ -336,7 +336,7 @@
   border: 1px solid var(--caution-line);
   background: var(--caution-soft);
   color: var(--text);
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 650;
 }
 .signal__kind .icon {
@@ -371,7 +371,7 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
 }

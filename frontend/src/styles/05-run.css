@@ -45,7 +45,7 @@
 .live__wait {
   text-align: center;
   font-family: var(--mono);
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
 
@@ -257,7 +257,7 @@ input.field:focus {
   color: var(--text);
 }
 .small {
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
 }
 
 .rows__num {

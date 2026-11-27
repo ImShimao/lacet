@@ -271,7 +271,7 @@
   flex: none;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: calc(11.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   white-space: nowrap;
   background: var(--surface-2);
