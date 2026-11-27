@@ -18,6 +18,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
+import About from './About.jsx'
 import { AVOIDABLE, COUNTS, DIRECTIONS, MAX_LAPS, MOMENTS, OPTIONAL_FILTERS, SAFETY, SPORTS, directionOf } from './FiltersSheet.jsx'
 import { LinkRow, PickRow, PrefsCard, ToggleRow } from './Prefs.jsx'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
@@ -263,22 +264,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       )
     case 'about':
       return (
-        <>
-          <h3 className="section">{t('Version')}</h3>
-          <BuildStamp />
-          <LastSearch />
-          {/* Les pages légales qu'Apple et le RGPD demandent, dans l'app même : sans
-              compte ni serveur, il n'y a rien d'autre à consulter ailleurs. */}
-          <h3 className="section">{t('Conditions d\'utilisation')}</h3>
-          <p className="muted small">
-            <b>{t('La note A, B ou C est une estimation, pas une garantie.')}</b>{' '}{t('Elle est calculée à partir d\'OpenStreetMap, qui peut être incomplet ou dépassé : un trottoir manquant, un chantier, une rue mal éclairée n\'y figurent pas toujours. Regarde la route, respecte le Code de la route et reste seul juge de ton parcours.')}</p>
-          <p className="muted small">{t('Lacet est fourni tel quel, sans garantie que les boucles, les distances, le dénivelé ou le guidage soient exacts. Le bouton SOS prépare un SMS : il n\'appelle pas les secours et ne remplace pas le 112.')}</p>
-          <h3 className="section">{t('Confidentialité')}</h3>
-          <p className="muted small">{t('Aucun compte, aucune mesure d\'usage, aucune publicité. Favoris, sorties, réglages et contact d\'urgence ne quittent pas cet appareil. Seuls partent sur le réseau, sans rien qui t\'identifie : la zone autour du départ (rues, altitudes, vent, fond de carte) et le lieu qu\'on cherche par son nom. Une sortie ne quitte le téléphone que si tu l\'exportes ou la partages.')}</p>
-          <p className="muted small">{t('« Tout effacer », dans Sauvegarde, supprime tout ce que l\'app a gardé. Pour toute question : la page du projet sur GitHub.')}</p>
-          <h3 className="section">{t('Sources')}</h3>
-          <p className="disclaimer">{t('Données © contributeurs OpenStreetMap (ODbL) · Fonds de carte © OpenFreeMap, © OpenMapTiles, © OpenTopoMap (CC-BY-SA), © Mapbox · Altitudes IGN RGE ALTI, Mapzen / Copernicus EU-DEM (hors ligne) et Valhalla (FOSSGIS) hors de France · Recherche de lieux Photon (Komoot) et Nominatim · Vent MET Norway (CC BY 4.0).')}</p>
-        </>
+        <About version={<BuildStamp />} diagnostic={<LastSearch />} />
       )
     default:
       return null

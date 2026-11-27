@@ -27,10 +27,17 @@
   opacity: 0.4;
   cursor: default;
 }
+/* L'action principale : un aplat de l'accent, sans lueur ni dégradé — une ombre
+   colorée floue se lit en bandes sur l'écran (2026-11-26). Elle s'enfonce
+   légèrement au toucher, comme un bouton iOS. */
 .btn--primary {
   background: var(--accent);
   border-color: transparent;
   color: var(--on-accent);
+  transition: transform 0.12s ease;
+}
+.btn--primary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .btn--big {
   font-size: calc(15.5px * var(--text-scale));

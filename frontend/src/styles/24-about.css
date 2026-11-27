@@ -1,0 +1,134 @@
+/* « À propos » (`About.jsx`) : la marque et sa version, puis les conditions,
+   la confidentialité et les sources, en lignes qu'on parcourt du regard. */
+
+.about__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--surface-2);
+}
+.about__mark {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  /* Le fond de l'écran de lancement : la marque y retrouve son cadre. */
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.about__id {
+  min-width: 0;
+}
+.about__id b {
+  display: block;
+  font-size: calc(19px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.about__id .muted {
+  font-size: calc(12px * var(--text-scale));
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.about__diag:empty {
+  display: none;
+}
+.about__diag .muted {
+  padding: 0 4px;
+  font-size: calc(11.5px * var(--text-scale));
+}
+
+/* La phrase qui compte avant tout le reste : la note n'est pas une garantie. */
+.about__callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-radius: 16px;
+  background: var(--caution-soft);
+  color: var(--caution);
+}
+.about__callout p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: calc(13.5px * var(--text-scale));
+  line-height: 1.45;
+}
+.about__callout b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Des lignes d'information, pas des boutons : rien ne s'enfonce au toucher,
+   et le détail passe à la ligne au lieu d'être coupé. */
+.about__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.about__point {
+  align-items: flex-start;
+  cursor: default;
+}
+.about__point:active {
+  background: none;
+}
+.about__point .menu__text em {
+  white-space: normal;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* Trois engagements, côte à côte : ce qu'on vient chercher sur cette page. */
+.about__pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.about__pillar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 6px 12px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--safe);
+  text-align: center;
+}
+.about__pillar span {
+  color: var(--text);
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.25;
+}
+.about__foot {
+  margin-top: -4px;
+  padding: 0 4px;
+}
+
+/* Les sources : le type de donnée à gauche, qui la fournit en dessous. */
+.about__sources {
+  margin: 0;
+}
+.about__sources div {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.about__sources div:last-child {
+  border-bottom: none;
+}
+.about__sources dt {
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 600;
+}
+.about__sources dd {
+  margin: 2px 0 0;
+  font-size: calc(12.5px * var(--text-scale));
+  line-height: 1.4;
+  color: var(--text-3);
+}

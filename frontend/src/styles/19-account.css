@@ -34,26 +34,32 @@
   gap: 18px;
 }
 
-/* Qui l'on est : l'activité du moment, et ce qu'on a déjà couru. */
-/* La carte du profil : un bouton qui ouvre la page « Profil ». */
+/* La carte du profil : un bouton qui ouvre la page « Profil ». Teintée de
+   l'accent, elle sert de tête à tout le sommaire. */
 .acct__card {
   display: flex;
   width: 100%;
   text-align: left;
-  padding: 14px 14px 14px 16px;
+  padding: 16px 14px 16px 16px;
   border-radius: 20px;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
+  /* Sans filet : le contour bleu se lisait comme des barres autour de l'avatar. */
+  border: 0;
+  /* Une teinte unie, pas un dégradé : un dégradé sur un petit aplat se lit
+     en bandes sur l'écran (constaté sur le bouton principal, le 2026-11-26). */
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+}
+.acct__card:active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
 }
 .acct__who {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 14px;
 }
 .acct__avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
   display: grid;
   place-items: center;
   flex: none;
@@ -80,10 +86,8 @@
 }
 .acct__label {
   margin: 0 0 0 4px;
-  font-size: calc(11.5px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
   color: var(--text-3);
 }
 .menu {
@@ -119,9 +123,27 @@
   background: var(--accent-soft);
   color: var(--accent-text);
 }
+/* Chaque famille de réglages a sa couleur : on repère la rubrique avant de lire
+   son nom. Les couleurs sont celles de l'app (sécurité, statut), en fond doux. */
 .menu__icon--risk {
   background: var(--risk-soft);
   color: var(--risk);
+}
+.menu__icon--info {
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  color: var(--info);
+}
+.menu__icon--caution {
+  background: var(--caution-soft);
+  color: var(--caution);
+}
+.menu__icon--safe {
+  background: var(--safe-soft);
+  color: var(--safe);
+}
+.menu__icon--trail {
+  background: color-mix(in srgb, var(--trail) 16%, transparent);
+  color: var(--trail);
 }
 .menu__text {
   flex: 1;

@@ -67,14 +67,6 @@
   background: var(--surface-2);
 }
 
-/* ══ le geste principal ══════════════════════════════════════════════════ */
-
-/* Un halo de l'accent sous le bouton principal : il se trouve sans le chercher,
-   même posé sur la carte. */
-.btn--primary:not(:disabled) {
-  box-shadow: 0 10px 26px -12px var(--accent-glow);
-}
-
 /* ══ tuiles de chiffres ══════════════════════════════════════════════════ */
 
 /* Le bilan, le détail d'une sortie, le mois : quatre tuiles séparées,

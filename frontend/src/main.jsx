@@ -60,6 +60,11 @@ async function start() {
 
 start()
 
+// Sans écouteur de toucher, Safari et la vue web d'iOS n'appliquent pas
+// `:active` : les boutons ne s'enfonçaient pas sous le doigt, la réponse
+// n'arrivait qu'au relâcher. Un écouteur vide suffit à rendre l'appui visible.
+document.addEventListener('touchstart', () => {}, { passive: true })
+
 // L'envoi vers Strava a été retiré de l'app (octobre 2026). Les jetons d'accès
 // qu'une version précédente avait gardés ne servent plus à rien, et ce sont des
 // clés : ils ne restent pas sur le téléphone.
