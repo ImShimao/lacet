@@ -41,6 +41,9 @@ export function BrandBadge({ brand }) {
 
 const DESTINATIONS = [
   { key: 'friend', icon: 'share', title: 'Un ami', sub: "Il l'ouvre avec Lacet, qui la note comme les siennes." },
+  // Une image plutôt qu'un fichier : « on fait celle-là ? », lisible dans
+  // n'importe quelle conversation, sans app pour l'ouvrir.
+  { key: 'image', icon: 'routes', title: 'Une image', sub: 'Le tracé, la distance et la note, à envoyer dans une conversation.', image: true },
   { key: 'garmin', brand: 'garmin', title: 'Garmin Connect', sub: 'Choisis Connect dans le menu de partage.' },
   { key: 'coros', brand: 'coros', title: 'COROS', sub: 'Choisis COROS dans le menu de partage.' },
   { key: 'suunto', brand: 'suunto', title: 'Suunto', sub: 'Choisis Suunto dans le menu de partage.' },
@@ -82,7 +85,7 @@ const openSite = async (url) => {
   window.open(url, '_blank', 'noopener')
 }
 
-export default function SendSheet({ onSend, busy = false, onClose }) {
+export default function SendSheet({ onSend, onImage = null, busy = false, onClose }) {
   const [guide, setGuide] = useState(null)
 
   if (guide) {
@@ -138,11 +141,11 @@ export default function SendSheet({ onSend, busy = false, onClose }) {
         )}
       </header>
       <div className="sendsheet__list">
-        {DESTINATIONS.map((d) => (
+        {DESTINATIONS.filter((d) => !d.image || onImage).map((d) => (
           <button
             key={d.key}
             className="sendsheet__row"
-            onClick={() => (d.guide ? setGuide(d) : onSend())}
+            onClick={() => (d.guide ? setGuide(d) : d.image ? onImage() : onSend())}
             disabled={busy && !d.guide}
           >
             {d.brand ? (

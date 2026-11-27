@@ -686,7 +686,14 @@ export default function Explore({
           </button>
         )}
       </div>
-      {sharing && <SendSheet onSend={exportGpx} busy={exporting} onClose={() => setSharing(false)} />}
+      {sharing && (
+        <SendSheet
+          onSend={exportGpx}
+          onImage={() => import('./shareCard').then((m) => m.shareLoopCard(selected, params.sport)).catch(() => {})}
+          busy={exporting}
+          onClose={() => setSharing(false)}
+        />
+      )}
       <StopsList {...stops} prefs={poiPrefs} distance={selected.distance_m} />
 
       {selected.instructions?.length > 2 && <RouteSteps steps={selected.instructions} onShow={onShowStep} />}
