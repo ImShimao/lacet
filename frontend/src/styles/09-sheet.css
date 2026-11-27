@@ -180,15 +180,15 @@
 /* Posées sur la carte, les voisines ne peuvent plus s'effacer par la
    transparence — le fond de carte transparaîtrait au travers. On les
    assombrit à la place. */
+/* Sans ombre : la bande qui défile coupe tout ce qui dépasse, et l'ombre
+   floue s'y tranchait net en bande sombre sous les cartes (2026-11-27). Le
+   contour suffit à les détacher du fond. */
 .shell[data-sheet='peek'] .rcard {
   opacity: 1;
-  box-shadow: 0 16px 34px -16px var(--shadow);
+  box-shadow: none;
 }
 .shell[data-sheet='peek'] .rcard:not(.rcard--on) {
   filter: var(--dim);
-}
-.shell[data-sheet='peek'] .rcard--on {
-  box-shadow: 0 16px 34px -16px var(--shadow);
 }
 .shell[data-sheet='peek'] .rcard__more {
   display: inline-flex;
