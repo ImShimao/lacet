@@ -301,48 +301,6 @@ describe("l'écran Aller à", () => {
   })
 })
 
-describe("l'accueil replié", () => {
-  // Une fois la carte déplacée, l'accueil ne garde que le départ et le bouton :
-  // la carte reprend la place, et rien ne disparaît pour de bon.
-  it('garde le départ et « Trouver ma boucle », et le départ rouvre le reste', () => {
-    const onExpand = vi.fn()
-    const onSearch = vi.fn()
-    render(
-      <Explore
-        start={{ lat: 47.9, lon: 7.2 }}
-        startLabel="Guebwiller"
-        geo={{ status: 'ready', position: [7.2, 47.9], accuracy: 8, following: false }}
-        result={null}
-        params={{ sport: 'run', surface: 'mixed', elevation: 'rolling', safety: 'safe', distance_km: 10, mode: 'distance' }}
-        compact
-        onExpand={onExpand}
-        onSearch={onSearch}
-        onQuickParams={() => {}}
-      />,
-    )
-    expect(screen.queryByRole('button', { name: /Filtres/ })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Trouver ma boucle/ }))
-    expect(onSearch).toHaveBeenCalled()
-    const depart = screen.getByRole('button', { name: /Guebwiller/ })
-    expect(depart).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(depart)
-    expect(onExpand).toHaveBeenCalled()
-  })
-})
-
-describe('les propositions réduites', () => {
-  // Carte déplacée, les cartes de boucle se réduisent ; le premier toucher les
-  // rouvre seulement, il n'ouvre pas le détail d'une carte à moitié lue.
-  it('rouvrent au premier toucher sans ouvrir le détail', () => {
-    const onExpand = vi.fn()
-    const onOpenDetail = vi.fn()
-    afficher({ compact: true, onExpand, onOpenDetail })
-    fireEvent.click(screen.getByRole('button', { name: /10 km|9,9/ }))
-    expect(onExpand).toHaveBeenCalled()
-    expect(onOpenDetail).not.toHaveBeenCalled()
-  })
-})
-
 describe('le relief en miniature', () => {
   // Une boucle plate ne doit pas se dessiner en montagnes russes : l'échelle
   // vaut au moins 40 m.

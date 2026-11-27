@@ -35,17 +35,6 @@
   font-size: calc(12px * var(--text-scale));
   color: var(--text-3);
 }
-/* L'accueil replié : le départ devient le bouton qui rouvre les réglages,
-   le chevron dit qu'il y a plus au-dessus. */
-.origin--more {
-  width: 100%;
-  min-height: 44px;
-  background: none;
-  border: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
 .origin__text {
   flex: 1;
   min-width: 0;
@@ -54,23 +43,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.origin--more > .icon:last-child {
-  color: var(--text-3);
-}
-.panel--compact {
-  animation: compact-in 0.2s ease both;
-}
-@keyframes compact-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .panel--compact {
-    animation: none;
-  }
 }
 /* L'arrivée d'un trajet : le texte prend la place, le bouton se range à droite. */
 .origin--dest > div {

@@ -252,8 +252,6 @@ export default function Explore({
   stops = { stops: [], loading: false, complete: true },
   poiPrefs = null,
   journey = false,
-  compact = false,
-  onExpand = null,
   onGoal = null,
   destination = null,
   placingDest = false,
@@ -322,28 +320,6 @@ export default function Explore({
   // Un trajet sans arrivée n'a qu'une question : où aller. La longueur, les
   // filtres et la course libre attendent qu'elle soit posée.
   const bare = journey && !destination
-
-  // Replié : le départ et le bouton, rien d'autre ; le départ rouvre le reste.
-  if (!result && compact && !journey && onExpand) {
-    return (
-      <div className="panel panel--compact">
-        <button className="origin origin--more" onClick={onExpand} aria-expanded={false}>
-          <span className="origin__pin">
-            <Icon name="pin" size={18} />
-          </span>
-          <span className="origin__text">
-            <b>{startLabel || (start ? t('Point choisi') : t('Localisation…'))}</b>
-            <em>{t('départ de la boucle')}</em>
-          </span>
-          <Icon name="chevronUp" size={18} />
-        </button>
-        <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
-          <Icon name="search" size={18} />
-          {t('Trouver ma boucle')}
-        </button>
-      </div>
-    )
-  }
 
   if (!result) {
     return (
@@ -514,8 +490,6 @@ export default function Explore({
         onSelect={onSelect}
         onOpenDetail={onOpenDetail}
         sport={params.sport}
-        compact={compact}
-        onExpand={onExpand}
       />
       {/* Sous les cartes, là où l'on hésite : au fond du détail, « Comparer »
           ne se trouvait qu'une fois le choix déjà fait. */}
@@ -848,7 +822,7 @@ function AlreadyRun({ found }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, compact = false, onExpand = null }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -908,19 +882,7 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, co
   }
 
   return (
-    <div
-      className="cards"
-      // Réduites (la carte a été déplacée), le premier toucher les rouvre
-      // seulement : sans quoi il ouvrirait le détail d'une carte à moitié lue.
-      onClickCapture={
-        compact && onExpand
-          ? (e) => {
-              e.stopPropagation()
-              onExpand()
-            }
-          : undefined
-      }
-    >
+    <div className="cards">
       <div className="cards__track" ref={track} onScroll={onScroll} onKeyDown={onKeyDown}>
         {/* Des cales plutôt qu'un rembourrage : Safari ignore le rembourrage de
             fin d'un conteneur qui défile, et la dernière carte ne pourrait

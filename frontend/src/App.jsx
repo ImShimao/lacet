@@ -137,10 +137,6 @@ export default function App() {
   // d'un appui long sur la carte ou depuis le menu du départ.
   const [via, setVia] = useState(null)
   const [placingVia, setPlacingVia] = useState(false)
-  // L'accueil replié : on a déplacé la carte, elle a la place ; un toucher sur
-  // la carte d'accueil la rouvre. Sur un iPhone SE, dépliée, elle en cachait
-  // les deux tiers.
-  const [homeCompact, setHomeCompact] = useState(false)
   // Les zones à éviter, gardées dans le stockage, et celle qu'on pose — `null`
   // hors du geste, `{ radius_m, name }` puis le centre une fois la carte touchée.
   const [zones, setZones] = useState(listZones)
@@ -537,7 +533,6 @@ export default function App() {
       data-sheet={sheetMode}
       data-flying={flying || undefined}
       data-zoning={(zoneDraft && !running) || undefined}
-      data-compact={(homeCompact && tab === 'explore' && !running) || undefined}
       data-placing={((placing || placingVia) && !running && tab === 'explore') || undefined}
       ref={shellRef}
     >
@@ -568,10 +563,7 @@ export default function App() {
           compassRef={compassRef}
           placing={placing}
           onPlace={(p) => applyStart(p)}
-          onUserMove={() => {
-            here.release()
-            setHomeCompact(true)
-          }}
+          onUserMove={() => here.release()}
           flyover={flying}
           onFlyoverEnd={() => setFlying(false)}
           via={running ? null : via}
@@ -960,12 +952,7 @@ export default function App() {
               isFavorite={isFavorite}
               onSelect={setSelected}
               onToggleDetail={() => setDetail((d) => !d)}
-              onSearch={() => {
-                setHomeCompact(false)
-                search()
-              }}
-              compact={homeCompact}
-              onExpand={() => setHomeCompact(false)}
+              onSearch={() => search()}
               onSearchWith={(patch) => search({ ...params, ...patch })}
               onCancel={found.cancel}
               onRegenerate={() => search(undefined, { regenerate: true })}
@@ -1016,10 +1003,7 @@ export default function App() {
                 setSheet('peek')
                 here.look({ lat, lon })
               }}
-              onOpenDetail={() => {
-                setHomeCompact(false)
-                setSheet('full')
-              }}
+              onOpenDetail={() => setSheet('full')}
               stops={stops}
               poiPrefs={poiPrefs}
             />
