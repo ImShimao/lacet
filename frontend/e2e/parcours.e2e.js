@@ -26,7 +26,8 @@ test("l'allure reste ouverte dans les filtres", async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Explorer' }).first().click()
-  await page.getByRole('button', { name: /^Filtres/ }).click()
+  // Les filtres s'ouvrent par la pastille sous la recherche.
+  await page.locator('.sportpill').click()
   await expect(page.getByRole('button', { name: 'min/km' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'km/h' })).toBeVisible()
 })
@@ -35,7 +36,7 @@ test('un menu de réglage passe devant les lignes qui suivent', async ({ page })
   await page.goto('/')
   await expect(page.locator('.launch')).toBeHidden({ timeout: LAUNCH_MS })
   await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
-  await page.getByRole('button', { name: /^Guidage et voix/ }).click()
+  await page.getByRole('button', { name: /^Voix/ }).click()
   await page.getByRole('button', { name: /^Anticipation des instructions/ }).click()
 
   // Le menu ouvert doit être l'élément qu'on touche au centre de sa première option.
