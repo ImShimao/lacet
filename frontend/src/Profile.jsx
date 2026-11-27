@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
-import { ActionRow, PrefsCard } from './Prefs.jsx'
+import { PrefsCard } from './Prefs.jsx'
 import { load, save } from './storage'
 import { t } from './i18n'
 
@@ -47,34 +47,49 @@ export function ProfileSettings({ params, onProfile, me: shared = null, setMe: s
 
   return (
     <>
-      <PrefsCard title={t('Identité')}>
-        <div className="prow">
-          <div className="prow__btn prow__static">
-            <Avatar photo={me.photo} size={20} />
-            <label className="prow__namefield">
-              <input
-                className="prow__input"
-                type="text"
-                autoComplete="nickname"
-                enterKeyHint="done"
-                maxLength={30}
-                aria-label={t('Pseudo')}
-                placeholder={t('Pseudo')}
-                value={me.name}
-                onChange={(e) => setMe({ name: e.target.value })}
-                onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-              />
-            </label>
-          </div>
-        </div>
-        <ActionRow
-          icon="user"
-          label={me.photo ? t('Changer de photo') : t('Ajouter une photo')}
-          accept="image/*"
-          onFile={(file) => file && setPicked(URL.createObjectURL(file))}
+      {/* Qui l'on est, en carte de visite : la photo en grand, qu'on touche
+          pour la changer, et le pseudo dessous. Trois lignes de réglage —
+          avatar minuscule, « Changer de photo », « Retirer la photo » — se
+          lisaient comme une liste d'options, pas comme un profil. */}
+      <section className="me" aria-label={t('Identité')}>
+        <label className="me__photo" aria-label={me.photo ? t('Changer de photo') : t('Ajouter une photo')}>
+          <Avatar photo={me.photo} size={34} />
+          <span className="me__badge" aria-hidden="true">
+            <Icon name={me.photo ? 'refresh' : 'plus'} size={15} />
+          </span>
+          <input
+            type="file"
+            id="me-photo"
+            accept="image/*"
+            className="visually-hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) setPicked(URL.createObjectURL(file))
+              // Rechoisir la même photo doit rouvrir le recadrage.
+              e.target.value = ''
+            }}
+          />
+        </label>
+        <input
+          className="me__name"
+          type="text"
+          autoComplete="nickname"
+          enterKeyHint="done"
+          maxLength={30}
+          aria-label={t('Pseudo')}
+          placeholder={t('Pseudo')}
+          value={me.name}
+          onChange={(e) => setMe({ name: e.target.value })}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
         />
-        {me.photo && <ActionRow icon="close" label={t('Retirer la photo')} danger onClick={() => setMe({ photo: null })} />}
-      </PrefsCard>
+        {me.photo ? (
+          <button className="me__remove" onClick={() => setMe({ photo: null })}>
+            {t('Retirer la photo')}
+          </button>
+        ) : (
+          <label htmlFor="me-photo" className="me__hint">{t('Ajouter une photo')}</label>
+        )}
+      </section>
 
       <PrefsCard title={t('Corps')} foot={t('Le poids sert à estimer les calories d\'une sortie, et rien d\'autre. Rien n\'est envoyé.')}>
         <NumberRow icon="ruler" label={t('Taille')} unit="cm" value={params.height_cm || 170} min={120} max={220} onChange={(height_cm) => onProfile({ height_cm })} />
