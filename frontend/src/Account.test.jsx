@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  * sommaire, lui, se retrouve là où on l'avait laissé.
  */
 
-vi.mock('./platform', () => ({ isNative: () => false, saveTextFile: vi.fn() }))
+vi.mock('./platform', () => ({ isNative: () => false, saveTextFile: vi.fn(), haptic: vi.fn() }))
 
 const Account = (await import('./Account.jsx')).default
 const { DEFAULTS } = await import('./FiltersSheet.jsx')

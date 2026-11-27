@@ -5,6 +5,7 @@ import { InfoButton } from './Explain.jsx'
 import { climbBand, reliefBadge } from './explain'
 import { reliefHintOnDevice } from './engine/client'
 import { pace } from './format'
+import { haptic } from './platform'
 import { fromKm, paceLabel, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 
 import { t, dec } from './i18n'
@@ -715,7 +716,11 @@ export function Segmented({ options, value, onChange }) {
           aria-pressed={value === o.key}
           aria-label={t(o.title)}
           title={t(o.title)}
-          onClick={() => onChange(o.key)}
+          onClick={() => {
+            // Un tapotement au changement de choix, comme les sélecteurs d'iOS.
+            if (o.key !== value) haptic('tickHaptic')
+            onChange(o.key)
+          }}
         >
           {t(o.label)}
         </button>

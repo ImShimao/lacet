@@ -10,6 +10,7 @@
  */
 
 import { useLayoutEffect, useRef, useState } from 'react'
+import { haptic } from './platform'
 import Icon from './Icon.jsx'
 import { tx } from './i18n'
 
@@ -103,7 +104,10 @@ export function ToggleRow({ icon, label, sub, on, onChange, disabled = false }) 
         role="switch"
         aria-checked={on}
         disabled={disabled}
-        onClick={() => onChange(!on)}
+        onClick={() => {
+          haptic('tickHaptic')
+          onChange(!on)
+        }}
       >
         <Head icon={icon} label={label} sub={sub} />
         <span className={`switch ${on ? 'switch--on' : ''}`} aria-hidden="true">
