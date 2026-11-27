@@ -368,7 +368,7 @@ input:focus-visible {
   /* Dégradé en pied de zone : une ligne coupée net se lit comme une fin de
      contenu, alors qu'il reste à faire défiler. */
   mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 /* Sur la carte, le titre seul : l'explication complète prenait cinq lignes
    et repoussait les propositions hors de l'écran. Le bouton d'à côté porte
