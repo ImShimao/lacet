@@ -514,6 +514,8 @@ export default function Explore({
         onSelect={onSelect}
         onOpenDetail={onOpenDetail}
         sport={params.sport}
+        compact={compact}
+        onExpand={onExpand}
       />
       {/* Sous les cartes, là où l'on hésite : au fond du détail, « Comparer »
           ne se trouvait qu'une fois le choix déjà fait. */}
@@ -846,7 +848,7 @@ function AlreadyRun({ found }) {
  * ailleurs — touchée sur la carte, ou la première au chargement — vient se
  * placer au centre.
  */
-function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) {
+function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, compact = false, onExpand = null }) {
   const track = useRef(null)
   const settle = useRef(null)
   const first = useRef(true)
@@ -906,7 +908,19 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport }) 
   }
 
   return (
-    <div className="cards">
+    <div
+      className="cards"
+      // Réduites (la carte a été déplacée), le premier toucher les rouvre
+      // seulement : sans quoi il ouvrirait le détail d'une carte à moitié lue.
+      onClickCapture={
+        compact && onExpand
+          ? (e) => {
+              e.stopPropagation()
+              onExpand()
+            }
+          : undefined
+      }
+    >
       <div className="cards__track" ref={track} onScroll={onScroll} onKeyDown={onKeyDown}>
         {/* Des cales plutôt qu'un rembourrage : Safari ignore le rembourrage de
             fin d'un conteneur qui défile, et la dernière carte ne pourrait

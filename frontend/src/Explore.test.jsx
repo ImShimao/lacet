@@ -329,3 +329,16 @@ describe("l'accueil replié", () => {
     expect(onExpand).toHaveBeenCalled()
   })
 })
+
+describe('les propositions réduites', () => {
+  // Carte déplacée, les cartes de boucle se réduisent ; le premier toucher les
+  // rouvre seulement, il n'ouvre pas le détail d'une carte à moitié lue.
+  it('rouvrent au premier toucher sans ouvrir le détail', () => {
+    const onExpand = vi.fn()
+    const onOpenDetail = vi.fn()
+    afficher({ compact: true, onExpand, onOpenDetail })
+    fireEvent.click(screen.getByRole('button', { name: /10 km|9,9/ }))
+    expect(onExpand).toHaveBeenCalled()
+    expect(onOpenDetail).not.toHaveBeenCalled()
+  })
+})

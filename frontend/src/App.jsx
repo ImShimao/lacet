@@ -537,6 +537,7 @@ export default function App() {
       data-sheet={sheetMode}
       data-flying={flying || undefined}
       data-zoning={(zoneDraft && !running) || undefined}
+      data-compact={(homeCompact && tab === 'explore' && !running) || undefined}
       data-placing={((placing || placingVia) && !running && tab === 'explore') || undefined}
       ref={shellRef}
     >
@@ -1000,7 +1001,10 @@ export default function App() {
                 setSheet('peek')
                 here.look({ lat, lon })
               }}
-              onOpenDetail={() => setSheet('full')}
+              onOpenDetail={() => {
+                setHomeCompact(false)
+                setSheet('full')
+              }}
               stops={stops}
               poiPrefs={poiPrefs}
             />

@@ -192,6 +192,9 @@
   margin: 0;
   padding: 2px 12px 0;
   background: none;
+  /* Le filet de la barre d'outils n'a de sens que sur la feuille : posé sur la
+     carte, il la rayait d'un trait. */
+  border-top: none;
 }
 .shell[data-sheet='peek'] .actionbar .btn--icon {
   background: var(--glass);
@@ -385,4 +388,14 @@
   .actionbar .btn {
     padding-block: 11px;
   }
+}
+
+/* Carte déplacée, feuille repliée : chaque proposition se réduit à son numéro,
+   sa note et sa distance. Sur un iPhone SE, les cartes entières cachaient la
+   moitié du tracé qu'on était justement en train de regarder. Un toucher les
+   rouvre (`RouteCards`). */
+.shell[data-compact][data-sheet='peek'] .rcard__name,
+.shell[data-compact][data-sheet='peek'] .rcard__stats,
+.shell[data-compact][data-sheet='peek'] .cards__dots {
+  display: none;
 }
