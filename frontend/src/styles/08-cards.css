@@ -359,7 +359,10 @@
   margin: 0 -18px -22px;
   padding: 18px 18px 14px;
   /* Le contenu qui défile dessous s'efface au lieu d'être coupé net. */
-  background: linear-gradient(to bottom, transparent, var(--surface) 16px);
+  /* Un aplat et un filet, comme une barre d'outils iOS : le fondu de 16 px
+     qui effaçait le contenu dessous était un dégradé, et il baguait. */
+  background: var(--surface);
+  border-top: 1px solid var(--line-soft);
 }
 .actionbar .btn--primary {
   /* Déjà grand : agrandi avec le texte, il ne tenait plus à côté des quatre

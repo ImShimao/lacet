@@ -85,10 +85,11 @@
 /* ══ squelette de chargement ═══════════════════════════════════════════ */
 
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
-  background-size: 200% 100%;
+  /* Un aplat qui respire par l'opacité : le reflet qui balayait était un
+     dégradé animé par `background-position`, repeint à chaque image. */
+  background: var(--surface-3);
   border-radius: 10px;
-  animation: shimmer 1.4s linear infinite;
+  animation: shimmer 1.4s ease-in-out infinite alternate;
 }
 .skeleton--line {
   height: 16px;
@@ -161,8 +162,11 @@ html.native textarea {
   }
 }
 @keyframes shimmer {
+  from {
+    opacity: 1;
+  }
   to {
-    background-position: -200% 0;
+    opacity: 0.55;
   }
 }
 @media (prefers-reduced-motion: reduce) {

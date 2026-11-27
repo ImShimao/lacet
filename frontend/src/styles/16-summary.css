@@ -85,7 +85,10 @@
   gap: 8px;
   margin: 0 -18px;
   padding: 14px 18px 12px;
-  background: linear-gradient(to bottom, transparent, var(--surface) 16px);
+  /* Un aplat et un filet, comme une barre d'outils iOS : le fondu de 16 px
+     qui effaçait le contenu dessous était un dégradé, et il baguait. */
+  background: var(--surface);
+  border-top: 1px solid var(--line-soft);
 }
 .summary__actions .btn--primary {
   flex: 1;
@@ -199,6 +202,8 @@
   width: 56px;
   height: 4px;
   border-radius: 999px;
+  /* Le seul dégradé gardé : c'est une donnée, l'allure qui va du plus vite
+     au plus lent le long du tracé, pas un effet. */
   background: linear-gradient(to right, var(--safe), var(--caution), var(--risk));
 }
 /* Ce que la sortie vaut, en une phrase : à l'accent, sous le nom. */
