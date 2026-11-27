@@ -79,8 +79,14 @@ jusqu'au bout de la sortie.
 `voiceSettings`) : les kilomètres à chaque borne, une sur deux ou jamais ; ce
 qu'ils disent — temps du kilomètre, allure moyenne, temps couru ; et l'annonce
 d'un virage plus tôt (×1,5) ou plus tard (×0,6). Seul le confort se règle : le
-« maintenant », les alertes de traversée et d'écart se disent toujours. Le débit
-de la voix reste celui de `VoicePlugin.swift`, qui ne le reçoit pas encore.
+« maintenant », les alertes de traversée et d'écart se disent toujours.
+« Guidage et voix » règle aussi la voix de l'iPhone utilisée (la liste est relue
+quand iOS la rend vide au premier appel), son débit, son **volume** (faible,
+moyen, fort : `utterance.volume`), ce que devient la **musique** pendant une
+phrase — baissée (`duckOthers`) ou en pause (session sans mélange, rendue avec
+`notifyOthersOnDeactivation` ; Apple Musique reprend seule, d'autres apps non) —
+et un **rappel du temps couru** toutes les 5, 10, 15 ou 30 minutes, au chrono en
+mouvement (`timeTick` dans `LiveRun.jsx`).
 
 ### Une sortie entière, écoutée
 

@@ -121,9 +121,13 @@ place d'une icône : dix « Boucle sud-ouest » se reconnaissent à leur dessin.
 course libre prend le nom de son moment — « Course du soir », « Vélo du
 matin ». Chaque mois de l'historique a un bouton **Bilan** : kilomètres, D+,
 temps, plus longue sortie et régularité, partageables en image comme une sortie.
-Sous les onglets Sorties / Favoris, le total, le volume par semaine et les
-séries et défis tiennent sur une bande qu'on fait glisser au pouce
-(`.statstrip`) : empilés, ils poussaient la liste sous le pli.
+Sous les onglets Sorties / Favoris, les **objectifs** de la semaine et du mois
+(réglés dans « Mon compte › Profil ») montrent ce qu'il reste à courir, en
+barres qui passent au vert une fois atteints (`goalProgress`, semaine depuis le
+lundi). Puis le total, en grand chiffre, le volume par semaine et les séries et
+défis tiennent sur une bande qu'on fait glisser au pouce (`.statstrip`) :
+empilés, ils poussaient la liste sous le pli. Chaque mois forme un seul bloc,
+comme un relevé de compte, la distance de chaque sortie en gros à droite.
 
 **Le point de passage** : un appui long sur la carte (ou « Passer par un
 point » dans le menu du départ) pose un fanion, et la recherche repart avec
@@ -133,9 +137,12 @@ des boucles qui y passent toutes. Le fanion se fait glisser ; la pastille
 **La zone à éviter** : le cercle hachuré des outils de carte efface la feuille,
 un toucher sur la carte pose le centre (un autre toucher, ou glisser la poignée
 du centre, le déplace), un curseur règle
-le rayon de 100 m à 2 km, un champ la nomme. Un cercle plutôt qu'un contour
-tracé au doigt, qui se battrait avec le déplacement de la carte — voir
-`zones.js`. Ses rues pèsent comme un signalement (`engine/blocked.js`) : un mur,
+le rayon de 100 m à 2 km, un champ la nomme. Ou un **contour** posé coin par
+coin, jamais tracé au doigt, qui se battrait avec le déplacement de la carte —
+voir `zones.js`. Ses coins gardent l'ordre des touchers ; deux côtés qui se
+croisent sont décroisés (`ringOf`, « 2-opt »), si bien qu'une forme en L reste
+un L et que des points posés en désordre ne font pas une étoile. Le « i » de la
+carte se pose au-dessus de la carte de réglage (`--zone-cover`). Ses rues pèsent comme un signalement (`engine/blocked.js`) : un mur,
 sauf quand le départ est dedans, où la boucle en sort par le plus court. Les
 zones gardées se gèrent dans « Mon compte › Sécurité », hachurées sur la carte
 quand elles comptent, en pointillés quand elles sont désactivées.
@@ -198,8 +205,14 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 
 ## Réglages
 
-**Mon compte › Apparence** règle la couleur d'accent (bleu, le violet
-d'origine, framboise, graphite), le thème — sombre, clair, ou « Auto », qui
+**Mon compte** s'ouvre sur un en-tête à la manière des apps bancaires : un grand
+avatar rond et « Profil local › », qui ouvre le profil. Les réglages à peu de
+choix s'ouvrent en menu posé sur la ligne (`Prefs.jsx`). Aucune barre de
+défilement nulle part : sur l'iPhone, le contenu qui suit le doigt suffit.
+
+**Mon compte › Apparence** règle la couleur d'accent (bleu, violet, framboise,
+vert — chacune avec sa teinte pour le thème clair et pour le sombre, le blanc
+dessus à 4,5:1), le thème — sombre, clair, ou « Auto », qui
 suit l'iPhone en direct — et la taille du texte (normale ou grande, +15 % ;
 les très grands chiffres de course ne bougent pas). Le choix se pose en
 attributs sur `<html>` avant le premier rendu (`appearance.js`, appelé par
@@ -212,7 +225,15 @@ case par filtre (Activité, Forme, Terrain, Dénivelé, Direction, Sécurité, �
 longueur et l'allure restent toujours. Un filtre masqué revient à sa valeur par
 défaut, écrite sous la case — sauf l'activité, qui garde la sienne. **Pendant la
 sortie › Écran** laisse l'écran se mettre en veille (téléphone au brassard) au
-lieu de rester allumé.
+lieu de rester allumé. **Parcours › Au lancement** choisit ce que l'accueil
+propose à l'ouverture : Boucle, Aller à…, ou le dernier utilisé.
+
+**L'interface**, refaite à la manière des apps récentes (Revolut) : boutons
+principaux et choix segmentés en gélule, gestes secondaires en ronds à côté de
+« Démarrer », pastille de l'onglet actif autour de son icône seulement. Toucher
+la carte ne réduit rien : l'accueil et les propositions restent comme on les a
+laissés. Une boucle proposée se partage en image (`drawLoopCard`) : tracé,
+distance, note et dénivelé, depuis « Partager › Une image ».
 
 Côté moteur Python, `backend/.env` (copie `.env.example`) :
 
