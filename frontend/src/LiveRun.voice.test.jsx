@@ -759,6 +759,16 @@ describe('la voix réglée', () => {
     expect(Math.max(...annonces(run)), transcription(run)).toBeLessThanOrEqual(70)
   }, 60_000)
 
+  it('redit le temps couru toutes les cinq minutes, kilomètres tus', async () => {
+    save({ voice: { km: 0, target: false, timeEvery: 5 } })
+    const { demande, routes } = await boucles(BEAUNE, 5)
+    const route = routes.find((r) => r.laps === 1)
+    const run = await courir(route, demande)
+    const rappels = run.dites.map((d) => d.texte).filter((t) => /^\d+ minutes de course\.$/.test(t))
+    // Une demi-heure de course à peu près : 5, 10, 15, 20, 25 minutes, dans l'ordre.
+    expect(rappels.slice(0, 3), transcription(run)).toEqual(['5 minutes de course.', '10 minutes de course.', '15 minutes de course.'])
+  }, 60_000)
+
   it('l’écart à l’allure visée se dit à chaque kilomètre, même kilomètres tus', async () => {
     // Le coureur simulé fait environ 2,9 m/s, soit près de 345 s/km ; l'allure
     // demandée est de 300 s/km : il est donc nettement trop lent, à chaque km.

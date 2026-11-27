@@ -302,6 +302,10 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
   // kilomètre (`splits`), l'historique et ses comparaisons en dépendent.
   const lastMile = useRef(0)
   const mileAt = useRef(0)
+  // Le dernier rappel du temps couru (`timeEvery`), en nombre de périodes.
+  // `null` jusqu'au premier tic : une sortie reprise ne redit pas d'un coup
+  // le temps déjà couru.
+  const lastTimeSaid = useRef(null)
   // Ce que la voix a dit, phrase par phrase — voir `talk`.
   const journal = useRef(resuming?.spoken ?? [])
   // Ce que la voix ne dit pas, pour le rapport de sortie (`runReport.js`) : la
@@ -421,6 +425,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     const tick = setInterval(() => {
       setState((s) => ({ ...s, elapsed: movingSeconds() }))
       coachTick()
+      timeTick()
       keepRun()
       if (!gpsLost.current && lastGoodAt.current && Date.now() - lastGoodAt.current > GPS_LOST_MS) {
         gpsLost.current = true
@@ -785,6 +790,23 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
     for (const text of said) talk(text, { priority: false, keep: true })
     setBlock(status)
     if (!status) coach.current = null
+  }
+
+  /**
+   * Le temps couru, redit toutes les N minutes si on l'a réglé : pour qui court
+   * à la montre plutôt qu'aux bornes. Le chrono en mouvement, pas l'horloge :
+   * une pause ne déclenche pas de rappel.
+   */
+  function timeTick() {
+    const every = (voicePrefs.current.timeEvery || 0) * 60
+    if (!every) return
+    const n = Math.floor(movingSeconds() / every)
+    if (lastTimeSaid.current === null || n <= lastTimeSaid.current) {
+      lastTimeSaid.current = Math.max(n, lastTimeSaid.current ?? n)
+      return
+    }
+    lastTimeSaid.current = n
+    talk(t(' {v1} de course.', { v1: capitalize(spokenDuration(n * every)) }).trim(), { priority: false, keep: true })
   }
 
   /** Ce que la voix dit à une borne — kilomètre ou mile —, selon les réglages. */
