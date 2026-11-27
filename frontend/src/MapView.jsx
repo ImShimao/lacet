@@ -12,6 +12,7 @@ import { useAppearance } from './appearance'
 
 import { t, dec } from './i18n'
 import { routeName } from './stepText'
+import { ringOf } from './zones'
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
 maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
@@ -1430,7 +1431,7 @@ function drawZones(m, zones, draft) {
     if (points.length === 2) {
       features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: { type: 'LineString', coordinates: points } })
     } else if (points.length >= 3) {
-      features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: ring(points) })
+      features.push({ type: 'Feature', properties: { on: true, draft: true }, geometry: ring(ringOf(points)) })
     }
   } else if (draft && Number.isFinite(draft.lon)) {
     features.push({

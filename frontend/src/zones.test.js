@@ -67,3 +67,24 @@ describe('les zones à éviter', () => {
     expect(avoidedZones()).toEqual([])
   })
 })
+
+describe('le contour d’une zone', () => {
+  // Douze points touchés en désordre ne doivent pas donner une étoile croisée.
+  it('range les coins autour du centre, sans qu’aucun côté n’en croise un autre', async () => {
+    const { ringOf } = await import('./zones')
+    const touches = [[7, 48], [7.02, 48.02], [7.02, 48], [7, 48.02], [7.01, 47.995], [7.025, 48.01]]
+    const ring = ringOf(touches)
+    expect(ring).toHaveLength(touches.length)
+    const cross = (a, b, c, d) => {
+      const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]))
+      return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0
+    }
+    const sides = ring.map((p, i) => [p, ring[(i + 1) % ring.length]])
+    for (let i = 0; i < sides.length; i++) for (let j = i + 2; j < sides.length; j++) {
+      if (i === 0 && j === sides.length - 1) continue
+      expect(cross(...sides[i], ...sides[j])).toBe(false)
+    }
+    // Deux points ne font pas encore un contour : rendus tels quels.
+    expect(ringOf(touches.slice(0, 2))).toEqual(touches.slice(0, 2))
+  })
+})

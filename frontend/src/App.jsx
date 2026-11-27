@@ -26,7 +26,7 @@ import useStart, { PARIS } from './useStart'
 import usePois from './usePois'
 import { askedOf, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
 import { blockedPoints } from './reports'
-import { ZONE_RADIUS, addZone, avoidedZones, listZones } from './zones'
+import { ZONE_RADIUS, addZone, avoidedZones, listZones, ringOf } from './zones'
 import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
 import { startAppearance, useAppearance } from './appearance'
 import { startLang, t, useLang } from './i18n'
@@ -303,7 +303,7 @@ export default function App() {
   // La zone gardée, les boucles affichées sont refaites sans elle : c'est la
   // question qu'on vient de poser, comme pour le point de passage.
   const keepZone = () => {
-    setZones(addZone(zoneDraft.shape === 'polygon' ? { ...zoneDraft, polygon: zoneDraft.points } : zoneDraft))
+    setZones(addZone(zoneDraft.shape === 'polygon' ? { ...zoneDraft, polygon: ringOf(zoneDraft.points) } : zoneDraft))
     setZoneDraft(null)
     haptic('tickHaptic')
     if (result) search()
