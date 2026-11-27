@@ -232,8 +232,7 @@ propose à l'ouverture : Boucle, Aller à…, ou le dernier utilisé.
 principaux et choix segmentés en gélule, gestes secondaires en ronds à côté de
 « Démarrer », pastille de l'onglet actif autour de son icône seulement. Toucher
 la carte ne réduit rien : l'accueil et les propositions restent comme on les a
-laissés. Une boucle proposée se partage en image (`drawLoopCard`) : tracé,
-distance, note et dénivelé, depuis « Partager › Une image ».
+laissés.
 
 Côté moteur Python, `backend/.env` (copie `.env.example`) :
 
