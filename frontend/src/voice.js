@@ -41,10 +41,19 @@ export const VOICE_DEFAULTS = {
   // et son débit : `slow`, `normal`, `fast` (`RATE`).
   voiceId: null,
   rate: 'normal',
+  // Pendant une phrase, la musique baisse (`duck`) ou s'arrête (`pause`) ; et
+  // le volume de la voix, relatif à celui de l'iPhone (`VOLUME`).
+  music: 'duck',
+  volume: 'high',
+  // Le temps couru, redit toutes les N minutes (0 : jamais), en plus des bornes.
+  timeEvery: 0,
 }
 
 /** Le débit de la voix, en multiple du débit d'origine. */
 export const RATE = { slow: 0.85, normal: 1, fast: 1.15 }
+
+/** Le volume de la voix : fort par défaut, comme avant ce réglage. */
+export const VOLUME = { low: 0.5, medium: 0.75, high: 1 }
 
 /** L'avance de l'annonce d'un virage : une trentaine de secondes, ou plus, ou moins. */
 export const LEAD = { early: 1.5, normal: 1, late: 0.6 }
@@ -70,8 +79,7 @@ export function setEnabled(value) {
  */
 export function speak(text, { priority = true } = {}) {
   if (!enabled || !text) return false
-  const { voiceId, rate } = voiceSettings()
-  nativeModule().then((n) => n.speakNative(text, { priority, voice: voiceId, rate: RATE[rate] ?? 1, lang: locale() }))
+  nativeModule().then((n) => n.speakNative(text, { priority, ...spokenWith(voiceSettings()) }))
   return true
 }
 
@@ -80,9 +88,17 @@ export function speak(text, { priority = true } = {}) {
  * réglages. Passe outre `enabled`, qui ne vaut que pendant une sortie.
  */
 export function preview(text = t('Dans deux cents mètres, tourne à gauche.')) {
-  const { voiceId, rate } = voiceSettings()
-  nativeModule().then((n) => n.speakNative(text, { voice: voiceId, rate: RATE[rate] ?? 1, lang: locale() }))
+  nativeModule().then((n) => n.speakNative(text, spokenWith(voiceSettings())))
 }
+
+/** Comment la voix parle, d'après les réglages : ce que reçoit le module natif. */
+export const spokenWith = ({ voiceId, rate, music, volume }) => ({
+  voice: voiceId,
+  rate: RATE[rate] ?? 1,
+  music: music === 'pause' ? 'pause' : 'duck',
+  volume: VOLUME[volume] ?? 1,
+  lang: locale(),
+})
 
 export function stop() {
   nativeModule().then((n) => n.stopSpeechNative())

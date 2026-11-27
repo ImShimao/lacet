@@ -13,7 +13,7 @@ const speakNative = vi.fn()
 const stopSpeechNative = vi.fn()
 vi.mock('./native', () => ({ speakNative, stopSpeechNative }))
 
-const { LEAD, RATE, VOICE_DEFAULTS, preview, setEnabled, speak, voiceSettings } = await import('./voice')
+const { LEAD, RATE, VOLUME, VOICE_DEFAULTS, preview, setEnabled, speak, voiceSettings } = await import('./voice')
 const { save } = await import('./storage')
 const { setLang } = await import('./i18n')
 
@@ -42,7 +42,15 @@ describe('la voix', () => {
     setEnabled(true)
     expect(speak('Dans cent mètres, tourne à droite')).toBe(true)
     await flush()
-    expect(speakNative).toHaveBeenCalledWith('Dans cent mètres, tourne à droite', { priority: true, voice: 'fr-FR.Thomas', rate: RATE.fast, lang: 'fr-FR' })
+    expect(speakNative).toHaveBeenCalledWith('Dans cent mètres, tourne à droite', { priority: true, voice: 'fr-FR.Thomas', rate: RATE.fast, music: 'duck', volume: 1, lang: 'fr-FR' })
+  })
+
+  it('met la musique en pause et baisse la voix quand on l’a réglé ainsi', async () => {
+    save({ voice: { music: 'pause', volume: 'low' } })
+    setEnabled(true)
+    speak('Tourne à gauche')
+    await flush()
+    expect(speakNative.mock.calls[0][1]).toMatchObject({ music: 'pause', volume: VOLUME.low })
   })
 
   it('laisse finir une consigne quand l’annonce n’est que du confort', async () => {
@@ -63,7 +71,7 @@ describe('la voix', () => {
     save({ voice: { rate: 'slow' } })
     preview()
     await flush()
-    expect(speakNative).toHaveBeenCalledWith(expect.stringMatching(/tourne à gauche/), { voice: null, rate: RATE.slow, lang: 'fr-FR' })
+    expect(speakNative).toHaveBeenCalledWith(expect.stringMatching(/tourne à gauche/), { voice: null, rate: RATE.slow, music: 'duck', volume: 1, lang: 'fr-FR' })
   })
 
   it('retombe sur les réglages d’origine, et sur un débit normal s’il est inconnu', async () => {

@@ -61,6 +61,11 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     @objc func speak(_ call: CAPPluginCall) {
         let text = call.getString("text") ?? ""
         let flush = call.getBool("flush") ?? true
+        // « pause » met la musique en pause le temps de la phrase, au lieu de
+        // la baisser : réglé dans « Guidage et voix ».
+        let pauseOthers = call.getString("music") == "pause"
+        // Le volume de la voix, de 0 à 1, relatif au volume de l'iPhone.
+        let volume = Float(min(1, max(0.1, call.getDouble("volume") ?? 1)))
         guard !text.isEmpty else {
             call.resolve()
             return
@@ -69,8 +74,9 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             if flush && self.synthesizer.isSpeaking {
                 self.synthesizer.stopSpeaking(at: .immediate)
             }
-            self.lowerOthers()
+            self.lowerOthers(pause: pauseOthers)
             let utterance = AVSpeechUtterance(string: text)
+            utterance.volume = volume
             // La voix choisie dans les réglages (`voices`), sinon celle du système.
             // La langue de l'app (`lang`, « fr-FR » ou « en-GB ») : une voix française
             // gardée dans les réglages ne lit pas des phrases anglaises.
@@ -133,8 +139,11 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
 
     // === la musique =============================================================
 
-    /// Baisse la musique, les podcasts et les livres audio.
-    private func lowerOthers() {
+    /// Baisse la musique, les podcasts et les livres audio — ou les met en
+    /// pause (`pause`) : sans `duckOthers` ni `mixWithOthers`, activer la
+    /// session interrompt les autres apps, et `notifyOthersOnDeactivation` leur
+    /// dit de reprendre une fois la voix tue.
+    private func lowerOthers(pause: Bool = false) {
         restore?.cancel()
         restore = nil
         let session = AVAudioSession.sharedInstance()
@@ -142,7 +151,7 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             try session.setCategory(
                 .playback,
                 mode: .voicePrompt,
-                options: [.duckOthers]
+                options: pause ? [] : [.duckOthers]
             )
             try session.setActive(true)
         } catch {
