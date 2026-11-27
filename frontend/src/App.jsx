@@ -24,7 +24,7 @@ import useSearch, { usePrefetch } from './useSearch'
 import useGeolocation from './useGeolocation'
 import useStart, { PARIS } from './useStart'
 import usePois from './usePois'
-import { askedOf, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
+import { askedOf, filtersLine, placeOf, requestFor, runEntry, summarise, toRequest } from './request'
 import { blockedPoints } from './reports'
 import { ZONE_RADIUS, addZone, avoidedZones, listZones, ringOf } from './zones'
 import { DEFAULT_STYLE, LIGHT_STYLE, offlineStyleFor } from './mapStyles'
@@ -685,6 +685,7 @@ export default function App() {
             }}
             compassRef={compassRef}
             onNorth={() => setNorthAt(Date.now())}
+            onFreeRun={tab === 'explore' && !result && !summary ? () => beginRun('free') : null}
             flying={flying}
             onFlyover={
               selected?.geometry?.length > 1 && tab === 'explore' && !viewing && !summary
@@ -741,21 +742,23 @@ export default function App() {
               !viewing &&
               tab !== 'explore' && <h2 className="side__title">{tab === 'routes' ? t('Mes parcours') : t('Mon compte')}</h2>
             )}
-            {/* La pastille n'est pas un titre : c'est le seul accès aux filtres
-                une fois les boucles affichées — le panneau ne montre plus alors
-                que le favori, l'export, la régénération et « Démarrer ». Avant la
-                recherche, le bouton « Filtres » est juste là, sous les yeux, et
-                deux entrées pour le même réglage encombraient le haut de l'écran
-                pour rien. Elle revient donc avec les propositions — et reste,
-                détail ouvert, en tête de la feuille : effacée, rien n'ouvrait
-                plus les filtres sans replier d'abord la feuille. */}
-            {tab === 'explore' && result && (
+            {/* La pastille n'est pas un titre : c'est le seul accès aux filtres,
+                avant comme après la recherche. Sur l'accueil, le bouton
+                « Filtres » et « Courir libre » faisaient une rangée de plus sous
+                « Trouver ma boucle », et le panneau montait jusqu'au milieu de
+                la carte (2026-11-27). Avant la recherche, elle dit le terrain et
+                le relief — la distance est déjà écrite en grand dans le panneau.
+                Détail ouvert, elle reste en tête de la feuille : effacée, rien
+                n'ouvrait plus les filtres sans replier d'abord la feuille. */}
+            {tab === 'explore' && (
               <button className="sportpill" onClick={() => setFiltersOpen(true)}>
                 <Icon name={sport?.icon} size={19} />
                 <b>{t(sport?.label)}</b>
                 {/* Un trajet n'a pas de distance réglée : la dire tromperait. */}
                 <span className="sportpill__spec">
-                  {result.meta?.journey
+                  {!result
+                    ? filtersLine(params)
+                    : result.meta?.journey
                     ? `${result.meta.roundtrip ? t('Aller-retour') : t('Trajet')} · ${(result.meta.stretched ? summarise(params).split(' · ') : summarise(params).split(' · ').slice(1)).join(' · ')}`
                     : summarise(params)}
                 </span>

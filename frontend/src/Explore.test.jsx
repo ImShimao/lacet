@@ -279,12 +279,18 @@ describe("l'écran Aller à", () => {
       />,
     )
 
-  it("sans arrivée, cache la longueur, les filtres et la course libre", () => {
+  it("sans arrivée, cache la longueur", () => {
     formulaire()
     expect(screen.getByText('Où vas-tu ?')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Filtres/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Courir libre/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /10 km/ })).toBeNull()
+  })
+
+  it("laisse les filtres à la pastille et la course libre à la carte", () => {
+    // Le panneau s'arrête à « Trouver… » : les filtres passent sous la
+    // recherche, la course libre dans la colonne de boutons de la carte.
+    formulaire({ destination: { lat: 47.91, lon: 7.21, label: 'Parc' } })
+    expect(screen.queryByRole('button', { name: /^Filtres/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Courir libre/ })).toBeNull()
   })
 
   it("pendant la pose, ne garde que la ligne d'arrivée", () => {
@@ -296,8 +302,7 @@ describe("l'écran Aller à", () => {
 
   it("une fois l'arrivée posée, tout revient", () => {
     formulaire({ destination: { lat: 47.91, lon: 7.21, label: 'Parc' } })
-    expect(screen.getByRole('button', { name: /Filtres/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Courir libre/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Trouver mon trajet/ })).toBeInTheDocument()
   })
 })
 

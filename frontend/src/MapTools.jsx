@@ -31,6 +31,7 @@ export function MapTools({
   onFlyover = null,
   drawingZone = false,
   onZone = null,
+  onFreeRun = null,
 }) {
   const [menu, setMenu] = useState(false)
 
@@ -115,6 +116,14 @@ export function MapTools({
           </div>
         )}
       </div>
+      {/* Courir sans tracé, depuis l'accueil seulement : dans le panneau, ce
+          geste rare faisait une rangée de boutons à lui seul. Une fois les
+          boucles proposées, il est au bas du détail. */}
+      {onFreeRun && (
+        <button className="tool" onClick={onFreeRun} aria-label={t('Courir libre')} title={t('Courir libre')}>
+          <Icon name="play" />
+        </button>
+      )}
       {/* Le survol n'a de sens qu'une boucle choisie : il n'apparaît qu'alors.
           Pendant le survol, il reste seul visible : c'est par lui qu'on
           l'arrête (voir `10-map-tools.css`). */}

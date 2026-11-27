@@ -21,7 +21,6 @@ import { downloadGpx } from './api'
 import { climbMismatch, nightfall, reliefMismatch, surfaceMismatch, weatherAdvice } from './explain'
 import { km } from './format'
 import { haptic } from './platform'
-import { filtersLine } from './request'
 import { clockTime, turnIcon } from './runFormat'
 import { fromKm, speedIn, speedLabel, toKm, unitLabel, units } from './units'
 import { presets } from './presets'
@@ -395,21 +394,6 @@ export default function Explore({
           <Icon name="search" size={18} />
           {journey ? (destination ? t('Trouver mon trajet') : t('Choisir l\'arrivée')) : t('Trouver ma boucle')}
         </button>
-        {/* Côte à côte : deux gestes secondaires empilés sous le principal
-            prenaient autant de place que lui, et le noyaient. */}
-        {!bare && (
-        <div className="row">
-          {/* Ce que les filtres règlent, dit avant de les ouvrir — sans la
-              distance, déjà écrite en grand juste au-dessus. */}
-          <button className="btn btn--stack" onClick={onOpenFilters}>
-            <Icon name="sliders" size={17} />
-            <span>{t('Filtres')}<em>{filtersLine(params)}</em>
-            </span>
-          </button>
-          <button className="btn btn--ghost" onClick={onFreeRun}>
-            <Icon name="play" size={17} />{t('Courir libre')}</button>
-        </div>
-        )}
         {/* Les rues se préparent en fond dès que le départ est connu : le dire
             explique pourquoi la recherche est soudain instantanée — et qu'elle
             le restera, même sans réseau. */}
