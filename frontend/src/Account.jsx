@@ -99,9 +99,11 @@ function Summary({ onPage, params, poiPrefs }) {
         </span>
         <span className="menu__text">
           <b>{t('Profil local')}</b>
-          <em>{summaryOf('profile', { params, poiPrefs })}</em>
+          <em>
+            {summaryOf('profile', { params, poiPrefs })}
+            <Icon name="chevronRight" size={15} />
+          </em>
         </span>
-        <Icon name="chevronRight" size={17} className="menu__chev" />
       </button>
 
       {GROUPS.map((group) => (

@@ -58,8 +58,8 @@
   position: relative;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 8px 40px 14px;
+  gap: 14px;
+  padding: 12px 16px 10px;
   text-align: center;
   background: none;
 }
@@ -78,31 +78,39 @@
   flex: none;
   color: var(--on-accent);
   background: var(--accent);
+  /* Un anneau net de la teinte douce, pas une ombre floue : il détache
+     l'avatar du fond sans le faire briller. */
+  box-shadow: 0 0 0 5px var(--accent-soft);
   transition: transform 0.12s ease;
 }
 .acct__avatar .icon {
   width: 34px;
   height: 34px;
 }
-.acct__who b {
+.acct__who .menu__text b {
   display: block;
   font-size: calc(22px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.025em;
 }
-.acct__who em {
-  display: block;
-  margin-top: 2px;
+/* L'état du profil dans une pastille, chevron compris : seul au bord droit,
+   le chevron flottait loin de tout et ne disait plus ce qu'il ouvrait. La
+   pastille, elle, se lit comme un bouton, à la manière des apps bancaires. */
+.acct__who .menu__text em {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
   font-style: normal;
-  font-size: calc(14px * var(--text-scale));
-  color: var(--text-2);
+  font-size: calc(13.5px * var(--text-scale));
+  font-weight: 600;
 }
-/* Le chevron reste, calé à droite à hauteur du nom : il dit que l'en-tête
-   s'ouvre sur la page Profil. */
-.acct__who .menu__chev {
-  position: absolute;
-  right: 12px;
-  top: 50%;
+.acct__who:active .menu__text em {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 /* Une famille : son nom en petites capitales, puis ses lignes d'un seul bloc. */
 .acct__group {
