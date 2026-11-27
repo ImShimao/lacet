@@ -64,11 +64,12 @@
   border-radius: 9px;
 }
 /* « Courir libre » : un geste secondaire, sobre — les pointillés le faisaient
-   passer pour une zone de dépôt. */
+   passer pour une zone de dépôt. Un filet discret quand même : sans contour,
+   les deux tuiles se fondaient dans le panneau, à côté des distances cerclées. */
 .panel .row .btn,
 .panel .row .btn--ghost {
   border-style: solid;
-  border-color: transparent;
+  border-color: var(--line-soft);
   background: var(--surface-2);
 }
 
