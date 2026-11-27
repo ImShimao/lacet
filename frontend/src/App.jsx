@@ -143,7 +143,12 @@ export default function App() {
   const [zoneDraft, setZoneDraft] = useState(null)
   // Boucle ou trajet : revenir à sa porte, ou aller quelque part (`engine/journey.js`).
   // Le choix reste d'une ouverture à l'autre ; l'arrivée, non : c'est celle d'un jour.
-  const [goal, setGoal] = useState(stored.goal === 'journey' ? 'journey' : 'loop')
+  // Au lancement : la boucle ou le trajet choisis dans « Parcours » (`launchGoal`),
+  // sinon le dernier utilisé.
+  const [goal, setGoal] = useState(() => {
+    const first = stored.launchGoal === 'loop' || stored.launchGoal === 'journey' ? stored.launchGoal : stored.goal
+    return first === 'journey' ? 'journey' : 'loop'
+  })
   const [destination, setDestination] = useState(null)
   const [placingDest, setPlacingDest] = useState(false)
   // Au plus court, plus long (à la distance ou la durée des réglages), ou

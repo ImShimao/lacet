@@ -417,6 +417,29 @@ function AppearanceSettings({ mapStyle, onStyles }) {
   )
 }
 
+// Ce que l'accueil propose à l'ouverture de l'app : lu par `App.jsx`.
+const LAUNCH_GOALS = [
+  { key: 'last', label: 'Le dernier utilisé' },
+  { key: 'loop', label: 'Boucle' },
+  { key: 'journey', label: 'Aller à…' },
+]
+
+function LaunchGoalRow() {
+  const [value, setValue] = useState(() => load().launchGoal ?? 'last')
+  return (
+    <PickRow
+      icon="play"
+      label={t('Au lancement')}
+      value={value}
+      options={LAUNCH_GOALS}
+      onChange={(launchGoal) => {
+        setValue(launchGoal)
+        save({ launchGoal })
+      }}
+    />
+  )
+}
+
 const UNIT_OPTIONS = [
   { key: 'km', label: 'Kilomètres' },
   { key: 'mi', label: 'Miles' },
@@ -518,6 +541,7 @@ function SearchSettings({ params, onProfile }) {
         title={t('Recherche')}
         foot={t('La nuit, les rues éclairées passent devant. « Auto » suit le coucher du soleil.')}
       >
+        <LaunchGoalRow />
         <PickRow
           icon="clock"
           label={t('Moment')}
@@ -959,6 +983,17 @@ const LEADS = [
   { key: 'normal', label: 'Moyen' },
   { key: 'late', label: 'Tard' },
 ]
+const VOLUMES = [
+  { key: 'low', label: 'Faible' },
+  { key: 'medium', label: 'Moyen' },
+  { key: 'high', label: 'Fort' },
+]
+// Ce que devient la musique le temps d'une phrase : baissée, ou en pause.
+const MUSIC = [
+  { key: 'duck', label: 'Baissée' },
+  { key: 'pause', label: 'En pause' },
+]
+const timeEvery = () => [0, 5, 10, 15, 30].map((n) => ({ key: n, label: n ? t('Toutes les {n} min', { n }) : t('Jamais') }))
 const RATES = [
   { key: 'slow', label: 'Lent' },
   { key: 'normal', label: 'Normal' },
@@ -1019,6 +1054,14 @@ function VoiceSetting() {
           options={voiceOptions}
           onChange={(voiceId) => change({ voiceId })}
         />
+        <PickRow icon="volume" label={t('Volume de la voix')} value={prefs.volume ?? 'high'} options={VOLUMES} onChange={(volume) => change({ volume })} />
+        <PickRow
+          icon="volumeOff"
+          label={t('Musique')}
+          value={prefs.music ?? 'duck'}
+          options={MUSIC}
+          onChange={(music) => change({ music })}
+        />
         <PickRow icon="gauge" label={t('Débit')} value={prefs.rate ?? 'normal'} options={RATES} onChange={(rate) => change({ rate })} />
         <PickRow
           icon="turnRight"
@@ -1039,6 +1082,13 @@ function VoiceSetting() {
           kmSays().map(([key, label, icon]) => (
             <ToggleRow key={key} icon={icon} label={label} on={prefs[key]} onChange={(on) => change({ [key]: on })} />
           ))}
+        <PickRow
+          icon="clock"
+          label={t('Rappel du temps couru')}
+          value={prefs.timeEvery ?? 0}
+          options={timeEvery()}
+          onChange={(timeEvery) => change({ timeEvery })}
+        />
         <ToggleRow
           icon="trendUp"
           label={t('Écart à l\'allure visée')}
