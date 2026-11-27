@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import { Segmented } from './FiltersSheet.jsx'
 import { ZONE_RADIUS, ZONE_REASONS } from './zones'
@@ -148,8 +148,25 @@ export function ZoneDraft({ draft, onChange, onKeep, onCancel }) {
   const points = draft.points ?? []
   const placed = polygon ? points.length >= 3 : Number.isFinite(draft.lon)
   const km = draft.radius_m >= 1000
+  // La hauteur de carte que la carte de réglage recouvre (`--zone-cover`) : le
+  // « i » de l'attribution se pose juste au-dessus, comme au-dessus du panneau
+  // ailleurs. Sans elle, il restait calé sur le panneau caché, très haut.
+  const box = useRef(null)
+  useEffect(() => {
+    const el = box.current
+    const shell = el?.closest('.shell')
+    if (!shell) return undefined
+    const update = () => shell.style.setProperty('--zone-cover', `${Math.round(shell.getBoundingClientRect().bottom - el.getBoundingClientRect().top)}px`)
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    update()
+    return () => {
+      observer.disconnect()
+      shell.style.removeProperty('--zone-cover')
+    }
+  }, [])
   return (
-    <div className="zonedraft" role="dialog" aria-label={t('Zone à éviter')}>
+    <div className="zonedraft" role="dialog" aria-label={t('Zone à éviter')} ref={box}>
       <b>{t('Zone à éviter')}</b>
       {/* Changer de forme repart d'une zone vide : un centre ne fait pas un contour. */}
       <Segmented

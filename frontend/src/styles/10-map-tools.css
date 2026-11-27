@@ -405,6 +405,10 @@
 .shell[data-zoning] .viapill {
   visibility: hidden;
 }
+.shell[data-zoning] .maplibregl-ctrl-bottom-left,
+.shell[data-zoning] .maplibregl-ctrl-bottom-right {
+  bottom: calc(var(--zone-cover, 0px) + 6px);
+}
 .zonedraft {
   position: absolute;
   left: 12px;
