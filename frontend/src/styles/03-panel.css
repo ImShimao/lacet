@@ -474,7 +474,7 @@
   text-align: left;
   font-size: calc(13.5px * var(--text-scale));
 }
-.list__row > span:not(.list__sport):not(.grade) {
+.list__row > span:not(.list__sport):not(.grade):not(.list__km) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

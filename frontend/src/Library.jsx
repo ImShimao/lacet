@@ -253,9 +253,14 @@ function Item({ route, run, shared: partagee, mapStyle, onOpen, onRename, onForg
         )}
         <em>
           {run
-            ? `${dayLabel(route.ranAt)} · ${km(route.actual_distance_m)} ${unitLabel()} · ${duration(route.actual_duration_s)} · ${paceOf(route)}${paceLabel()}`
-            : `${km(route.distance_m)} ${unitLabel()} · D+ ${Math.round(route.ascent_m || 0)} m`}
+            ? `${dayLabel(route.ranAt)} · ${duration(route.actual_duration_s)} · ${paceOf(route)}${paceLabel()}`
+            : `D+ ${Math.round(route.ascent_m || 0)} m`}
         </em>
+      </span>
+      {/* La distance à droite, en gras, comme un montant sur un relevé de
+          compte : c'est le chiffre qu'on cherche en parcourant la liste. */}
+      <span className="list__km">
+        <b>{km(run ? route.actual_distance_m : route.distance_m)}</b> {unitLabel()}
       </span>
       {route.grade ? (
         <span className={`grade grade--${route.grade}`}>{route.grade}</span>

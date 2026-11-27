@@ -119,7 +119,7 @@
 }
 /* Le nom qu'on corrige prend toute la place de la ligne. Seize pixels au
    moins : en dessous, iOS zoome toute l'app au toucher du champ. */
-.list__row--naming > span:not(.list__sport):not(.grade) {
+.list__row--naming > span:not(.list__sport):not(.grade):not(.list__km) {
   flex: 1;
 }
 .list__row input {
@@ -238,8 +238,62 @@
   font-size: calc(12px * var(--text-scale));
   font-variant-numeric: tabular-nums;
 }
-.list__row > span:not(.list__sport):not(.grade) {
+.list__row > span:not(.list__sport):not(.grade):not(.list__km) {
   font-size: calc(14.5px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/* ══ la liste comme un relevé ══════════════════════════════════════════
+   À la manière des apps bancaires (Revolut, N26) : les sorties d'un mois
+   forment un seul bloc, séparées par des filets, sous l'en-tête du mois. Une
+   pile de cartes espacées faisait autant de cadres que de lignes. Le ruban
+   qu'on glisse (`.list__item`) porte les arrondis : il rogne aussi les
+   boutons Renommer et Supprimer qu'il cache à droite. */
+.list,
+.list__group {
+  gap: 0;
+}
+.list__main,
+.list__main > .offline {
+  position: relative;
+  border-radius: 0;
+}
+.list__group:first-child .list__item,
+.list__group:has(> .monthhead) .list__item {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+.list__group:last-child .list__item,
+.list__group:has(+ .list__group > .monthhead) .list__item {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+.list__group + .list__group:not(:has(> .monthhead)) .list__main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 58px;
+  right: 14px;
+  border-top: 1px solid var(--line-soft);
+  z-index: 1;
+}
+.list__group:not(:first-child) > .monthhead {
+  padding-top: 22px;
+}
+.list__km {
+  flex: none;
+  margin-left: auto;
+  font-size: calc(12px * var(--text-scale));
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.list__km b {
+  font-size: calc(16px * var(--text-scale));
+  font-weight: 700;
+  color: var(--text);
+}
+.list__row .list__km + .grade {
+  margin-left: 0;
 }

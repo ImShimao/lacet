@@ -543,3 +543,21 @@
 .statstrip__card > * {
   margin: 0;
 }
+
+/* Le total en tête, en grand, comme le solde d'une app bancaire ; les trois
+   autres chiffres en rang dessous. Quatre chiffres de même taille ne disaient
+   pas lequel regarder. */
+.statstrip .statstrip__card .stats--four {
+  grid-template-columns: repeat(3, 1fr);
+}
+.statstrip .statstrip__card .stats--four > div:first-child {
+  grid-column: 1 / -1;
+}
+.statstrip .statstrip__card .stats--four > div:first-child b {
+  font-size: calc(40px * var(--text-scale));
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.statstrip .statstrip__card .stats--four > div:not(:first-child) b {
+  font-size: calc(19px * var(--text-scale));
+}
