@@ -893,7 +893,7 @@ export default {
   "Bleu": "Blue",
   "Violet": "Purple",
   "Framboise": "Raspberry",
-  "Graphite": "Graphite",
+  "Vert": "Green",
   "Comme l'iPhone": "Like the iPhone",
   "Sombre": "Dark",
   "Clair": "Light",

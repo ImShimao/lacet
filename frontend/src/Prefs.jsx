@@ -54,7 +54,7 @@ export function PickRow({ icon, label, sub, value, options, onChange, shown = nu
     // 50 px par choix. Le menu va du côté qui a le plus de place, et ne
     // dépasse jamais cette place : la liste des voix d'iOS, longue, montait
     // sinon sous l'en-tête de la page (en haut) — ou sous la barre d'onglets.
-    const want = Math.min(options.length * 50 + 16, 380)
+    const want = Math.min(options.length * 50 + 18, 380)
     const below = (window.innerHeight || 800) - 90 - box.top - 6
     const above = box.bottom - 6 - 120
     const up = below < want && above > below

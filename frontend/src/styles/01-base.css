@@ -183,25 +183,34 @@
   --accent: #c21a5e;
   --accent-press: #a3164f;
 }
-/* Graphite : sans couleur. Clair sur le thème sombre, noir sur le clair. */
-[data-accent='graphite'] {
-  --accent: #e6e9ed;
-  --accent-press: #c9ced5;
-  --accent-light: #e6e9ed;
-  --accent-deep: #1f2329;
-  --on-accent: #0b0d10;
-  --runbar-note: #8f5f00;
+/* Vert, à la place du graphite : un accent sans couleur se confondait avec
+   le texte, et un bouton principal blanc ne se lisait plus comme une action
+   (retour du 2026-11-27). Même règle que les autres : le blanc dessus à 4,5:1,
+   et 4:1 sur la surface — 4,58 et 4,00 en sombre, 5,02 en clair. Le vert de
+   la note A reste à part : il ne suit pas l'accent (voir `--safe`). */
+[data-accent='green'] {
+  --accent: #178745;
+  --accent-press: #15803d;
+  --accent-light: #6fdc8c;
+  --accent-deep: #166534;
 }
-[data-theme='light'][data-accent='graphite'],
-[data-theme='light'] [data-accent='graphite'] {
-  --accent: #1f2329;
-  --accent-press: #000;
-  --on-accent: #fff;
-  --runbar-note: #fff2b3;
+[data-theme='light'][data-accent='green'],
+[data-theme='light'] [data-accent='green'] {
+  --accent: #15803d;
+  --accent-press: #166534;
 }
 
 * {
   box-sizing: border-box;
+}
+/* Aucune barre de défilement : sur l'iPhone, le défilement se voit au
+   contenu qui suit le doigt, et une barre grise collée au bord d'un menu de
+   quatre choix ne servait à rien (retour du 2026-11-27). */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
 }
 html,
 body,

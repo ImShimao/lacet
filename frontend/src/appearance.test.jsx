@@ -107,8 +107,8 @@ describe('Apparence', () => {
 
   it('repart à zéro avec « Tout effacer »', () => {
     page('appearance')
-    choisir("Couleur d'accent", 'Graphite')
-    expect(root.dataset.accent).toBe('graphite')
+    choisir("Couleur d'accent", 'Vert')
+    expect(root.dataset.accent).toBe('green')
 
     wipe()
     startAppearance()

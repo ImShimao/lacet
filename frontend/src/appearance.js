@@ -22,7 +22,7 @@ export const ACCENTS = [
   { key: 'blue', label: 'Bleu' },
   { key: 'violet', label: 'Violet' },
   { key: 'rose', label: 'Framboise' },
-  { key: 'graphite', label: 'Graphite' },
+  { key: 'green', label: 'Vert' },
 ]
 
 export const THEMES = [

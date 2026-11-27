@@ -291,10 +291,18 @@
   gap: 9px;
 }
 .swatch-opt i {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--accent);
+}
+/* La couleur choisie se voit à sa pastille, pas seulement à la coche : un
+   anneau de sa propre teinte, détaché par un liseré de la couleur du menu. */
+.pop__opt[aria-selected='true'] .swatch-opt i {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--accent);
+}
+.pop__opt[aria-selected='true'] {
+  background: var(--accent-soft);
 }
 
 /* Faire défiler une feuille ou un menu jusqu'au bout ne doit pas emmener la

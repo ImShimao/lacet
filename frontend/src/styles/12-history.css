@@ -412,8 +412,8 @@
 }
 .runctl__main--paused {
   background: var(--safe-fill);
-  /* Blanc sur le vert, quel que soit l'accent : en graphite, le texte
-     d'accent est sombre et se perdait sur ce vert. */
+  /* Blanc sur le vert, quel que soit l'accent : un texte d'accent clair
+     se perdait sur ce vert. */
   color: var(--on-color);
   /* La même ombre neutre qu'en marche : un halo vert flou bavait sur la
      carte et faisait un dégradé autour du bouton. */
