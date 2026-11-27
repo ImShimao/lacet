@@ -30,10 +30,14 @@
 /* L'action principale : un aplat de l'accent, sans lueur ni dégradé — une ombre
    colorée floue se lit en bandes sur l'écran (2026-11-26). Elle s'enfonce
    légèrement au toucher, comme un bouton iOS. */
+/* Teinté plutôt que plein (2026-11-27) : la grande gélule bleu vif écrasait
+   tout le bas de l'écran, à côté de boutons sombres. Un fond d'accent dilué
+   dans la surface, un filet et le texte en accent, comme les boutons
+   « tinted » d'iOS — et comme le rouge doux des actions qui effacent. */
 .btn--primary {
-  background: var(--accent);
-  border-color: transparent;
-  color: var(--on-accent);
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface-2));
+  border-color: var(--accent-line);
+  color: var(--accent-text);
   /* En gélule, comme les apps bancaires récentes : l'action principale ne se
      confond plus avec les tuiles carrées des réglages posées à côté. */
   border-radius: 999px;
@@ -55,9 +59,12 @@
   width: 48px;
   padding: 13px 0;
 }
+/* Allumé, un bouton prend la même teinte que l'action principale : le filet
+   d'accent vif seul faisait un anneau criard à côté d'elle. */
 .btn--on {
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
 }
 
 .seg {
