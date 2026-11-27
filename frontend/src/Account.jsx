@@ -38,7 +38,7 @@ import { setUnits, unitLabel, units } from './units'
 import { parsePresets, presets, setPresets } from './presets'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
 
-import { SECTIONS } from './accountSections.js'
+import { SECTIONS, SETTINGS_GROUPS } from './accountSections.js'
 
 import { t, locale, dec, lang, useLang, setLang, LANGUAGES } from './i18n'
 export { SECTIONS, sectionTitle } from './accountSections.js'
@@ -139,7 +139,13 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
       </div>
 
       <div key={tab} className="acct__tab" role="tabpanel">
-        {tab === 'settings' && rows('Paramètres')}
+        {tab === 'settings' &&
+          SETTINGS_GROUPS.map((group) => (
+            <section key={group} className="acct__group" aria-label={t(group)}>
+              <h3 className="acct__label">{t(group)}</h3>
+              {rows(group)}
+            </section>
+          ))}
         {tab === 'profile' && <ProfileSettings params={params} onProfile={onProfile} />}
         {tab === 'data' && (
           <>
@@ -202,27 +208,39 @@ function summaryOf(key, { params, poiPrefs }) {
       ]
         .filter(Boolean)
         .join(' · ')
-    case 'run': {
-      const { km } = voiceSettings()
+    case 'home': {
+      const hidden = params.hiddenFilters?.length ?? 0
+      return [t('Raccourcis de l\'accueil'), hidden ? t('Filtres masqués : {hidden}', { hidden }) : null]
+        .filter(Boolean)
+        .join(' · ')
+    }
+    case 'voice': {
+      const { km, rate } = voiceSettings()
       return [
-        t('Recalcul {v1}', { v1: t(saved.autoReroute !== false ? 'auto' : 'manuel') }),
-        t('Arrêt {v1} à l\'arrivée', { v1: t(saved.autoFinish !== false ? 'auto' : 'manuel') }),
-        km ? null : t('Kilomètres tus'),
-        workoutSettings().on ? t('Fractionné {v1}', { v1: t(workoutPlan().label) }) : null,
+        km ? kmEvery().find((o) => o.key === km)?.label : t('Kilomètres tus'),
+        t('Débit {v1}', { v1: t(RATES.find((o) => o.key === (rate ?? 'normal'))?.label ?? 'Normal').toLowerCase() }),
       ]
         .filter(Boolean)
         .join(' · ')
     }
-    case 'safety': {
-      const reports = activeReports().length
-      const contact = saved.emergencyContact
+    case 'run':
+      return [
+        t('Recalcul {v1}', { v1: t(saved.autoReroute !== false ? 'auto' : 'manuel') }),
+        t('Arrêt {v1} à l\'arrivée', { v1: t(saved.autoFinish !== false ? 'auto' : 'manuel') }),
+      ].join(' · ')
+    case 'workout':
+      return workoutSettings().on ? t('Fractionné {v1}', { v1: t(workoutPlan().label) }) : t('Désactivée')
+    case 'safety':
+      return saved.emergencyContact
         ? t('SOS vers {emergencyContact}{v2}', { emergencyContact: saved.emergencyContact, v2: saved.notifyContact ? t(' · départ et retour annoncés') : '' })
         : t('Pas de contact d\'urgence')
+    case 'zones': {
+      const reports = activeReports().length
       const zones = listZones().filter((z) => z.on !== false).length
+      if (!reports && !zones) return t('Aucune zone, aucun signalement')
       return [
-        contact,
-        reports && `${reports} signalement${reports > 1 ? 's' : ''}`,
         zones && t('{zones} zone{v2} évitée{v3}', { zones, v2: zones > 1 ? 's' : '', v3: zones > 1 ? 's' : '' }),
+        reports && `${reports} signalement${reports > 1 ? 's' : ''}`,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -253,19 +271,24 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       return <ProfileSettings params={params} onProfile={onProfile} />
     case 'search':
       return <SearchSettings params={params} onProfile={onProfile} />
+    case 'home':
+      return <HomeSettings params={params} onProfile={onProfile} />
+    case 'voice':
+      return <VoiceSetting />
     case 'run':
       return (
         <>
-          <VoiceSetting />
-          <WorkoutSetting />
           <RunSettings poiPrefs={poiPrefs} onPoiPrefs={onPoiPrefs} />
           <LockScreenSetting />
         </>
       )
+    case 'workout':
+      return <WorkoutSetting />
     case 'safety':
+      return <EmergencyContact />
+    case 'zones':
       return (
         <>
-          <EmergencyContact />
           <MyZones zones={zones} onZones={onZones} />
           <MyReports />
         </>
@@ -599,16 +622,6 @@ function SearchSettings({ params, onProfile }) {
           onChange={(count) => onProfile({ count })}
         />
       </PrefsCard>
-
-      <PrefsCard
-        title={t('Raccourcis de l\'accueil')}
-        foot={t('Les touches sous la règle de distance, six au plus.')}
-      >
-        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label={t('Distances')} icon="routes" unit={unitLabel()} />
-        <PresetRow kind="duration" label={t('Durées')} icon="clock" unit="min" />
-      </PrefsCard>
-
-      <ShownFilters params={params} onProfile={onProfile} />
     </>
   )
 }
@@ -618,6 +631,23 @@ function SearchSettings({ params, onProfile }) {
  * Une liste tapée d'un trait (« 3 · 5 · 10 ») se lisait comme un texte, pas
  * comme des touches ; ici, on voit ce que l'accueil montrera.
  */
+/** Ce que montre l'accueil : ses raccourcis de distance, et les filtres du panneau. */
+function HomeSettings({ params, onProfile }) {
+  const sport = params.sport ?? 'run'
+  return (
+    <>
+      <PrefsCard
+        title={t('Raccourcis de l\'accueil')}
+        foot={t('Les touches sous la règle de distance, six au plus.')}
+      >
+        <PresetRow kind={sport === 'bike' ? 'bike' : 'run'} label={t('Distances')} icon="routes" unit={unitLabel()} />
+        <PresetRow kind="duration" label={t('Durées')} icon="clock" unit="min" />
+      </PrefsCard>
+      <ShownFilters params={params} onProfile={onProfile} />
+    </>
+  )
+}
+
 function PresetRow({ kind, label, icon, unit }) {
   const [list, setList] = useState(() => presets(kind))
   const [adding, setAdding] = useState(false)

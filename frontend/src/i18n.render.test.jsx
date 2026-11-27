@@ -65,7 +65,7 @@ describe('l’app en anglais', () => {
   it('montre le sommaire de Mon compte en anglais', () => {
     setLang('en')
     render(account(null))
-    for (const title of ['Guidance and voice', 'Safety', 'Appearance']) {
+    for (const title of ['Voice', 'Appearance', 'Display']) {
       expect(screen.getByText(title)).toBeInTheDocument()
     }
     // La sauvegarde et « À propos » vivent sous l'onglet « Data ».
@@ -74,7 +74,7 @@ describe('l’app en anglais', () => {
       expect(screen.getByText(title)).toBeInTheDocument()
     }
     fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
-    expect(screen.queryByText('Guidage et voix')).toBeNull()
+    expect(screen.queryByText('Voix')).toBeNull()
     expect(screen.getByText('No account. Favorites, runs and settings never leave this device.')).toBeInTheDocument()
   })
 

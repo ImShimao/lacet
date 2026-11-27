@@ -81,11 +81,12 @@ describe('Mon compte', () => {
   it('range le sommaire en trois onglets, le profil réglable sur place', () => {
     const onProfile = vi.fn()
     render(<Account page={null} onPage={() => {}} params={DEFAULTS} poiPrefs={{}} onProfile={onProfile} />)
-    expect(screen.getByRole('button', { name: /^Parcours/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Itinéraire/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Séance fractionnée/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Stockage/ })).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Profil' }))
-    expect(screen.queryByRole('button', { name: /^Parcours/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Itinéraire/ })).toBeNull()
     fireEvent.pointerDown(screen.getByRole('button', { name: /Augmenter poids/i }))
     fireEvent.pointerUp(screen.getByRole('button', { name: /Augmenter poids/i }))
     expect(onProfile).toHaveBeenCalledWith({ weight_kg: (DEFAULTS.weight_kg || 70) + 1 })
@@ -134,7 +135,7 @@ describe('Mon compte', () => {
     const page = () =>
       render(
         <Account
-          page="run"
+          page="voice"
           params={DEFAULTS}
           geo={{ status: 'idle' }}
           history={[]}
@@ -197,7 +198,7 @@ describe('Mon compte', () => {
     const page = (params) =>
       render(
         <Account
-          page="search"
+          page="home"
           params={params}
           geo={{ status: 'idle' }}
           history={[]}

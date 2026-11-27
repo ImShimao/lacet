@@ -210,8 +210,10 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 ## Réglages
 
 **Mon compte** s'ouvre sur une carte « Profil local » (avatar, poids), puis
-trois onglets : **Paramètres** (Parcours, Guidage et voix, Sécurité,
-Apparence), **Profil** (poids et objectifs, réglables sur place) et
+trois onglets : **Paramètres**, rangé sous quatre intitulés — Recherche
+(Itinéraire, Accueil et filtres), Course (Voix, Pendant la sortie, Séance
+fractionnée), Sécurité (Contact d'urgence, Zones et signalements), Affichage
+(Apparence) —, **Profil** (poids et objectifs, réglables sur place) et
 **Données** (Stockage, Sauvegarde, À propos). L'onglet choisi est gardé pendant
 la session. Toutes les pages sont faites des mêmes cartes de `Prefs.jsx` —
 lignes à menu, interrupteurs, lignes d'information et lignes d'action, en
