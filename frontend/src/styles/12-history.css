@@ -31,8 +31,10 @@
   padding: 3px 7px;
   margin-left: -7px;
 }
-.rundet__name input:hover {
-  border-color: var(--line);
+@media (hover: hover) {
+  .rundet__name input:hover {
+    border-color: var(--line);
+  }
 }
 .rundet__name input:focus {
   outline: none;

@@ -95,9 +95,16 @@
 .startmenu button .icon {
   color: var(--accent-text);
 }
-.startmenu button:hover,
+/* Le survol, seulement là où il existe : au doigt, `:hover` reste accroché
+   après le toucher, et la ligne paraît encore choisie. */
+.startmenu button:active,
 .startmenu button:focus-visible {
   background: var(--surface-2);
+}
+@media (hover: hover) {
+  .startmenu button:hover {
+    background: var(--surface-2);
+  }
 }
 
 /* En course, sous le bandeau de consigne. */

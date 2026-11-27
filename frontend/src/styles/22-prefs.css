@@ -296,3 +296,12 @@
   border-radius: 50%;
   background: var(--accent);
 }
+
+/* Faire défiler une feuille ou un menu jusqu'au bout ne doit pas emmener la
+   page ou la carte derrière : le geste s'arrête au bord de ce qu'on touche. */
+.modal__panel,
+.sheet__panel,
+.infosheet__panel,
+.pop {
+  overscroll-behavior: contain;
+}
