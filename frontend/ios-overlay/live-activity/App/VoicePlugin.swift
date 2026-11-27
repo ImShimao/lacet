@@ -102,20 +102,33 @@ public class VoicePlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
 
     /// Les voix installées sur l'iPhone dans la langue de l'app (`lang`, « fr » par
     /// défaut), les meilleures d'abord.
+    ///
+    /// Lue sur le fil principal, et relue tant qu'elle revient vide : appelée
+    /// depuis le fil de Capacitor, au premier appel de l'app, iOS rendait une
+    /// liste vide, et le réglage ne montrait que « Voix du système » (constaté
+    /// le 2026-11-27).
     @objc func voices(_ call: CAPPluginCall) {
         let prefix = String((call.getString("lang") ?? "fr").prefix(2))
-        let list = AVSpeechSynthesisVoice.speechVoices()
-            .filter { $0.language.hasPrefix(prefix) }
-            .sorted { $0.quality.rawValue > $1.quality.rawValue }
-            .map { voice -> [String: Any] in
-                [
-                    "id": voice.identifier,
-                    "name": voice.name,
-                    "language": voice.language,
-                    "enhanced": voice.quality != .default,
-                ]
+        func read(attempt: Int) {
+            let all = AVSpeechSynthesisVoice.speechVoices()
+            if all.isEmpty && attempt < 5 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { read(attempt: attempt + 1) }
+                return
             }
-        call.resolve(["voices": list])
+            let list = all
+                .filter { $0.language.hasPrefix(prefix) }
+                .sorted { $0.quality.rawValue > $1.quality.rawValue }
+                .map { voice -> [String: Any] in
+                    [
+                        "id": voice.identifier,
+                        "name": voice.name,
+                        "language": voice.language,
+                        "enhanced": voice.quality != .default,
+                    ]
+                }
+            call.resolve(["voices": list])
+        }
+        DispatchQueue.main.async { read(attempt: 0) }
     }
 
     // === la musique =============================================================

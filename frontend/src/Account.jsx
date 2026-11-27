@@ -986,7 +986,21 @@ function VoiceSetting() {
 
   useEffect(() => {
     if (!isNative()) return
-    import('./native').then((n) => n.voicesNative(lang())).then(setVoices)
+    // Redemandée une fois si vide : iOS charge ses voix à la demande, et la
+    // première réponse arrivait parfois avant elles.
+    let gone = false
+    const ask = (again) =>
+      import('./native')
+        .then((n) => n.voicesNative(lang()))
+        .then((list) => {
+          if (gone) return
+          if (list.length || !again) setVoices(list)
+          else setTimeout(() => ask(false), 1500)
+        })
+    ask(true)
+    return () => {
+      gone = true
+    }
   }, [language])
 
   const voiceOptions = [
