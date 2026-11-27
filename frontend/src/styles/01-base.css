@@ -407,18 +407,27 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  font-size: calc(10.5px * var(--text-scale));
-  color: var(--text-3);
+  gap: 2px;
+  font-size: calc(11px * var(--text-scale));
+  font-weight: 600;
+  /* `--text-2`, pas `--text-3` : sur le verre de la gélule, un libellé de
+     11 px en gris clair se perdait sur une carte claire. */
+  color: var(--text-2);
 }
 .tab .icon {
-  opacity: 0.9;
+  box-sizing: content-box;
+  padding: 3px 16px;
+  border-radius: 999px;
 }
-/* L'onglet actif porte une pastille : la couleur seule se perdait sur un
-   libellé de 10px. */
+/* La pastille de l'onglet actif ne couvre que l'icône, à la manière des apps
+   récentes (Revolut, Material 3) : sur tout l'onglet, elle faisait de la
+   gélule un bloc lourd de trois boutons. Le libellé reste en accent et en
+   gras, pour qu'on ne lise pas l'état à la couleur seule. */
 .tab--on {
   color: var(--accent-text);
   font-weight: 700;
+}
+.tab--on .icon {
   background: var(--accent-soft);
 }
 
