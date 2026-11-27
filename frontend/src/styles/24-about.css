@@ -1,33 +1,45 @@
 /* « À propos » (`About.jsx`) : la marque et sa version, puis les conditions,
    la confidentialité et les sources, en lignes qu'on parcourt du regard. */
 
+/* Centrée, sans carte : la marque se lisait comme une ligne de réglage de plus. */
 .about__head {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 20px;
-  background: var(--surface-2);
+  gap: 4px;
+  padding: 8px 16px 4px;
+  text-align: center;
 }
 .about__mark {
-  width: 56px;
-  height: 56px;
+  width: 76px;
+  height: 76px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 16px;
+  margin-bottom: 8px;
+  border-radius: 22px;
   /* Le fond de l'écran de lancement : la marque y retrouve son cadre. */
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+.about__name {
+  font-size: calc(24px * var(--text-scale));
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+.about__tagline {
+  font-size: calc(14px * var(--text-scale));
+  color: var(--text-2);
+}
 .about__id {
   min-width: 0;
+  margin-top: 6px;
 }
-.about__id b {
-  display: block;
-  font-size: calc(19px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: -0.025em;
+.about__id .muted {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
 }
 .about__id .muted {
   font-size: calc(12px * var(--text-scale));
@@ -106,11 +118,6 @@
   font-weight: 600;
   line-height: 1.25;
 }
-.about__foot {
-  margin-top: -4px;
-  padding: 0 4px;
-}
-
 /* Les sources : le type de donnée à gauche, qui la fournit en dessous. */
 .about__sources {
   margin: 0;
