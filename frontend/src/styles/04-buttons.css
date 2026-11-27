@@ -186,3 +186,38 @@ html.native textarea {
   color: var(--text-3);
   white-space: nowrap;
 }
+
+/* ══ cibles tactiles ═══════════════════════════════════════════════════════ */
+
+/* 44 px au doigt, comme le veut Apple, sans changer ce qu'on voit : une zone
+   invisible déborde du bouton là où il est plus petit. Mesuré à 390 px : les
+   (i) et les croix faisaient 32 et 34 px, les puces de distance 35, le lien
+   « Comparer » 31, « Réinitialiser » 32. Le débord ne touche aucun voisin :
+   seulement le vide autour. */
+.info-btn,
+.mapsheet__close,
+.modal__reset,
+.comparelink,
+.dist .chip,
+.chips .chip {
+  position: relative;
+}
+.info-btn::after,
+.mapsheet__close::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.modal__reset::after,
+.comparelink::after,
+.dist .chip::after,
+.chips .chip::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+/* En pause, le seul bouton qui ramène à la maison : une vraie hauteur de
+   bouton, au pouce, sans viser. */
+.live__home {
+  min-height: 44px;
+}
