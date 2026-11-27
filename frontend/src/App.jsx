@@ -1040,6 +1040,13 @@ export default function App() {
               // Toucher « Mon compte » ramène à son sommaire, d'où qu'on vienne.
               setAccountPage(null)
               setRoutesView(null)
+              // Retoucher l'onglet où l'on est remonte en haut, comme partout sur
+              // iOS : au fond d'une longue liste de sorties, c'est le geste qu'on
+              // tente, et il ne faisait rien.
+              if (key === tab) {
+                const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                shellRef.current?.querySelector('.side__body')?.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' })
+              }
               setTab(key)
               if (key === 'explore') setSheet('peek')
             }}
