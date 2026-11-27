@@ -36,8 +36,8 @@ const PAGES = [
 
 // Les seuils du moteur (`safety/gate`), dits sans jargon.
 const GRADES = [
-  ['A', 'Au plus 1 % du parcours au contact du trafic, et aucune traversée non protégée.'],
-  ['B', 'Au plus 3 % du parcours au contact du trafic.'],
+  ['A', 'Au plus 1 % du parcours au contact du trafic, et au plus une traversée non protégée.'],
+  ['B', 'Au plus 3 % du parcours au contact du trafic, ou plusieurs traversées non protégées.'],
   ['C', 'Plus exposée. Proposée seulement en mode Standard, jamais en mode Sûr.'],
 ]
 

@@ -175,8 +175,8 @@ elle seule** — pas sa beauté, pas sa longueur, pas son dénivelé.
 
 | Note | Condition |
 |---|---|
-| **A** | Au plus 1 % du parcours au contact direct du trafic, **et aucune** traversée non protégée. |
-| **B** | Au plus 3 % au contact du trafic. C'est aussi la note d'une boucle sans aucune exposition mais qui traverse une voie rapide sans passage protégé. |
+| **A** | Au plus 1 % du parcours au contact direct du trafic, **et au plus une** traversée non protégée. |
+| **B** | Au plus 3 % au contact du trafic. C'est aussi la note d'une boucle sans aucune exposition mais qui traverse plusieurs fois une voie rapide sans passage protégé. |
 | **C** | Au-delà. N'apparaît qu'en mode Standard : le portail du mode Sûr rejette ces tracés. |
 
 « Au contact du trafic » a un sens précis : un tronçon dont le risque dépasse
@@ -186,10 +186,28 @@ ne dirait plus rien.
 
 En mode Sûr à pied, l'exposition est plafonnée à 3 % par le portail : **un B y
 signale donc presque toujours une traversée**, pas une portion longée. Le détail
-sous la proposition dit lequel des deux. Une boucle entièrement sur trottoirs
-qui coupe une seule fois une départementale sans passage piéton est notée B —
-c'est voulu : ces quelques secondes sont le vrai risque d'une sortie à la
-campagne, et l'app prévient 120 m avant.
+sous la proposition dit lequel des deux, et l'app prévient 120 m avant chaque
+traversée.
+
+**Une traversée isolée garde le A.** Une boucle entièrement sur trottoirs qui
+coupait une seule fois une départementale était notée B. Mesuré en mode Sûr à
+pied sur huit départs autour de Guebwiller (5 à 21 km, 159 boucles) : 54 des
+58 B ne l'étaient que pour leurs traversées, dont 36 pour une seule. Le B ne
+distinguait plus une route coupée une fois d'une boucle qui en enchaîne
+plusieurs. Depuis, le A tolère une traversée (`MAX_CROSSINGS_FOR_A`) : 146 A et
+13 B sur les mêmes recherches.
+
+Le classement, lui, n'a presque pas bougé. Une A avec une traversée recule d'un
+demi-cran (`CROSSING_A_PENALTY`, 0,45) : elle passe derrière les A sans
+traversée, mais toujours devant une B. Sans ce retrait, les boucles proposées
+sans aucune traversée passaient de 101 à 87 ; avec, il en reste 100, et la tête
+de liste ne change pas.
+
+**Les seuils du portail ne limitent pas.** Sur ces mêmes recherches, les
+desserrer (250 ou 400 m exposés d'affilée, 3 traversées, 5 % exposé) rend
+exactement les mêmes 159 boucles : 31 recherches sur 32 trouvent déjà leurs cinq
+boucles sûres, et le portail n'écarte que des candidats qui n'auraient pas été
+retenus. Ils restent donc tels quels.
 
 **Ce que dit le pourcentage de la carte de parcours.** « 64 % hors chaussée »
 compte les trottoirs et les chemins **connus d'OpenStreetMap**, et rien d'autre :

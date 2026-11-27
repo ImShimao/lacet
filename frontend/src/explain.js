@@ -230,7 +230,7 @@ const safety = (sport) => {
   return {
     title: t('Sécurité'),
     intro:
-      t('Chaque boucle est notée A, B ou C. A : quasiment tout sur trottoir ou voie propre, et aucune traversée sans passage protégé. B : quelques mètres au contact du trafic. C : davantage. Tout vient d\'OpenStreetMap — un chantier d\'hier n\'y est pas encore.'),
+      t('Chaque boucle est notée A, B ou C. A : quasiment tout sur trottoir ou voie propre, et au plus une traversée sans passage protégé. B : quelques mètres au contact du trafic, ou plusieurs traversées. C : davantage. Tout vient d\'OpenStreetMap — un chantier d\'hier n\'y est pas encore.'),
     items: [
       {
         icon: 'shield',

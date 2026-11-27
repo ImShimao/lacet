@@ -464,6 +464,9 @@ export function runGate(stats, mode, sport = 'run') {
   return { passed: failures.length === 0, failures, firstLabel: failures[0]?.label ?? '' }
 }
 
+/** Traversées non protégées que la note A tolère encore — `MAX_CROSSINGS_FOR_A`. */
+export const MAX_CROSSINGS_FOR_A = 1
+
 /** Note affichée et commentaires — `grade_route`. */
 export function gradeRoute(stats) {
   const notes = []
@@ -497,7 +500,8 @@ export function gradeRoute(stats) {
     )
   }
 
-  if (stats.exposedShare <= 0.01 && stats.unprotectedCrossings === 0) return ['A', notes]
+  // Une traversée isolée garde le A : voir `grade_route` pour la mesure.
+  if (stats.exposedShare <= 0.01 && stats.unprotectedCrossings <= MAX_CROSSINGS_FOR_A) return ['A', notes]
   if (stats.exposedShare <= 0.03) return ['B', notes]
   return ['C', notes]
 }

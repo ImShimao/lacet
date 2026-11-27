@@ -128,7 +128,7 @@ class TestPoidsDansLaNotation:
         """Le point le plus important : c'est un départage, pas un critère."""
         req = self.req()
         # Vent de dos, mais une traversée non protégée — donc notée B.
-        confortable = candidate(leg(0.0), unprotected_crossings=1)
+        confortable = candidate(leg(0.0), unprotected_crossings=2)
         # Vent de face, mais rien à lui reprocher — notée A.
         sur = candidate(leg(180.0))
         assert final_score(sur, TARGET, req, None, NORD) > final_score(

@@ -249,6 +249,13 @@ MIN_ROUNDNESS = 0.12
 GRADE_PENALTY = 0.9
 GRADE_RANK = {"A": 0, "B": 1, "C": 2}
 
+# Une A qui traverse une fois une voie rapide recule d'un demi-cran. Sans ce
+# retrait, l'ouverture de la note A aux traversées isolées mettait ces boucles à
+# égalité avec les A sans traversée : sur 32 recherches autour de Guebwiller,
+# les A sans traversée proposées passaient de 101 à 87. Un demi-cran les remet
+# derrière, sans jamais faire passer une B devant une A.
+CROSSING_A_PENALTY = 0.45
+
 # Nombre de traversées non protégées à partir duquel la composante de sécurité
 # correspondante s'annule. Le portail en tolère deux en mode Sûr : au-delà de
 # trois, le classement n'a plus de raison de faire la différence.
@@ -860,7 +867,9 @@ def preliminary_score(cand: Candidate, target_m: float, tolerance: float) -> flo
 def grade_penalty(cand: Candidate) -> float:
     """Retrait dû à la note de sécurité — voir `GRADE_PENALTY`."""
     assert cand.stats is not None
-    return GRADE_PENALTY * GRADE_RANK[grade_route(cand.stats)[0]]
+    grade = grade_route(cand.stats)[0]
+    crossing_a = grade == "A" and cand.stats.unprotected_crossings > 0
+    return GRADE_PENALTY * GRADE_RANK[grade] + (CROSSING_A_PENALTY if crossing_a else 0.0)
 
 
 def unpaved_share(cand: Candidate) -> float | None:

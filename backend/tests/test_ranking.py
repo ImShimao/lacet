@@ -84,10 +84,10 @@ class TestNoteEtClassement:
 
     @pytest.mark.parametrize(
         "crossings, exposed_share, expected",
-        [(0, 0.0, "A"), (1, 0.0, "B"), (0, 0.02, "B"), (0, 0.05, "C")],
+        [(0, 0.0, "A"), (1, 0.0, "A"), (2, 0.0, "B"), (0, 0.02, "B"), (0, 0.05, "C")],
     )
     def test_rappel_de_la_regle_de_notation(self, crossings, exposed_share, expected):
-        """A : rien d'exposé et aucune traversée · B : jusqu'à 3 % · C : au-delà."""
+        """A : rien d'exposé et au plus une traversée · B : jusqu'à 3 % ou plusieurs traversées · C : au-delà."""
         s = stats(
             unprotected_crossings=crossings,
             exposed_m=TARGET * exposed_share,
@@ -101,10 +101,18 @@ class TestNoteEtClassement:
 
     def test_une_note_inferieure_coute_toujours_plus_qu_elle_ne_rapporte(self):
         a = candidate()
-        b = candidate(unprotected_crossings=1)
+        b = candidate(unprotected_crossings=2)
         assert grade_route(a.stats)[0] == "A"
         assert grade_route(b.stats)[0] == "B"
         assert grade_penalty(b) - grade_penalty(a) == pytest.approx(GRADE_PENALTY)
+
+    def test_une_a_avec_une_traversee_recule_d_un_demi_cran(self):
+        """Notée A, elle passe derrière les A sans traversée, et devant toute B."""
+        a = candidate()
+        a1 = candidate(unprotected_crossings=1)
+        b = candidate(unprotected_crossings=2)
+        assert grade_route(a1.stats)[0] == "A"
+        assert grade_penalty(a) < grade_penalty(a1) < grade_penalty(b)
 
     def test_la_selection_ne_remonte_pas_une_boucle_moins_bien_notee(self):
         """Le cas réel : la B partait dans une direction inutilisée et passait devant."""
@@ -114,7 +122,7 @@ class TestNoteEtClassement:
         good = candidate(bearing=0.0, roundness=0.55, edges=[1, 2, 3])
         rival = candidate(bearing=10.0, roundness=0.55, edges=[1, 2, 4])
         worse = candidate(bearing=180.0, roundness=0.60, edges=[7, 8, 9],
-                          unprotected_crossings=1)
+                          unprotected_crossings=2)
 
         scored = sorted(
             ((final_score(c, TARGET, req, None), c, i) for i, c in enumerate((good, rival, worse))),
@@ -161,7 +169,7 @@ class TestPreferenceDeDenivele:
         choisi, la A monte quatre fois trop."""
         req = request(elevation=ElevationPref.flat)
         steep_a = candidate(bearing=0.0, edges=[1, 2, 3])
-        flat_b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        flat_b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         scored = sorted(
             ((final_score(steep_a, TARGET, req, 400.0), steep_a, 0),
              (final_score(flat_b, TARGET, req, 30.0), flat_b, 1)),
@@ -184,7 +192,7 @@ class TestPreferenceDeDenivele:
         """Deux boucles plates : la A passe devant la B, même un peu moins plate."""
         req = request(elevation=ElevationPref.flat)
         a = candidate(bearing=0.0, edges=[1, 2, 3])
-        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         assert final_score(a, TARGET, req, 90.0) > final_score(b, TARGET, req, 30.0)
 
     def test_les_cotes_ecartent_le_plat(self):
@@ -233,7 +241,7 @@ class TestPreferenceDeTerrain:
     def test_en_sentier_une_b_de_chemins_passe_devant_une_a_goudronnee(self):
         req = request(surface=SurfacePref.trail)
         road_a = surfaced(10_000.0, 0.0, bearing=0.0, edges=[1, 2, 3])
-        trail_b = surfaced(3000.0, 7000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        trail_b = surfaced(3000.0, 7000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         assert final_score(trail_b, TARGET, req, None) > final_score(road_a, TARGET, req, None)
 
     def test_en_route_les_chemins_passent_derriere(self):
@@ -253,7 +261,7 @@ class TestPreferenceDeTerrain:
         quelques allées de parc ne font pas passer une B devant une A."""
         req = request(surface=SurfacePref.mixed)
         street_a = surfaced(10_000.0, 0.0, bearing=0.0, edges=[1, 2, 3])
-        park_b = surfaced(9000.0, 1000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        park_b = surfaced(9000.0, 1000.0, bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         assert final_score(street_a, TARGET, req, None) > final_score(park_b, TARGET, req, None)
 
     def test_la_reserve_se_choisit_sur_les_reglages(self):
@@ -312,7 +320,7 @@ class TestDeniveleVise:
     def test_dans_la_fourchette_la_note_reprend_la_main(self):
         req = request(climb_m=150.0)
         a = candidate(bearing=0.0, edges=[1, 2, 3])
-        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        b = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         assert final_score(a, TARGET, req, 125.0) > final_score(b, TARGET, req, 150.0)
 
     def test_un_d_plus_negatif_est_refuse(self):
@@ -378,7 +386,7 @@ class TestTours:
     def test_une_boucle_entiere_notee_b_passe_devant_des_tours_notes_a(self):
         req = request()
         tours = self.lapped(bearing=0.0, edges=[1, 2, 3])
-        entiere = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=1)
+        entiere = candidate(bearing=180.0, edges=[7, 8, 9], unprotected_crossings=2)
         scored = sorted(
             ((final_score(c, TARGET, req, None), c, i) for i, c in enumerate((tours, entiere))),
             key=lambda t: -t[0],

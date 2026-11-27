@@ -93,8 +93,12 @@ class TestNote:
         grade, _ = grade_route(stats())
         assert grade == "A"
 
-    def test_traversee_non_protegee_empeche_le_a(self):
+    def test_une_traversee_isolee_garde_le_a(self):
         grade, _ = grade_route(stats(unprotected_crossings=1))
+        assert grade == "A"
+
+    def test_plusieurs_traversees_non_protegees_empechent_le_a(self):
+        grade, _ = grade_route(stats(unprotected_crossings=2))
         assert grade == "B"
 
     def test_note_b(self):

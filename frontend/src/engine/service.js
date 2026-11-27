@@ -99,6 +99,7 @@ const LAP_PENALTY = 0.12
 const MIN_ROUNDNESS = 0.12
 const GRADE_PENALTY = 0.9
 const GRADE_RANK = { A: 0, B: 1, C: 2 }
+const CROSSING_A_PENALTY = 0.45
 const CROSSINGS_REFERENCE = 3
 const GOOD_ROUNDNESS = 0.55
 const BACKTRACK_WEIGHT = 1.6
@@ -1112,7 +1113,12 @@ async function within(task, ms) {
   }
 }
 
-const gradePenalty = (cand) => GRADE_PENALTY * GRADE_RANK[gradeRoute(cand.stats)[0]]
+// Une A qui traverse une fois une voie rapide recule d'un demi-cran — `CROSSING_A_PENALTY`.
+const gradePenalty = (cand) => {
+  const grade = gradeRoute(cand.stats)[0]
+  const crossingA = grade === 'A' && cand.stats.unprotectedCrossings > 0
+  return GRADE_PENALTY * GRADE_RANK[grade] + (crossingA ? CROSSING_A_PENALTY : 0)
+}
 
 /** Part du tracé hors bitume, ou `null` pour un tracé sans segments. */
 function unpavedShare(cand) {

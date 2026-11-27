@@ -201,11 +201,15 @@ def run_gate(stats: RouteStats, mode: str, sport: str = "run") -> GateResult:
     return GateResult(passed=not failures, failures=failures)
 
 
+# Traversées non protégées que la note A tolère encore — voir `grade_route`.
+MAX_CROSSINGS_FOR_A = 1
+
+
 def grade_route(stats: RouteStats) -> tuple[str, list[str]]:
     """Note affichée. Découle des mêmes mesures que le portail.
 
-    A : exposition <= 1 % et aucune traversée non protégée
-    B : exposition <= 3 %
+    A : exposition <= 1 % et au plus une traversée non protégée
+    B : exposition <= 3 %, ou plusieurs traversées non protégées
     C : au-delà — n'apparaît qu'en mode Standard
     """
     notes: list[str] = []
@@ -237,7 +241,13 @@ def grade_route(stats: RouteStats) -> tuple[str, list[str]]:
             "d'un trottoir est estimée et non confirmée par OpenStreetMap."
         )
 
-    if stats.exposed_share <= 0.01 and stats.unprotected_crossings == 0:
+    # Une traversée isolée ne fait plus tomber la note. Mesuré en mode Sûr à pied
+    # autour de Guebwiller (8 départs, 5 à 21 km, 159 boucles) : 54 des 58 B ne
+    # l'étaient que pour leurs traversées, dont 36 pour une seule. Le B ne
+    # distinguait plus une départementale coupée une fois d'une boucle qui en
+    # enchaîne plusieurs. Le score compte toujours chaque traversée : à note
+    # égale, la boucle qui n'en a aucune passe devant.
+    if stats.exposed_share <= 0.01 and stats.unprotected_crossings <= MAX_CROSSINGS_FOR_A:
         return "A", notes
     if stats.exposed_share <= 0.03:
         return "B", notes
