@@ -209,9 +209,14 @@ qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord
 
 ## Réglages
 
-**Mon compte** s'ouvre sur un en-tête à la manière des apps bancaires : un grand
-avatar rond et « Profil local › », qui ouvre le profil. Les réglages à peu de
-choix s'ouvrent en menu posé sur la ligne (`Prefs.jsx`). Aucune barre de
+**Mon compte** s'ouvre sur une carte « Profil local » (avatar, poids), puis
+trois onglets : **Paramètres** (Parcours, Guidage et voix, Sécurité,
+Apparence), **Profil** (poids et objectifs, réglables sur place) et
+**Données** (Stockage, Sauvegarde, À propos). L'onglet choisi est gardé pendant
+la session. Toutes les pages sont faites des mêmes cartes de `Prefs.jsx` —
+lignes à menu, interrupteurs, lignes d'information et lignes d'action, en
+rouge quand elles effacent — et les réglages à peu de choix s'ouvrent en menu
+posé sur la ligne. Aucune barre de
 défilement nulle part : sur l'iPhone, le contenu qui suit le doigt suffit.
 
 **Mon compte › Apparence** règle la couleur d'accent (bleu, violet, framboise,

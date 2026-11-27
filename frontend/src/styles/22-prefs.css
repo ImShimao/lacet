@@ -101,6 +101,78 @@
   color: var(--accent-text);
 }
 
+/* Une ligne qui montre sans agir : pas de reflet au toucher. */
+.prow__static {
+  cursor: default;
+}
+.prow__static:active {
+  background: none;
+}
+/* Ce qui vient sous le texte d'une ligne — la jauge du stockage —, aligné
+   sur le texte, après l'icône. */
+.prow__under {
+  padding: 0 16px 14px 53px;
+  margin-top: -4px;
+}
+/* Un champ dans une ligne : la ligne entière en a l'allure, sans cadre de
+   formulaire. Seize pixels, sinon iOS zoome l'app au toucher. */
+.prow__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: calc(16px * var(--text-scale));
+  font-weight: 500;
+}
+.prow__input:focus {
+  outline: none;
+}
+.prow__input::placeholder {
+  color: var(--text-3);
+}
+.prow:has(.prow__input:focus-visible) .prow__btn {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+/* Le petit geste d'une ligne (« Retirer », « Supprimer ») : une gélule. */
+.prow__act {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
+}
+.prow__act:active {
+  background: var(--accent-soft);
+}
+.prow__act--danger {
+  color: var(--risk);
+}
+/* Ce qui détruit se lit en rouge, icône comprise, comme dans les Réglages d'iOS. */
+.prow__btn--danger,
+.prow__btn--danger .prow__icon {
+  color: var(--risk);
+}
+.prow__btn--danger:active:not(:disabled) {
+  background: var(--risk-soft);
+}
+/* Une ligne d'action se touche comme un bouton, même faite d'une étiquette. */
+label.prow__btn {
+  cursor: pointer;
+}
+label.prow__btn:active {
+  background: var(--accent-soft);
+}
+/* Les lignes des zones : le nom, l'interrupteur et « Supprimer » côte à côte. */
+.zonerow {
+  gap: 12px;
+}
+
 /* L'interrupteur, à la manière d'iOS : la couleur de l'accent quand il est mis. */
 .switch {
   flex: none;

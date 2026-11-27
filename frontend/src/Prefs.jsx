@@ -118,6 +118,47 @@ export function ToggleRow({ icon, label, sub, on, onChange, disabled = false }) 
   )
 }
 
+/**
+ * Une ligne qui montre sans rien changer : un chiffre, un état. `children`
+ * vient sous le texte — une jauge, par exemple — et `trailing` prend la place
+ * de la valeur, pour un petit bouton (« Retirer »).
+ */
+export function InfoRow({ icon, label, sub, value, trailing = null, children = null }) {
+  return (
+    <div className="prow">
+      <div className="prow__btn prow__static">
+        <Head icon={icon} label={label} sub={sub} />
+        {value !== undefined && value !== null && <span className="prow__value">{tx(value)}</span>}
+        {trailing}
+      </div>
+      {children && <div className="prow__under">{children}</div>}
+    </div>
+  )
+}
+
+/**
+ * Une ligne qui agit : sauvegarder, vider, effacer. Sans chevron — elle ne mène
+ * nulle part —, en rouge quand elle détruit. `onFile` en fait un choix de
+ * fichier, que seule une étiquette autour d'un champ caché sait ouvrir sur iOS.
+ */
+export function ActionRow({ icon, label, sub, onClick, onFile = null, accept, danger = false, disabled = false }) {
+  const cls = `prow__btn ${danger ? 'prow__btn--danger' : ''}`
+  return (
+    <div className="prow">
+      {onFile ? (
+        <label className={cls}>
+          <Head icon={icon} label={label} sub={sub} />
+          <input type="file" accept={accept} className="visually-hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        </label>
+      ) : (
+        <button className={cls} onClick={onClick} disabled={disabled}>
+          <Head icon={icon} label={label} sub={sub} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** Une ligne qui ouvre autre chose : une feuille, une page. */
 export function LinkRow({ icon, label, sub, value, onClick }) {
   return (

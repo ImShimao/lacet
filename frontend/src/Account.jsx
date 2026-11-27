@@ -4,10 +4,14 @@
  * L'écran empilait quatorze rubriques les unes sous les autres — poids,
  * cartes hors ligne, contact d'urgence, version de l'app… — et l'on
  * faisait défiler le tout pour trouver le réglage qu'on venait changer. Le
- * sommaire range ces rubriques en trois familles, comme les Réglages de
- * l'iPhone : ce qu'on règle, ce que l'app garde, et ce qu'il faut savoir
- * d'elle. Chaque ligne dit déjà l'essentiel — « 70 kg », « Pause auto activée » — et
- * n'a besoin d'être ouverte que pour le changer.
+ * sommaire range ces rubriques en trois onglets : Paramètres (ce qu'on règle),
+ * Profil (poids et objectifs, réglables sur place) et Données (ce que l'app
+ * garde, et ce qu'il faut savoir d'elle). Une longue liste unique obligeait à
+ * lire les familles pour trouver la sienne ; trois onglets n'en montrent
+ * qu'une. Chaque ligne dit déjà l'essentiel — « Sécurité sûr · 5 boucles » —
+ * et n'a besoin d'être ouverte que pour le changer. Les pages, elles, sont
+ * toutes faites des mêmes cartes de `Prefs.jsx`, au lieu de boutons et de
+ * jauges dessinés chacun à sa façon.
  *
  * Tout y est local à l'appareil — c'est le propos de l'écran, et la raison
  * pour laquelle il ne dépend de rien d'autre que du stockage de l'app.
@@ -20,7 +24,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import About from './About.jsx'
 import { AVOIDABLE, COUNTS, DIRECTIONS, MAX_LAPS, MOMENTS, OPTIONAL_FILTERS, SAFETY, SPORTS, directionOf } from './FiltersSheet.jsx'
-import { LinkRow, PickRow, PrefsCard, ToggleRow } from './Prefs.jsx'
+import { ActionRow, InfoRow, LinkRow, PickRow, PrefsCard, ToggleRow } from './Prefs.jsx'
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
@@ -33,9 +37,6 @@ import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
 import { parsePresets, presets, setPresets } from './presets'
 import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearance } from './appearance'
-
-/** Les familles du sommaire, dans leur ordre. */
-const GROUPS = ['Paramètres', 'Données', 'Infos']
 
 import { SECTIONS } from './accountSections.js'
 
@@ -89,44 +90,97 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
  * répétait. Les sorties et les kilomètres cumulés n'y sont plus — ils se
  * lisent dans « Mes parcours », avec leur graphique.
  */
-function Summary({ onPage, params, poiPrefs }) {
+function Summary({ onPage, params, poiPrefs, onProfile }) {
   const sport = SPORTS.find((s) => s.key === params.sport)
+  const [tab, setTab] = useState(lastTab)
+  const pick = (key) => {
+    lastTab = key
+    setTab(key)
+  }
+  const rows = (group) => (
+    <div className="menu">
+      {SECTIONS.filter((s) => s.group === group).map((s) => (
+        <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
+          <span className="menu__icon">
+            <Icon name={s.icon} size={18} />
+          </span>
+          <span className="menu__text">
+            <b>{t(s.title)}</b>
+            <em>{summaryOf(s.key, { params, poiPrefs })}</em>
+          </span>
+          <Icon name="chevronRight" size={17} className="menu__chev" />
+        </button>
+      ))}
+    </div>
+  )
   return (
     <>
-      <button className="acct__card acct__who" onClick={() => onPage('profile')}>
+      {/* Qui l'on est, en une ligne : l'avatar et l'état du profil. Le toucher
+          mène à l'onglet Profil, juste dessous. */}
+      <button className="acct__who" onClick={() => pick('profile')}>
         <span className="acct__avatar">
           <Icon name={sport?.icon ?? 'user'} size={24} />
         </span>
         <span className="menu__text">
-          <b>
-            {t('Profil local')}
-            <Icon name="chevronRight" size={18} />
-          </b>
+          <b>{t('Profil local')}</b>
+          <em>{summaryOf('profile', { params, poiPrefs })}</em>
         </span>
       </button>
 
-      {GROUPS.map((group) => (
-        <section className="acct__group" key={group} aria-label={t(group)}>
-          <h3 className="acct__label">{t(group)}</h3>
-          <div className="menu">
-            {SECTIONS.filter((s) => s.group === group).map((s) => (
-              <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
-                <span className="menu__icon">
-                  <Icon name={s.icon} size={18} />
-                </span>
-                <span className="menu__text">
-                  <b>{t(s.title)}</b>
-                  <em>{summaryOf(s.key, { params, poiPrefs })}</em>
-                </span>
-                <Icon name="chevronRight" size={17} className="menu__chev" />
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
+      {/* Trois onglets plutôt qu'une longue liste : ce qu'on règle, qui l'on
+          est, ce que l'app garde. Le choix tient le temps de la session — on
+          revient d'une page sur l'onglet qu'on avait quitté. */}
+      <div className="seg acct__tabs" role="tablist">
+        {TABS.map((k) => (
+          <button key={k.key} role="tab" aria-selected={tab === k.key} aria-pressed={tab === k.key} onClick={() => pick(k.key)}>
+            {t(k.label)}
+          </button>
+        ))}
+      </div>
+
+      <div key={tab} className="acct__tab" role="tabpanel">
+        {tab === 'settings' && rows('Paramètres')}
+        {tab === 'profile' && <ProfileSettings params={params} onProfile={onProfile} />}
+        {tab === 'data' && (
+          <>
+            {rows('Données')}
+            <section className="acct__group" aria-label={t('Infos')}>
+              <h3 className="acct__label">{t('Infos')}</h3>
+              {rows('Infos')}
+            </section>
+          </>
+        )}
+      </div>
 
       <p className="muted small acct__foot">{t('Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.')}</p>
     </>
+  )
+}
+
+const TABS = [
+  { key: 'settings', label: 'Paramètres' },
+  { key: 'profile', label: 'Profil' },
+  { key: 'data', label: 'Données' },
+]
+// L'onglet ouvert, gardé le temps de la session : le sommaire est recréé à
+// chaque retour d'une page, et revenait sinon sur « Paramètres ».
+let lastTab = 'settings'
+
+/** Le poids et les objectifs : une carte de réglages comme les autres. */
+function ProfileSettings({ params, onProfile }) {
+  return (
+    <PrefsCard
+      foot={
+        <>
+          {t('Le poids sert à estimer les calories d\'une sortie, et rien d\'autre. Rien n\'est envoyé.')}{' '}
+          {t('Les objectifs s\'affichent en tête de tes sorties, avec ce qu\'il reste à courir. À 0, pas d\'objectif.')}
+        </>
+      }
+    >
+      <NumberRow icon="gauge" label={t('Poids')} unit={t('kg')} value={params.weight_kg || 70} min={30} max={200} onChange={(weight_kg) => onProfile({ weight_kg })} />
+      <NumberRow icon="flag" label={t('Objectif par semaine')} unit="km" value={params.weekly_km || 0} min={0} max={300} onChange={(weekly_km) => onProfile({ weekly_km })} />
+      <NumberRow icon="trendUp" label={t('Objectif par mois')} unit="km" value={params.monthly_km || 0} min={0} max={1000} onChange={(monthly_km) => onProfile({ monthly_km })} />
+    </PrefsCard>
   )
 }
 
@@ -196,38 +250,7 @@ function summaryOf(key, { params, poiPrefs }) {
 function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiPrefs, onClearData, onProfile, onRestored, zones = [], onZones = () => {} }) {
   switch (page) {
     case 'profile':
-      return (
-        <>
-          <p className="muted small">{t('Le poids sert à estimer les calories d\'une sortie, et rien d\'autre. Rien n\'est envoyé.')}</p>
-          <div className="rows">
-            <NumberRow
-              label={t('Poids')}
-              unit={t('kg')}
-              value={params.weight_kg || 70}
-              min={30}
-              max={200}
-              onChange={(weight_kg) => onProfile({ weight_kg })}
-            />
-            <NumberRow
-              label={t('Objectif par semaine')}
-              unit="km"
-              value={params.weekly_km || 0}
-              min={0}
-              max={300}
-              onChange={(weekly_km) => onProfile({ weekly_km })}
-            />
-            <NumberRow
-              label={t('Objectif par mois')}
-              unit="km"
-              value={params.monthly_km || 0}
-              min={0}
-              max={1000}
-              onChange={(monthly_km) => onProfile({ monthly_km })}
-            />
-          </div>
-          <p className="muted small">{t('Les objectifs s\'affichent en tête de tes sorties, avec ce qu\'il reste à courir. À 0, pas d\'objectif.')}</p>
-        </>
-      )
+      return <ProfileSettings params={params} onProfile={onProfile} />
     case 'search':
       return <SearchSettings params={params} onProfile={onProfile} />
     case 'run':
@@ -242,11 +265,8 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'safety':
       return (
         <>
-          <h3 className="section">{t('Contact d\'urgence')}</h3>
           <EmergencyContact />
-          <h3 className="section">{t('Mes zones à éviter')}</h3>
           <MyZones zones={zones} onZones={onZones} />
-          <h3 className="section">{t('Mes signalements')}</h3>
           <MyReports />
         </>
       )
@@ -255,11 +275,8 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'storage':
       return (
         <>
-          <h3 className="section">{t('Sorties et favoris')}</h3>
           <StoredData />
-          <h3 className="section">{t('Cartes hors ligne')}</h3>
           <OfflineStorage />
-          <h3 className="section">{t('Rues gardées')}</h3>
           <KeptStreets />
         </>
       )
@@ -267,7 +284,6 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       return (
         <>
           <BackupRows onRestored={onRestored} />
-          <h3 className="section">{t('Tout effacer')}</h3>
           <ClearData onClearData={onClearData} />
         </>
       )
@@ -288,40 +304,50 @@ function EmergencyContact() {
   const [contact, setContact] = useState(() => load().emergencyContact || '')
   const [announce, setAnnounce] = useState(() => Boolean(load().notifyContact))
   return (
-    <>
-      <p className="muted small">{t('Le bouton SOS prépare un SMS vers ce numéro avec ta position.')}{' '}<b>{t('L\'app ne l\'envoie pas')}</b>{' '}{t(': c\'est toi qui appuies sur envoyer.')}</p>
-      <input
-        className="field"
-        type="tel"
-        inputMode="tel"
-        autoComplete="tel"
-        aria-label={t('Numéro du contact d\'urgence')}
-        placeholder="06 12 34 56 78"
-        value={contact}
-        onChange={(e) => {
-          setContact(e.target.value)
-          save({ emergencyContact: e.target.value.trim() })
+    <PrefsCard
+      title={t('Contact d\'urgence')}
+      foot={
+        <>
+          {t('Le bouton SOS prépare un SMS vers ce numéro avec ta position.')} <b>{t('L\'app ne l\'envoie pas')}</b>{' '}
+          {t(': c\'est toi qui appuies sur envoyer.')}{' '}
+          {!announce
+            ? t('Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.')
+            : contact.trim()
+              ? t('Au départ, Messages s’ouvre avec la distance, le point de départ et l’heure prévue du retour : envoie, puis reviens dans Lacet pour le compte à rebours. À l’arrivée, un bouton prépare « De retour de ma sortie ».')
+              : t('Donne un numéro ci-dessus : sans lui, rien ne part.')}
+        </>
+      }
+    >
+      {/* Le numéro est une ligne de la carte, pas un champ à part : on le lit
+          comme un réglage, au même titre que l'interrupteur dessous. */}
+      <div className="prow">
+        <label className="prow__btn prow__static">
+          <Icon name="sos" size={19} className="prow__icon" />
+          <input
+            className="prow__input"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            aria-label={t('Numéro du contact d\'urgence')}
+            placeholder="06 12 34 56 78"
+            value={contact}
+            onChange={(e) => {
+              setContact(e.target.value)
+              save({ emergencyContact: e.target.value.trim() })
+            }}
+          />
+        </label>
+      </div>
+      <ToggleRow
+        icon="share"
+        label={t('Prévenir au départ et au retour')}
+        on={announce}
+        onChange={(value) => {
+          setAnnounce(value)
+          save({ notifyContact: value })
         }}
       />
-      <PrefsCard>
-        <ToggleRow
-          icon="sos"
-          label={t('Prévenir au départ et au retour')}
-          on={announce}
-          onChange={(value) => {
-            setAnnounce(value)
-            save({ notifyContact: value })
-          }}
-        />
-      </PrefsCard>
-      <p className="muted small">
-        {!announce
-          ? t('Au départ, Messages peut s’ouvrir avec le parcours, d’où tu pars et l’heure prévue du retour ; à l’arrivée, un bouton dit que tout va bien.')
-          : contact.trim()
-            ? t('Au départ, Messages s’ouvre avec la distance, le point de départ et l’heure prévue du retour : envoie, puis reviens dans Lacet pour le compte à rebours. À l’arrivée, un bouton prépare « De retour de ma sortie ».')
-            : t('Donne un numéro ci-dessus : sans lui, rien ne part.')}
-      </p>
-    </>
+    </PrefsCard>
   )
 }
 
@@ -334,25 +360,32 @@ function ClearData({ onClearData }) {
   const [confirm, setConfirm] = useState(false)
   const [done, setDone] = useState(false)
   return (
-    <>
-      <p className="muted small">{t('Favoris, sorties, départs nommés, signalements, contact d\'urgence, réglages, cartes et rues gardées. Fais une sauvegarde avant si tu veux pouvoir revenir en arrière.')}</p>
+    <PrefsCard
+      title={t('Tout effacer')}
+      foot={
+        done
+          ? t('Tout est effacé : l\'app repart comme au premier jour.')
+          : t('Favoris, sorties, départs nommés, signalements, contact d\'urgence, réglages, cartes et rues gardées. Fais une sauvegarde avant si tu veux pouvoir revenir en arrière.')
+      }
+    >
       {confirm ? (
-        <div className="row">
-          <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
-          <button
-            className="btn btn--primary btn--danger"
+        <>
+          <ActionRow icon="close" label={t('Annuler')} onClick={() => setConfirm(false)} />
+          <ActionRow
+            icon="ban"
+            danger
+            label={t('Confirmer l\'effacement')}
             onClick={async () => {
               await onClearData()
               setConfirm(false)
               setDone(true)
             }}
-          >{t('Confirmer l\'effacement')}</button>
-        </div>
+          />
+        </>
       ) : (
-        <button className="btn btn--danger" onClick={() => setConfirm(true)}>{t('Effacer mes données')}</button>
+        <ActionRow icon="ban" danger label={t('Effacer mes données')} onClick={() => setConfirm(true)} />
       )}
-      {done && <p className="muted small">{t('Tout est effacé : l\'app repart comme au premier jour.')}</p>}
-    </>
+    </PrefsCard>
   )
 }
 
@@ -695,13 +728,10 @@ function KeptStreets() {
   }, [])
 
   return (
-    <>
-      <div className="rows">
-        <Row label={t('Espace occupé')} value={usage ? offline.formatBytes(usage.bytes) : '—'} />
-        <Row label={t('Plafond')} value={usage ? offline.formatBytes(usage.budget) : '—'} />
-      </div>
-      <p className="muted small">{t('Gardées toutes seules dès qu\'on cherche une boucle, pour trois mois : rien à préparer avant un voyage.')}</p>
-    </>
+    <PrefsCard title={t('Rues gardées')} foot={t('Gardées toutes seules dès qu\'on cherche une boucle, pour trois mois : rien à préparer avant un voyage.')}>
+      <InfoRow icon="routes" label={t('Espace occupé')} value={usage ? offline.formatBytes(usage.bytes) : '—'} />
+      <InfoRow icon="gauge" label={t('Plafond')} value={usage ? offline.formatBytes(usage.budget) : '—'} />
+    </PrefsCard>
   )
 }
 
@@ -751,29 +781,35 @@ function StoredData() {
         </div>
       )}
 
-      <div className={`gauge ${serre ? 'gauge--tight' : ''}`}>
-        <i style={{ transform: `scaleX(${part})` }} />
-      </div>
-      <p className="muted small">
-        <b>{mo(info.bytes)}</b>{' '}{t('sur environ {v1} — {history} sortie{v3} ({v4}), {favorites} favori{v6} ({v7}).', { v1: mo(info.quota), history: info.counts.history, v3: info.counts.history > 1 ? 's' : '', v4: mo(info.parts.history), favorites: info.counts.favorites, v6: info.counts.favorites > 1 ? 's' : '', v7: mo(info.parts.favorites) })}</p>
-
-      {info.counts.traces > 0 && (
-        <div className="row">
-          <button
-            className="btn"
+      <PrefsCard
+        title={t('Sorties et favoris')}
+        foot={
+          freed !== null
+            ? t('{v1} libérés. Les chiffres des sorties n\'ont pas bougé.', { v1: mo(freed) })
+            : t('Une trace est le dessin de ce qu\'on a réellement couru. La retirer garde la distance, le temps, l\'allure et les tours de kilomètre : seuls le tracé sur la carte et son export s\'en vont.')
+        }
+      >
+        <InfoRow
+          icon="archive"
+          label={mo(info.bytes)}
+          sub={t('sur environ {v1} — {history} sortie{v3} ({v4}), {favorites} favori{v6} ({v7}).', { v1: mo(info.quota), history: info.counts.history, v3: info.counts.history > 1 ? 's' : '', v4: mo(info.parts.history), favorites: info.counts.favorites, v6: info.counts.favorites > 1 ? 's' : '', v7: mo(info.parts.favorites) })}
+        >
+          <div className={`gauge ${serre ? 'gauge--tight' : ''}`}>
+            <i style={{ transform: `scaleX(${part})` }} />
+          </div>
+        </InfoRow>
+        {info.counts.traces > 0 && (
+          <ActionRow
+            icon="routes"
+            label={t('Retirer les {traces} traces gardées ({v2})', { traces: info.counts.traces, v2: mo(info.parts.traces) })}
             onClick={() => {
               const libere = dropTracks()
               setFreed(libere)
               setInfo(usage())
             }}
-          >{t('Retirer les {traces} traces gardées ({v2})', { traces: info.counts.traces, v2: mo(info.parts.traces) })}</button>
-        </div>
-      )}
-      <p className="muted small">
-        {freed !== null
-          ? t('{v1} libérés. Les chiffres des sorties n\'ont pas bougé.', { v1: mo(freed) })
-          : t('Une trace est le dessin de ce qu\'on a réellement couru. La retirer garde la distance, le temps, l\'allure et les tours de kilomètre : seuls le tracé sur la carte et son export s\'en vont.')}
-      </p>
+          />
+        )}
+      </PrefsCard>
     </>
   )
 }
@@ -797,30 +833,29 @@ const dayOf = (at) => new Date(at).toLocaleDateString(locale(), { day: 'numeric'
  */
 function MyReports() {
   const [items, setItems] = useState(() => activeReports())
-  if (!items.length) {
-    return (
-      <p className="muted small">{t('Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou dangereux pour six mois.')}</p>
-    )
-  }
   return (
-    <>
-      <p className="muted small">{t('{length} point{v2} écarté{v3} du routage, dans un rayon de vingt-cinq mètres chacun. Ils s\'effacent d\'eux-mêmes au bout de six mois.', { length: items.length, v2: items.length > 1 ? 's' : '', v3: items.length > 1 ? 's' : '' })}</p>
-      <div className="rows">
-        {items.map((r) => (
-          <div className="rows__row" key={r.id}>
-            <span>
-              {kindLabel(r.kind)}
-              <em className="muted small">
-                {' '}
-                · {new Date(r.at).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })} ·{' '}
-                {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
-              </em>
-            </span>
-            <button className="linkish" onClick={() => setItems(removeReport(r.id))}>{t('Retirer')}</button>
-          </div>
-        ))}
-      </div>
-    </>
+    <PrefsCard
+      title={t('Mes signalements')}
+      foot={
+        items.length
+          ? t('{length} point{v2} écarté{v3} du routage, dans un rayon de vingt-cinq mètres chacun. Ils s\'effacent d\'eux-mêmes au bout de six mois.', { length: items.length, v2: items.length > 1 ? 's' : '', v3: items.length > 1 ? 's' : '' })
+          : null
+      }
+    >
+      {items.length ? (
+        items.map((r) => (
+          <InfoRow
+            key={r.id}
+            icon="warning"
+            label={kindLabel(r.kind)}
+            sub={`${new Date(r.at).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })} · ${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}`}
+            trailing={<button className="prow__act" onClick={() => setItems(removeReport(r.id))}>{t('Retirer')}</button>}
+          />
+        ))
+      ) : (
+        <InfoRow icon="warning" sub={t('Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou dangereux pour six mois.')} />
+      )}
+    </PrefsCard>
   )
 }
 
@@ -833,34 +868,39 @@ function MyReports() {
  * ferme en février —, et on la supprime quand elle n'a plus lieu d'être.
  */
 function MyZones({ zones, onZones }) {
-  if (!zones.length) {
-    return (
-      <p className="muted small">{t('Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs passent autour.')}</p>
-    )
-  }
   return (
-    <div className="rows">
-      {zones.map((z) => (
-        <div className="rows__row zonerow" key={z.id}>
-          <input
-            className="zonerow__name"
-            defaultValue={z.name}
-            maxLength={60}
-            aria-label={t('Nom de la zone')}
-            onBlur={(e) => e.target.value !== z.name && onZones(updateZone(z.id, { name: e.target.value }))}
-          />
-          <label className="zonerow__on">
-            <input
-              type="checkbox"
-              checked={z.on !== false}
-              onChange={(e) => onZones(updateZone(z.id, { on: e.target.checked }))}
-            />
-            {z.on !== false ? t('Évitée') : t('Ignorée')}
-          </label>
-          <button className="linkish" onClick={() => onZones(removeZone(z.id))}>{t('Supprimer')}</button>
-        </div>
-      ))}
-    </div>
+    <PrefsCard title={t('Mes zones à éviter')}>
+      {zones.length ? (
+        zones.map((z) => (
+          <div className="prow" key={z.id}>
+            <div className="prow__btn prow__static zonerow">
+              <Icon name="zone" size={19} className="prow__icon" />
+              <input
+                className="prow__input"
+                defaultValue={z.name}
+                maxLength={60}
+                aria-label={t('Nom de la zone')}
+                onBlur={(e) => e.target.value !== z.name && onZones(updateZone(z.id, { name: e.target.value }))}
+              />
+              {/* L'interrupteur d'iOS plutôt qu'une case : évitée ou ignorée,
+                  le temps qu'elle redevienne praticable. */}
+              <button
+                role="switch"
+                aria-checked={z.on !== false}
+                aria-label={z.on !== false ? t('Évitée') : t('Ignorée')}
+                className={`switch ${z.on !== false ? 'switch--on' : ''}`}
+                onClick={() => onZones(updateZone(z.id, { on: z.on === false }))}
+              >
+                <i />
+              </button>
+              <button className="prow__act prow__act--danger" onClick={() => onZones(removeZone(z.id))}>{t('Supprimer')}</button>
+            </div>
+          </div>
+        ))
+      ) : (
+        <InfoRow icon="zone" sub={t('Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs passent autour.')} />
+      )}
+    </PrefsCard>
   )
 }
 
@@ -878,35 +918,36 @@ function OfflineStorage() {
 
   if (!offline.isAvailable()) {
     return (
-      <p className="muted small">{t('Le stockage de l\'appareil ne répond pas : les cartes ne peuvent pas être gardées. Les parcours, eux, restent accessibles.')}</p>
+      <PrefsCard title={t('Cartes hors ligne')}>
+        <InfoRow icon="layers" sub={t('Le stockage de l\'appareil ne répond pas : les cartes ne peuvent pas être gardées. Les parcours, eux, restent accessibles.')} />
+      </PrefsCard>
     )
   }
 
   return (
-    <>
-      <div className="rows">
-        <Row label={t('Parcours avec carte')} value={count} />
-        <Row label={t('Espace occupé')} value={offline.formatBytes(total)} />
-      </div>
-      <p className="muted small">{t('Les cinq dernières sorties gardent leur carte, au cas où le réseau tombe. Hors ligne, c\'est le fond Nuit qui sert.')}</p>
+    <PrefsCard title={t('Cartes hors ligne')} foot={t('Les cinq dernières sorties gardent leur carte, au cas où le réseau tombe. Hors ligne, c\'est le fond Nuit qui sert.')}>
+      <InfoRow icon="layers" label={t('Parcours avec carte')} value={String(count)} />
+      <InfoRow icon="download" label={t('Espace occupé')} value={offline.formatBytes(total)} />
       {count > 0 &&
         (confirm ? (
-          <div className="row">
-            <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
-            <button
-              className="btn btn--primary btn--danger"
+          <>
+            <ActionRow icon="close" label={t('Annuler')} onClick={() => setConfirm(false)} />
+            <ActionRow
+              icon="ban"
+              danger
+              label={t('Vider les cartes')}
               onClick={async () => {
                 await offline.clear()
                 setTotal(0)
                 setCount(0)
                 setConfirm(false)
               }}
-            >{t('Vider les cartes')}</button>
-          </div>
+            />
+          </>
         ) : (
-          <button className="btn btn--danger" onClick={() => setConfirm(true)}>{t('Vider les cartes hors ligne')}</button>
+          <ActionRow icon="ban" danger label={t('Vider les cartes hors ligne')} onClick={() => setConfirm(true)} />
         ))}
-    </>
+    </PrefsCard>
   )
 }
 
@@ -1335,22 +1376,10 @@ function BackupRows({ onRestored }) {
   }
 
   return (
-    <>
-      <p className="muted small">{t('Un fichier qui emporte favoris, sorties et réglages — à garder ailleurs avant de supprimer l\'app, qui les effacerait.')}</p>
-      <div className="row">
-        <button className="btn" onClick={backup}>
-          <Icon name="fileExport" size={15} />{t('Sauvegarder')}</button>
-        <label className="btn">
-          <Icon name="fileImport" size={15} />{t('Restaurer')}<input
-            type="file"
-            accept="application/json,.json"
-            className="visually-hidden"
-            onChange={(e) => restore(e.target.files?.[0])}
-          />
-        </label>
-      </div>
-      {message && <p className="muted small">{message}</p>}
-    </>
+    <PrefsCard foot={message ?? t('Un fichier qui emporte favoris, sorties et réglages — à garder ailleurs avant de supprimer l\'app, qui les effacerait.')}>
+      <ActionRow icon="fileExport" label={t('Sauvegarder')} onClick={backup} />
+      <ActionRow icon="fileImport" label={t('Restaurer')} accept="application/json,.json" onFile={restore} />
+    </PrefsCard>
   )
 }
 
@@ -1409,7 +1438,7 @@ function useHold(step, delays = { first: 420, min: 55 }) {
  * ce soit. Ce qui est saisi n'est pris qu'à la validation, et ramené dans les
  * bornes — un champ vidé le temps de retaper ne doit pas valoir « 0 kg ».
  */
-function NumberRow({ label, unit, value, min, max, onChange }) {
+function NumberRow({ icon, label, unit, value, min, max, onChange }) {
   const [draft, setDraft] = useState(null)
   const moins = useHold(() => onChange(Math.max(min, value - 1)))
   const plus = useHold(() => onChange(Math.min(max, value + 1)))
@@ -1423,39 +1452,36 @@ function NumberRow({ label, unit, value, min, max, onChange }) {
   }
 
   return (
-    <div className="rows__row">
-      <span>{label}</span>
-      <span className="rows__num">
-        <button {...moins} aria-label={t('Diminuer {v1}', { v1: label.toLowerCase() })}>
-          <Icon name="minus" size={15} />
-        </button>
-        <label className="rows__field">
-          <input
-            type="text"
-            inputMode="numeric"
-            enterKeyHint="done"
-            aria-label={t('{label} en {v2}', { label, v2: { kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? t('centimètres') })}
-            value={draft ?? value}
-            onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
-            onFocus={(e) => e.target.select()}
-            onBlur={commit}
-            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-          />
-          <b>{unit}</b>
-        </label>
-        <button {...plus} aria-label={t('Augmenter {v1}', { v1: label.toLowerCase() })}>
-          <Icon name="plus" size={15} />
-        </button>
-      </span>
+    <div className="prow">
+      <div className="prow__btn prow__static">
+        {icon && <Icon name={icon} size={19} className="prow__icon" />}
+        <span className="prow__text">
+          <b>{label}</b>
+        </span>
+        <span className="rows__num">
+          <button {...moins} aria-label={t('Diminuer {v1}', { v1: label.toLowerCase() })}>
+            <Icon name="minus" size={15} />
+          </button>
+          <label className="rows__field">
+            <input
+              type="text"
+              inputMode="numeric"
+              enterKeyHint="done"
+              aria-label={t('{label} en {v2}', { label, v2: { kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? t('centimètres') })}
+              value={draft ?? value}
+              onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
+              onFocus={(e) => e.target.select()}
+              onBlur={commit}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+            />
+            <b>{unit}</b>
+          </label>
+          <button {...plus} aria-label={t('Augmenter {v1}', { v1: label.toLowerCase() })}>
+            <Icon name="plus" size={15} />
+          </button>
+        </span>
+      </div>
     </div>
   )
 }
 
-function Row({ label, value }) {
-  return (
-    <div className="rows__row">
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-  )
-}

@@ -57,6 +57,8 @@ describe('Mon compte', () => {
     Object.defineProperty(corps, 'scrollTop', { value: 0, writable: true, configurable: true })
     corps.scrollTop = 640
 
+    // « À propos » est sous l'onglet « Données ».
+    fireEvent.click(screen.getByRole('tab', { name: 'Données' }))
     await act(async () => {
       screen.getByText('À propos').closest('button').click()
     })
@@ -71,7 +73,26 @@ describe('Mon compte', () => {
     })
     // … et le sommaire revient où l'on était.
     expect(corps.scrollTop).toBe(640)
-    expect(screen.getByText('Paramètres')).toBeTruthy()
+    // … sur l'onglet qu'on avait quitté.
+    expect(screen.getByRole('tab', { name: 'Données' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('tab', { name: 'Paramètres' }))
+  })
+
+  it('range le sommaire en trois onglets, le profil réglable sur place', () => {
+    const onProfile = vi.fn()
+    render(<Account page={null} onPage={() => {}} params={DEFAULTS} poiPrefs={{}} onProfile={onProfile} />)
+    expect(screen.getByRole('button', { name: /^Parcours/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Stockage/ })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Profil' }))
+    expect(screen.queryByRole('button', { name: /^Parcours/ })).toBeNull()
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Augmenter poids/i }))
+    fireEvent.pointerUp(screen.getByRole('button', { name: /Augmenter poids/i }))
+    expect(onProfile).toHaveBeenCalledWith({ weight_kg: (DEFAULTS.weight_kg || 70) + 1 })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Données' }))
+    expect(screen.getByRole('button', { name: /^Stockage/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Paramètres' }))
   })
 
   it('ne propose plus Strava', () => {
