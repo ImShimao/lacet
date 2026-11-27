@@ -779,7 +779,6 @@
   margin-left: -1px;
   border-radius: 2px;
   background: var(--accent-text);
-  box-shadow: 0 0 10px var(--accent-glow);
   pointer-events: none;
 }
 

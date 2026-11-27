@@ -27,11 +27,12 @@
   height: 4px;
   border-radius: 2px;
   background: var(--surface-3);
-  transition: background 0.12s ease, width 0.12s ease;
+  transition: background 0.12s ease, transform 0.12s ease;
 }
+/* S'allonge par l'échelle, pas par la largeur : compositeur seulement. */
 .grabber:active::before {
   background: var(--accent);
-  width: 52px;
+  transform: translateX(-50%) scaleX(1.44);
 }
 
 /* L'attribution et la consigne de placement se posent au-dessus de ce qui

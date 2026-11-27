@@ -236,9 +236,8 @@
   transform: scale(0.95);
 }
 .mapsheet__tile[aria-checked='true'] .mapsheet__thumb {
-  box-shadow:
-    0 0 0 2.5px var(--accent),
-    0 6px 18px var(--accent-glow);
+  /* L'anneau seul : un halo coloré flou n'ajoutait rien qu'un dégradé. */
+  box-shadow: 0 0 0 2.5px var(--accent);
 }
 .mapsheet__check {
   position: absolute;

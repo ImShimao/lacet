@@ -22,7 +22,6 @@
   --accent-text: var(--accent-light);
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-line: color-mix(in srgb, var(--accent-text) 42%, transparent);
-  --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
   --on-accent: #fff;
   --on-color: #fff;
 
@@ -146,22 +145,43 @@
    même attribut et se peint avec le vrai jeton. */
 :root,
 [data-accent='blue'] {
-  --accent: #2563eb;
-  --accent-press: #1d4ed8;
+  --accent: #2f6df2;
+  --accent-press: #2563eb;
   --accent-light: #7cb0ff;
   --accent-deep: #1d4ed8;
 }
 [data-accent='violet'] {
-  --accent: #7c3aed;
-  --accent-press: #6d28d9;
+  --accent: #8447f0;
+  --accent-press: #7c3aed;
   --accent-light: #b79dff;
   --accent-deep: #6d28d9;
 }
 [data-accent='rose'] {
-  --accent: #d61f69;
-  --accent-press: #be185d;
+  --accent: #db2a72;
+  --accent-press: #c21a5e;
   --accent-light: #ff7eb0;
   --accent-deep: #be185d;
+}
+/* Chaque accent a sa teinte par thème, comme les couleurs système d'iOS.
+   Sombre (ci-dessus) : un aplat relevé, qui se détache à 4:1 au moins des
+   surfaces (#2563eb n'y tenait que 3,2:1) et porte encore le blanc à 4,5:1.
+   Clair (ci-dessous) : un aplat plus soutenu, à 5:1 sur le fond pâle, et un
+   appui qui fonce encore. Mesures : `contrast.js`, mêmes formules que WCAG. */
+:root[data-theme='light'],
+[data-theme='light'][data-accent='blue'],
+[data-theme='light'] [data-accent='blue'] {
+  --accent: #1d5fe0;
+  --accent-press: #1a4fc9;
+}
+[data-theme='light'][data-accent='violet'],
+[data-theme='light'] [data-accent='violet'] {
+  --accent: #7c3aed;
+  --accent-press: #6d28d9;
+}
+[data-theme='light'][data-accent='rose'],
+[data-theme='light'] [data-accent='rose'] {
+  --accent: #c21a5e;
+  --accent-press: #a3164f;
 }
 /* Graphite : sans couleur. Clair sur le thème sombre, noir sur le clair. */
 [data-accent='graphite'] {

@@ -1444,7 +1444,7 @@ export default function LiveRun({ route, request, sport, resuming, stage, speaki
 
       {route && (
         <div className="live__bar" aria-hidden="true">
-          <i style={{ width: `${share * 100}%` }} />
+          <i style={{ transform: `scaleX(${share})` }} />
         </div>
       )}
 

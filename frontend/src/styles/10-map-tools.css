@@ -160,10 +160,11 @@
 .flypin__dot {
   background: var(--accent);
   border: 4px solid var(--marker-ring);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 50%, transparent), 0 3px 12px var(--accent-glow);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 50%, transparent), 0 3px 12px var(--shadow-soft);
 }
 .flypin__pulse {
-  background: var(--accent-glow);
+  /* Un aplat translucide qui grandit, pas une ombre : il reste net. */
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
   animation: flypulse 1.4s ease-out infinite;
 }
 @keyframes flypulse {
@@ -281,7 +282,6 @@
   margin-left: -1px;
   border-radius: 1px;
   background: var(--text);
-  box-shadow: 0 0 8px var(--accent-glow);
 }
 /* Les commandes reçoivent le toucher ; le reste du tableau le laisse à la carte. */
 .flyhud button,

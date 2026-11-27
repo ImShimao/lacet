@@ -79,7 +79,12 @@
   display: block;
   height: 100%;
   background: var(--accent);
-  transition: width 0.6s linear;
+  /* `scaleX` plutôt que `width` : la barre avance à chaque relevé GPS, et une
+     largeur animée recalculait la mise en page de l'écran de course chaque
+     image ; une échelle ne touche que le compositeur. La barre fait 4 px,
+     l'arrondi déformé par l'échelle ne se voit pas. */
+  transform-origin: left;
+  transition: transform 0.6s linear;
 }
 
 /* Le SOS s'arme par appui maintenu : l'anneau qui se remplit est le seul
