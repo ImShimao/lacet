@@ -404,7 +404,9 @@
   /* Blanc sur le vert, quel que soit l'accent : en graphite, le texte
      d'accent est sombre et se perdait sur ce vert. */
   color: var(--on-color);
-  box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--safe-fill) 60%, transparent);
+  /* La même ombre neutre qu'en marche : un halo vert flou bavait sur la
+     carte et faisait un dégradé autour du bouton. */
+  box-shadow: 0 12px 30px -12px var(--shadow);
 }
 
 /* Séries et défis : la flamme des semaines, puis la barre du défi du mois. */
