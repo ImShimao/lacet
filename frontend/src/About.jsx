@@ -40,7 +40,7 @@ export default function About({ version = null, diagnostic = null }) {
         <Point icon="routes" title={t('Fourni tel quel')}>
           {t('Boucles, distances, dénivelé et guidage peuvent être inexacts.')}
         </Point>
-        <Point icon="sos" tone="risk" title={t('Le SOS ne remplace pas le 112')}>
+        <Point icon="sos" title={t('Le SOS ne remplace pas le 112')}>
           {t('Il prépare un SMS : il n\'appelle pas les secours.')}
         </Point>
       </ul>
@@ -52,16 +52,16 @@ export default function About({ version = null, diagnostic = null }) {
         <Pillar icon="ban" label={t('Aucune publicité')} />
       </div>
       <ul className="menu about__list">
-        <Point icon="lock" tone="safe" title={t('Reste sur cet appareil')}>
+        <Point icon="lock" title={t('Reste sur cet appareil')}>
           {t('Favoris, sorties, réglages et contact d\'urgence.')}
         </Point>
-        <Point icon="navigation" tone="info" title={t('Part sur le réseau, sans rien qui t\'identifie')}>
+        <Point icon="navigation" title={t('Part sur le réseau, sans rien qui t\'identifie')}>
           {t('La zone autour du départ (rues, altitudes, vent, fond de carte) et le lieu cherché par son nom.')}
         </Point>
         <Point icon="share" title={t('Seulement si tu le décides')}>
           {t('Une sortie quitte le téléphone quand tu l\'exportes ou la partages.')}
         </Point>
-        <Point icon="archive" tone="trail" title={t('Tout effacer')}>
+        <Point icon="archive" title={t('Tout effacer')}>
           {t('Dans Sauvegarde, supprime tout ce que l\'app a gardé.')}
         </Point>
       </ul>
@@ -93,10 +93,10 @@ const SOURCES = [
 ]
 
 /** Un engagement : son icône, une phrase qui le dit, une ligne de détail. */
-function Point({ icon, tone = null, title, children }) {
+function Point({ icon, title, children }) {
   return (
     <li className="menu__row about__point">
-      <span className={`menu__icon ${tone ? `menu__icon--${tone}` : ''}`}>
+      <span className="menu__icon">
         <Icon name={icon} size={18} />
       </span>
       <span className="menu__text">

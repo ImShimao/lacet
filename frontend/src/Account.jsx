@@ -110,7 +110,7 @@ function Summary({ onPage, params, poiPrefs }) {
           <div className="menu">
             {SECTIONS.filter((s) => s.group === group).map((s) => (
               <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
-                <span className={`menu__icon ${s.tone ? `menu__icon--${s.tone}` : ''}`}>
+                <span className="menu__icon">
                   <Icon name={s.icon} size={18} />
                 </span>
                 <span className="menu__text">

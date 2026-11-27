@@ -124,6 +124,9 @@
 .menu__row:active {
   background: var(--surface-3);
 }
+/* Une seule teinte, celle de l'accent : une couleur par rubrique donnait un
+   écran bariolé, et le rouge ou le jaune de la sécurité s'y lisaient comme des
+   avertissements. */
 .menu__icon {
   width: 36px;
   height: 36px;
@@ -133,28 +136,6 @@
   flex: none;
   background: var(--accent-soft);
   color: var(--accent-text);
-}
-/* Chaque famille de réglages a sa couleur : on repère la rubrique avant de lire
-   son nom. Les couleurs sont celles de l'app (sécurité, statut), en fond doux. */
-.menu__icon--risk {
-  background: var(--risk-soft);
-  color: var(--risk);
-}
-.menu__icon--info {
-  background: color-mix(in srgb, var(--info) 14%, transparent);
-  color: var(--info);
-}
-.menu__icon--caution {
-  background: var(--caution-soft);
-  color: var(--caution);
-}
-.menu__icon--safe {
-  background: var(--safe-soft);
-  color: var(--safe);
-}
-.menu__icon--trail {
-  background: color-mix(in srgb, var(--trail) 16%, transparent);
-  color: var(--trail);
 }
 .menu__text {
   flex: 1;
