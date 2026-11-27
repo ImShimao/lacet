@@ -32,7 +32,9 @@ import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { KINDS, NEAR_M } from './pois'
 import { preview, voiceSettings } from './voice'
-import { CUSTOM_DEFAULTS, WORKOUT_PRESETS, shortAmount, workoutPlan, workoutSettings } from './workout'
+import { workoutPlan, workoutSettings } from './workout'
+import WorkoutSetting from './Workout.jsx'
+import { Avatar, ProfileSettings, useIdentity } from './Profile.jsx'
 import { styleByKey } from './mapStyles'
 import { setUnits, unitLabel, units } from './units'
 import { parsePresets, presets, setPresets } from './presets'
@@ -93,6 +95,9 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
 function Summary({ onPage, params, poiPrefs, onProfile }) {
   const sport = SPORTS.find((s) => s.key === params.sport)
   const [tab, setTab] = useState(lastTab)
+  // Partagé entre l'en-tête et l'onglet Profil : la photo changée dessous
+  // apparaît aussitôt dans l'en-tête.
+  const [me, setMe] = useIdentity()
   const pick = (key) => {
     lastTab = key
     setTab(key)
@@ -118,11 +123,9 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
       {/* Qui l'on est, en une ligne : l'avatar et l'état du profil. Le toucher
           mène à l'onglet Profil, juste dessous. */}
       <button className="acct__who" onClick={() => pick('profile')}>
-        <span className="acct__avatar">
-          <Icon name={sport?.icon ?? 'user'} size={24} />
-        </span>
+        <Avatar photo={me.photo} icon={sport?.icon ?? 'user'} />
         <span className="menu__text">
-          <b>{t('Profil local')}</b>
+          <b>{me.name.trim() || t('Profil local')}</b>
           <em>{summaryOf('profile', { params, poiPrefs })}</em>
         </span>
       </button>
@@ -146,7 +149,7 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
               {rows(group)}
             </section>
           ))}
-        {tab === 'profile' && <ProfileSettings params={params} onProfile={onProfile} />}
+        {tab === 'profile' && <ProfileSettings params={params} onProfile={onProfile} me={me} setMe={setMe} />}
         {tab === 'data' && (
           <>
             {rows('Données')}
@@ -172,24 +175,6 @@ const TABS = [
 // chaque retour d'une page, et revenait sinon sur « Paramètres ».
 let lastTab = 'settings'
 
-/** Le poids et les objectifs : une carte de réglages comme les autres. */
-function ProfileSettings({ params, onProfile }) {
-  return (
-    <PrefsCard
-      foot={
-        <>
-          {t('Le poids sert à estimer les calories d\'une sortie, et rien d\'autre. Rien n\'est envoyé.')}{' '}
-          {t('Les objectifs s\'affichent en tête de tes sorties, avec ce qu\'il reste à courir. À 0, pas d\'objectif.')}
-        </>
-      }
-    >
-      <NumberRow icon="gauge" label={t('Poids')} unit={t('kg')} value={params.weight_kg || 70} min={30} max={200} onChange={(weight_kg) => onProfile({ weight_kg })} />
-      <NumberRow icon="flag" label={t('Objectif par semaine')} unit="km" value={params.weekly_km || 0} min={0} max={300} onChange={(weekly_km) => onProfile({ weekly_km })} />
-      <NumberRow icon="trendUp" label={t('Objectif par mois')} unit="km" value={params.monthly_km || 0} min={0} max={1000} onChange={(monthly_km) => onProfile({ monthly_km })} />
-    </PrefsCard>
-  )
-}
-
 /**
  * Ce que dit une ligne du sommaire sous son titre : l'état du moment plutôt
  * qu'une description. « 70 kg » répond à la question avant qu'on ouvre.
@@ -198,7 +183,12 @@ function summaryOf(key, { params, poiPrefs }) {
   const saved = load()
   switch (key) {
     case 'profile':
-      return t('Poids {v1} kg{v2}', { v1: params.weight_kg || 70, v2: params.weekly_km ? t(' · {weekly_km} km par semaine', { weekly_km: params.weekly_km }) : '' })
+      return [
+        params.height_cm ? `${params.height_cm} cm` : null,
+        t('Poids {v1} kg{v2}', { v1: params.weight_kg || 70, v2: params.weekly_km ? t(' · {weekly_km} km par semaine', { weekly_km: params.weekly_km }) : '' }),
+      ]
+        .filter(Boolean)
+        .join(' · ')
     case 'search':
       return [
         t('Sécurité {v1}', { v1: t(SAFETY.find((o) => o.key === params.safety)?.label ?? 'Sûr').toLowerCase() ?? t('sûre') }),
@@ -283,7 +273,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
         </>
       )
     case 'workout':
-      return <WorkoutSetting />
+      return <WorkoutSetting pace={params.pace_sec_per_km} />
     case 'safety':
       return <EmergencyContact />
     case 'zones':
@@ -1179,79 +1169,6 @@ function VoiceSetting() {
   )
 }
 
-const WARMUPS = [0, 5, 10, 15, 20].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
-const COOLDOWNS = [0, 5, 10].map((n) => ({ key: n, label: n ? `${n} min` : t('Aucun') }))
-
-// Les réglages de la séance personnalisée : des pas qu'un coach donnerait,
-// de la côte courte au long fractionné.
-const REPS = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map((n) => ({ key: n, label: `${n}` }))
-const WORK_M = [100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 3000].map((m) => ({ key: m, label: shortAmount({ m }) }))
-const WORK_S = [15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 480, 600].map((s) => ({ key: s, label: shortAmount({ s }) }))
-const RESTS = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300].map((s) => ({ key: s, label: shortAmount({ s }) }))
-
-/**
- * La séance fractionnée de la prochaine sortie : la voix dit chaque bloc, le
- * bandeau le bloc en cours (`workout.js`). Gardée allumée d'une sortie à
- * l'autre — c'est la semaine de piste —, à couper une fois la séance faite.
- */
-function WorkoutSetting() {
-  const [prefs, setPrefs] = useState(workoutSettings)
-  const change = (patch) => {
-    const next = { ...prefs, ...patch }
-    setPrefs(next)
-    save({ workout: next })
-  }
-  return (
-    <PrefsCard
-      title={t('Séance fractionnée')}
-      foot={t('Chaque bloc annoncé, prévenu avant sa fin, et chaque répétition chronométrée.')}
-    >
-      <ToggleRow icon="repeat" label={t('Guider une séance')} on={prefs.on} onChange={(on) => change({ on })} />
-      {prefs.on && (
-        <>
-          <PickRow
-            icon="flame"
-            label={t('Séance')}
-            value={prefs.preset}
-            options={[...WORKOUT_PRESETS.map((p) => ({ key: p.key, label: t(p.label) })), { key: 'custom', label: t('Personnalisée') }]}
-            onChange={(preset) => change({ preset })}
-          />
-          {prefs.preset === 'custom' && <CustomWorkout custom={{ ...CUSTOM_DEFAULTS, ...prefs.custom }} onChange={(custom) => change({ custom })} />}
-          <PickRow icon="clock" label={t('Échauffement')} value={prefs.warmup_min} options={WARMUPS} onChange={(warmup_min) => change({ warmup_min })} />
-          <PickRow icon="clock" label={t('Retour au calme')} value={prefs.cooldown_min} options={COOLDOWNS} onChange={(cooldown_min) => change({ cooldown_min })} />
-        </>
-      )}
-    </PrefsCard>
-  )
-}
-
-/** La séance personnalisée, champ par champ : répétitions, effort, récupération. */
-function CustomWorkout({ custom, onChange }) {
-  const set = (patch) => onChange({ ...custom, ...patch })
-  const bySeconds = custom.unit === 's'
-  return (
-    <>
-      <PickRow icon="repeat" label={t('Répétitions')} value={custom.reps} options={REPS} onChange={(reps) => set({ reps })} />
-      <PickRow
-        icon="gauge"
-        label={t('Effort mesuré en')}
-        value={custom.unit}
-        options={[
-          { key: 'm', label: t('Distance') },
-          { key: 's', label: t('Durée') },
-        ]}
-        onChange={(unit) => set({ unit })}
-      />
-      {bySeconds ? (
-        <PickRow icon="flame" label={t('Effort')} value={custom.work_s} options={WORK_S} onChange={(work_s) => set({ work_s })} />
-      ) : (
-        <PickRow icon="flame" label={t('Effort')} value={custom.work_m} options={WORK_M} onChange={(work_m) => set({ work_m })} />
-      )}
-      <PickRow icon="clock" label={t('Récupération')} value={custom.rest_s} options={RESTS} onChange={(rest_s) => set({ rest_s })} />
-    </>
-  )
-}
-
 /**
  * L'écran de verrouillage pendant une sortie guidée.
  *
@@ -1412,106 +1329,3 @@ function BackupRows({ onRestored }) {
     </PrefsCard>
   )
 }
-
-/**
- * Un appui maintenu répète le pas, de plus en plus vite.
- *
- * Passer de 70 à 82 kg demandait douze appuis, et de 175 à 194 cm dix-neuf.
- * La valeur est lue dans une référence à chaque répétition : la lire dans la
- * fermeture figerait le premier chiffre, et tous les pas suivants
- * réécriraient la même valeur.
- */
-function useHold(step, delays = { first: 420, min: 55 }) {
-  const timer = useRef(null)
-  const action = useRef(step)
-  action.current = step
-
-  const stop = () => {
-    clearTimeout(timer.current)
-    timer.current = null
-  }
-  useEffect(() => stop, [])
-
-  const start = (event) => {
-    // Un seul doigt, et pas de sélection ni de zoom déclenchés par l'appui long.
-    event.preventDefault()
-    // Un second doigt lançait une seconde répétition sans arrêter la première :
-    // lever la main n'en arrêtait qu'une, et le poids filait jusqu'à sa borne,
-    // réécrit sur le disque vingt fois par seconde.
-    stop()
-    action.current()
-    let delay = delays.first
-    const tick = () => {
-      action.current()
-      delay = Math.max(delays.min, delay * 0.72)
-      timer.current = setTimeout(tick, delay)
-    }
-    timer.current = setTimeout(tick, delay)
-  }
-
-  // `detail` vaut zéro quand le clic vient du clavier (Entrée ou Espace sur le
-  // bouton) : là, aucun événement de pointeur n'est émis, et le pas ne se ferait
-  // jamais. À la souris ou au doigt, l'appui l'a déjà fait.
-  const onClick = (event) => {
-    if (event.detail === 0) action.current()
-  }
-
-  return { onClick, onPointerDown: start, onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop }
-}
-
-/**
- * Une valeur chiffrée : au doigt par les deux boutons, au clavier en touchant
- * le nombre.
- *
- * Le nombre est un champ, et pas seulement un affichage : douze appuis pour
- * corriger un poids est le genre de détail qui fait renoncer à régler quoi que
- * ce soit. Ce qui est saisi n'est pris qu'à la validation, et ramené dans les
- * bornes — un champ vidé le temps de retaper ne doit pas valoir « 0 kg ».
- */
-function NumberRow({ icon, label, unit, value, min, max, onChange }) {
-  const [draft, setDraft] = useState(null)
-  const moins = useHold(() => onChange(Math.max(min, value - 1)))
-  const plus = useHold(() => onChange(Math.min(max, value + 1)))
-
-  const commit = () => {
-    const saisi = Number(draft)
-    setDraft(null)
-    if (draft !== null && draft !== '' && Number.isFinite(saisi)) {
-      onChange(Math.min(max, Math.max(min, Math.round(saisi))))
-    }
-  }
-
-  return (
-    <div className="prow">
-      <div className="prow__btn prow__static">
-        {icon && <Icon name={icon} size={19} className="prow__icon" />}
-        <span className="prow__text">
-          <b>{label}</b>
-        </span>
-        <span className="rows__num">
-          <button {...moins} aria-label={t('Diminuer {v1}', { v1: label.toLowerCase() })}>
-            <Icon name="minus" size={15} />
-          </button>
-          <label className="rows__field">
-            <input
-              type="text"
-              inputMode="numeric"
-              enterKeyHint="done"
-              aria-label={t('{label} en {v2}', { label, v2: { kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? t('centimètres') })}
-              value={draft ?? value}
-              onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
-              onFocus={(e) => e.target.select()}
-              onBlur={commit}
-              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-            />
-            <b>{unit}</b>
-          </label>
-          <button {...plus} aria-label={t('Augmenter {v1}', { v1: label.toLowerCase() })}>
-            <Icon name="plus" size={15} />
-          </button>
-        </span>
-      </div>
-    </div>
-  )
-}
-

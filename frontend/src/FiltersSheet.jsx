@@ -229,6 +229,7 @@ export const OPTIONAL_FILTERS = [
 const KEPT_ON_RESET = [
   'sport',
   'weight_kg',
+  'height_cm',
   'weekly_km',
   'time_of_day',
   'side',
