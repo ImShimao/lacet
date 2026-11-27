@@ -105,7 +105,11 @@ export function ReportButton({ disabled, onReport }) {
   if (!open) {
     return (
       <button className="signal" onClick={() => setOpen(true)} disabled={disabled}>
-        <Icon name="cone" size={17} />{t('Signaler un problème ici')}</button>
+        <Icon name="cone" size={17} />{t('Signaler un problème ici')}
+        {/* Grisé sans raison, le bouton paraissait cassé : le signalement se
+            pose à la position, et il n'y en a pas encore. */}
+        {disabled && <em className="signal__why">{t('en attente du GPS')}</em>}
+      </button>
     )
   }
   return (

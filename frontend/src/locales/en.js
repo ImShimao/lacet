@@ -475,6 +475,7 @@ export default {
   "{length} sortie{v2} · {v3} {v4} · {v5}": "{length} run{v2} · {v3} {v4} · {v5}",
   "Signal GPS perdu. Je reprends dès qu’il revient.": "GPS signal lost. I will resume as soon as it returns.",
   "Signal GPS retrouvé.": "GPS signal found again.",
+  "en attente du GPS": "waiting for GPS",
   "Pause automatique.": "Automatic pause.",
   "Reprise.": "Resumed.",
   "kilomètre": "kilometer",

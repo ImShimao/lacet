@@ -317,7 +317,18 @@
   font-weight: 600;
 }
 .signal:disabled {
-  opacity: 0.4;
+  /* Une couleur mesurée plutôt qu'une opacité : à 40 %, le libellé tombait à
+     2:1, illisible au soleil. `--text-3` tient 4,5:1 dans les deux thèmes ;
+     le tiret de la bordure et la raison disent qu'il attend. */
+  color: var(--text-3);
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.signal__why {
+  flex-basis: 100%;
+  font-style: normal;
+  font-weight: 400;
+  font-size: calc(12px * var(--text-scale));
 }
 .signal--open {
   display: grid;

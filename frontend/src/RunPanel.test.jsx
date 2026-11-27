@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
-import { RunStats } from './RunPanel.jsx'
+import { ReportButton, RunStats } from './RunPanel.jsx'
 import { setUnits } from './units'
 
 /**
@@ -47,5 +47,16 @@ describe('les chiffres de course', () => {
     stats({ paused: 'auto', laps: 3, lap: 2 })
     expect(screen.getByText('Pause automatique')).toBeInTheDocument()
     expect(screen.getByText((_, el) => el?.className === 'lapcount' && el.textContent === 'Tour 2 sur 3')).toBeInTheDocument()
+  })
+})
+
+describe('le signalement en course', () => {
+  // Grisé sans raison, il paraissait cassé : il attend une position.
+  it('dit pourquoi il est grisé tant que le GPS ne répond pas', () => {
+    const { rerender } = render(<ReportButton disabled onReport={() => {}} />)
+    expect(screen.getByRole('button', { name: /Signaler un problème ici/ })).toBeDisabled()
+    expect(screen.getByText('en attente du GPS')).toBeInTheDocument()
+    rerender(<ReportButton disabled={false} onReport={() => {}} />)
+    expect(screen.queryByText('en attente du GPS')).not.toBeInTheDocument()
   })
 })
