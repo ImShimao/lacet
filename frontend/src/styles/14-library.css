@@ -206,3 +206,40 @@
   margin-top: 8px;
   gap: 2px;
 }
+
+/* ══ une ligne, une carte ════════════════════════════════════════════════ */
+
+/* La flèche « garder la carte » flottait à droite, hors de la ligne : chaque
+   ligne s'arrêtait 46 px avant le bord, sous des cartes de chiffres qui, elles,
+   allaient jusqu'au bout — un bord droit en dents de scie. La surface passe à
+   la ligne entière ; la flèche y prend sa place, au bout, comme un accessoire
+   de cellule iOS. Ce sont toujours deux boutons côte à côte, pas l'un dans
+   l'autre. */
+.list__main {
+  gap: 0;
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.list__main > .list__row {
+  background: none;
+  padding-right: 4px;
+}
+.list__main > .offline {
+  min-width: 44px;
+  border-radius: 0 var(--r) var(--r) 0;
+}
+.list__main > .list__row:active,
+.list__main > .offline:active {
+  background: var(--surface-3);
+}
+/* La date, la distance et l'allure : 12 px, pas 10,5 — en dessous, la ligne
+   se lisait en plissant les yeux, téléphone tenu à bout de bras. */
+.list__row em {
+  font-size: calc(12px * var(--text-scale));
+  font-variant-numeric: tabular-nums;
+}
+.list__row > span:not(.list__sport):not(.grade) {
+  font-size: calc(14.5px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
