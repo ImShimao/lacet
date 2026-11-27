@@ -34,6 +34,9 @@
   background: var(--accent);
   border-color: transparent;
   color: var(--on-accent);
+  /* En gélule, comme les apps bancaires récentes : l'action principale ne se
+     confond plus avec les tuiles carrées des réglages posées à côté. */
+  border-radius: 999px;
   transition: transform 0.12s ease;
 }
 .btn--primary:active:not(:disabled) {
