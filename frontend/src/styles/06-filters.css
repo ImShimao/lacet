@@ -526,6 +526,19 @@
 .field--open {
   border-color: var(--line);
 }
+/* Deux réglages repliés qui se suivent ne font qu'une carte, coupée d'un
+   filet : Relief et Distance flottaient en deux pavés séparés de 18 px, là
+   où les Réglages de l'iPhone groupent les lignes sœurs. */
+.field--fold:has(+ .field--fold) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.field--fold + .field--fold {
+  margin-top: -18px;
+  border-top-color: var(--line-soft);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
 .field__toggle {
   display: flex;
   align-items: center;
