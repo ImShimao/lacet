@@ -16,7 +16,7 @@ import { sketch } from './routeDraw'
 import { RenameField } from './RunDetail.jsx'
 import MonthReport from './MonthReport.jsx'
 import Challenges from './Challenges.jsx'
-import { dailyMetres, monthKey, monthLabel } from './monthSummary'
+import { dailyMetres, goalProgress, monthKey, monthLabel } from './monthSummary'
 import { paceLabel, speedIn, speedLabel, unitLabel } from './units'
 
 import { t, locale, dec } from './i18n'
@@ -80,6 +80,8 @@ export default function Library({ saved, history, initialView, onOpen, onOpenRun
 
       {/* Le bilan, la semaine et les défis côte à côte, au pouce : empilés, ils
           poussaient la liste des sorties — ce qu'on vient chercher — sous le pli. */}
+      {view === 'history' && (profile?.weekly_km > 0 || profile?.monthly_km > 0) && <Goals history={history} profile={profile} />}
+
       {view === 'history' && shown.length > 0 && (
         <div className="statstrip" aria-label={t('Bilan')}>
           <div className="statstrip__card">
@@ -734,6 +736,41 @@ function Totals({ history, profile }) {
           .join(' · ')}
       </p>
     </>
+  )
+}
+
+/**
+ * Les objectifs de distance : où l'on en est cette semaine et ce mois-ci, en
+ * barres pleines. Le repère sur « Volume par semaine » disait l'objectif, pas
+ * ce qu'il restait à courir : ici, d'un coup d'œil, « 18 sur 25 km ». Toutes
+ * activités confondues : l'objectif est réglé une fois, pas par sport.
+ */
+function Goals({ history, profile }) {
+  const { week_m, month_m } = goalProgress(history)
+  const rows = [
+    profile.weekly_km > 0 && [t('Cette semaine'), week_m, profile.weekly_km],
+    profile.monthly_km > 0 && [t('Ce mois-ci'), month_m, profile.monthly_km],
+  ].filter(Boolean)
+  return (
+    <section className="goals" aria-label={t('Objectifs')}>
+      {rows.map(([label, metres, goal]) => {
+        const done = metres >= goal * 1000
+        return (
+          <div key={label} className={`goal ${done ? 'goal--done' : ''}`}>
+            <div className="goal__head">
+              <span>{label}</span>
+              <span>
+                <b>{km(metres, 0)}</b> / {goal} {unitLabel()}
+                {done && <Icon name="check" size={14} />}
+              </span>
+            </div>
+            <div className="goal__bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.round(metres / 100) / 10}>
+              <i style={{ transform: `scaleX(${Math.min(1, metres / (goal * 1000))})` }} />
+            </div>
+          </div>
+        )
+      })}
+    </section>
   )
 }
 

@@ -74,3 +74,23 @@ export function dailyMetres(runs, key) {
   }
   return out
 }
+
+/**
+ * Les mètres de la semaine en cours (depuis lundi minuit) et du mois en cours,
+ * pour les objectifs de Mes parcours. Semaine et mois du calendrier, pas « les
+ * 7 derniers jours » : un objectif se remet à zéro le lundi, comme on le compte
+ * soi-même.
+ */
+export function goalProgress(history, now = new Date()) {
+  const lundi = monday(now).getTime()
+  const mois = monthKey(now.toISOString())
+  let week_m = 0
+  let month_m = 0
+  for (const r of history || []) {
+    const at = new Date(r.ranAt)
+    if (Number.isNaN(at.getTime()) || at > now) continue
+    if (at.getTime() >= lundi) week_m += r.actual_distance_m || 0
+    if (monthKey(r.ranAt) === mois) month_m += r.actual_distance_m || 0
+  }
+  return { week_m, month_m }
+}

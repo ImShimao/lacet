@@ -216,8 +216,16 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
               max={300}
               onChange={(weekly_km) => onProfile({ weekly_km })}
             />
+            <NumberRow
+              label={t('Objectif par mois')}
+              unit="km"
+              value={params.monthly_km || 0}
+              min={0}
+              max={1000}
+              onChange={(monthly_km) => onProfile({ monthly_km })}
+            />
           </div>
-          <p className="muted small">{t('L\'objectif trace un repère sur « Volume par semaine », dans tes sorties. À 0, pas de repère.')}</p>
+          <p className="muted small">{t('Les objectifs s\'affichent en tête de tes sorties, avec ce qu\'il reste à courir. À 0, pas d\'objectif.')}</p>
         </>
       )
     case 'search':

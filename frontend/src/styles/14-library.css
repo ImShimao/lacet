@@ -297,3 +297,62 @@
 .list__row .list__km + .grade {
   margin-left: 0;
 }
+
+/* ══ les objectifs ══════════════════════════════════════════════════════
+   Une carte, une ligne par objectif : le nom, « 18 / 25 km », puis la barre.
+   La barre se remplit par l'échelle (compositeur seulement), et passe au vert
+   de la note A une fois l'objectif atteint : le seul vert qui veut dire « bon ». */
+.goals {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+.goal__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: calc(13.5px * var(--text-scale));
+  color: var(--text-2);
+}
+.goal__head > span:last-child {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.goal__head b {
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 700;
+  color: var(--text);
+}
+.goal__head .icon {
+  align-self: center;
+  color: var(--safe);
+}
+.goal__bar {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.goal__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.5s var(--ease);
+}
+.goal--done .goal__bar i {
+  background: var(--safe);
+}
+@media (prefers-reduced-motion: reduce) {
+  .goal__bar i {
+    transition: none;
+  }
+}

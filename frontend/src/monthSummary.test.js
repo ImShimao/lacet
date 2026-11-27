@@ -87,3 +87,18 @@ describe('la distance par jour', () => {
     expect(jours[0]).toBe(0)
   })
 })
+
+describe('les objectifs', () => {
+  // Semaine du calendrier, depuis lundi : la sortie de dimanche dernier ne
+  // compte pas pour cette semaine, mais compte pour le mois.
+  it('comptent la semaine depuis lundi et le mois en cours', async () => {
+    const { goalProgress } = await import('./monthSummary')
+    const now = new Date(2026, 10, 27, 12) // vendredi 27 novembre 2026
+    const runs = [
+      { ranAt: new Date(2026, 10, 23, 8).toISOString(), actual_distance_m: 10000 }, // lundi
+      { ranAt: new Date(2026, 10, 22, 8).toISOString(), actual_distance_m: 5000 }, // dimanche d'avant
+      { ranAt: new Date(2026, 9, 31, 8).toISOString(), actual_distance_m: 8000 }, // octobre
+    ]
+    expect(goalProgress(runs, now)).toEqual({ week_m: 10000, month_m: 15000 })
+  })
+})
