@@ -342,3 +342,17 @@ describe('les propositions réduites', () => {
     expect(onOpenDetail).not.toHaveBeenCalled()
   })
 })
+
+describe('le relief en miniature', () => {
+  // Une boucle plate ne doit pas se dessiner en montagnes russes : l'échelle
+  // vaut au moins 40 m.
+  it('dessine un profil, à plat pour 3 m de bosses, et rien sans altitudes', async () => {
+    const { Spark } = await import('./Explore.jsx')
+    const plat = [0, 1, 2, 3, 2, 1].map((e, i) => ({ dist_m: i * 50, ele_m: 300 + e }))
+    const { container, rerender } = render(<Spark points={plat} />)
+    const ys = container.querySelector('.rcard__spark-line').getAttribute('d').match(/,[\d.]+/g).map((s) => Number(s.slice(1)))
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(2)
+    rerender(<Spark points={null} />)
+    expect(container.querySelector('svg')).toBeNull()
+  })
+})

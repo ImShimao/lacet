@@ -977,6 +977,7 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, co
               </span>
               <span className="rcard__km">
                 <b>{km(r.distance_m, 1)}</b> {unitLabel()}
+                <Spark points={r.elevation_profile} />
               </span>
               <span className="rcard__name">{routeName(r.name)}</span>
               <span className="rcard__stats">
@@ -1017,6 +1018,30 @@ function RouteCards({ routes, selected, onSelect, onOpenDetail, known, sport, co
 }
 
 /** « 58 min », « 1 h 12 » : une durée estimée n'a pas de secondes à afficher. */
+/**
+ * Le relief d'une proposition en miniature, comme sur les cartes de Komoot :
+ * on compare les boucles d'un coup d'œil, sans ouvrir le détail. L'échelle
+ * verticale vaut au moins 40 m, sans quoi une boucle plate aux 3 m de bosses
+ * se dessinerait en montagnes russes.
+ */
+export function Spark({ points }) {
+  if (!points || points.length < 2) return null
+  const W = 72
+  const H = 22
+  // Une quarantaine de points suffisent à 72 px de large.
+  const step = Math.max(1, Math.floor(points.length / 40))
+  const ele = points.filter((_, i) => i % step === 0).map((p) => p.ele_m)
+  const low = Math.min(...ele)
+  const span = Math.max(40, Math.max(...ele) - low)
+  const xy = ele.map((e, i) => `${((i / (ele.length - 1)) * W).toFixed(1)},${(H - 1 - ((e - low) / span) * (H - 2)).toFixed(1)}`)
+  return (
+    <svg className="rcard__spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <path className="rcard__spark-fill" d={`M0,${H} L${xy.join(' L')} L${W},${H}Z`} />
+      <path className="rcard__spark-line" d={`M${xy.join(' L')}`} />
+    </svg>
+  )
+}
+
 function minutes(seconds) {
   const m = Math.round((seconds || 0) / 60)
   if (m < 60) return `${m} min`

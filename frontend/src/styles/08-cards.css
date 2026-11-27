@@ -98,10 +98,30 @@
   text-transform: uppercase;
 }
 .rcard__km {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: calc(14px * var(--text-scale));
   font-weight: 700;
   color: var(--text-2);
   line-height: 1;
+}
+/* Le relief en miniature, calé à droite du chiffre : un aplat doux sous un
+   trait, aux couleurs de l'accent. */
+.rcard__spark {
+  margin-left: auto;
+  align-self: flex-end;
+  flex: none;
+}
+.rcard__spark-fill {
+  fill: var(--accent-soft);
+}
+.rcard__spark-line {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .rcard__km b {
   font-size: 36px;
