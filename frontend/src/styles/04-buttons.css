@@ -67,11 +67,19 @@
   gap: 3px;
 }
 .seg button {
+  position: relative;
   padding: 13px 8px;
   border-radius: 11px;
   font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--text-2);
+}
+/* La cible déborde jusqu'au bord du rail (3 px autour) : 39 px de bouton
+   répondent sur 45, sans changer l'allure du segment. */
+.seg button::after {
+  content: '';
+  position: absolute;
+  inset: -3px -1.5px;
 }
 /* `aria-pressed` pour les boutons-bascules, `aria-checked` pour les groupes de
    boutons radio (la pause automatique) : sans le second, son choix ne se

@@ -327,6 +327,7 @@
 }
 /* Le nombre se touche pour le taper : il en a l'air, sans devenir un formulaire. */
 .rows__field {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 4px;
@@ -334,6 +335,13 @@
   border-radius: 9px;
   background: var(--surface-3);
   cursor: text;
+}
+/* Le champ fait 33 px : le toucher compte 6 px autour, sans toucher aux
+   boutons − et + : 10 px d'écart, dont 4 déjà pris par leurs propres cibles. */
+.rows__field::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
 }
 .rows__field:focus-within {
   outline: 2px solid var(--accent);
@@ -682,6 +690,11 @@
 .dist .seg button {
   padding-block: 6px;
   font-size: calc(12.5px * var(--text-scale));
+}
+/* Ce segment-là est compact (30 px) : sa cible déborde de 8 px en haut et en
+   bas pour dépasser 44 px. Au-dessus et dessous, rien d'autre ne se touche. */
+.dist .seg button::after {
+  inset: -8px -1.5px;
 }
 .dist__value {
   display: flex;
