@@ -692,8 +692,8 @@ export default function Explore({
       <button className="linkish" onClick={onFreeRun}>{t('ou courir librement, sans suivre de tracé')}</button>
 
       {/* Collée au bas du panneau : « Démarrer » reste à portée de pouce quel
-          que soit l'endroit où l'on a fait défiler le détail. À côté, le seul
-          autre geste qu'on fait avant de partir : garder la boucle. */}
+          que soit l'endroit où l'on a fait défiler le détail. De part et
+          d'autre : revenir au générateur, et garder la boucle. */}
       <div className="actionbar">
         {/* Retour à l'accueil et à « Trouver ma boucle » : une boucle importée
             ou un favori rouvert n'avaient pas d'autre sortie qu'une nouvelle
@@ -703,6 +703,10 @@ export default function Explore({
             <Icon name="close" size={19} />
           </button>
         )}
+        <button className="btn btn--primary" onClick={onStart}>
+          <Icon name="play" size={17} />{t('Démarrer')}</button>
+        {/* Le cœur de l'autre côté de « Démarrer » : collé à la croix, on
+            visait l'un en voulant l'autre, et la barre penchait d'un côté. */}
         <button
           className={`btn btn--icon ${isFavorite ? 'btn--on' : ''}`}
           onClick={onFavorite}
@@ -712,8 +716,6 @@ export default function Explore({
         >
           {isFavorite ? <SolidIcon name="heart" size={19} /> : <Icon name="heart" size={19} />}
         </button>
-        <button className="btn btn--primary" onClick={onStart}>
-          <Icon name="play" size={17} />{t('Démarrer')}</button>
       </div>
     </div>
   )
