@@ -722,6 +722,8 @@
   max-width: 88px;
   padding-inline: 4px;
   white-space: nowrap;
+  justify-content: center;
+  text-align: center;
 }
 /* Écrans courts (iPhone SE) : le panneau d'accueil se tasse pour laisser voir
    la carte et son repère au-dessus de lui. */
