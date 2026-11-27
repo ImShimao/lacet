@@ -124,9 +124,12 @@ struct LoopMark: Shape {
     }
 }
 
-// Les couleurs de l'app : le violet de l'accent sur le noir du fond.
-private let accent = Color(red: 0.608, green: 0.435, blue: 1.0)
-private let backdrop = Color(red: 0.039, green: 0.035, blue: 0.063)
+// Les couleurs de l'app : le bleu de l'accent par défaut (#2f6df2) sur le noir
+// du fond (#0b0d10). Le violet d'origine est parti de l'app le 2026-10-30 ; la
+// vignette le gardait seule. Elle ne lit pas l'accent choisi : sans « app
+// group », elle n'a pas accès aux réglages de l'app.
+private let accent = Color(red: 0.184, green: 0.427, blue: 0.949)
+private let backdrop = Color(red: 0.043, green: 0.051, blue: 0.063)
 private let caution = Color(red: 1.0, green: 0.416, blue: 0.271)
 
 /// Le fond, posé comme iOS 17 et suivants l'exigent.
