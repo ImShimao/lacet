@@ -401,34 +401,6 @@
 
 /* ══ écarts, listes, messages ══════════════════════════════════════════ */
 
-.rejected {
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--surface-2);
-  padding: 11px 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.rejected__title {
-  font-size: calc(12px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-.rejected__row {
-  display: grid;
-  grid-template-columns: 52px 1fr;
-  gap: 9px;
-  font-size: calc(12px * var(--text-scale));
-  color: var(--text-2);
-}
-.rejected__row .mono {
-  color: var(--text-3);
-  font-size: calc(12px * var(--text-scale));
-}
-
 .list {
   display: flex;
   flex-direction: column;

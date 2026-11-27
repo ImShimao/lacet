@@ -406,7 +406,6 @@ export default {
   "de {from}": "from {from}",
   "Feuille de route · {length} consignes": "Roadbook · {length} instructions",
   "{text}, à {v2} {v3} — montrer sur la carte": "{text}, in {v2} {v3} — show on the map",
-  "{length} écarté{v2} par le contrôle": "{length} rejected{v2} by the check",
   "Filtres de recherche": "Search filters",
   "Réinitialiser": "Reset",
   "Activité": "Activity",

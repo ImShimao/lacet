@@ -426,13 +426,12 @@ export default function Explore({
     )
   }
 
-  const { routes, rejected, meta } = result
+  const { routes, meta } = result
 
   if (!routes.length) {
     return (
       <div className="panel">
         <div className="notice notice--warn">{t(meta.message)}</div>
-        {rejected?.length > 0 && <RejectedList rejected={rejected} />}
         <button className="btn btn--primary" onClick={onOpenFilters}>{t('Modifier les filtres')}</button>
         <button className="btn btn--ghost" onClick={onFreeRun}>
           <Icon name="play" size={17} />{t('Courir sans itinéraire')}</button>
@@ -627,8 +626,7 @@ export default function Explore({
 
       {detail && (
         <>
-          {rejected?.length > 0 && <RejectedList rejected={rejected} />}
-          <p className="disclaimer">{t('Note tirée d\'OpenStreetMap, parfois incomplet ou dépassé : reste attentif sur le terrain.')}</p>
+            <p className="disclaimer">{t('Note tirée d\'OpenStreetMap, parfois incomplet ou dépassé : reste attentif sur le terrain.')}</p>
         </>
       )}
 
@@ -1078,20 +1076,6 @@ function RouteSteps({ steps, onShow }) {
         ))}
       </ol>
     </details>
-  )
-}
-
-function RejectedList({ rejected }) {
-  return (
-    <div className="rejected">
-      <span className="rejected__title">{t('{length} écarté{v2} par le contrôle', { length: rejected.length, v2: rejected.length > 1 ? 's' : '' })}</span>
-      {rejected.map((r, i) => (
-        <div key={i} className="rejected__row">
-          <span className="mono">{km(r.distance_m, 1)} {unitLabel()}</span>
-          <span>{engineText(r.label)}</span>
-        </div>
-      ))}
-    </div>
   )
 }
 
