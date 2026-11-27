@@ -87,4 +87,11 @@ describe('le contour d’une zone', () => {
     // Deux points ne font pas encore un contour : rendus tels quels.
     expect(ringOf(touches.slice(0, 2))).toEqual(touches.slice(0, 2))
   })
+
+  it('garde une forme en creux telle qu’on l’a posée', async () => {
+    const { ringOf } = await import('./zones')
+    // Un L, coin par coin : déjà sans croisement, il ne doit pas bouger.
+    const l = [[7, 48], [7.02, 48], [7.02, 48.005], [7.005, 48.005], [7.005, 48.02], [7, 48.02]]
+    expect(ringOf(l)).toEqual(l)
+  })
 })

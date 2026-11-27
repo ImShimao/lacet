@@ -40,21 +40,38 @@ export const ZONE_REASONS = [
 const isRing = (p) => Array.isArray(p) && p.length >= 3 && p.every((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]))
 
 /**
- * Les coins d'un contour, rangés autour de leur centre. Reliés dans l'ordre où
- * on les touche, douze points posés en désordre donnaient une étoile de traits
- * croisés, et une surface que le moteur aurait lue à moitié trouée. Rangés par
- * angle, ils forment un contour qui ne se croise jamais. L'ordre des touchers
- * reste dans le brouillon, pour « Retirer le dernier point ».
- * shortcut: un contour en creux (un L) se referme en éventail autour du
- * centre ; à revoir si l'on veut dessiner des formes concaves.
+ * Les coins d'un contour, démêlés. Reliés dans l'ordre où on les touche, douze
+ * points posés en désordre donnaient une étoile de traits croisés, et une
+ * surface que le moteur aurait lue à moitié trouée. Les ranger par angle autour
+ * du centre supprimait les croisements, mais refermait en éventail une forme
+ * en creux, un L ou un bois en croissant. Ici, l'ordre des touchers est gardé,
+ * et chaque paire de côtés qui se croisent est décroisée en retournant le
+ * morceau entre eux (« 2-opt ») : le contour raccourcit à chaque fois, donc
+ * la boucle s'arrête, et une forme déjà propre ne bouge pas.
  */
 export function ringOf(points) {
-  if (!Array.isArray(points) || points.length < 3) return points
-  const [cx, cy] = points.reduce((s, [x, y]) => [s[0] + x / points.length, s[1] + y / points.length], [0, 0])
+  if (!Array.isArray(points) || points.length < 4) return points
+  const ring = [...points]
+  const n = ring.length
   // Les degrés de longitude rétrécissent avec la latitude : sans ce facteur,
-  // les angles mesurés sur la carte ne seraient pas ceux qu'on voit.
-  const k = Math.cos((cy * Math.PI) / 180)
-  return [...points].sort((a, b) => Math.atan2(a[1] - cy, (a[0] - cx) * k) - Math.atan2(b[1] - cy, (b[0] - cx) * k))
+  // les croisements seraient jugés sur une carte étirée.
+  const k = Math.cos((ring.reduce((s, p) => s + p[1], 0) / n) * (Math.PI / 180))
+  const side = (p, q, r) => Math.sign((q[0] - p[0]) * k * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]) * k)
+  const cross = (a, b, c, d) => side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0
+  for (let pass = 0, changed = true; changed && pass < n * n; pass++) {
+    changed = false
+    for (let i = 0; i < n - 2 && !changed; i++) {
+      for (let j = i + 2; j < n && !changed; j++) {
+        if (i === 0 && j === n - 1) continue
+        if (cross(ring[i], ring[i + 1], ring[j], ring[(j + 1) % n])) {
+          // Retourner les coins de i+1 à j décroise ces deux côtés.
+          ring.splice(i + 1, j - i, ...ring.slice(i + 1, j + 1).reverse())
+          changed = true
+        }
+      }
+    }
+  }
+  return ring
 }
 
 /** Toutes les zones, actives ou non, de la plus récente à la plus ancienne. */
