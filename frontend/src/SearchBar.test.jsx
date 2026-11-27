@@ -128,3 +128,24 @@ describe('la recherche d’un départ', () => {
     expect(onPick).toHaveBeenLastCalledWith({ lat: 47.9, lon: 7.2, label: '12 Rue des Tonneliers', street: 'Rue des Tonneliers' })
   })
 })
+
+describe('l’autre bout du trajet', () => {
+  // Un lieu trouvé peut devenir l'arrivée d'un toucher, sans repasser par
+  // « Aller à… » puis chercher à nouveau.
+  it('fait d’un lieu l’arrivée par le bouton de sa ligne, sans le prendre pour départ', async () => {
+    cherche.mockResolvedValue([lieu('Guebwiller')])
+    const onPick = vi.fn()
+    const onPickOther = vi.fn()
+    render(
+      <SearchBar
+        onPick={onPick}
+        onPickOther={onPickOther}
+        other={{ icon: 'flag', label: 'Arrivée', aria: 'Arriver à {name}' }}
+      />,
+    )
+    taper('guebwiller')
+    fireEvent.click(await screen.findByRole('button', { name: 'Arriver à Guebwiller' }))
+    expect(onPickOther).toHaveBeenCalledWith(expect.objectContaining({ lat: 47.9, lon: 7.2, label: 'Guebwiller' }))
+    expect(onPick).not.toHaveBeenCalled()
+  })
+})

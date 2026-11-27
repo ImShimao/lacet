@@ -23,7 +23,7 @@ import { t } from './i18n'
  * résultat le faisait disparaître, puisque quitter le champ fermait la liste
  * avant qu'on ait pu l'atteindre.
  */
-export default function SearchBar({ onPick, near = null, label = t('Chercher un lieu de départ') }) {
+export default function SearchBar({ onPick, onPickOther = null, other = null, near = null, label = t('Chercher un lieu de départ') }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -93,10 +93,12 @@ export default function SearchBar({ onPick, near = null, label = t('Chercher un 
     field.current?.focus()
   }
 
-  const choose = (place) => {
+  // `pick` : le geste principal (le départ, ou l'arrivée en trajet) ; le bouton
+  // de droite d'une ligne passe `onPickOther`, l'autre bout du trajet.
+  const choose = (place, pick = onPick) => {
     // La rue de l'adresse suit le lieu : c'est sur elle que la boucle partira.
     const street = place.street ? { street: place.street } : {}
-    onPick({ lat: place.lat, lon: place.lon, label: place.short, ...street })
+    pick({ lat: place.lat, lon: place.lon, label: place.short, ...street })
     rememberPlace({ label: place.short, sub: place.kind || place.label || '', lat: place.lat, lon: place.lon, ...street })
     setRecents(recentPlaces())
     setQuery('')
@@ -205,8 +207,8 @@ export default function SearchBar({ onPick, near = null, label = t('Chercher un 
             </p>
           )}
           {shown.map((place, i) => (
+            <div className="search__item" key={`${place.lat},${place.lon},${i}`}>
             <button
-              key={`${place.lat},${place.lon},${i}`}
               id={`search-result-${i}`}
               role="option"
               aria-selected={i === active}
@@ -226,6 +228,22 @@ export default function SearchBar({ onPick, near = null, label = t('Chercher un 
                 <em>{[place.kind, place.label].filter(Boolean).join(' · ')}</em>
               )}
             </button>
+            {/* L'autre bout, d'un toucher : comme « Itinéraire » dans Plans.
+                Sans lui, faire d'un lieu cherché l'arrivée demandait de passer
+                en « Aller à… » d'abord, puis de chercher à nouveau. */}
+            {onPickOther && other && (
+              <button
+                type="button"
+                className="search__other"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(place, onPickOther)}
+                aria-label={t(other.aria, { name: place.short })}
+              >
+                <Icon name={other.icon} size={17} />
+                <span>{t(other.label)}</span>
+              </button>
+            )}
+            </div>
           ))}
         </div>
       )}

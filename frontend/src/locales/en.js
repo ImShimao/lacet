@@ -817,6 +817,8 @@ export default {
   "{r} mètres": "{r} meters",
   "{text} kilomètre{v2}": "{text} kilometer{v2}",
   "Arrivée": "Finish",
+  "Arriver à {name}": "Finish at {name}",
+  "Partir de {name}": "Start from {name}",
   "Continue sur le parcours": "Keep following the route",
   "Sortie": "Run",
   "Sortie terminée": "Run finished",

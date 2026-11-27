@@ -627,6 +627,21 @@ export default function App() {
               // est presque toujours là où l'on est, l'arrivée jamais.
               label={journey ? t('Chercher une arrivée') : undefined}
               onPick={(p) => (journey ? pickDestination(p, p.label) : applyStart(placeOf(p), p.label, true))}
+              // Chaque lieu trouvé peut aussi devenir l'autre bout : en boucle,
+              // l'arrivée (on passe alors en trajet) ; en trajet, le départ.
+              other={
+                journey
+                  ? { icon: 'pin', label: 'Départ', aria: 'Partir de {name}' }
+                  : { icon: 'flag', label: 'Arrivée', aria: 'Arriver à {name}' }
+              }
+              onPickOther={(p) => {
+                if (journey) {
+                  applyStart(placeOf(p), p.label, true)
+                  return
+                }
+                chooseGoal('journey')
+                pickDestination(p, p.label)
+              }}
             />
           </div>
         )}
