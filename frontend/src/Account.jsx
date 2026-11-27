@@ -331,7 +331,7 @@ function ClearData({ onClearData }) {
         <div className="row">
           <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
           <button
-            className="btn btn--primary"
+            className="btn btn--primary btn--danger"
             onClick={async () => {
               await onClearData()
               setConfirm(false)
@@ -340,7 +340,7 @@ function ClearData({ onClearData }) {
           >{t('Confirmer l\'effacement')}</button>
         </div>
       ) : (
-        <button className="btn" onClick={() => setConfirm(true)}>{t('Effacer mes données')}</button>
+        <button className="btn btn--danger" onClick={() => setConfirm(true)}>{t('Effacer mes données')}</button>
       )}
       {done && <p className="muted small">{t('Tout est effacé : l\'app repart comme au premier jour.')}</p>}
     </>
@@ -861,7 +861,7 @@ function OfflineStorage() {
           <div className="row">
             <button className="btn" onClick={() => setConfirm(false)}>{t('Annuler')}</button>
             <button
-              className="btn btn--primary"
+              className="btn btn--primary btn--danger"
               onClick={async () => {
                 await offline.clear()
                 setTotal(0)
@@ -871,7 +871,7 @@ function OfflineStorage() {
             >{t('Vider les cartes')}</button>
           </div>
         ) : (
-          <button className="btn" onClick={() => setConfirm(true)}>{t('Vider les cartes hors ligne')}</button>
+          <button className="btn btn--danger" onClick={() => setConfirm(true)}>{t('Vider les cartes hors ligne')}</button>
         ))}
     </>
   )

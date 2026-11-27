@@ -222,3 +222,96 @@
   background: var(--accent-soft);
   color: var(--text);
 }
+
+/* ══ les pages, sur un seul modèle ═══════════════════════════════════════ */
+
+/* Profil, Sécurité, Stockage et Sauvegarde avaient leur propre allure — titres
+   en gras, tableaux à filet, notes en 11,5 px — à côté de Parcours, Guidage et
+   Apparence, en listes groupées à la manière d'iOS. Une page de réglages se
+   lisait autrement que sa voisine. Elles prennent ici toutes le même modèle :
+   le nom du groupe en petit et gris, une carte sans filet, la note dessous. */
+.acct--page .section {
+  margin: 10px 0 -6px 4px;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-3);
+}
+.acct--page .muted.small,
+.acct--page .disclaimer {
+  margin: 0 4px;
+  font-size: calc(12.5px * var(--text-scale));
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.acct--page .rows {
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+.acct--page .rows__row {
+  position: relative;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 16px;
+  border-bottom: 0;
+  background: none;
+  font-size: calc(15px * var(--text-scale));
+}
+/* Le filet entre deux lignes part du texte, pas du bord, comme dans les
+   listes de Réglages. */
+.acct--page .rows__row + .rows__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.acct--page .rows__row span:last-child {
+  font-size: calc(15px * var(--text-scale));
+}
+/* Les « − » et « + » du profil : 36 px à l'œil, 44 au doigt. */
+.rows__num button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.rows__num button::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.rows__num button:active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+/* Le champ du contact d'urgence a l'allure d'une ligne de carte. */
+.acct--page input.field {
+  min-height: 52px;
+  border-radius: 18px;
+  border-color: var(--line-soft);
+  background: var(--surface-2);
+  padding-inline: 16px;
+}
+.acct--page .btn {
+  min-height: 48px;
+  border-radius: 14px;
+  border-color: var(--line-soft);
+}
+.acct--page .gauge {
+  margin: 2px 4px 0;
+}
+/* Ce qui efface se lit en rouge, comme les actions destructrices d'iOS : on
+   ne le touche pas par mégarde en le prenant pour un bouton ordinaire. */
+.btn--danger {
+  color: var(--risk);
+}
+.btn--danger.btn--primary {
+  /* Un fond doux plutôt qu'un aplat rouge : le blanc sur le rouge vif du
+     thème sombre tombait à 3:1. */
+  background: var(--risk-soft);
+  border-color: var(--risk-line);
+  color: var(--risk);
+}
