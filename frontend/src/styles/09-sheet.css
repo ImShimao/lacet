@@ -163,6 +163,12 @@
 .shell[data-sheet='peek'] .cards {
   margin-inline: 0;
 }
+/* Le défilement de côté reste aux cartes ; le doigt qui monte revient au
+   geste qui ouvre le détail (`useSheetDrag`). Sans cela, iOS le prend pour un
+   défilement et annule le pointeur en route. */
+.shell[data-sheet='peek'] .panel--results {
+  touch-action: pan-x;
+}
 .shell[data-sheet='peek'] .cards__dots {
   display: none;
 }
@@ -220,22 +226,15 @@
 }
 .shell[data-sheet='full'] .side {
   height: 88cqh;
-  /* Le geste de fermeture : la feuille descend avec le doigt, puis revient
-     ou s'efface. Sans transformation au repos (`0px` compte comme une
-     transformation), les éléments en position fixe se caleraient sur elle. */
-  /* Courbe d'iOS plutôt que `ease-out` : la feuille part vite puis se pose sans
-     à-coup, comme les feuilles natives. */
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.shell[data-sheet='full'][data-dragging] .side {
+/* Le geste : la feuille suit le doigt, puis `useSheetDrag` finit son mouvement
+   image par image — un ressort pour revenir, l'élan du doigt pour se fermer.
+   Pas de transition ici : reprise en plein vol, elle sauterait à la fin de sa
+   course. Sans transformation au repos (`0px` compte comme une
+   transformation), les éléments en position fixe se caleraient sur elle. */
+.shell[data-sheet='full'][data-dragging] .side,
+.shell[data-sheet='peek'][data-dragging] .side {
   transform: translateY(var(--sheet-drag, 0px));
-  transition: none;
-}
-/* La fermeture : la feuille finit sa course vers le bas, puis rend la place.
-   Disparaître d'un coup donnait l'impression d'un écran qui saute. */
-.shell[data-sheet='full'][data-closing] .side {
-  transform: translateY(var(--sheet-drag, 0px));
-  transition: transform 0.18s cubic-bezier(0.4, 0, 1, 1);
 }
 /* Le doigt parcourt la bande de parcours : la feuille s'efface autour d'elle,
    et toute la carte reparaît, le point qui court sur le tracé compris. La

@@ -126,8 +126,7 @@
 .shell[data-sheet='full'] .side {
   animation: sheet-up 0.3s var(--ease);
 }
-.shell[data-sheet='full'][data-dragging] .side,
-.shell[data-sheet='full'][data-closing] .side {
+.shell[data-sheet='full'][data-dragging] .side {
   animation: none;
 }
 

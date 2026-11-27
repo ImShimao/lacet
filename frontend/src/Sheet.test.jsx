@@ -52,7 +52,7 @@ describe('l’en-tête de la feuille dépliée', () => {
     fireEvent.click(pill)
     expect(tete.setPointerCapture).not.toHaveBeenCalled()
     expect(onPill).toHaveBeenCalled()
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(600)
     expect(setSheet).not.toHaveBeenCalled()
   })
 
@@ -62,7 +62,7 @@ describe('l’en-tête de la feuille dépliée', () => {
     fireEvent.pointerMove(pill, { clientY: 190 })
     expect(tete.setPointerCapture).toHaveBeenCalled()
     fireEvent.pointerUp(pill, { clientY: 190 })
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(600)
     expect(setSheet).toHaveBeenCalledWith('peek')
   })
 
@@ -70,5 +70,76 @@ describe('l’en-tête de la feuille dépliée', () => {
     const { tete } = afficher()
     fireEvent.pointerDown(tete, { clientY: 100 })
     expect(tete.setPointerCapture).toHaveBeenCalled()
+  })
+
+  it('se referme sur un coup sec, même court', () => {
+    const { setSheet, tete } = afficher()
+    fireEvent.pointerDown(tete, { clientY: 100 })
+    vi.advanceTimersByTime(16)
+    fireEvent.pointerMove(tete, { clientY: 115 })
+    vi.advanceTimersByTime(16)
+    fireEvent.pointerMove(tete, { clientY: 130 })
+    fireEvent.pointerUp(tete, { clientY: 130 })
+    vi.advanceTimersByTime(600)
+    expect(setSheet).toHaveBeenCalledWith('peek')
+  })
+
+  it('revient en place quand on la lâche doucement avant le seuil', () => {
+    const { setSheet, tete } = afficher()
+    fireEvent.pointerDown(tete, { clientY: 100 })
+    fireEvent.pointerMove(tete, { clientY: 140 })
+    vi.advanceTimersByTime(300)
+    fireEvent.pointerUp(tete, { clientY: 140 })
+    vi.advanceTimersByTime(1000)
+    expect(setSheet).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Repliée, la feuille s'ouvre en la tirant vers le haut depuis les cartes de
+ * boucle ; un glissement de côté, lui, reste aux cartes.
+ */
+function Repliee({ setSheet, canOpen = true }) {
+  const shell = useRef(document.createElement('div'))
+  const drag = useSheetDrag('peek', setSheet, shell, { canOpen })
+  return (
+    <div data-testid="cartes" {...drag(true)}>
+      Boucle nord · 10 km
+    </div>
+  )
+}
+
+function replier(canOpen) {
+  const setSheet = vi.fn()
+  render(<Repliee setSheet={setSheet} canOpen={canOpen} />)
+  const cartes = screen.getByTestId('cartes')
+  cartes.setPointerCapture = vi.fn()
+  return { setSheet, cartes }
+}
+
+describe('la feuille repliée', () => {
+  it('s’ouvre quand on la tire vers le haut', () => {
+    const { setSheet, cartes } = replier()
+    fireEvent.pointerDown(cartes, { clientX: 100, clientY: 500 })
+    fireEvent.pointerMove(cartes, { clientX: 102, clientY: 380 })
+    fireEvent.pointerUp(cartes, { clientX: 102, clientY: 380 })
+    expect(setSheet).toHaveBeenCalledWith('full')
+  })
+
+  it('laisse les cartes défiler de côté', () => {
+    const { setSheet, cartes } = replier()
+    fireEvent.pointerDown(cartes, { clientX: 300, clientY: 500 })
+    fireEvent.pointerMove(cartes, { clientX: 150, clientY: 470 })
+    fireEvent.pointerUp(cartes, { clientX: 100, clientY: 470 })
+    expect(cartes.setPointerCapture).not.toHaveBeenCalled()
+    expect(setSheet).not.toHaveBeenCalled()
+  })
+
+  it('ne s’ouvre pas sans boucle à détailler', () => {
+    const { setSheet, cartes } = replier(false)
+    fireEvent.pointerDown(cartes, { clientX: 100, clientY: 500 })
+    fireEvent.pointerMove(cartes, { clientX: 100, clientY: 300 })
+    fireEvent.pointerUp(cartes, { clientX: 100, clientY: 300 })
+    expect(setSheet).not.toHaveBeenCalled()
   })
 })

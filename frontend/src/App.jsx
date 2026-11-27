@@ -517,6 +517,8 @@ export default function App() {
       setSheet(next)
     },
     shellRef,
+    // Repliée, la feuille ne s'ouvre vers le haut que sur une boucle à détailler.
+    { canOpen: Boolean(selected) && tab === 'explore' },
   )
 
   const announcement = busy

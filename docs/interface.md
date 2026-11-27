@@ -6,8 +6,12 @@
 
 La carte occupe tout l'écran, et le reste flotte dessus : les cartes de
 parcours, qu'on fait défiler du pouce, la barre d'action et les onglets.
-Toucher la carte de parcours choisie déplie son détail — profil, note de
-sécurité, points d'eau — et la poignée grise le replie. L'app reste en
+Toucher la carte de parcours choisie, ou la tirer vers le haut, déplie son
+détail — profil, note de sécurité, points d'eau. On le replie en le tirant
+vers le bas, ou en touchant la poignée grise. Comme une feuille d'iOS, un coup
+sec suffit, la feuille garde l'élan du doigt, revient en place sur un ressort
+quand on la lâche avant le seuil, et se rattrape en plein vol
+(`useSheetDrag`, `Sheet.jsx`). L'app reste en
 portrait (`customize.py`) : on court téléphone en main ou au bras, et une app
 qui pivote au moindre mouvement est inutilisable en courant.
 
