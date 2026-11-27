@@ -252,6 +252,8 @@ export default function Explore({
   stops = { stops: [], loading: false, complete: true },
   poiPrefs = null,
   journey = false,
+  compact = false,
+  onExpand = null,
   onGoal = null,
   destination = null,
   placingDest = false,
@@ -320,6 +322,28 @@ export default function Explore({
   // Un trajet sans arrivée n'a qu'une question : où aller. La longueur, les
   // filtres et la course libre attendent qu'elle soit posée.
   const bare = journey && !destination
+
+  // Replié : le départ et le bouton, rien d'autre ; le départ rouvre le reste.
+  if (!result && compact && !journey && onExpand) {
+    return (
+      <div className="panel panel--compact">
+        <button className="origin origin--more" onClick={onExpand} aria-expanded={false}>
+          <span className="origin__pin">
+            <Icon name="pin" size={18} />
+          </span>
+          <span className="origin__text">
+            <b>{startLabel || (start ? t('Point choisi') : t('Localisation…'))}</b>
+            <em>{t('départ de la boucle')}</em>
+          </span>
+          <Icon name="chevronUp" size={18} />
+        </button>
+        <button className="btn btn--primary btn--big" onClick={onSearch} disabled={!start}>
+          <Icon name="search" size={18} />
+          {t('Trouver ma boucle')}
+        </button>
+      </div>
+    )
+  }
 
   if (!result) {
     return (

@@ -59,6 +59,12 @@
 .toolmenu {
   position: relative;
 }
+/* Menu ouvert, les commandes passent devant le panneau (z-index 10) : sur un
+   iPhone SE, le panneau d'accueil recouvrait le menu dès sa deuxième ligne,
+   et « Choisir sur la carte » était hors d'atteinte. */
+.stage__tools:has(.startmenu) {
+  z-index: 11;
+}
 .startmenu {
   position: absolute;
   top: 0;
@@ -357,7 +363,7 @@
   justify-content: space-between;
   margin-top: -6px;
   color: var(--text-3);
-  font-size: calc(11px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-variant-numeric: tabular-nums;
 }
 .flyhud__controls {
@@ -469,7 +475,7 @@
   background: var(--surface-2);
   color: var(--text-2);
   font: inherit;
-  font-size: calc(10.5px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
 }
 .reason span {

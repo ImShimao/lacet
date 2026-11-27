@@ -43,6 +43,27 @@
 .stage__hint {
   bottom: calc(var(--sheet-cover, 0px) + 12px);
 }
+/* Pendant qu'on pose le départ ou un point de passage, le panneau s'efface :
+   sur un iPhone SE il cachait les deux tiers de la carte qu'on vise. Les
+   onglets restent ; `display` (et non une transformation) pour que
+   `--sheet-cover` retombe et que la consigne descende au-dessus d'eux. */
+.shell[data-placing] .side__body {
+  display: none;
+}
+.shell[data-placing] .stage__hint {
+  animation: hint-in 0.2s ease both;
+}
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell[data-placing] .stage__hint {
+    animation: none;
+  }
+}
 
 /* ── repliée ── */
 .shell[data-sheet='peek'] .side {

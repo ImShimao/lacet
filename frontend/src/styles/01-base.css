@@ -366,11 +366,13 @@ input:focus-visible {
   flex: none;
 }
 /* Les onglets : une gélule flottante. */
+/* 4 px autour, 5 px dans chaque onglet : la gélule passe de 62 à 57 px de
+   haut, rendus à la carte, et chaque onglet garde ses 44 px de cible. */
 .side__tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   margin: 4px 12px calc(10px + env(safe-area-inset-bottom));
-  padding: 5px;
+  padding: 4px;
   gap: 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -379,7 +381,8 @@ input:focus-visible {
   box-shadow: 0 14px 34px -14px var(--shadow);
 }
 .tab {
-  padding: 7px 4px 6px;
+  min-height: 44px;
+  padding: 5px 4px;
   border-radius: 999px;
   display: flex;
   flex-direction: column;

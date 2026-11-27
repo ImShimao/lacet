@@ -300,3 +300,32 @@ describe("l'écran Aller à", () => {
     expect(screen.getByRole('button', { name: /Courir libre/ })).toBeInTheDocument()
   })
 })
+
+describe("l'accueil replié", () => {
+  // Une fois la carte déplacée, l'accueil ne garde que le départ et le bouton :
+  // la carte reprend la place, et rien ne disparaît pour de bon.
+  it('garde le départ et « Trouver ma boucle », et le départ rouvre le reste', () => {
+    const onExpand = vi.fn()
+    const onSearch = vi.fn()
+    render(
+      <Explore
+        start={{ lat: 47.9, lon: 7.2 }}
+        startLabel="Guebwiller"
+        geo={{ status: 'ready', position: [7.2, 47.9], accuracy: 8, following: false }}
+        result={null}
+        params={{ sport: 'run', surface: 'mixed', elevation: 'rolling', safety: 'safe', distance_km: 10, mode: 'distance' }}
+        compact
+        onExpand={onExpand}
+        onSearch={onSearch}
+        onQuickParams={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /Filtres/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Trouver ma boucle/ }))
+    expect(onSearch).toHaveBeenCalled()
+    const depart = screen.getByRole('button', { name: /Guebwiller/ })
+    expect(depart).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(depart)
+    expect(onExpand).toHaveBeenCalled()
+  })
+})
