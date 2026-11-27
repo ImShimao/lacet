@@ -378,7 +378,7 @@ function AppearanceSettings({ mapStyle, onStyles }) {
         onChange={(theme) => setAppearance({ theme })}
       />
       <PickRow
-        icon="sun"
+        icon="palette"
         label={t('Couleur d\'accent')}
         value={look.accent}
         shown={ACCENTS.find((o) => o.key === look.accent)?.label}
@@ -395,14 +395,14 @@ function AppearanceSettings({ mapStyle, onStyles }) {
         onChange={(accent) => setAppearance({ accent })}
       />
       <PickRow
-        icon="sliders"
+        icon="textSize"
         label={t('Taille du texte')}
         value={look.text}
         options={TEXT_SIZES}
         onChange={(text) => setAppearance({ text })}
       />
       <PickRow
-        icon="routes"
+        icon="ruler"
         label={t('Unités')}
         value={unit}
         options={UNIT_OPTIONS}

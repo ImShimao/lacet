@@ -92,6 +92,20 @@ const PATHS = {
     </>
   ),
   moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />,
+  // --- réglages d'apparence ---------------------------------------------
+  // Une palette pour l'accent : le soleil disait « luminosité », pas « couleur ».
+  palette: (
+    <>
+      <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2.1a3.9 3.9 0 0 0 3.9-3.9c0-4.1-3.8-7.3-8.5-7.3z" />
+      <circle cx="7.5" cy="11.5" r="1" />
+      <circle cx="10.5" cy="7.5" r="1" />
+      <circle cx="15" cy="8" r="1" />
+    </>
+  ),
+  // « Aa » : un grand A et un petit, la taille du texte sans un mot.
+  textSize: <path d="M3 18.5 8.5 5.5l5.5 13M5 14h7M14.5 18.5l3.25-7.5 3.25 7.5M15.6 16h4.3" />,
+  // Une règle graduée : les unités de mesure.
+  ruler: <path d="M3.5 15.5 15.5 3.5l5 5-12 12zM7.5 11.5l2 2M10.5 8.5l1.5 1.5M13.5 5.5l2 2M9 10l1 1M12 7l1 1" />,
   rain: <path d="M7 15.5a4 4 0 0 1-.4-8 5.5 5.5 0 0 1 10.6 1.3A3.4 3.4 0 0 1 17 15.5zM8.5 18.5l-1 2M12.5 18.5l-1 2M16.5 18.5l-1 2" />,
   pin: (
     <>
