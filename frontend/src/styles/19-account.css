@@ -51,32 +51,58 @@
 .acct__card:active {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
 }
+/* L'en-tête du compte, à la manière des apps bancaires (Revolut, N26) : pas
+   de carte, un grand avatar rond au centre, le nom dessous, l'état en une
+   ligne. Le sommaire commence par qui l'on est, et le reste s'aligne dessous. */
 .acct__who {
-  display: flex;
+  position: relative;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  padding: 8px 40px 14px;
+  text-align: center;
+  background: none;
+}
+.acct__who:active {
+  background: none;
+}
+.acct__who:active .acct__avatar {
+  transform: scale(0.96);
 }
 .acct__avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 18px;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   flex: none;
   color: var(--on-accent);
   background: var(--accent);
+  transition: transform 0.12s ease;
+}
+.acct__avatar .icon {
+  width: 34px;
+  height: 34px;
 }
 .acct__who b {
   display: block;
-  font-size: calc(18px * var(--text-scale));
+  font-size: calc(22px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.025em;
 }
 .acct__who em {
   display: block;
+  margin-top: 2px;
   font-style: normal;
-  font-size: calc(13px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale));
   color: var(--text-2);
+}
+/* Le chevron reste, calé à droite à hauteur du nom : il dit que l'en-tête
+   s'ouvre sur la page Profil. */
+.acct__who .menu__chev {
+  position: absolute;
+  right: 12px;
+  top: 50%;
 }
 /* Une famille : son nom en petites capitales, puis ses lignes d'un seul bloc. */
 .acct__group {
