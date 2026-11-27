@@ -98,11 +98,10 @@ function Summary({ onPage, params, poiPrefs }) {
           <Icon name={sport?.icon ?? 'user'} size={24} />
         </span>
         <span className="menu__text">
-          <b>{t('Profil local')}</b>
-          <em>
-            {summaryOf('profile', { params, poiPrefs })}
-            <Icon name="chevronRight" size={15} />
-          </em>
+          <b>
+            {t('Profil local')}
+            <Icon name="chevronRight" size={18} />
+          </b>
         </span>
       </button>
 

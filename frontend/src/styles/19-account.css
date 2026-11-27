@@ -87,30 +87,19 @@
   width: 34px;
   height: 34px;
 }
+/* Le nom seul, suivi d'un chevron : il se lit comme un lien vers la page
+   Profil. Le poids affiché dessous n'apprenait rien qu'on ait besoin de
+   relire à chaque visite (retour du 2026-11-27). */
 .acct__who .menu__text b {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: calc(22px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.025em;
 }
-/* L'état du profil dans une pastille, chevron compris : seul au bord droit,
-   le chevron flottait loin de tout et ne disait plus ce qu'il ouvrait. La
-   pastille, elle, se lit comme un bouton, à la manière des apps bancaires. */
-.acct__who .menu__text em {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-top: 8px;
-  padding: 6px 8px 6px 12px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-style: normal;
-  font-size: calc(13.5px * var(--text-scale));
-  font-weight: 600;
-}
-.acct__who:active .menu__text em {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+.acct__who .menu__text b .icon {
+  color: var(--text-3);
 }
 /* Une famille : son nom en petites capitales, puis ses lignes d'un seul bloc. */
 .acct__group {
