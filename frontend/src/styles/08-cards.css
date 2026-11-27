@@ -45,7 +45,10 @@
   /* Une surface suffit à détacher la carte de la carte : seul le choix en
      cours garde un contour, pour qu'il se lise sans chercher. */
   border: 1.5px solid transparent;
-  opacity: 0.6;
+  /* 0,8 et pas 0,6 : à 0,6, le nom et les unités des autres propositions
+     tombaient à 3,1:1 en clair (4,1:1 en sombre), sous le 4,5:1 du WCAG AA.
+     Le contour d'accent suffit à distinguer le choix en cours. */
+  opacity: 0.8;
   transition:
     opacity 0.18s ease,
     border-color 0.18s ease,
