@@ -8,7 +8,11 @@
 // pauses déduites : un feu rouge en pleine récupération ne la mange pas.
 //
 // Indépendante du tracé : elle se court sur une boucle guidée comme en course
-// libre. Réglée dans « Mon compte › Guidage et voix », lue au départ.
+// libre. Réglée dans « Mon compte › Séance fractionnée », lue au départ.
+//
+// Une séance personnalisée enchaîne des séries — « 6 × 400 m, puis 3 × 1 km » —,
+// chacune avec son effort et sa récupération, et une récupération plus longue
+// entre deux séries : une seule série ne disait ni la pyramide ni le court-long.
 
 import { load } from './storage'
 
@@ -24,7 +28,29 @@ export const WORKOUT_PRESETS = [
 
 // La séance à soi : réglée champ par champ quand aucun classique ne convient.
 // Gardée même quand on revient à un classique, pour la retrouver telle quelle.
-export const CUSTOM_DEFAULTS = { reps: 6, unit: 'm', work_m: 400, work_s: 60, rest_s: 90 }
+export const SERIES_DEFAULTS = { reps: 6, unit: 'm', work_m: 400, work_s: 60, rest_s: 90 }
+export const CUSTOM_DEFAULTS = { series: [SERIES_DEFAULTS], set_rest_s: 180 }
+export const MAX_SERIES = 6
+
+/**
+ * Les séries d'une séance personnalisée. Avant les séries, la séance tenait en
+ * une seule (`{ reps, unit, work_m, … }` à plat) : on la relit comme sa
+ * première série, pour ne rien perdre de ce qui était réglé.
+ */
+export function customSeries(custom = {}) {
+  if (Array.isArray(custom.series) && custom.series.length) return custom.series.map((x) => ({ ...SERIES_DEFAULTS, ...x }))
+  return [{ ...SERIES_DEFAULTS, ...custom }]
+}
+
+/** Une série réglée (`unit`, `work_m`, `work_s`) mise sous la forme d'une série de séance. */
+const seriesOf = (x) => ({ reps: x.reps, work: x.unit === 's' ? { s: x.work_s } : { m: x.work_m }, rest_s: x.rest_s })
+
+/** Le classique repris en séance personnalisée, pour le retoucher. */
+export function customFromPreset(key) {
+  const p = WORKOUT_PRESETS.find((x) => x.key === key) ?? WORKOUT_PRESETS[0]
+  const series = { ...SERIES_DEFAULTS, reps: p.reps, rest_s: p.rest_s, ...(p.work.m ? { unit: 'm', work_m: p.work.m } : { unit: 's', work_s: p.work.s }) }
+  return { ...CUSTOM_DEFAULTS, series: [series] }
+}
 
 export const WORKOUT_DEFAULTS = { on: false, preset: '400', warmup_min: 10, cooldown_min: 5, custom: CUSTOM_DEFAULTS }
 
@@ -37,14 +63,20 @@ export function shortAmount(b) {
   return s ? `${m} min ${s}` : `${m} min`
 }
 
-/** La séance à courir : un classique, ou la séance personnalisée mise sous la même forme. */
+const seriesLabel = (x) => `${x.reps} × ${shortAmount(x.work)} / ${shortAmount({ s: x.rest_s })}`
+
+/**
+ * La séance à courir : ses séries, et la récupération entre deux séries. Un
+ * classique n'a qu'une série, et pas de récupération à part.
+ */
 export function workoutPlan(settings = workoutSettings()) {
   if (settings.preset === 'custom') {
-    const c = { ...CUSTOM_DEFAULTS, ...settings.custom }
-    const work = c.unit === 's' ? { s: c.work_s } : { m: c.work_m }
-    return { key: 'custom', reps: c.reps, work, rest_s: c.rest_s, label: `${c.reps} × ${shortAmount(work)} / ${shortAmount({ s: c.rest_s })}` }
+    const series = customSeries(settings.custom).map(seriesOf)
+    const set_rest_s = settings.custom?.set_rest_s ?? CUSTOM_DEFAULTS.set_rest_s
+    return { key: 'custom', series, set_rest_s, label: series.map(seriesLabel).join(' + ') }
   }
-  return WORKOUT_PRESETS.find((p) => p.key === settings.preset) ?? WORKOUT_PRESETS[0]
+  const p = WORKOUT_PRESETS.find((x) => x.key === settings.preset) ?? WORKOUT_PRESETS[0]
+  return { key: p.key, series: [{ reps: p.reps, work: p.work, rest_s: p.rest_s }], set_rest_s: 0, label: p.label }
 }
 
 export const workoutSettings = () => ({ ...WORKOUT_DEFAULTS, ...load().workout })
@@ -69,18 +101,57 @@ export function durationWords(seconds) {
 
 const amountWords = (b) => (b.m ? (b.m % 1000 ? tr('{m} mètres', { m: b.m }) : b.m === 1000 ? tr('1 kilomètre') : tr('{v1} kilomètres', { v1: b.m / 1000 })) : durationWords(b.s))
 
-/** Les blocs de la séance, dans l'ordre. */
+/**
+ * Les blocs de la séance, dans l'ordre. Les répétitions se comptent sur toute
+ * la séance — « répétition 7 sur 9 » —, pas série par série : c'est ce qui
+ * reste à courir qu'on veut entendre.
+ */
 export function blocksOf(settings = workoutSettings()) {
-  const preset = workoutPlan(settings)
+  const plan = workoutPlan(settings)
+  const reps = plan.series.reduce((n, x) => n + x.reps, 0)
   const out = []
   if (settings.warmup_min > 0) out.push({ kind: 'warmup', s: settings.warmup_min * 60 })
-  for (let rep = 1; rep <= preset.reps; rep += 1) {
-    out.push({ kind: 'work', rep, reps: preset.reps, ...preset.work })
-    if (rep < preset.reps) out.push({ kind: 'rest', rep, reps: preset.reps, s: preset.rest_s })
-  }
+  let rep = 0
+  plan.series.forEach((x, i) => {
+    for (let k = 1; k <= x.reps; k += 1) {
+      rep += 1
+      out.push({ kind: 'work', rep, reps, ...x.work })
+      if (rep === reps) continue
+      // La dernière répétition d'une série : la récupération entre séries, si elle est réglée.
+      const between = k === x.reps && i < plan.series.length - 1 && plan.set_rest_s > 0
+      out.push({ kind: 'rest', rep, reps, s: between ? plan.set_rest_s : x.rest_s })
+    }
+  })
   if (settings.cooldown_min > 0) out.push({ kind: 'cooldown', s: settings.cooldown_min * 60 })
-  const spoken = tr('{reps} fois {v2}, récupération {v3}', { reps: preset.reps, v2: amountWords(preset.work), v3: durationWords(preset.rest_s) })
-  return { label: preset.label, spoken, blocks: out }
+  const spoken = plan.series
+    .map((x) => tr('{reps} fois {v2}, récupération {v3}', { reps: x.reps, v2: amountWords(x.work), v3: durationWords(x.rest_s) }))
+    .join(tr(', puis '))
+  return { label: plan.label, spoken, blocks: out }
+}
+
+// L'effort se court plus vite que l'allure habituelle, la récupération plus
+// lentement, en trottinant : sans ces écarts, 8 × 400 m à 6:30/km
+// s'annonçaient pour un quart d'heure de trop.
+const WORK_PACE = 0.85
+const REST_PACE = 1.4
+
+/**
+ * Ce que la séance prendra, à l'allure donnée (secondes au kilomètre) : sa
+ * durée, sa distance, et chaque bloc avec sa durée — pour la dessiner à
+ * l'échelle. Une estimation : on ne court pas un 400 m comme on le prévoit.
+ */
+export function estimate(settings = workoutSettings(), pace = 390) {
+  const blocks = blocksOf(settings).blocks.map((b) => {
+    const factor = b.kind === 'work' ? WORK_PACE : b.kind === 'rest' ? REST_PACE : 1
+    const p = pace * factor
+    return b.m ? { ...b, secs: (b.m / 1000) * p, metres: b.m } : { ...b, secs: b.s, metres: (b.s / p) * 1000 }
+  })
+  return {
+    blocks,
+    seconds: blocks.reduce((n, b) => n + b.secs, 0),
+    metres: blocks.reduce((n, b) => n + b.metres, 0),
+    reps: blocks.filter((b) => b.kind === 'work').length,
+  }
 }
 
 function startPhrase(b) {

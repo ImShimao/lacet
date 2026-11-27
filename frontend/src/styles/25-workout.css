@@ -1,0 +1,87 @@
+/* La séance fractionnée (`Workout.jsx`) : sa frise, à l'échelle du temps. */
+
+.wtl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+.wtl__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wtl__head b {
+  font-size: calc(26px * var(--text-scale));
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.wtl__head span {
+  font-size: calc(13px * var(--text-scale));
+  color: var(--text-3);
+  text-align: right;
+}
+/* Un bloc par effort ou récupération, collés par 2 px : même trente blocs
+   restent lisibles un à un. Un minimum de 3 px garde les plus courts visibles. */
+.wtl__bar {
+  display: flex;
+  gap: 2px;
+  height: 34px;
+}
+.wtl__b {
+  flex-basis: 0;
+  min-width: 3px;
+  border-radius: 4px;
+}
+.wtl__bar .wtl__b:first-child {
+  border-radius: 9px 4px 4px 9px;
+}
+.wtl__bar .wtl__b:last-child {
+  border-radius: 4px 9px 9px 4px;
+}
+/* L'effort en plein, la récupération en dilué, l'échauffement et le calme en
+   neutre : l'œil compte les efforts sans lire de légende. Les récupérations
+   sont moins hautes, comme le cœur qui redescend. */
+.wtl__b--work {
+  background: var(--accent);
+}
+.wtl__b--rest {
+  align-self: flex-end;
+  height: 55%;
+  background: color-mix(in srgb, var(--accent) 38%, var(--surface-3));
+}
+.wtl__b--warmup,
+.wtl__b--cooldown {
+  align-self: flex-end;
+  height: 70%;
+  background: color-mix(in srgb, var(--text-3) 45%, var(--surface-3));
+}
+.wtl__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(12.5px * var(--text-scale));
+  color: var(--text-2);
+}
+.wtl__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wtl__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.wtl__legend .wtl__dot {
+  height: 9px;
+  align-self: center;
+}

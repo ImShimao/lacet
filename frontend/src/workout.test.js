@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blocksOf, createCoach, durationWords } from './workout'
+import { blocksOf, createCoach, customFromPreset, durationWords, estimate } from './workout'
 
 /**
  * La séance fractionnée : les blocs dans l'ordre, et ce que la voix dit — une
@@ -49,6 +49,58 @@ describe('la séance fractionnée', () => {
     // Pas de nouvelle présentation : la répétition en cours continue.
     expect(again.update(90, 400)).toMatchObject({ said: [], status: { title: 'Répétition 1/8', left: 180 } })
     expect(again.update(150, 580).said).toEqual(['Terminé en 1 minute 30. Récupère : 1 minute 30, en trottinant.'])
+  })
+
+  it('enchaîne plusieurs séries, avec la récupération entre séries', () => {
+    const settings = {
+      preset: 'custom',
+      warmup_min: 0,
+      cooldown_min: 0,
+      custom: {
+        set_rest_s: 240,
+        series: [
+          { reps: 2, unit: 'm', work_m: 400, rest_s: 60 },
+          { reps: 2, unit: 's', work_s: 30, rest_s: 30 },
+        ],
+      },
+    }
+    const { blocks, spoken, label } = blocksOf(settings)
+    expect(blocks.map((b) => [b.kind, b.m ?? b.s])).toEqual([
+      ['work', 400],
+      ['rest', 60],
+      ['work', 400],
+      ['rest', 240],
+      ['work', 30],
+      ['rest', 30],
+      ['work', 30],
+    ])
+    // Les répétitions se comptent sur toute la séance.
+    expect(blocks.filter((b) => b.kind === 'work').map((b) => `${b.rep}/${b.reps}`)).toEqual(['1/4', '2/4', '3/4', '4/4'])
+    expect(label).toBe('2 × 400 m / 1 min + 2 × 30 s / 30 s')
+    expect(spoken).toBe('2 fois 400 mètres, récupération 1 minute, puis 2 fois 30 secondes, récupération 30 secondes')
+  })
+
+  it('relit une séance personnalisée d’avant les séries comme sa première série', () => {
+    const { blocks } = blocksOf({ preset: 'custom', warmup_min: 0, cooldown_min: 0, custom: { reps: 3, unit: 's', work_s: 60, rest_s: 45 } })
+    expect(blocks.map((b) => [b.kind, b.s])).toEqual([
+      ['work', 60],
+      ['rest', 45],
+      ['work', 60],
+      ['rest', 45],
+      ['work', 60],
+    ])
+  })
+
+  it('reprend un classique pour le retoucher', () => {
+    expect(customFromPreset('1000').series).toEqual([expect.objectContaining({ reps: 5, unit: 'm', work_m: 1000, rest_s: 120 })])
+  })
+
+  it('estime la durée de la séance à l’allure donnée', () => {
+    // 1 km d'effort à 5:00 × 0,85 = 255 s, 60 s de récupération, 5 min de calme.
+    const e = estimate({ preset: 'custom', warmup_min: 0, cooldown_min: 5, custom: { series: [{ reps: 2, unit: 'm', work_m: 500, rest_s: 60 }] } }, 300)
+    expect(e.reps).toBe(2)
+    expect(e.seconds).toBeCloseTo(255 + 60 + 300)
+    expect(e.blocks.map((b) => b.kind)).toEqual(['work', 'rest', 'work', 'cooldown'])
   })
 
   it('dit les durées comme on les dit', () => {
