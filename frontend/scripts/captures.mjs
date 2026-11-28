@@ -31,7 +31,10 @@ const context = await browser.newContext({
   colorScheme: 'dark',
 })
 // Les captures montrent l'app, pas l'accueil de première ouverture.
-await context.addInitScript(() => localStorage.setItem('lacet.accueil', 'oui'))
+await context.addInitScript(() => {
+  localStorage.setItem('lacet.accueil', 'oui')
+  localStorage.setItem('lacet.visite', 'oui')
+})
 const page = await context.newPage()
 const shot = async (name) => {
   // Le temps que les tuiles de la carte finissent d'arriver et les animations de s'arrêter.

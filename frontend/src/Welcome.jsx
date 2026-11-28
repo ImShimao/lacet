@@ -41,7 +41,7 @@ const GRADES = [
   ['C', 'Plus exposée. Proposée seulement en mode Standard, jamais en mode Sûr.'],
 ]
 
-function seen() {
+export function seen() {
   try {
     return localStorage.getItem(KEY) === 'oui'
   } catch {
@@ -118,7 +118,7 @@ function VoiceArt() {
 
 const ART = { loop: LoopArt, grades: GradesArt, voice: VoiceArt }
 
-export default function Welcome() {
+export default function Welcome({ onDone = () => {} }) {
   const [step, setStep] = useState(0)
   const [dir, setDir] = useState('fwd')
   const [open, setOpen] = useState(false)
@@ -139,6 +139,8 @@ export default function Welcome() {
   const finish = () => {
     remember()
     setDone(true)
+    // La visite guidée prend la suite (`Tour.jsx`).
+    onDone()
   }
   const go = (next) => {
     setDir(next > step ? 'fwd' : 'back')

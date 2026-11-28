@@ -1,0 +1,94 @@
+/* La visite guidée (`Tour.jsx`) : l'écran assombri, un trou éclairé sur
+   l'élément montré, et une bulle avec sa flèche. */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+}
+/* Le voile, c'est l'ombre pleine du trou : un aplat sans flou, qui laisse
+   l'élément à nu. Le trou ne laisse pas passer le toucher : on lit, on ne
+   joue pas encore. */
+.tour__hole {
+  position: absolute;
+  border-radius: 16px;
+  box-shadow: 0 0 0 200vmax var(--scrim);
+  outline: 2px solid var(--accent);
+  animation: tour-in 0.25s ease both;
+}
+.tour__bubble {
+  position: absolute;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  animation: tour-in 0.25s ease 0.05s both;
+}
+/* La flèche : un carré tourné, au bord de la bulle, pointé sur l'élément. */
+.tour__bubble::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--arrow) - 7px);
+  width: 14px;
+  height: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+.tour__bubble--below::before {
+  top: -8px;
+  border-right: none;
+  border-bottom: none;
+}
+.tour__bubble--above::before {
+  bottom: -8px;
+  border-left: none;
+  border-top: none;
+}
+.tour__bubble h2 {
+  margin: 0 0 4px;
+  font-size: calc(16px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.tour__bubble p {
+  margin: 0;
+  font-size: calc(14px * var(--text-scale));
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.tour__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tour__count {
+  flex: 1;
+  font-size: calc(12.5px * var(--text-scale));
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.tour__skip {
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.tour__next {
+  flex: none;
+  min-height: 40px;
+  padding: 9px 18px;
+}
+@keyframes tour-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour__hole,
+  .tour__bubble {
+    animation: none;
+  }
+}

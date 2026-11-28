@@ -120,7 +120,7 @@ export function MapTools({
           geste rare faisait une rangée de boutons à lui seul. Une fois les
           boucles proposées, il est au bas du détail. */}
       {onFreeRun && (
-        <button className="tool" onClick={onFreeRun} aria-label={t('Courir libre')} title={t('Courir libre')}>
+        <button className="tool tool--free" onClick={onFreeRun} aria-label={t('Courir libre')} title={t('Courir libre')}>
           <Icon name="play" />
         </button>
       )}

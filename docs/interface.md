@@ -207,6 +207,13 @@ poignée de la feuille se manœuvre aux flèches. Et une région annoncée dit c
 qui vient de se passer — « 5 itinéraires proposés, le premier : Boucle nord,
 10 km, note A » — parce que le reste de l'interface change en silence.
 
+À la première ouverture, trois pages disent ce que fait l'app (`Welcome.jsx`),
+puis une **visite guidée** pose des bulles sur l'écran d'Explorer
+(`Tour.jsx`) : le départ, la longueur, les filtres, la personnalisation du
+parcours, la course libre, « Trouver ma boucle » et les onglets. Chaque bulle
+éclaire son élément, le reste s'assombrit ; un élément absent est sauté. Une
+seule fois, et « Passer » l'arrête.
+
 ## Réglages
 
 **Mon compte** s'ouvre sur une carte « Profil local » (avatar, poids), puis

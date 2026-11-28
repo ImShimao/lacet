@@ -13,7 +13,10 @@ const LAUNCH_MS = 15_000
 // L'accueil de première ouverture couvrirait l'app : ces tests regardent ce
 // qui vient après, comme un utilisateur qui l'a déjà vu.
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('lacet.accueil', 'oui'))
+  await page.addInitScript(() => {
+    localStorage.setItem('lacet.accueil', 'oui')
+    localStorage.setItem('lacet.visite', 'oui')
+  })
 })
 
 test('le lancement se joue puis disparaît', async ({ page }) => {

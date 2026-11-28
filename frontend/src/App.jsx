@@ -13,7 +13,8 @@ import RunDetail from './RunDetail.jsx'
 import { sectionTitle } from './accountSections.js'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import Launch from './Launch.jsx'
-import Welcome from './Welcome.jsx'
+import Welcome, { seen as welcomeSeen } from './Welcome.jsx'
+import Tour from './Tour.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
 import { GeoBanner, LibraryNotice, ResumeBanner } from './Banners.jsx'
@@ -59,6 +60,8 @@ export default function App() {
   const [poiPrefs, setPoiPrefs] = useState(stored.pois || { water: false })
 
   const [tab, setTab] = useState('explore')
+  // L'accueil fini (ou déjà vu), la visite guidée peut se poser.
+  const [welcomed, setWelcomed] = useState(welcomeSeen)
   // La page ouverte dans « Mon compte », ou `null` pour son sommaire. Tenue
   // ici parce que c'est l'en-tête de l'app qui porte le retour.
   const [accountPage, setAccountPage] = useState(null)
@@ -1066,7 +1069,10 @@ export default function App() {
         />
       )}
       <Launch />
-      <Welcome />
+      <Welcome onDone={() => setWelcomed(true)} />
+      {/* Les bulles se posent sur l'accueil d'Explorer : ailleurs, ce qu'elles
+          montrent n'est pas à l'écran. */}
+      {welcomed && tab === 'explore' && !result && !running && <Tour />}
     </div>
   )
 }
