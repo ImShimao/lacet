@@ -62,17 +62,16 @@ await page.locator('.launch').waitFor({ state: 'hidden', timeout: 15_000 })
 
 // Les filtres.
 await page.getByRole('button', { name: 'Explorer' }).first().click()
-await page.getByRole('button', { name: /^Filtres/ }).click()
+await page.locator('.sportpill').click()
 await shot('5-filtres')
 await page.getByRole('button', { name: 'Annuler' }).click()
 
-// Les réglages, en lignes : le guidage et la voix.
+// Les réglages : la carte du profil, puis l'onglet Paramètres rangé par familles.
 await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
-await page.getByRole('button', { name: /^Guidage et voix/ }).click()
+await page.getByRole('tab', { name: 'Paramètres' }).waitFor()
 await shot('6-reglages')
 
 // Les fonds de carte.
-await page.getByRole('button', { name: 'Mon compte', exact: true }).first().click()
 await page.getByRole('button', { name: /^Apparence/ }).click()
 await page.getByRole('button', { name: /^Style de carte/ }).click()
 await page.waitForTimeout(8000)
