@@ -14,7 +14,7 @@ import { sectionTitle } from './accountSections.js'
 import MapStyleSheet from './MapStyleSheet.jsx'
 import Launch from './Launch.jsx'
 import Welcome, { seen as welcomeSeen } from './Welcome.jsx'
-import Tour from './Tour.jsx'
+import Tour, { forgetTour } from './Tour.jsx'
 import TabBar from './TabBar.jsx'
 import { MapTools, RunTools, ZoneDraft } from './MapTools.jsx'
 import { GeoBanner, LibraryNotice, ResumeBanner } from './Banners.jsx'
@@ -62,6 +62,9 @@ export default function App() {
   const [tab, setTab] = useState('explore')
   // L'accueil fini (ou déjà vu), la visite guidée peut se poser.
   const [welcomed, setWelcomed] = useState(welcomeSeen)
+  // Rejouée depuis Mon compte : une nouvelle clé remonte la visite, qui se pose
+  // vite — on vient de la demander, pas d'animation de lancement à attendre.
+  const [tourRun, setTourRun] = useState(0)
   // La page ouverte dans « Mon compte », ou `null` pour son sommaire. Tenue
   // ici parce que c'est l'en-tête de l'app qui porte le retour.
   const [accountPage, setAccountPage] = useState(null)
@@ -900,6 +903,17 @@ export default function App() {
                 onZones={onZones}
                 page={accountPage}
                 onPage={setAccountPage}
+                onReplayTour={() => {
+                  forgetTour()
+                  setWelcomed(true)
+                  // Les bulles montrent le générateur : des propositions
+                  // affichées le cachaient, et la visite ne venait pas.
+                  setDetail(false)
+                  found.forget()
+                  setAccountPage(null)
+                  setTab('explore')
+                  setTourRun((n) => n + 1)
+                }}
                 params={params}
                 geo={geo}
                 history={history}
@@ -1072,7 +1086,7 @@ export default function App() {
       <Welcome onDone={() => setWelcomed(true)} />
       {/* Les bulles se posent sur l'accueil d'Explorer : ailleurs, ce qu'elles
           montrent n'est pas à l'écran. */}
-      {welcomed && tab === 'explore' && !result && !running && <Tour />}
+      {welcomed && tab === 'explore' && !result && !running && <Tour key={tourRun} delay={tourRun ? 450 : undefined} />}
     </div>
   )
 }

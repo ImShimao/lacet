@@ -212,7 +212,8 @@ puis une **visite guidée** pose des bulles sur l'écran d'Explorer
 (`Tour.jsx`) : le départ, la longueur, les filtres, la personnalisation du
 parcours, la course libre, « Trouver ma boucle » et les onglets. Chaque bulle
 éclaire son élément, le reste s'assombrit ; un élément absent est sauté. Une
-seule fois, et « Passer » l'arrête.
+seule fois, et « Passer » l'arrête ; **Mon compte › Données › Revoir la visite**
+la rejoue (les propositions affichées sont refermées, pour montrer le générateur).
 
 ## Réglages
 

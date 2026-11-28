@@ -96,6 +96,15 @@ describe('Mon compte', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Paramètres' }))
   })
 
+  it('rejoue la visite guidée depuis l’onglet Données', () => {
+    const onReplayTour = vi.fn()
+    render(<Account page={null} onPage={() => {}} params={DEFAULTS} poiPrefs={{}} onProfile={() => {}} onReplayTour={onReplayTour} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Données' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Revoir la visite/ }))
+    expect(onReplayTour).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('tab', { name: 'Paramètres' }))
+  })
+
   it('ne propose plus Strava', () => {
     render(<Ecran />)
     expect(screen.queryByText('Strava')).toBeNull()

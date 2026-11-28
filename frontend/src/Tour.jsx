@@ -31,6 +31,15 @@ export const STEPS = [
   { target: '.side__tabs', title: 'Tes sorties et tes réglages', text: 'Mes parcours garde tes favoris et tes sorties ; Mon compte, ton profil et tes réglages.' },
 ]
 
+/** Pour « Revoir la visite » (Mon compte) : elle se reposera à son prochain affichage. */
+export function forgetTour() {
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // Sans stockage, elle n'avait de toute façon pas été retenue.
+  }
+}
+
 export function tourSeen() {
   try {
     return localStorage.getItem(KEY) === 'oui'
@@ -61,7 +70,7 @@ export function placeBubble(rect, view, width = 320, height = 170) {
     : { below, left, width: w, bottom: view.h - rect.top + HALO + GAP, arrow }
 }
 
-export default function Tour({ onDone = () => {} }) {
+export default function Tour({ onDone = () => {}, delay = SHOW_AFTER_MS }) {
   const [open, setOpen] = useState(false)
   const [steps, setSteps] = useState([])
   const [i, setI] = useState(0)
@@ -75,7 +84,7 @@ export default function Tour({ onDone = () => {} }) {
       if (!shown.length) return
       setSteps(shown)
       setOpen(true)
-    }, SHOW_AFTER_MS)
+    }, delay)
     return () => clearTimeout(timer)
   }, [])
 

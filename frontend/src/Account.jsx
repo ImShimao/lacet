@@ -92,7 +92,7 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
  * répétait. Les sorties et les kilomètres cumulés n'y sont plus — ils se
  * lisent dans « Mes parcours », avec leur graphique.
  */
-function Summary({ onPage, params, poiPrefs, onProfile }) {
+function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
   const sport = SPORTS.find((s) => s.key === params.sport)
   const [tab, setTab] = useState(lastTab)
   // Partagé entre l'en-tête et l'onglet Profil : la photo changée dessous
@@ -102,7 +102,7 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
     lastTab = key
     setTab(key)
   }
-  const rows = (group) => (
+  const rows = (group, extra = null) => (
     <div className="menu">
       {SECTIONS.filter((s) => s.group === group).map((s) => (
         <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
@@ -116,6 +116,7 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
           <Icon name="chevronRight" size={17} className="menu__chev" />
         </button>
       ))}
+      {extra}
     </div>
   )
   return (
@@ -155,7 +156,22 @@ function Summary({ onPage, params, poiPrefs, onProfile }) {
             {rows('Données')}
             <section className="acct__group" aria-label={t('Infos')}>
               <h3 className="acct__label">{t('Infos')}</h3>
-              {rows('Infos')}
+              {rows(
+                'Infos',
+                // La visite guidée se rejoue sur Explorer, où sont ses bulles.
+                onReplayTour && (
+                  <button className="menu__row" onClick={onReplayTour}>
+                    <span className="menu__icon">
+                      <Icon name="play" size={18} />
+                    </span>
+                    <span className="menu__text">
+                      <b>{t('Revoir la visite')}</b>
+                      <em>{t('Les bulles sur l\'écran Explorer')}</em>
+                    </span>
+                    <Icon name="chevronRight" size={17} className="menu__chev" />
+                  </button>
+                ),
+              )}
             </section>
           </>
         )}

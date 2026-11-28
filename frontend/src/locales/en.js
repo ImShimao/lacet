@@ -170,6 +170,8 @@ export default {
   "Mes parcours garde tes favoris et tes sorties ; Mon compte, ton profil et tes réglages.": "My routes keeps your favorites and runs; My account, your profile and settings.",
   "Suivant": "Next",
   "C'est parti": "Let's go",
+  "Revoir la visite": "Replay the tour",
+  "Les bulles sur l'écran Explorer": "The bubbles on the Explore screen",
   "Les touches sous la règle de distance, six au plus.": "The keys under the distance ruler, six at most.",
   "Distances": "Distances",
   "Durées": "Durations",
