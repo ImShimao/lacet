@@ -1,0 +1,64 @@
+{
+  "name": "Lacet",
+  "identifier": "fr.lacet.source",
+  "subtitle": "Les compilations de Lacet",
+  "iconURL": "https://raw.githubusercontent.com/ImShimao/lacet/altstore/icon-192.png?v=cc8fe3ed",
+  "tintColor": "2563EB",
+  "apps": [
+    {
+      "name": "Lacet",
+      "bundleIdentifier": "fr.lacet.app",
+      "developerName": "Shimao",
+      "subtitle": "Des boucles de course depuis ta porte",
+      "localizedDescription": "Des boucles de course et de vélo depuis ta porte, qui évitent les routes rapides sans trottoir. Jusqu'à vingt propositions notées A, B ou C, guidage vocal tour par tour, écran de verrouillage, recalcul si tu t'en écartes, et tout qui se calcule sur le téléphone — sans compte ni serveur.",
+      "iconURL": "https://raw.githubusercontent.com/ImShimao/lacet/altstore/icon-192.png?v=cc8fe3ed",
+      "tintColor": "2563EB",
+      "screenshotURLs": [],
+      "permissions": [
+        {
+          "type": "background-audio",
+          "usageDescription": "Le guidage vocal continue pendant la sortie, écran éteint."
+        },
+        {
+          "type": "location",
+          "usageDescription": "Pendant une sortie, Lacet continue de suivre ta position écran verrouillé, pour la distance et le guidage vocal."
+        },
+        {
+          "type": "motion",
+          "usageDescription": "Lacet mesure le dénivelé de tes sorties avec le baromètre du téléphone, bien plus précis que l'altitude du GPS."
+        }
+      ],
+      "version": "1.1.23",
+      "buildVersion": "134",
+      "versionDate": "2026-11-28T10:40:49.275820+00:00",
+      "versionDescription": "• Chaque zone à éviter a son bouton « Voir » qui la montre sur la carte, et se supprime de là\n• Toucher un signalement dans Zones et signalements le montre sur la carte, avec le cercle évité, et permet de le retirer de là\n• Le script des captures ouvre les filtres par la pastille et photographie le sommaire de Mon compte",
+      "downloadURL": "https://github.com/ImShimao/lacet/releases/download/v1.1.23/Lacet.ipa",
+      "size": 60757200,
+      "versions": [
+        {
+          "version": "1.1.23",
+          "buildVersion": "134",
+          "date": "2026-11-28T10:40:49.275820+00:00",
+          "localizedDescription": "• Chaque zone à éviter a son bouton « Voir » qui la montre sur la carte, et se supprime de là\n• Toucher un signalement dans Zones et signalements le montre sur la carte, avec le cercle évité, et permet de le retirer de là\n• Le script des captures ouvre les filtres par la pastille et photographie le sommaire de Mon compte",
+          "downloadURL": "https://github.com/ImShimao/lacet/releases/download/v1.1.23/Lacet.ipa",
+          "size": 60757200,
+          "permissions": [
+            {
+              "type": "background-audio",
+              "usageDescription": "Le guidage vocal continue pendant la sortie, écran éteint."
+            },
+            {
+              "type": "location",
+              "usageDescription": "Pendant une sortie, Lacet continue de suivre ta position écran verrouillé, pour la distance et le guidage vocal."
+            },
+            {
+              "type": "motion",
+              "usageDescription": "Lacet mesure le dénivelé de tes sorties avec le baromètre du téléphone, bien plus précis que l'altitude du GPS."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "news": []
+}
