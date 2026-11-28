@@ -361,12 +361,6 @@
   background: var(--accent-soft);
 }
 
-.route-meta {
-  font-size: calc(12px * var(--text-scale));
-  font-weight: 600;
-  color: var(--text-3);
-}
-
 /* ── barre d'action collée au bas du panneau ──────────────────────────── */
 
 .actionbar {
@@ -456,17 +450,6 @@
   flex-direction: column;
   gap: 2px;
   padding: 7px 0 5px;
-}
-.btn__cap {
-  font-size: calc(12px * var(--text-scale));
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: 0;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.btn--on .btn__cap {
-  color: var(--accent-text);
 }
 
 /* Petit écran (SE) : quatre boutons et « Démarrer » sur 296 px. Les boutons

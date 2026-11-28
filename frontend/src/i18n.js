@@ -74,9 +74,6 @@ export const useLang = () => useSyncExternalStore(onLang, lang)
 /** La locale des dates et des nombres (`toLocaleDateString`). */
 export const locale = () => (lang() === 'en' ? 'en-GB' : 'fr-FR')
 
-/** Un nombre à virgule comme on l'écrit : « 5,2 » en français, « 5.2 » en anglais. */
-export const num = (value) => (lang() === 'en' ? String(value) : String(value).replace('.', ','))
-
 /**
  * Traduit une clé (le texte français). Une variable absente de `vars` reste
  * telle quelle, avec ses accolades : on la voit, donc on la corrige.

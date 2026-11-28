@@ -153,23 +153,6 @@
   color: var(--text);
 }
 
-.windnote {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 12px;
-  border-radius: var(--r);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  font-size: calc(12px * var(--text-scale));
-  line-height: 1.4;
-  color: var(--text-2);
-}
-.windnote .icon {
-  flex: none;
-  color: var(--info);
-}
-
 /* Retour, météo, vent : des pastilles sur une ligne, pas trois cadres. */
 .facts {
   display: flex;

@@ -206,10 +206,10 @@
   background: var(--glass);
   backdrop-filter: blur(12px);
 }
-/* Sans leur mot dessous, les gestes secondaires sont des ronds, à côté de la
-   gélule « Démarrer » : trois formes nettes au lieu de deux carrés et un
-   rectangle aux coins presque pareils. */
-.actionbar .btn--icon:not(:has(.btn__cap)) {
+/* Les gestes secondaires sont des ronds, à côté de la gélule « Démarrer » :
+   trois formes nettes au lieu de deux carrés et un rectangle aux coins
+   presque pareils. */
+.actionbar .btn--icon {
   height: 48px;
   border-radius: 50%;
 }

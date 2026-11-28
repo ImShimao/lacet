@@ -525,8 +525,5 @@ export function turnOf(angle, road = null) {
   return { turn, text: phrase(turn, road) }
 }
 
-/** La phrase d'un virage déjà nommé : « Tourne à droite sur rue Pasteur ». */
-export const turnPhrase = (turn, road = null) => phrase(turn, road)
-
 /** Cap de départ et cap d'arrivée d'une géométrie, lissés sur vingt mètres. */
 export const headings = (coords) => [bearingFromStart(coords), bearingToEnd(coords)]

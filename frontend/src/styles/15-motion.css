@@ -19,7 +19,6 @@
 .tab,
 .menu__row,
 .field__toggle,
-.acct__card,
 .runctl__side,
 .runctl__main,
 .sportpill {
@@ -31,7 +30,6 @@
 .tab:active,
 .menu__row:active,
 .field__toggle:active,
-.acct__card:active,
 .runctl__side:active,
 .sportpill:active {
   transform: scale(0.97);
@@ -159,7 +157,6 @@
   animation: bounce-in 0.4s var(--ease);
 }
 /* Mon compte : la carte du profil, puis chaque famille, l'une après l'autre. */
-.acct:not(.acct--page) > .acct__card,
 .acct:not(.acct--page) > .acct__group {
   animation: rise 0.34s var(--ease) backwards;
 }
@@ -243,7 +240,6 @@
   .tab:active,
   .menu__row:active,
   .field__toggle:active,
-  .acct__card:active,
   .runctl__side:active,
   .runctl__main:active,
   .sportpill:active {

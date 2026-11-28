@@ -1,11 +1,6 @@
 /* Les points d'eau : une ligne dans le détail, un
    repère rond sur la carte, une ligne discrète pendant la sortie. */
 
-.check__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
 
 .stops {
   display: grid;
