@@ -344,7 +344,7 @@ function NumberRow({ icon, label, unit, value, min, max, onChange }) {
               type="text"
               inputMode="numeric"
               enterKeyHint="done"
-              aria-label={t('{label} en {v2}', { label, v2: { kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? t('centimètres') })}
+              aria-label={t('{label} en {v2}', { label, v2: t({ kg: 'kilogrammes', km: 'kilomètres' }[unit] ?? 'centimètres') })}
               value={draft ?? value}
               onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
               onFocus={(e) => e.target.select()}
