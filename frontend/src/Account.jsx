@@ -20,7 +20,7 @@
  * qui porte le retour au sommaire, et l'onglet le referme quand on y revient.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
 import About from './About.jsx'
 import { AVOIDABLE, COUNTS, DIRECTIONS, MAX_LAPS, MOMENTS, OPTIONAL_FILTERS, SAFETY, SPORTS, directionOf } from './FiltersSheet.jsx'
@@ -43,6 +43,9 @@ import { ACCENTS, TEXT_SIZES, THEMES, getAppearance, setAppearance, useAppearanc
 import { SECTIONS, SETTINGS_GROUPS } from './accountSections.js'
 
 import { t, locale, dec, lang, useLang, setLang, LANGUAGES } from './i18n'
+
+// Chargée au toucher : MapLibre n'a pas à peser sur l'ouverture de Mon compte.
+const ReportSheet = lazy(() => import('./ReportSheet.jsx'))
 export { SECTIONS, sectionTitle } from './accountSections.js'
 
 export default function Account({ page = null, onPage = () => {}, ...props }) {
@@ -296,7 +299,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
       return (
         <>
           <MyZones zones={zones} onZones={onZones} />
-          <MyReports />
+          <MyReports mapStyle={mapStyle} />
         </>
       )
     case 'appearance':
@@ -867,8 +870,10 @@ const dayOf = (at) => new Date(at).toLocaleDateString(locale(), { day: 'numeric'
  * poche, et la boucle du dimanche se met à faire un crochet inexplicable —
  * cette liste est la seule façon de comprendre pourquoi, et d'y remédier.
  */
-function MyReports() {
+function MyReports({ mapStyle }) {
   const [items, setItems] = useState(() => activeReports())
+  // Le signalement ouvert sur la carte : on voit où il est avant de le retirer.
+  const [shown, setShown] = useState(null)
   return (
     <PrefsCard
       title={t('Mes signalements')}
@@ -880,16 +885,29 @@ function MyReports() {
     >
       {items.length ? (
         items.map((r) => (
-          <InfoRow
+          <LinkRow
             key={r.id}
             icon="warning"
             label={kindLabel(r.kind)}
-            sub={`${new Date(r.at).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })} · ${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}`}
-            trailing={<button className="prow__act" onClick={() => setItems(removeReport(r.id))}>{t('Retirer')}</button>}
+            sub={t('{day} · voir sur la carte', { day: dayOf(r.at) })}
+            onClick={() => setShown(r)}
           />
         ))
       ) : (
         <InfoRow icon="warning" sub={t('Rien de signalé. En course, « Signaler un problème ici » écarte un passage fermé ou dangereux pour six mois.')} />
+      )}
+      {shown && (
+        <Suspense fallback={null}>
+          <ReportSheet
+            report={shown}
+            mapStyle={mapStyle}
+            onClose={() => setShown(null)}
+            onRemove={() => {
+              setItems(removeReport(shown.id))
+              setShown(null)
+            }}
+          />
+        </Suspense>
       )}
     </PrefsCard>
   )

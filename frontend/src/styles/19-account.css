@@ -401,3 +401,17 @@
   flex: 1;
   accent-color: var(--accent);
 }
+
+/* Un signalement sur sa carte : un point rouge cerclé de blanc, lisible sur
+   tous les fonds, au centre du cercle que le routage évite. */
+.reportsheet__map {
+  height: min(42vh, 320px);
+}
+.reportpin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--risk);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
