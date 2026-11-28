@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -29,6 +29,38 @@ describe('le profil', () => {
     expect(onProfile).toHaveBeenCalledWith({ height_cm: 171 })
     // Sans photo, rien à retirer.
     expect(screen.queryByRole('button', { name: /^Retirer la photo/ })).toBeNull()
+  })
+
+  it('un doigt levé au milieu d\'un pincement ne fait pas tomber l\'app', async () => {
+    // Plantage vu sur l'iPhone (1.1.21) : React jouait la mise à jour du zoom
+    // après le `pointerup`, qui avait déjà effacé le geste en cours.
+    vi.stubGlobal('Image', class {
+      naturalWidth = 520
+      naturalHeight = 390
+      set src(_) { queueMicrotask(() => this.onload()) }
+    })
+    const { PhotoCropper } = await import('./Profile.jsx')
+    render(<PhotoCropper src="blob:photo" onCancel={() => {}} onDone={() => {}} />)
+    await screen.findByRole('button', { name: /Valider/ })
+    await act(async () => {})
+    const area = document.querySelector('.crop__view')
+    const pointer = (type, id, x) => {
+      const event = createEvent[type](area)
+      Object.assign(event, { pointerId: id, clientX: x, clientY: 100 })
+      fireEvent(area, event)
+    }
+    pointer('pointerDown', 1, 100)
+    pointer('pointerDown', 2, 140)
+    // Le premier mouvement à deux doigts fixe l'écart de départ.
+    pointer('pointerMove', 2, 140)
+    // Le mouvement et la levée dans le même lot : la mise à jour du zoom ne
+    // se joue qu'après la levée, comme sous le doigt.
+    act(() => {
+      pointer('pointerMove', 2, 200)
+      pointer('pointerUp', 2, 200)
+    })
+    expect(screen.getByRole('slider', { name: 'Zoom' }).value).not.toBe('1')
+    vi.unstubAllGlobals()
   })
 
   it('garde la photo sous tout le rond', () => {

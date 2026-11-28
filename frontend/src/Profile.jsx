@@ -187,7 +187,11 @@ export function PhotoCropper({ src, onCancel, onDone }) {
       const dist = Math.hypot(a.x - b.x, a.y - b.y)
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
       if (!gesture.current) gesture.current = { dist, zoom: view.zoom }
-      setView((cur) => zoomTo(cur, (gesture.current.zoom * dist) / gesture.current.dist, mid.x, mid.y))
+      // Le geste est lu maintenant, pas dans la mise à jour : React la joue plus
+      // tard, et un doigt levé entre-temps l'avait remis à `null` — l'app
+      // tombait sur « null is not an object (gesture.current.zoom) ».
+      const zoom = (gesture.current.zoom * dist) / gesture.current.dist
+      setView((cur) => zoomTo(cur, zoom, mid.x, mid.y))
     }
   }
   const up = (e) => {
