@@ -28,6 +28,8 @@ import { ActionRow, InfoRow, LinkRow, PickRow, PrefsCard, ToggleRow } from './Pr
 import { MAX_FAVORITES, MAX_HISTORY, MAX_PLACES, dropTracks, exportAll, forgetTrim, importAll, load, save, usage } from './storage'
 import { activeReports, kindLabel, removeReport } from './reports'
 import { listZones, removeZone, updateZone } from './zones'
+import { circlePolygon, zoneShape } from './circle'
+import { BLOCK_RADIUS_M } from './engine/blocked'
 import { isNative, saveTextFile } from './platform'
 import * as offline from './offlineMaps'
 import { KINDS, NEAR_M } from './pois'
@@ -45,7 +47,7 @@ import { SECTIONS, SETTINGS_GROUPS } from './accountSections.js'
 import { t, locale, dec, lang, useLang, setLang, LANGUAGES } from './i18n'
 
 // Chargée au toucher : MapLibre n'a pas à peser sur l'ouverture de Mon compte.
-const ReportSheet = lazy(() => import('./ReportSheet.jsx'))
+const AreaSheet = lazy(() => import('./AreaSheet.jsx'))
 export { SECTIONS, sectionTitle } from './accountSections.js'
 
 export default function Account({ page = null, onPage = () => {}, ...props }) {
@@ -298,7 +300,7 @@ function SectionPage({ page, mapStyle, onStyles = null, params, poiPrefs, onPoiP
     case 'zones':
       return (
         <>
-          <MyZones zones={zones} onZones={onZones} />
+          <MyZones zones={zones} onZones={onZones} mapStyle={mapStyle} />
           <MyReports mapStyle={mapStyle} />
         </>
       )
@@ -898,8 +900,13 @@ function MyReports({ mapStyle }) {
       )}
       {shown && (
         <Suspense fallback={null}>
-          <ReportSheet
-            report={shown}
+          <AreaSheet
+            title={kindLabel(shown.kind)}
+            sub={t('Signalé le {day}', { day: new Date(shown.at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' }) })}
+            geometry={circlePolygon([shown.lon, shown.lat], BLOCK_RADIUS_M)}
+            point={[shown.lon, shown.lat]}
+            note={t('Le cercle rouge est évité par les boucles et les recalculs.')}
+            removeLabel={t('Retirer ce signalement')}
             mapStyle={mapStyle}
             onClose={() => setShown(null)}
             onRemove={() => {
@@ -921,7 +928,8 @@ function MyReports({ mapStyle }) {
  * retrouver, on la désactive le temps qu'elle redevienne praticable — la chasse
  * ferme en février —, et on la supprime quand elle n'a plus lieu d'être.
  */
-function MyZones({ zones, onZones }) {
+function MyZones({ zones, onZones, mapStyle }) {
+  const [shown, setShown] = useState(null)
   return (
     <PrefsCard title={t('Mes zones à éviter')}>
       {zones.length ? (
@@ -947,12 +955,29 @@ function MyZones({ zones, onZones }) {
               >
                 <i />
               </button>
-              <button className="prow__act prow__act--danger" onClick={() => onZones(removeZone(z.id))}>{t('Supprimer')}</button>
+              {/* « Supprimer » est dans la carte : on retire ce qu'on a vu, pas un nom. */}
+              <button className="prow__act" aria-label={t('Voir {name} sur la carte', { name: z.name })} onClick={() => setShown(z)}>{t('Voir')}</button>
             </div>
           </div>
         ))
       ) : (
         <InfoRow icon="zone" sub={t('Aucune zone. Sur la carte, le cercle hachuré en pose une : boucles et recalculs passent autour.')} />
+      )}
+      {shown && (
+        <Suspense fallback={null}>
+          <AreaSheet
+            title={shown.name}
+            geometry={zoneShape(shown)}
+            note={t('Boucles et recalculs passent autour de la zone rouge.')}
+            removeLabel={t('Supprimer cette zone')}
+            mapStyle={mapStyle}
+            onClose={() => setShown(null)}
+            onRemove={() => {
+              onZones(removeZone(shown.id))
+              setShown(null)
+            }}
+          />
+        </Suspense>
       )}
     </PrefsCard>
   )

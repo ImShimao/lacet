@@ -13,7 +13,7 @@ import { useAppearance } from './appearance'
 import { t, dec } from './i18n'
 import { routeName } from './stepText'
 import { ringOf } from './zones'
-import { circlePolygon } from './circle'
+import { circlePolygon, zoneShape } from './circle'
 // Les cartes gardées hors ligne : `offlineRequest` détourne
 // vers ce protocole ce qui est sur l'appareil. Voir `offlineMaps.js`.
 maplibregl.addProtocol(OFFLINE_PROTOCOL, loadOffline)
@@ -1422,7 +1422,7 @@ function drawZones(m, zones, draft) {
   const features = zones.map((z) => ({
     type: 'Feature',
     properties: { on: z.on !== false },
-    geometry: z.polygon ? ring(z.polygon) : circlePolygon([z.lon, z.lat], z.radius_m),
+    geometry: zoneShape(z),
   }))
   if (draft?.shape === 'polygon') {
     // Le contour en cours : ses coins, le trait qui les relie, puis la surface

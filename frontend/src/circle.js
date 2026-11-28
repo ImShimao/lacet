@@ -9,3 +9,8 @@ export function circlePolygon([lon, lat], radiusM, steps = 48) {
   }
   return { type: 'Polygon', coordinates: [ring] }
 }
+
+/** La forme d'une zone à éviter : son tracé à main levée, sinon son cercle. */
+export function zoneShape(z) {
+  return z.polygon ? { type: 'Polygon', coordinates: [[...z.polygon, z.polygon[0]]] } : circlePolygon([z.lon, z.lat], z.radius_m)
+}
