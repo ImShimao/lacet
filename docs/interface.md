@@ -217,12 +217,13 @@ la rejoue (les propositions affichées sont refermées, pour montrer le généra
 
 ## Réglages
 
-**Mon compte** s'ouvre sur une carte « Profil local » (avatar, poids), puis
-trois onglets : **Paramètres**, rangé sous quatre intitulés — Recherche
-(Itinéraire, Accueil et filtres), Course (Voix, Pendant la sortie, Séance
-fractionnée), Sécurité (Contact d'urgence, Zones et signalements), Affichage
-(Apparence) —, **Profil** (poids et objectifs, réglables sur place) et
-**Données** (Stockage, Sauvegarde, À propos). L'onglet choisi est gardé pendant
+**Mon compte** s'ouvre sur la carte du profil (photo, pseudo — « Ton profil »
+sans pseudo —, taille et poids) ; la toucher ouvre la page Profil (photo
+recadrée, pseudo, taille, poids, objectifs). Dessous, deux onglets :
+**Paramètres**, rangé sous quatre intitulés — Recherche (Itinéraire, Accueil et
+filtres), Course (Voix, Pendant la sortie, Séance fractionnée), Sécurité
+(Contact d'urgence, Zones et signalements), Affichage (Apparence) —, et
+**Données** (Stockage, Sauvegarde, Revoir la visite, À propos). L'onglet choisi est gardé pendant
 la session. Toutes les pages sont faites des mêmes cartes de `Prefs.jsx` —
 lignes à menu, interrupteurs, lignes d'information et lignes d'action, en
 rouge quand elles effacent — et les réglages à peu de choix s'ouvrent en menu

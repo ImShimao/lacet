@@ -40,9 +40,8 @@ export function Avatar({ photo, icon = 'user', size = 24 }) {
 }
 
 /** Qui l'on est, son corps, ses objectifs : trois cartes de réglages. */
-export function ProfileSettings({ params, onProfile, me: shared = null, setMe: setShared = null }) {
-  const own = useIdentity()
-  const [me, setMe] = shared ? [shared, setShared] : own
+export function ProfileSettings({ params, onProfile }) {
+  const [me, setMe] = useIdentity()
   const [picked, setPicked] = useState(null)
 
   return (

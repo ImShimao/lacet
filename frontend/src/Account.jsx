@@ -95,9 +95,8 @@ export default function Account({ page = null, onPage = () => {}, ...props }) {
 function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
   const sport = SPORTS.find((s) => s.key === params.sport)
   const [tab, setTab] = useState(lastTab)
-  // Partagé entre l'en-tête et l'onglet Profil : la photo changée dessous
-  // apparaît aussitôt dans l'en-tête.
-  const [me, setMe] = useIdentity()
+  // Relu à chaque retour de la page Profil : le sommaire est recréé.
+  const [me] = useIdentity()
   const pick = (key) => {
     lastTab = key
     setTab(key)
@@ -123,18 +122,20 @@ function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
   return (
     <>
       {/* Qui l'on est, en une ligne : l'avatar et l'état du profil. Le toucher
-          mène à l'onglet Profil, juste dessous. */}
-      <button className="acct__who" onClick={() => pick('profile')}>
+          ouvre la page Profil ; au retour, la carte montre ce qu'on y a mis.
+          Un onglet Profil la répétait juste dessous. */}
+      <button className="acct__who" onClick={() => onPage('profile')}>
         <Avatar photo={me.photo} icon={sport?.icon ?? 'user'} />
         <span className="menu__text">
-          <b>{me.name.trim() || t('Profil local')}</b>
+          <b>{me.name.trim() || t('Ton profil')}</b>
           <em>{summaryOf('profile', { params, poiPrefs })}</em>
         </span>
+        <Icon name="chevronRight" size={17} className="menu__chev" />
       </button>
 
-      {/* Trois onglets plutôt qu'une longue liste : ce qu'on règle, qui l'on
-          est, ce que l'app garde. Le choix tient le temps de la session — on
-          revient d'une page sur l'onglet qu'on avait quitté. */}
+      {/* Deux onglets plutôt qu'une longue liste : ce qu'on règle, ce que
+          l'app garde. Le choix tient le temps de la session — on revient
+          d'une page sur l'onglet qu'on avait quitté. */}
       <div className="seg acct__tabs" role="tablist">
         {TABS.map((k) => (
           <button key={k.key} role="tab" aria-selected={tab === k.key} aria-pressed={tab === k.key} onClick={() => pick(k.key)}>
@@ -151,7 +152,6 @@ function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
               {rows(group)}
             </section>
           ))}
-        {tab === 'profile' && <ProfileSettings params={params} onProfile={onProfile} me={me} setMe={setMe} />}
         {tab === 'data' && (
           <>
             {rows('Données')}
@@ -185,7 +185,6 @@ function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
 
 const TABS = [
   { key: 'settings', label: 'Paramètres' },
-  { key: 'profile', label: 'Profil' },
   { key: 'data', label: 'Données' },
 ]
 // L'onglet ouvert, gardé le temps de la session : le sommaire est recréé à

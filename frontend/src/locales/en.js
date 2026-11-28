@@ -23,7 +23,7 @@ export default {
   "Effort": "Effort",
   "Continuer": "Continue",
   "Commencer": "Get started",
-  "Profil local": "Local profile",
+  "Ton profil": "Your profile",
   "Aucun compte. Favoris, sorties et réglages ne quittent pas cet appareil.": "No account. Favorites, runs and settings never leave this device.",
   "Poids {v1} kg{v2}": "Weight {v1} kg{v2}",
   " · {weekly_km} km par semaine": " · {weekly_km} km per week",
