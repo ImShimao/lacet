@@ -102,8 +102,10 @@ function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
     lastTab = key
     setTab(key)
   }
-  const rows = (group, extra = null) => (
+  // `first` : une ligne qui n'est pas une page, posée en tête du groupe.
+  const rows = (group, first = null) => (
     <div className="menu">
+      {first}
       {SECTIONS.filter((s) => s.group === group).map((s) => (
         <button key={s.key} className="menu__row" onClick={() => onPage(s.key)}>
           <span className="menu__icon">
@@ -116,7 +118,6 @@ function Summary({ onPage, params, poiPrefs, onProfile, onReplayTour = null }) {
           <Icon name="chevronRight" size={17} className="menu__chev" />
         </button>
       ))}
-      {extra}
     </div>
   )
   return (
