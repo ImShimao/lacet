@@ -38,7 +38,7 @@ sécurité, puis te guide à la voix, écran verrouillé.
 
 | En course | Les filtres | Les réglages | Les fonds de carte |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/images/2-course.png" width="200" alt="Pendant la sortie : la consigne en bandeau bleu, la carte inclinée, le chrono, la distance restante et le bouton pause"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, durée ou distance, 10 km souple à ±10 %, allure 6:30/km toujours visible"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte › Guidage et voix : une ligne par réglage, sa valeur et un menu, ou un interrupteur"> | <img src="docs/images/7-fonds.png" width="200" alt="La feuille Style de carte : un aperçu en grand et huit vignettes rendues sur l'endroit affiché"> |
+| <img src="docs/images/2-course.png" width="200" alt="Pendant la sortie : la consigne en bandeau bleu, la carte inclinée, le chrono, la distance restante et le bouton pause"> | <img src="docs/images/5-filtres.png" width="200" alt="Les filtres : course ou vélo, terrain route, mixte ou sentier, voies sans voitures d'abord, relief et distance"> | <img src="docs/images/6-reglages.png" width="200" alt="Mon compte : la carte du profil, les onglets Paramètres et Données, les réglages rangés en Recherche, Course, Sécurité et Affichage"> | <img src="docs/images/7-fonds.png" width="200" alt="La feuille Style de carte : un aperçu en grand et huit vignettes rendues sur l'endroit affiché"> |
 
 </div>
 
