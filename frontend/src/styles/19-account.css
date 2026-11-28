@@ -292,7 +292,7 @@
 }
 /* La carte d'identité du profil : la photo en grand, son pastillon pour la
    changer, le pseudo centré dessous — une carte de visite, pas des lignes. */
-.me {
+.ident {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -302,27 +302,27 @@
   border-radius: 20px;
   background: var(--surface-2);
 }
-.me__photo {
+.ident__photo {
   position: relative;
   cursor: pointer;
   border-radius: 50%;
   transition: transform 0.12s ease;
 }
-.me__photo:active {
+.ident__photo:active {
   transform: scale(0.96);
 }
-.me__photo .acct__avatar {
+.ident__photo .acct__avatar {
   width: 96px;
   height: 96px;
   box-shadow: 0 0 0 5px var(--accent-soft);
 }
-.me__photo:focus-within .acct__avatar {
+.ident__photo:focus-within .acct__avatar {
   outline: 2px solid var(--accent);
   outline-offset: 7px;
 }
 /* Le pastillon posé sur le rond, détouré de la couleur de la carte : il se lit
    comme un bouton sans ombre. */
-.me__badge {
+.ident__badge {
   position: absolute;
   right: -2px;
   bottom: -2px;
@@ -337,7 +337,7 @@
 }
 /* Le pseudo s'écrit à sa place, en titre : un filet sous le champ dit qu'on
    peut le toucher, et s'allume quand on écrit. */
-.me__name {
+.ident__name {
   width: 100%;
   max-width: 260px;
   padding: 6px 4px;
@@ -351,24 +351,24 @@
   letter-spacing: -0.02em;
   text-align: center;
 }
-.me__name::placeholder {
+.ident__name::placeholder {
   color: var(--text-3);
   font-weight: 600;
 }
-.me__name:focus {
+.ident__name:focus {
   outline: none;
   border-bottom-color: var(--accent);
 }
-.me__remove,
-.me__hint {
+.ident__remove,
+.ident__hint {
   font-size: calc(13px * var(--text-scale));
   font-weight: 600;
 }
-.me__remove {
+.ident__remove {
   padding: 6px 10px;
   color: var(--risk);
 }
-.me__hint {
+.ident__hint {
   cursor: pointer;
   padding: 6px 0;
   color: var(--text-3);

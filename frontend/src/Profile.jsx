@@ -51,10 +51,10 @@ export function ProfileSettings({ params, onProfile, me: shared = null, setMe: s
           pour la changer, et le pseudo dessous. Trois lignes de réglage —
           avatar minuscule, « Changer de photo », « Retirer la photo » — se
           lisaient comme une liste d'options, pas comme un profil. */}
-      <section className="me" aria-label={t('Identité')}>
-        <label className="me__photo" aria-label={me.photo ? t('Changer de photo') : t('Ajouter une photo')}>
+      <section className="ident" aria-label={t('Identité')}>
+        <label className="ident__photo" aria-label={me.photo ? t('Changer de photo') : t('Ajouter une photo')}>
           <Avatar photo={me.photo} size={34} />
-          <span className="me__badge" aria-hidden="true">
+          <span className="ident__badge" aria-hidden="true">
             <Icon name={me.photo ? 'refresh' : 'plus'} size={15} />
           </span>
           <input
@@ -71,7 +71,7 @@ export function ProfileSettings({ params, onProfile, me: shared = null, setMe: s
           />
         </label>
         <input
-          className="me__name"
+          className="ident__name"
           type="text"
           autoComplete="nickname"
           enterKeyHint="done"
@@ -83,11 +83,11 @@ export function ProfileSettings({ params, onProfile, me: shared = null, setMe: s
           onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
         />
         {me.photo ? (
-          <button className="me__remove" onClick={() => setMe({ photo: null })}>
+          <button className="ident__remove" onClick={() => setMe({ photo: null })}>
             {t('Retirer la photo')}
           </button>
         ) : (
-          <label htmlFor="me-photo" className="me__hint">{t('Ajouter une photo')}</label>
+          <label htmlFor="me-photo" className="ident__hint">{t('Ajouter une photo')}</label>
         )}
       </section>
 
